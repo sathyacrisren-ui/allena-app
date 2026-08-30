@@ -2411,22 +2411,31 @@ function todayPoints(){
   const dd=(S.daily&&S.daily.days||{})[k]||{};if(dd.bw!=null)n+=1;
   ((S.acl&&S.acl.checks)||[]).forEach(c=>{if(c.date===k)['pain','swell','stiff','conf'].forEach(f=>{if(c[f]!=null)n+=1})});
   return n}
-function dayStreak(){
+function dayStreakInfo(){
   // days in a row with anything logged. Yesterday counts as unbroken until
-  // tonight, so nobody wakes up to a lost streak.
+  // tonight, so nobody wakes up to a lost streak. One QUIET day per calendar
+  // week can bridge a single gap between logged days — never two in a row,
+  // never at the tail, never banked. It is an anti-anxiety valve, not a loophole.
   const has={};
   (S.history||[]).forEach(h=>{has[(h.date||'').slice(0,10)]=1});
   (S.runs||[]).forEach(r=>{has[r.date]=1});
   Object.keys((S.gar&&S.gar.days)||{}).forEach(k=>{if(S.gar.days[k].am!=null)has[k]=1});
   Object.keys((S.daily&&S.daily.days)||{}).forEach(k=>{if(S.daily.days[k].bw!=null)has[k]=1});
   ((S.acl&&S.acl.checks)||[]).forEach(c=>{has[c.date]=1});
-  let n=0,d=new Date();
+  let n=0,d=new Date(),quiet=[],pend=null;const usedWk={};
   for(let i=0;i<400;i++){
     const k=dayKey(d);
-    if(has[k])n++;
-    else if(i>0)break;                    // today not yet logged is not a break
+    if(has[k]){
+      if(pend){n++;quiet.push(pend);pend=null}   // the gap it bridged is real
+      n++}
+    else if(i>0){
+      const w=questWeekKey(k);
+      if(pend||usedWk[w])break;                  // two in a row, or week already used
+      usedWk[w]=1;pend=k}                        // provisional — only counts if a logged day precedes it
     d.setDate(d.getDate()-1)}
-  return n}
+  return{n:n,quiet:quiet,
+    quietThisWeek:quiet.filter(k=>questWeekKey(k)===questWeekKey()).length}}
+function dayStreak(){return dayStreakInfo().n}
 
 
 /* what Allena noticed — a different real observation each day */
@@ -3912,6 +3921,7 @@ function viewPoints(){
      '<div class="an-bar" style="height:5px;width:'+Math.min(100,Math.round((d.total-t[0])/(nx[0]-t[0])*100))+'%;background:'+t[2]+'"></div></div>'+
      '<p class="mono" style="color:var(--faint);font-size:10.5px;margin-top:7px">'+(nx[0]-d.total).toLocaleString()+' more to '+esc(nx[1])+'</p>':
      '<p class="mono" style="color:var(--faint);font-size:10.5px;margin-top:10px">Top tier. There is nothing above this.</p>')+
+   '<button data-a="treeShare" class="btn mt2" style="color:var(--amber);border-color:rgba(217,119,87,.42)">Share the tree</button>'+
    '</div>';
   h+='<p class="eyebrow mt2">Why yours looks like that</p>'+
     '<div class="card mt" style="padding:6px 16px">'+
@@ -3920,6 +3930,7 @@ function viewPoints(){
      ['Leaves',Math.min(220,20+Math.round(tr.pts/9))+' from '+tr.pts.toLocaleString()+' data points'],
      ['Blossom',tr.rare+' rare find'+(tr.rare===1?'':'s')],
      ['Roots',tr.weeks+' week'+(tr.weeks===1?'':'s')+' of consistency'],
+     ['Season',treeSeason().name],
      tr.runs?['Blue sweeps',tr.km+' km run']:null].filter(Boolean)
      .map((x,i)=>'<div style="display:flex;justify-content:space-between;align-items:baseline;padding:10px 0'+(i?';border-top:1px solid var(--line)':'')+'">'+
        '<span style="font-size:12.5px;color:var(--dim)">'+esc(x[0])+'</span>'+
@@ -5139,10 +5150,55 @@ function treeStage(t){
   if(t.pts<8000)return['Mature','Years of this look like something.'];
   if(t.pts<20000)return['Old growth','Very few of these exist.'];
   return['Ancient','There is nothing beyond this. Keep going anyway.']}
+
+/* seasonal palette (prompt 4): only the leaves change, and subtly —
+   colour still means one thing, so blossom stays amber and the
+   trunk keeps the tier colour. Southern-hemisphere months. */
+function treeSeason(d){
+  const m=(d?new Date(d):new Date()).getMonth()+1;
+  if(m>=9&&m<=11)return{name:'Spring — fresh leaves',leaf:'#8FBF6E'};
+  if(m===12||m<=2)return{name:'Summer — deep leaves',leaf:'#5E9E63'};
+  if(m>=3&&m<=5)return{name:'Autumn — turning leaves',leaf:'#C98A4B'};
+  return{name:'Winter — pale leaves',leaf:'#8FA3B0'}}
+
+function treeShareRun(){
+ try{
+  const t=treeData(),stg=treeStage(t);
+  let svg=growTree(560,700);
+  svg=svg.replace('<svg ','<svg xmlns="http://www.w3.org/2000/svg" width="560" height="700" ')
+         .replace(/var\(--amber\)/g,'#D97757').replace(/var\(--line\)/g,'#3A3733');
+  const img=new Image();
+  img.onload=function(){try{
+    const c=document.createElement('canvas');c.width=1080;c.height=1920;
+    const x=c.getContext('2d');
+    x.fillStyle='#1A1917';x.fillRect(0,0,1080,1920);
+    x.drawImage(img,60,340,960,1200);
+    x.textAlign='center';
+    x.fillStyle='#8A8578';x.font='600 34px -apple-system,system-ui,sans-serif';
+    x.fillText('A  L  L  E  N  A',540,150);
+    x.fillStyle='#EDE9E1';x.font='700 76px Georgia,serif';
+    x.fillText(stg[0],540,268);
+    x.fillStyle=t.tier[2];x.font='700 96px -apple-system,system-ui,sans-serif';
+    x.fillText(t.pts.toLocaleString(),540,1650);
+    x.fillStyle='#8A8578';x.font='500 36px -apple-system,system-ui,sans-serif';
+    x.fillText('data points · '+t.found+' found'+(t.km?' · '+t.km+' km run':''),540,1712);
+    x.fillText('grown from real training',540,1830);
+    S.shareImg=c.toDataURL('image/png');
+    const openSheet=function(){S.sheet={t:'treeshare'};render()};
+    if(navigator.share&&navigator.canShare&&c.toBlob){
+      c.toBlob(function(b){try{
+        const f=new File([b],'allena-tree.png',{type:'image/png'});
+        if(navigator.canShare({files:[f]}))navigator.share({files:[f]}).catch(function(){});
+        else openSheet()}catch(e){openSheet()}},'image/png')}
+    else openSheet()}catch(e){flash('Could not draw the tree.')}};
+  img.onerror=function(){flash('Could not draw the tree.')};
+  img.src='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(svg)
+ }catch(e){flash('Could not draw the tree.')}}
+
 function growTree(W,Hh){
   const t=treeData(),R=seedRand(t.seed);
   W=W||300;Hh=Hh||300;
-  const col=t.tier[2];
+  const col=t.tier[2],leafCol=treeSeason().leaf;
   const groundY=Hh-26;
   let out='';
   /* roots — consistency below the surface */
@@ -5174,7 +5230,7 @@ function growTree(W,Hh){
           out+='<circle cx="'+x2.toFixed(1)+'" cy="'+y2.toFixed(1)+'" r="'+(leafSize+1.4).toFixed(1)+
             '" fill="var(--amber)" opacity=".9"/>'}
         else out+='<circle cx="'+x2.toFixed(1)+'" cy="'+y2.toFixed(1)+'" r="'+
-          (leafSize*(0.7+R()*0.6)).toFixed(1)+'" fill="'+col+'" opacity="'+(0.45+R()*0.4).toFixed(2)+'"/>'}
+          (leafSize*(0.7+R()*0.6)).toFixed(1)+'" fill="'+leafCol+'" opacity="'+(0.45+R()*0.4).toFixed(2)+'"/>'}
       return}
     // how many ways it splits comes from how many lifts you train
     const forks=2+(t.liftCount>=6&&R()<0.35?1:0);
@@ -5210,6 +5266,169 @@ function growTree(W,Hh){
    that speaks with a single voice, because at 6am nobody wants
    four cards, they want a verdict.
    ══════════════════════════════════════════════════════════ */
+
+/* ══ rest-day content (prompt 2) ════════════════════════════
+   Rest days were dead air: "week complete", nothing else. Now
+   the verdict card serves one rotating piece of the user's own
+   data — never generic advice, always their numbers. Rotation
+   is by calendar day, so seven consecutive rest days show
+   seven different things (tests assert it).
+   ══════════════════════════════════════════════════════════ */
+function restPool(){
+  const out=[];
+  const H=(S.history||[]).filter(h=>h.complete&&!h.run);
+  const add=(d,a,v,label)=>{if(d)out.push({d:d,a:a||null,v:v||'',label:label||'Have a look'})};
+  try{ // tonnage this week vs the month
+    const wk=questWeekKey();let tw=0,t4=0,w4=0;
+    H.forEach(h=>{const t=h.log.reduce((a,l)=>a+(l.w||0)*(l.r||0),0);
+      if(questWeekKey(h.date)===wk)tw+=t;
+      else if(new Date(h.date)>Date.now()-28*864e5){t4+=t;w4=1}});
+    if(tw&&t4)add('This week you moved '+Math.round(tw/1000*10)/10+' tonnes. Your recent weeks average '+Math.round(t4/4/1000*10)/10+'.','nav','progress')}catch(e){}
+  try{ // biggest lift move over 8 weeks
+    const since=dayKey(new Date(Date.now()-56*864e5)),lifts={};
+    H.forEach(h=>{if(h.date.slice(0,10)<since)return;
+      h.log.forEach(l=>{if(!l.w||!l.r)return;const b=gBase(l.ex),e=e1rm(l.w,l.r);
+        (lifts[b]=lifts[b]||[]).push({e:e,d:h.date})})});
+    let best=null;
+    Object.keys(lifts).forEach(b=>{const l=lifts[b].sort((a,c)=>a.d.localeCompare(c.d));
+      if(l.length<4)return;const gain=l[l.length-1].e/l[0].e;
+      if(gain>1.02&&(!best||gain>best.gain))best={b:b,gain:gain}});
+    if(best)add(best.b+' is up '+Math.round((best.gain-1)*100)+'% over eight weeks. That is what the slow part looks like from above.','nav','progress')}catch(e){}
+  try{ // the standing best
+    let top=null;
+    H.forEach(h=>h.log.forEach(l=>{if(!l.w||!l.r)return;const e=e1rm(l.w,l.r);
+      if(!top||e>top.e)top={e:e,ex:gBase(l.ex),w:l.w,r:l.r,d:h.date.slice(0,10)}}));
+    if(top)add('Your best set ever is still '+top.w+' kg × '+top.r+' on '+top.ex+', from '+fmtDate(top.d+'T12:00')+'. It is waiting.','nav','progress')}catch(e){}
+  try{ // readiness week vs baseline
+    if(S.gar&&S.gar.on){const days=S.gar.days||{},ks=Object.keys(days).filter(k=>days[k].am!=null).sort();
+      if(ks.length>=10){const last7=ks.slice(-7).map(k=>days[k].am),rest=ks.slice(0,-7).map(k=>days[k].am);
+        const a7=Math.round(last7.reduce((a,b)=>a+b,0)/last7.length);
+        const ab=Math.round(rest.reduce((a,b)=>a+b,0)/rest.length);
+        add('Readiness averaged '+a7+' this week against your usual '+ab+'. '+(a7>=ab?'Recovery is keeping up with the work.':'The work is currently ahead of the recovery.'),'sigOpen')}}}catch(e){}
+  try{ // bodyweight fortnight
+    const dd=(S.daily&&S.daily.days)||{},ks=Object.keys(dd).filter(k=>dd[k].bw!=null).sort();
+    if(ks.length>=8){const cut=dayKey(new Date(Date.now()-14*864e5));
+      const rec=ks.filter(k=>k>=cut).map(k=>dd[k].bw),old=ks.filter(k=>k<cut).map(k=>dd[k].bw);
+      if(rec.length>=3&&old.length>=3){
+        const a=rec.reduce((x,y)=>x+y,0)/rec.length,b=old.reduce((x,y)=>x+y,0)/old.length,df=a-b;
+        add('Bodyweight is '+(Math.abs(df)<0.4?'holding steady at '+(Math.round(a*10)/10)+' kg over the fortnight.':(df>0?'up ':'down ')+(Math.round(Math.abs(df)*10)/10)+' kg over the fortnight — '+(Math.round(a*10)/10)+' kg now.'),'nav','progress')}}}catch(e){}
+  try{ // running pace
+    if(S.runOn&&(S.runs||[]).length>=6){const rs=S.runs.filter(r=>paceMin(r)).sort((a,b)=>a.date.localeCompare(b.date));
+      if(rs.length>=6){const last=paceMin(rs[rs.length-1]),avg=rs.slice(0,-1).reduce((a,r)=>a+paceMin(r),0)/(rs.length-1);
+        const f=p=>Math.floor(p)+':'+String(Math.round((p%1)*60)).padStart(2,'0');
+        add('Your last run went at '+f(last)+'/km against a '+f(avg)+' average. '+(last<avg?'Fitness moving the right way.':'Slower is fine — most runs should be.'),'nav','run')}}}catch(e){}
+  try{ // month km
+    if(S.runOn){const ym=today().slice(0,7);
+      const pm=(function(){const d=new Date();d.setMonth(d.getMonth()-1);return dayKey(d).slice(0,7)})();
+      const sum=m=>Math.round((S.runs||[]).filter(r=>(r.date||'').slice(0,7)===m).reduce((a,r)=>a+(r.km||0),0));
+      const cur=sum(ym),prev=sum(pm);
+      if(cur&&prev)add(cur+' km so far this month; '+prev+' km in the whole of last month.','nav','run')}}catch(e){}
+  try{ // a find worth re-reading
+    const l=bankList().filter(x=>x.rar==='rare'||x.rar==='epic');
+    if(l.length)add('From your collection: "'+l[0].t+'" — '+l[0].d,'collOpen','','Open the collection')}catch(e){}
+  try{ // weeks of consistency
+    const st=weekStreak();
+    if(st.weeks>=3)add(st.weeks+' weeks in a row without missing. Consistency is the whole trick, and you currently have it.','nav','points')}catch(e){}
+  try{ // biggest session of the month
+    let big=null;
+    H.forEach(h=>{if(new Date(h.date)<Date.now()-30*864e5)return;
+      const t=h.log.reduce((a,l)=>a+(l.w||0)*(l.r||0),0);
+      if(t&&(!big||t>big.t))big={t:t,d:h.date.slice(0,10),n:h.dayTitle||'a session'}});
+    if(big)add('Your biggest session this month moved '+Math.round(big.t/1000*10)/10+' tonnes ('+fmtDate(big.d+'T12:00')+'). Rest is how that gets paid for.','nav','history')}catch(e){}
+  try{ // rehab direction
+    if(S.acl&&S.acl.on){const ch=(S.acl.checks||[]).slice().sort((a,b)=>a.date.localeCompare(b.date));
+      if(ch.length>=6){const rec=ch.slice(-3),old=ch.slice(-6,-3);
+        const av=l=>l.reduce((a,c)=>a+(c.pain||0),0)/l.length;
+        const a=av(rec),b=av(old);
+        add('Knee pain has averaged '+(Math.round(a*10)/10)+'/10 across your last three check-ins'+(a<b?', down from '+(Math.round(b*10)/10)+'. Quiet progress is still progress.':'. Keeping the record is what makes the physio visits count.'),'nav','rehab')}}}catch(e){}
+  return out}
+function restItem(k){
+  const pool=restPool();
+  if(!pool.length)return null;
+  const di=Math.floor(new Date((k||today())+'T12:00').getTime()/864e5);
+  return pool[di%pool.length]}
+
+/* ══ the monthly wrap (prompt 3) ════════════════════════════
+   On the 1st, last month becomes a story: tonnage against the
+   month before, the best find, the biggest lift move, the
+   kilometres, and ONE honest worth-fixing line. Revealed once
+   with the thinking sequence, then kept in a Reports list on
+   Progress. Copyable as plain text. Voice stays flat.
+   ══════════════════════════════════════════════════════════ */
+const K_WRAP='training-reports-v1';
+function wraps(){return S.wraps||(S.wraps=lget(K_WRAP,{}))}
+function wrapSaveAll(){lset(K_WRAP,S.wraps)}
+function prevYm(ym){const d=new Date(ym+'-15T12:00');d.setMonth(d.getMonth()-1);return dayKey(d).slice(0,7)}
+function ymName(ym){try{return new Date(ym+'-15T12:00').toLocaleDateString(undefined,{month:'long',year:'numeric'})}catch(e){return ym}}
+function monthAgg(ym){
+  const H=(S.history||[]).filter(h=>h.complete&&!h.run&&(h.date||'').slice(0,7)===ym);
+  let ton=0,sets=0;H.forEach(h=>h.log.forEach(l=>{if(l.w&&l.r){ton+=l.w*l.r;sets++}}));
+  const km=Math.round((S.runs||[]).filter(r=>(r.date||'').slice(0,7)===ym).reduce((a,r)=>a+(r.km||0),0)*10)/10;
+  return{sessions:H.length,ton:Math.round(ton),sets:sets,km:km}}
+function wrapBuild(ym){
+  const cur=monthAgg(ym),prev=monthAgg(prevYm(ym));
+  if(!cur.sessions&&!cur.km)return null;
+  // biggest lift move: best e1rm inside the month vs best before it
+  let move=null;
+  try{const inM={},before={};
+    (S.history||[]).filter(h=>h.complete&&!h.run).forEach(h=>{
+      const m=(h.date||'').slice(0,7);
+      h.log.forEach(l=>{if(!l.w||!l.r)return;const b=gBase(l.ex),e=e1rm(l.w,l.r);
+        if(m===ym){if(!inM[b]||e>inM[b])inM[b]=e}
+        else if(m<ym){if(!before[b]||e>before[b])before[b]=e}})});
+    Object.keys(inM).forEach(b=>{if(!before[b])return;const g=inM[b]/before[b];
+      if(g>1.015&&(!move||g>move.g))move={ex:b,g:g,pct:Math.round((g-1)*100)}})}catch(e){}
+  // the best find of the month
+  let disc=null;
+  try{const order={epic:0,rare:1,uncommon:2,common:3};
+    const l=bankList().filter(x=>(x.found||'').slice(0,7)===ym)
+      .sort((a,b)=>order[a.rar]-order[b.rar]);
+    if(l.length)disc={t:l[0].t,rar:l[0].rar}}catch(e){}
+  // ONE honest worth-fixing line
+  let fix='Nothing glaring. The boring answer is to keep doing exactly this.';
+  try{const p=activeProgSafe(),b=p?blockAdherence(p):null;
+    if(b&&b.worst&&b.worst.length&&b.worst[0].times>=2)
+      fix=String(b.worst[0].n).replace(/ — .*/,'')+' got left out '+b.worst[0].times+' times. Either it earns a place or it goes — skipping it silently does neither.';
+    else if(b&&b.pct!=null&&b.pct<75)
+      fix='You did '+b.pct+'% of the planned sets. The block only works if it mostly happens.';
+    else if(S.gar&&S.gar.on){const days=S.gar.days||{};
+      const logged=Object.keys(days).filter(k=>k.slice(0,7)===ym&&days[k].am!=null).length;
+      if(logged<10&&cur.sessions>=6)fix='Only '+logged+' readiness mornings all month. That is the input that lets Allena pick your hard days — it is thirty seconds.'}}catch(e){}
+  return{ym:ym,name:ymName(ym),built:today(),
+    sessions:cur.sessions,ton:cur.ton,tonPrev:prev.ton,sets:cur.sets,
+    km:cur.km,kmPrev:prev.km,move:move,disc:disc,fix:fix}}
+function wrapDue(){
+  const pm=prevYm(today().slice(0,7));
+  if(wraps()[pm])return null;
+  const a=monthAgg(pm);
+  return (a.sessions||a.km)?pm:null}
+function wrapText(r){
+  const L=[];
+  L.push(r.name+' — Allena');
+  L.push('');
+  if(r.sessions)L.push(r.sessions+' sessions, '+(Math.round(r.ton/100)/10)+' tonnes'+
+    (r.tonPrev?' ('+(r.ton>=r.tonPrev?'+':'')+Math.round((r.ton/r.tonPrev-1)*100)+'% on the month before)':''));
+  if(r.km)L.push(r.km+' km run'+(r.kmPrev?' ('+r.kmPrev+' km the month before)':''));
+  if(r.move)L.push('Biggest move: '+r.move.ex+' up '+r.move.pct+'%');
+  if(r.disc)L.push('Best find: '+r.disc.t+' ('+r.disc.rar+')');
+  L.push('Worth fixing: '+r.fix);
+  return L.join('\n')}
+function wrapLine(){
+  const pm=wrapDue();
+  if(!pm)return '';
+  return '<button data-a="wrapGo" data-v="'+pm+'" style="display:flex;align-items:center;gap:9px;margin-top:12px;padding-top:12px;border-top:1px solid var(--line);width:100%;text-align:left">'+
+    '<span class="mono" style="color:var(--faint);font-size:9px;letter-spacing:.06em;flex:none">WRAP</span>'+
+    '<span style="flex:1;min-width:0;font-size:12px;color:var(--dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(ymName(pm))+' is ready to read</span>'+
+    '<span class="mono" style="color:var(--amber);font-size:11px;flex:none">Open</span></button>'}
+function wrapsCard(){
+  const w=wraps(),keys=Object.keys(w).sort().reverse();
+  if(!keys.length)return '';
+  return '<p class="eyebrow mt2">Monthly wraps</p>'+
+    '<div class="card mt" style="padding:4px 15px">'+
+    keys.map((ym,i)=>'<button data-a="wrapOpen" data-v="'+ym+'" style="width:100%;text-align:left;display:flex;justify-content:space-between;align-items:baseline;gap:10px;padding:12px 0'+(i?';border-top:1px solid var(--line)':'')+'">'+
+      '<span style="font-size:13.5px;font-weight:600">'+esc(w[ym].name||ym)+'</span>'+
+      '<span class="mono" style="color:var(--faint);font-size:11px">'+(w[ym].sessions||0)+' sessions'+(w[ym].km?' · '+w[ym].km+' km':'')+'</span></button>').join('')+'</div>'}
+
 function todayVerdict(){
   const p=activeProgSafe();
   const k=today();
@@ -5246,8 +5465,11 @@ function todayVerdict(){
     if(!pick){const ws=weekState(p,S.week);
       const left=p.days.map((d,i)=>({d:d,i:i})).filter(x=>!ws.done.has(x.d.name));
       if(left.length)pick={i:left[0].i,name:left[0].d.name}}}
-  if(!pick)return{tone:'ok',t:'Week complete',
-    d:'Every session in this week is logged. Rest, or start the next week early if you feel good.',cta:null};
+  if(!pick){const ri=restItem();
+    if(ri)return{tone:'ok',t:'Week complete',d:ri.d,
+      cta:ri.a?{a:ri.a,v:ri.v,label:ri.label}:null};
+    return{tone:'ok',t:'Week complete',
+      d:'Every session in this week is logged. Rest, or start the next week early if you feel good.',cta:null}}
   const legDay=(function(){try{const m=dayMuscles(p,pick.i,S.week);return !!(m.Quads||m.Hamstrings||m.Glutes)}catch(e){return false}})();
   if(rd&&rd.level==='low')return{tone:'warn',t:pick.name+', but lighter',
     d:'Readiness is low this morning. Same session, about 10% off the loads, and stop at RPE 8.',
@@ -5441,6 +5663,7 @@ function verdictCard(){
       '<p style="font-size:13.5px;font-weight:600;margin-top:5px">'+esc(n.t)+'</p>'+
       '<p style="color:var(--dim);font-size:12px;line-height:1.55;margin-top:3px">'+esc(n.d)+'</p></div>':'')+
     questLine()+
+    wrapLine()+
     '</div>'}
 
 /* ══ the watchlist ══════════════════════════════════════════
@@ -7702,6 +7925,7 @@ function viewProgress(){
     // sections that build their own collapser keep it; everything else gets one
     if(out.indexOf('id="sec-'+k+'"')>=0){h+=out;return}
     h+=collapser(k,PSECTION_LABELS[k]||k,sectionSub(k),out)});
+  h+=wrapsCard();
   h+='<button data-a="playoutOpen" style="width:100%;margin-top:26px;padding:12px;color:var(--faint);font-size:11.5px;letter-spacing:.04em">Rearrange this screen</button>';
   return h+'</div>'}
 function weekRange(iso){
@@ -8328,6 +8552,7 @@ function sheetHtml(){
       '<p style="color:var(--dim);font-size:13px;line-height:1.6">Each of these changes what Allena can tell you. Training is optional — a rest day still counts.</p>'+
       (st>1||pts?'<p class="mono" style="color:var(--faint);font-size:11px;margin-top:8px">'+
         (st>1?st+' days in a row':'')+(st>1&&pts?' \u00b7 ':'')+(pts?'+'+pts+' points today':'')+'</p>':'')+
+      (st>1&&dayStreakInfo().quietThisWeek?'<p class="mono" style="color:var(--faint);font-size:10.5px;margin-top:4px">\u25e6 streak includes 1 quiet day this week \u2014 the one each week that can pass unlogged</p>':'')+
       '<div style="margin-top:14px;display:flex;flex-direction:column;gap:10px">'+
       pr.tasks.map(x=>'<div class="card" style="padding:13px 15px;display:flex;align-items:center;gap:11px'+(x.done?';border-color:var(--green)':'')+'">'+
         '<span style="width:21px;height:21px;border-radius:7px;flex:none;display:inline-flex;align-items:center;justify-content:center;font-size:12px;'+
@@ -8360,6 +8585,27 @@ function sheetHtml(){
          '<button data-a="questPass" class="btn mt" style="color:var(--dim)">Not this week</button>'
         :'')+
       '<p style="color:var(--faint);font-size:11px;line-height:1.55;margin-top:12px">One per week, generated Monday from what you have already done. If it does not happen, nothing is lost and nothing turns red — a fresh one simply arrives Monday.</p>')}
+  if(S.sheet.t==='wrap'){
+    if(S.think&&S.think.key==='wrap'&&!S.think.done)
+      return wrapSheet('Month in review',thinkPanel('Reading the month back'));
+    const r=wraps()[S.sheet.ym];if(!r)return '';
+    const delta=r.tonPrev?Math.round((r.ton/r.tonPrev-1)*100):null;
+    return wrapSheet(r.name,
+      '<div class="row" style="gap:12px;margin-top:4px">'+
+        bigNum(r.sessions,'sessions')+
+        bigNum((Math.round(r.ton/100)/10)+'t','lifted'+(delta!=null?' ('+(delta>=0?'+':'')+delta+'%)':''),delta!=null&&delta>=0?'var(--green)':'var(--text)')+
+        (r.km?bigNum(r.km,'km run'):bigNum(r.sets,'sets'))+'</div>'+
+      (r.move?'<div class="card mt2" style="padding:13px 15px"><p class="mono" style="font-size:9px;color:var(--green);letter-spacing:.06em">BIGGEST MOVE</p>'+
+        '<p style="font-size:13.5px;font-weight:600;margin-top:4px">'+esc(r.move.ex)+' up '+r.move.pct+'%</p></div>':'')+
+      (r.disc?'<div class="card mt" style="padding:13px 15px"><p class="mono" style="font-size:9px;color:'+rarityOf(r.disc.rar)[1]+';letter-spacing:.06em">BEST FIND · '+esc(r.disc.rar.toUpperCase())+'</p>'+
+        '<p style="font-size:13.5px;font-weight:600;margin-top:4px">'+esc(r.disc.t)+'</p></div>':'')+
+      '<div class="card mt" style="padding:13px 15px;border-color:rgba(217,119,87,.42)"><p class="mono" style="font-size:9px;color:var(--amber);letter-spacing:.06em">WORTH FIXING</p>'+
+        '<p style="color:var(--dim);font-size:12.5px;line-height:1.55;margin-top:4px">'+esc(r.fix)+'</p></div>'+
+      '<button data-a="wrapCopy" data-v="'+r.ym+'" class="btn mt2" style="color:var(--amber)">Copy as text</button>')}
+  if(S.sheet.t==='treeshare'){
+    return wrapSheet('Your tree',
+      (S.shareImg?'<img src="'+S.shareImg+'" alt="Tree share card" style="width:100%;border-radius:14px;border:1px solid var(--line)">':'')+
+      '<p style="color:var(--dim);font-size:12.5px;line-height:1.55;margin-top:10px">Long-press the image, then Save Image. Nothing on it beyond the tree, the stage and the numbers shown.</p>')}
   if(S.sheet.t==='adh'){
     const p=activeProgSafe();if(!p)return '';
     const a=weekAdherence(p,S.week),b=blockAdherence(p);
@@ -9171,6 +9417,14 @@ function runAction(a,v,t,e){
     case 'questOpen':S.sheet={t:'quest'};render();break;
     case 'questAccept':{const Q=questCurrent();if(Q&&Q.state==='offered'){Q.state='on';questSave();vib(12)}render();break}
     case 'questPass':{const Q=questCurrent();if(Q&&Q.state==='offered'){Q.state='passed';questSave()}S.sheet=null;render();break}
+    case 'wrapGo':{const ym=v;S.sheet={t:'wrap',ym:ym};
+      thinkStart('wrap',[['Reading '+ymName(ym)],['Comparing with '+ymName(prevYm(ym))],['Weighing what to say honestly']],function(){
+        if(!wraps()[ym]){const r=wrapBuild(ym);if(r){wraps()[ym]=r;wrapSaveAll()}}});
+      render();break}
+    case 'wrapOpen':S.sheet={t:'wrap',ym:v};render();break;
+    case 'wrapCopy':{const r=wraps()[v];
+      if(r){try{navigator.clipboard.writeText(wrapText(r)).then(function(){flash('Copied.')})}catch(e){flash('Could not copy.')}}break}
+    case 'treeShare':treeShareRun();break;
     case 'sigOpen':S.sheet={t:'signal'};render();break;
     case 'dpOpen':S.sheet=null;S.view='points';render();break;
     case 'collOpen':S.sheet=null;S.view='collection';render();break;
