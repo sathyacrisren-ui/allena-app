@@ -5183,15 +5183,41 @@ function treeSeason(d){
 function treeShareRun(){
  try{
   const t=treeData(),stg=treeStage(t);
-  let svg=growTree(720,900);
-  svg=svg.replace('<svg ','<svg xmlns="http://www.w3.org/2000/svg" width="720" height="900" ')
+  let svg=growTree(300,270);
+  svg=svg.replace('<svg ','<svg xmlns="http://www.w3.org/2000/svg" ')
          .replace(/var\(--amber\)/g,'#D97757').replace(/var\(--line\)/g,'#3A3733');
+  /* the tree's drawn size depends on the data — a young tree fills a
+     third of its frame. Measure the real bounding box and crop to it,
+     so every tree fills the card. */
+  let vbW=300,vbH=270;
+  try{
+    const holder=document.createElement('div');
+    holder.style.cssText='position:absolute;left:-9999px;top:0;width:300px;height:270px';
+    holder.innerHTML=svg;
+    document.body.appendChild(holder);
+    const el2=holder.querySelector('svg');
+    /* the full-width ground line and shadow would anchor the box wide —
+       measure the tree itself; the crop then runs the ground edge-to-edge */
+    el2.querySelectorAll('ellipse').forEach(function(n){n.remove()});
+    el2.querySelectorAll('line').forEach(function(n){if(n.getAttribute('stroke')==='#3A3733')n.remove()});
+    const bb=el2.getBBox();
+    holder.remove();
+    if(bb&&bb.width>20&&bb.height>20){
+      const pad=Math.max(10,bb.width*0.06);
+      vbW=bb.width+pad*2;vbH=bb.height+pad*2;
+      svg=svg.replace(/viewBox="[^"]*"/,'viewBox="'+(bb.x-pad).toFixed(1)+' '+(bb.y-pad).toFixed(1)+' '+vbW.toFixed(1)+' '+vbH.toFixed(1)+'"')}}catch(e){}
+  /* fit the cropped tree into the card's tree zone, centred */
+  const availW=1000,availH=1150;
+  let dw=availW,dh=dw*vbH/vbW;
+  if(dh>availH){dh=availH;dw=dh*vbW/vbH}
+  const dx=(1080-dw)/2,dy=360+(availH-dh)/2;
+  svg=svg.replace('<svg ','<svg width="'+Math.round(dw)+'" height="'+Math.round(dh)+'" ');
   const img=new Image();
   img.onload=function(){try{
     const c=document.createElement('canvas');c.width=1080;c.height=1920;
     const x=c.getContext('2d');
     x.fillStyle='#1A1917';x.fillRect(0,0,1080,1920);
-    x.drawImage(img,45,300,990,1237);
+    x.drawImage(img,dx,dy,dw,dh);
     x.textAlign='center';
     x.fillStyle='#8A8578';x.font='600 34px -apple-system,system-ui,sans-serif';
     x.fillText('A  L  L  E  N  A',540,150);
