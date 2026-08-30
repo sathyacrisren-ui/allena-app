@@ -93,7 +93,7 @@ textarea{line-height:1.5;resize:vertical}
 .eyebrow{font-size:11px;letter-spacing:.16em;text-transform:uppercase;font-weight:600;color:var(--faint)}
 .card{background:var(--surface);border:1px solid var(--line);border-radius:18px;max-width:100%;min-width:0}
 .btn{border-radius:12px;padding:14px;font-size:14px;background:var(--surface);border:1px solid var(--line);width:100%;text-align:center}
-.big{border-radius:14px;padding:20px;font-size:20px;letter-spacing:.04em;font-weight:600;width:100%}
+.big{border-radius:13px;padding:15px 20px;font-size:14px;letter-spacing:.14em;font-weight:600;width:100%}
 .row{display:flex;gap:8px;min-width:0}
 .pill{padding:9px 14px;border-radius:999px;font-size:12.5px;white-space:nowrap;border:1px solid var(--line);background:var(--surface);color:var(--dim);max-width:100%;overflow:hidden;text-overflow:ellipsis}
 .pill.on{background:var(--text);color:#1A1917;border-color:var(--text);font-weight:600}
@@ -3454,7 +3454,7 @@ const RSI_Q=['I am confident I could play my sport without concern for my knee',
  'I am confident I could play without thinking about my knee'];
 function menuBtn(){return '<button data-a="menuOpen" style="width:40px;height:40px;border-radius:13px;background:var(--surface);border:1px solid var(--line);color:var(--dim);display:flex;align-items:center;justify-content:center;flex:none">'+
   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" style="width:19px;height:19px"><circle cx="12" cy="8" r="3.2"/><path d="M5 20c0-3.6 3.1-5.5 7-5.5s7 1.9 7 5.5"/></svg></button>'}
-function headBtns(){return '<div style="display:flex;gap:8px;flex:none;align-items:center">'+allenaBtn()+menuBtn()+'</div>'}
+function headBtns(){return '<div style="display:flex;gap:8px;flex:none;align-items:center">'+pointsChip()+menuBtn()+'</div>'}
 function pointsChip(){
   const d=dataPoints(),t=dpTier(d.total),nx=dpNext(d.total);
   const pct=nx?Math.min(100,Math.round((d.total-t[0])/(nx[0]-t[0])*100)):100;
@@ -5725,7 +5725,7 @@ function verdictCard(){
       '<div style="display:flex;align-items:center;gap:9px;margin-top:13px;padding-top:12px;border-top:1px solid var(--line)">'+dots+
       '<span class="mono" style="flex:1;color:var(--faint);font-size:10.5px">'+pr.done+' of '+pr.total+' · finishing the small ones is what unlocks tonight’s find</span>'+
       '<button data-a="todayOpen" class="mono" style="color:var(--amber);font-size:11px;flex:none">All</button></div>'}
-  return '<div class="card an-hero" style="padding:18px;border-radius:22px;border-color:'+(done?'var(--green)':'var(--line)')+'">'+
+  return '<div class="card an-hero" style="padding:18px;border-radius:22px;margin-top:16px;border-color:'+(done?'var(--green)':'var(--line)')+'">'+
     inner+
     patternLine()+
     questLine()+
@@ -5742,7 +5742,7 @@ function sessionCard(){
     '<div style="flex:1;min-width:0">'+
     '<p class="disp" style="font-size:16.5px;font-weight:700;line-height:1.2">'+esc(v.t)+'</p>'+
     '<p style="color:var(--dim);font-size:12px;line-height:1.5;margin-top:3px">'+esc(v.d)+'</p></div>'+
-    (v.cta?'<button data-a="'+v.cta.a+'" data-v="'+v.cta.v+'" class="disp" style="flex:none;background:var(--amber);color:#1A1917;padding:12px 17px;border-radius:13px;font-size:13.5px;font-weight:700">START</button>':'')+
+    (v.cta?'<button data-a="'+v.cta.a+'" data-v="'+v.cta.v+'" class="disp" style="flex:none;background:var(--amber);color:#1A1917;padding:11px 17px;border-radius:12px;font-size:12px;font-weight:700;letter-spacing:.14em">START</button>':'')+
     '</div></div>'}
 function unlockCard(){
   /* the watchlist, worn as the game it honestly is: every analysis is
@@ -6066,6 +6066,24 @@ function anStats(){
     lifts:Object.keys(lifts).length,
     runs:(S.runs||[]).length,km:Math.round((S.runs||[]).reduce((a,r)=>a+(r.km||0),0)),
     rehab:((S.acl&&S.acl.checks)||[]).length+((S.acl&&S.acl.issues)||[]).length}}
+/* ── GATED PREVIEW — SANDBOX ONLY, never ship ──────────────
+   The owner wants to feel what point-gated patterns would be
+   like before ruling. Patterns beyond floor(points/300) render
+   locked WITHOUT their titles. This is the dark pattern the
+   audit prohibits, built here so the judgement is informed. */
+function gateN(){return Math.max(1,Math.floor(dataPoints().total/300))}
+function gateLockedCard(i){
+  const pts=dataPoints().total,need=(i+1)*300;
+  const pct=Math.min(100,Math.round(pts/need*100));
+  return '<div class="card" style="padding:14px 16px;opacity:.8">'+
+    '<div style="display:flex;align-items:center;gap:10px">'+
+    '<span class="mono" style="color:var(--faint);font-size:9px;letter-spacing:.08em;border:1px solid var(--line);padding:3px 8px;border-radius:999px;flex:none">LOCKED</span>'+
+    '<span style="flex:1;color:var(--faint);font-size:12.5px">A pattern Allena has already found in your data</span></div>'+
+    '<div style="display:flex;justify-content:space-between;align-items:baseline;margin-top:10px">'+
+    '<span class="mono" style="color:var(--faint);font-size:10px">unlocks at '+need.toLocaleString()+' points</span>'+
+    '<span class="mono" style="color:var(--amber);font-size:10px">'+pts.toLocaleString()+' / '+need.toLocaleString()+'</span></div>'+
+    '<div style="height:4px;border-radius:2px;background:var(--line);overflow:hidden;margin-top:6px">'+
+    '<div style="height:4px;width:'+pct+'%;background:var(--amber)"></div></div></div>'}
 function analyseCard(){
   const P=allPatterns(),warn=P.filter(p=>p.tone==='warn').length;
   const st=S.anState||'idle';
@@ -6116,7 +6134,8 @@ function analyseCard(){
         (P.length?'<p class="eyebrow" style="margin-top:16px;color:var(--amber)">Worth acting on</p>'+
           '<p style="color:var(--faint);font-size:11px;line-height:1.5;margin-top:3px">Connections between your lifting, running, readiness and rehab.</p>':'')+
         '<div style="margin-top:10px;display:flex;flex-direction:column;gap:8px">'+
-        P.map((p,i)=>'<div class="an-rise" style="animation-delay:'+(i*0.06).toFixed(2)+'s">'+patCard(p)+'</div>').join('')+'</div>'+
+        '<p class="mono" style="color:var(--red);font-size:9px;letter-spacing:.08em;margin-top:4px">GATED PREVIEW · SANDBOX ONLY · '+gateN()+' OF '+P.length+' UNLOCKED</p>'+
+        P.map((p,i)=>'<div class="an-rise" style="animation-delay:'+(i*0.06).toFixed(2)+'s">'+(i<gateN()?patCard(p):gateLockedCard(i))+'</div>').join('')+'</div>'+
         (shown.length?'<p class="eyebrow" style="margin-top:18px">What you have earned</p>'+
           '<p style="color:var(--faint);font-size:11px;line-height:1.5;margin-top:3px">Records and milestones, kept for good.</p>':'')+
         '<div style="margin-top:10px;display:flex;flex-direction:column;gap:8px">'+
