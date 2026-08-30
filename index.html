@@ -15,8 +15,8 @@
 <style>
 :root{
   --bg:#151310; --surface:#211E19; --raised:#2C2922; --line:#3B372F;
-  --text:#F5F3EF; --dim:#A8A29A; --faint:#78726A;
-  --amber:#D97757; --blue:#6B9BD1; --green:#7FA86B; --red:#C1554A;
+  --text:#FBF9F6; --dim:#BDB6AC; --faint:#8B8479;
+  --amber:#E07B55; --blue:#77A6DC; --green:#8CBE72; --red:#C1554A;
   --teal:#5FA8A0; --violet:#9C8AC4; --gold:#E0A458;
 }
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
@@ -108,8 +108,8 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
 .pad{padding-left:20px;padding-right:20px}
 .eyebrow{font-size:13.5px;letter-spacing:-.01em;text-transform:none;font-weight:700;color:var(--dim);font-family:-apple-system,'Inter',system-ui,sans-serif}
 .card{background:var(--surface);border:1px solid rgba(255,255,255,.05);border-radius:20px;max-width:100%;min-width:0}
-.btn{border-radius:14px;padding:14px;font-size:14px;font-weight:600;background:var(--raised);border:1px solid transparent;width:100%;text-align:center}
-.big{border-radius:14px;padding:15px 20px;font-size:14px;letter-spacing:.14em;font-weight:700;width:100%;box-shadow:0 8px 24px rgba(217,119,87,.22)}
+.btn{border-radius:999px;padding:14px 16px;font-size:14.5px;font-weight:700;letter-spacing:-.01em;background:var(--raised);border:1px solid transparent;width:100%;text-align:center}
+.big{border-radius:999px;padding:17px 22px;font-size:16.5px;letter-spacing:-.02em;font-weight:800;width:100%;box-shadow:0 10px 26px rgba(224,123,85,.25)}
 .row{display:flex;gap:8px;min-width:0}
 .pill{padding:10px 15px;border-radius:999px;font-size:13px;font-weight:600;white-space:nowrap;border:1px solid transparent;background:var(--raised);color:var(--dim);max-width:100%;overflow:hidden;text-overflow:ellipsis}
 .pill.on{background:var(--text);color:#1A1917;border-color:var(--text);font-weight:600}
@@ -1792,7 +1792,7 @@ function viewSetup(){
             '<span class="mono" style="color:var(--faint);font-size:10px">'+esc(x.tags.join(', '))+'</span></span>'+
             '<span class="mono" style="color:'+(on?'var(--green)':'var(--faint)')+';font-size:10px;flex:none">'+(on?'KEEPING':'OUT')+'</span></button>'}).join('')+'</div>'});
     if(!list.length)b+='<p style="color:var(--faint);font-size:12.5px;margin-top:14px">Nothing in the exercise library is ruled out by what you selected.</p>';
-    b+='<button data-a="suReviewed" class="big disp mt2" style="background:var(--amber);color:#1A1917;font-size:15px">GOT IT — CONTINUE</button>';
+    b+='<button data-a="suReviewed" class="big disp mt2" style="background:var(--amber);color:#1A1917;font-size:15px">Got it — continue</button>';
     return '<div class="view pad stg" style="padding-top:26px">'+
       '<div style="height:3px;background:var(--line);border-radius:3px"><div style="height:100%;width:100%;background:var(--amber);border-radius:3px"></div></div>'+
       '<p class="mono" style="color:var(--faint);font-size:10px;letter-spacing:.08em;text-transform:uppercase;margin-top:12px">What comes out</p>'+
@@ -1814,7 +1814,7 @@ function viewSetup(){
       line('Emphasis',foc.length?foc.join(', '):'balanced')+
       line('Working around',restrList(st)||'nothing')+'</div>'+
       '<p style="color:var(--dim);font-size:12.5px;line-height:1.6;margin-top:14px">No weights are guessed. In round one you find a load that lands on the target effort; progression runs off your own numbers from then on.</p>'+
-      '<button data-a="suBuild" class="big disp mt" style="background:var(--amber);color:#1A1917;font-size:16px">BUILD MY PROGRAM</button>'+
+      '<button data-a="suBuild" class="big disp mt" style="background:var(--amber);color:#1A1917;font-size:16px">Build my program</button>'+
       '<button data-a="suOwn" class="btn mt" style="border-color:var(--amber);color:var(--amber)">I already know what I want to run</button>'+
       '<p style="color:var(--faint);font-size:11.5px;line-height:1.55;margin-top:8px">Write your own block instead. Allena keeps everything you just told her — your restrictions, equipment and days — and reviews what you build against it.</p>'}
   const pct=Math.round(st.step/(T.length-1)*100);
@@ -1861,6 +1861,10 @@ function dayKey(d){d=d?new Date(d):new Date();
   const t=d.getTime()-d.getTimezoneOffset()*60000;
   return new Date(t).toISOString().slice(0,10)}
 function today(){return dayKey()}
+function daysSince(k){
+  /* whole calendar days from dayKey k to today — stable all day,
+     unlike Date.now()-based math which flips at noon. */
+  return Math.round((new Date(today()+'T12:00').getTime()-new Date(k+'T12:00').getTime())/864e5)}
 function creatineCard(){
   if(!S.supp.on)return '';
   const on=!!S.supp.days[today()];
@@ -2136,7 +2140,7 @@ function viewQuick(){
     '<div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px;margin-top:12px">'+
     stepper('quick.note.sleep','Sleep',q.note.sleep,0.5,'hrs')+stepper('quick.note.fatigue','Fatigue 1-5',q.note.fatigue,1,'')+'</div></div>';
   const n=q.rows.filter(r=>(r.secs?+r.s>0:(+r.w>0&&+r.r>0))).length;
-  h+='<button data-a="quickSave" class="big disp mt2" style="background:'+(n?'var(--green)':'var(--raised)')+';color:'+(n?'#1A1917':'var(--faint)')+';font-size:17px">SAVE '+n+' SET'+(n===1?'':'S')+'</button>'+
+  h+='<button data-a="quickSave" class="big disp mt2" style="background:'+(n?'var(--green)':'var(--raised)')+';color:'+(n?'#1A1917':'var(--faint)')+';font-size:17px">Save '+n+' set'+(n===1?'':'s')+'</button>'+
    '<p style="text-align:center;color:var(--faint);font-size:11.5px;margin-top:10px">Blank rows are ignored; tap × to remove one. Everything counts toward PRs, goals and trends exactly like a live session.</p></div>';
   return h}
 
@@ -2298,7 +2302,7 @@ function viewOwn(){
   h+='<button data-a="ownAddDay" class="btn mt" style="color:var(--amber)">+ Add a day</button>';
   const total=p.days.reduce((a,d2)=>a+d2.exercises.reduce((x,e)=>x+(e.sets['default']||[]).length,0),0);
   h+='<p class="mono" style="color:var(--faint);font-size:11px;margin-top:12px">'+p.days.length+' day'+(p.days.length===1?'':'s')+' · '+total+' sets a week</p>';
-  h+='<button data-a="ownReview" class="big disp mt2" style="background:'+(total?'var(--amber)':'var(--raised)')+';color:'+(total?'#1A1917':'var(--faint)')+';font-size:16px">ALLENA, LOOK IT OVER</button>';
+  h+='<button data-a="ownReview" class="big disp mt2" style="background:'+(total?'var(--amber)':'var(--raised)')+';color:'+(total?'#1A1917':'var(--faint)')+';font-size:16px">Allena, look it over</button>';
   return h+'</div>'}
 function viewOwnReview(){
   const d=S.own;if(!d||!d.review)return '';
@@ -2318,7 +2322,7 @@ function viewOwnReview(){
         '<p style="font-size:14px;font-weight:600;color:'+(f.hard?'var(--red)':'var(--amber)')+'">'+esc(f.t)+'</p>'+
         '<p style="color:var(--dim);font-size:12.5px;line-height:1.6;margin-top:4px">'+esc(f.d)+'</p>'+
         (f.fix?'<button data-a="ownFix" data-v="'+i+'" class="btn mt" style="font-size:12px;color:var(--amber)">'+esc(f.fix.label)+'</button>':'')+'</div>').join('')+'</div>'}
-  h+='<button data-a="ownSave" class="big disp mt2" style="background:var(--amber);color:#1A1917;font-size:16px">START THIS BLOCK</button>'+
+  h+='<button data-a="ownSave" class="big disp mt2" style="background:var(--amber);color:#1A1917;font-size:16px">Start this block</button>'+
     '<button data-a="ownBack" class="btn mt">Keep editing</button>';
   return h+'</div>'}
 function reviewOwn(p){
@@ -2379,7 +2383,7 @@ function viewImport(){
       '<p style="color:var(--faint);font-size:11.5px;line-height:1.5;margin-top:8px">Excel .xlsx can\'t be read in the browser — in Excel choose File → Save As → CSV, or just photograph the sheet.</p>';
     if(f.img)h+='<img src="'+f.img+'" style="width:100%;max-height:180px;object-fit:contain;border-radius:12px;margin-top:10px;background:var(--surface)">';
     if(f.err)h+='<p style="color:var(--red);font-size:12.5px;line-height:1.5;margin-top:12px">'+esc(f.err)+'</p>';
-    h+='<button data-a="impParse" class="big disp mt2" style="background:'+((f.text.trim()||f.img)&&!f.busy?'var(--amber)':'var(--raised)')+';color:'+((f.text.trim()||f.img)&&!f.busy?'#1A1917':'var(--faint)')+';font-size:15px">'+(f.busy?'READING…':'READ IT WITH ALLENA')+'</button>'+
+    h+='<button data-a="impParse" class="big disp mt2" style="background:'+((f.text.trim()||f.img)&&!f.busy?'var(--amber)':'var(--raised)')+';color:'+((f.text.trim()||f.img)&&!f.busy?'#1A1917':'var(--faint)')+';font-size:15px">'+(f.busy?'Reading…':'Read it with Allena')+'</button>'+
       '<p style="color:var(--faint);font-size:11.5px;line-height:1.55;margin-top:8px">It lands in the block editor so you can fix anything Allena misread, then she reviews the whole thing before you run it.</p>';
     if(!S.ai.key)h+='<p style="color:var(--faint);font-size:11.5px;margin-top:8px">Needs your API key — Data → Allena.</p>';
   }
@@ -2406,7 +2410,7 @@ function viewScans(){
    '<h1 class="disp" style="font-size:25px;font-weight:700">BODY SCANS</h1>'+
    '<p style="color:var(--dim);font-size:13px;line-height:1.55;margin-top:8px">Evolt or any body-composition scan. One a week is plenty — day-to-day noise in these devices is larger than real weekly change.</p>';
   if(since!=null&&since<5)h+='<div class="card mt" style="padding:12px 15px;border-color:var(--amber)"><p style="color:var(--dim);font-size:12.5px">Last scan was '+since+' day'+(since===1?'':'s')+' ago. Weekly spacing gives a cleaner trend.</p></div>';
-  h+='<button data-a="scanNew" class="big disp mt" style="background:var(--amber);color:#1A1917;font-size:15px">ADD A SCAN</button>';
+  h+='<button data-a="scanNew" class="big disp mt" style="background:var(--amber);color:#1A1917;font-size:15px">Add a scan</button>';
   const latest=list[0],prev=list[1];
   if(latest){
     const pt=proteinTarget(latest);
@@ -2441,7 +2445,7 @@ function scanSheet(){
     '<input type="date" data-sdate="1" value="'+esc(f.date)+'" style="width:100%;margin-top:6px;background:var(--surface);border:1px solid var(--line);border-radius:10px;color:var(--text);padding:11px;font-size:16px;outline:none">';
   inner+='<div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px;margin-top:14px">'+
     SCAN_FIELDS.map(x=>stepper('sform.'+x[0],x[1],f[x[0]],x[3],x[2])).join('')+'</div>';
-  inner+='<button data-a="scanSave" class="big disp mt" style="background:var(--amber);color:#1A1917;font-size:16px">SAVE SCAN</button>'+
+  inner+='<button data-a="scanSave" class="big disp mt" style="background:var(--amber);color:#1A1917;font-size:16px">Save scan</button>'+
     '<p style="color:var(--faint);font-size:11px;line-height:1.5;margin-top:10px">Only a small thumbnail of the image is kept, so backups stay light.</p>';
   return wrapSheet('Add a scan',inner)}
 
@@ -3742,7 +3746,7 @@ function viewReport(){
       R.patterns.map(p=>'<div class="card" style="padding:13px 15px;border-color:'+(p.tone==='good'?'var(--green)':p.tone==='warn'?'var(--amber)':'var(--line)')+'">'+
         '<p style="font-size:13.5px;font-weight:600;color:'+(p.tone==='good'?'var(--green)':p.tone==='warn'?'var(--amber)':'var(--text)')+'">'+esc(p.t)+'</p>'+
         '<p style="color:var(--dim);font-size:12.5px;line-height:1.55;margin-top:4px">'+esc(p.d)+'</p></div>').join('')+'</div>'}
-  h+='<button data-a="reportCopy" class="big disp mt2" style="background:var(--amber);color:#1A1917;font-size:15px">COPY AS TEXT</button>'+
+  h+='<button data-a="reportCopy" class="big disp mt2" style="background:var(--amber);color:#1A1917;font-size:15px">Copy as text</button>'+
     '<p style="color:var(--faint);font-size:11px;line-height:1.55;margin-top:10px">Copies a plain-text version for a message or an email. It reports what you logged and nothing more — it is not an assessment, and it does not replace one.</p>';
   return h+'</div>'}
 function unseenRun(){
@@ -3757,7 +3761,7 @@ function viewRun(){
     '<h1 class="disp" style="font-size:25px;font-weight:700">RUNNING</h1>'+headBtns()+'</div>';
   if(!R.length)return h+'<div class="card mt2" style="padding:18px">'+
     '<p style="color:var(--dim);font-size:13.5px;line-height:1.6">Nothing logged yet. Add a run by hand, or bring your history across from Strava, Garmin or wherever it lives.</p>'+
-    '<button data-a="runLog" class="big disp mt2" style="background:var(--amber);color:#1A1917;font-size:15px">LOG A RUN</button>'+
+    '<button data-a="runLog" class="big disp mt2" style="background:var(--amber);color:#1A1917;font-size:15px">Log a run</button>'+
     '<button data-a="runImport" class="btn mt">Import my history</button></div></div>';
   // this week at a glance
   h+='<button data-a="runDetail" data-v="load" class="card mt2" style="width:100%;text-align:left;padding:16px;display:block">'+
@@ -4045,7 +4049,7 @@ function viewPoints(){
         '<span style="width:8px;height:8px;border-radius:8px;background:'+(on?x[2]:'var(--line)')+';flex:none"></span>'+
         '<span style="flex:1;font-size:12.5px'+(on?';font-weight:600':'')+'">'+esc(x[1])+'</span>'+
         '<span class="mono" style="color:var(--faint);font-size:11px">'+(x[0]?x[0].toLocaleString():'0')+'</span></div>'}).join('')+'</div>';
-  h+='<button data-a="dpShare" class="big disp mt2" style="background:var(--amber);color:#1A1917;font-size:15px">COPY TO SHARE</button>'+
+  h+='<button data-a="dpShare" class="big disp mt2" style="background:var(--amber);color:#1A1917;font-size:15px">Copy to share</button>'+
    '<p class="eyebrow mt2">How it is counted</p>'+
    '<div class="card mt" style="padding:14px 16px">'+
    [['Recorded live','A session with a running clock and real rests between sets. These are the points that mean something.'],
@@ -4095,7 +4099,7 @@ function viewDiary(){
         '<span style="flex:1;font-size:12.5px;line-height:1.45">'+esc(x.kind)+(x.phase?' <span class="mono" style="color:var(--faint);font-size:10px">phase '+x.phase+'</span>':'')+'</span>'+
         '<button data-a="diaryDel" data-v="'+esc(x.date+'|'+x.ex+'|'+x.kind)+'" class="mono" style="color:var(--faint);font-size:11px;flex:none">✕</button></div>').join('')+
       '</div>').join('')+'</div>';
-  h+='<button data-a="reportOpen" class="big disp mt2" style="background:var(--amber);color:#1A1917;font-size:15px">BUILD MY PHYSIO REPORT</button>'+
+  h+='<button data-a="reportOpen" class="big disp mt2" style="background:var(--amber);color:#1A1917;font-size:15px">Build my physio report</button>'+
     '<button data-a="diaryCopy" class="btn mt" style="color:var(--dim)">Copy just these notes</button>';
   return h+'</div>'}
 function viewProto(){
@@ -4125,7 +4129,7 @@ function viewProto(){
           (on?'background:var(--green);color:#1A1917':'border:1.5px solid var(--line);color:var(--faint)')+'">'+(on?'✓':(i+1))+'</span>'+
           '<span style="flex:1;font-size:13px;line-height:1.45">'+esc(c)+'</span></button>'}).join('')+'</div>';
     const all=sg.crit.every((c,i)=>st.met&&st.met[i]);
-    if(all&&st.stage<p.stages.length)h+='<button data-a="protoNext" data-v="'+k+'" class="big disp mt" style="background:var(--green);color:#1A1917;font-size:15px">MOVE TO STAGE '+(st.stage+1)+'</button>';
+    if(all&&st.stage<p.stages.length)h+='<button data-a="protoNext" data-v="'+k+'" class="big disp mt" style="background:var(--green);color:#1A1917;font-size:15px">Move to stage '+(st.stage+1)+'</button>';
     if(all&&st.stage===p.stages.length)h+='<div class="card mt" style="padding:14px 16px;border-color:var(--green)"><p style="color:var(--dim);font-size:12.5px;line-height:1.55">Final stage cleared. Keep two of these sessions a week going — the strength that got you here is what stops it coming back.</p></div>';
     if(st.stage>1)h+='<button data-a="protoBack" data-v="'+k+'" class="btn mt" style="color:var(--dim);font-size:12.5px">Step back a stage</button>';
   }else{
@@ -4229,7 +4233,7 @@ function viewAcl(){
      '<p style="color:var(--dim);font-size:12.5px;line-height:1.55;margin-top:4px">'+esc(hold.msg)+'</p>'+
      (hold.clears?'<p class="mono" style="color:var(--faint);font-size:10.5px;margin-top:7px">Lifts on '+fmtDate(hold.clears.toISOString())+' if nothing else flares. It never blocks going back down a phase, or returning to one you had already reached.</p>':'')+
      '<button data-a="aclFlareList" class="mono" style="color:var(--amber);font-size:11px;margin-top:8px">Review the logged flare-ups ›</button></div>'}}
-  if(isNow&&ready&&ph<5)h+='<button data-a="aclAdvance" class="big disp mt" style="background:var(--green);color:#1A1917;font-size:15px">EVERY CRITERION MET — MOVE TO PHASE '+(ph+1)+'</button>';
+  if(isNow&&ready&&ph<5)h+='<button data-a="aclAdvance" class="big disp mt" style="background:var(--green);color:#1A1917;font-size:15px">Every criterion met — move to phase '+(ph+1)+'</button>';
   if(isNow&&ph<aclPeak())h+='<button data-a="aclReturn" class="btn mt" style="border-color:var(--amber);color:var(--amber)">Return to phase '+(ph+1)+' — you reached it before</button>';
   if(isNow&&ph>1)h+='<button data-a="aclBack" class="btn mt" style="color:var(--dim)">Step back to phase '+(ph-1)+' — the knee has regressed</button>';
   if(ready&&ph===5)h+='<div class="card mt" style="padding:15px;border-color:var(--green)"><p style="font-size:13.5px;line-height:1.6;color:var(--dim)"><b style="color:var(--green)">All criteria met.</b> Graded return: modified training, then full training, then competition — and keep the strength work twice a week. Second-injury risk stays elevated for the first 12 months even with everything passed, especially under 18. Final clearance is your surgeon\'s and physio\'s call.</p></div>';
@@ -4354,7 +4358,7 @@ function aclTestSheet(){
     const sc=RSI_Q.map((q,n)=>f['q'+n]==null?50:f['q'+n]).reduce((a,b)=>a+b,0)/RSI_Q.length;
     inner+='<p class="mono" style="color:var(--amber);font-size:13px;margin-top:14px">Score '+Math.round(sc)+' — 65 opens phase 4, 75 is required for return to sport.</p>';
   }
-  inner+='<button data-a="aclTestSave" class="big disp mt" style="background:var(--amber);color:#1A1917;font-size:16px">SAVE TEST</button>';
+  inner+='<button data-a="aclTestSave" class="big disp mt" style="background:var(--amber);color:#1A1917;font-size:16px">Save test</button>';
   return wrapSheet({quad:'Quadriceps strength',ham:'Hamstring strength',hop:'Hop battery',rsi:'Psychological readiness'}[k],inner)}
 function aclGateSheet(){
   const g=S.agate;if(!g)return '';
@@ -4365,7 +4369,7 @@ function aclGateSheet(){
     '<p style="color:var(--dim);font-size:13px;line-height:1.6;margin-top:6px">'+esc(g.how)+'</p>'+
     '<p class="eyebrow" style="margin-top:18px">Why it matters</p>'+
     '<p style="color:var(--dim);font-size:13px;line-height:1.6;margin-top:6px">'+esc(g.why)+'</p>';
-  if(g.src&&g.src!=='time')inner+='<button data-a="aclTest" data-v="'+g.src+'" class="big disp mt" style="background:var(--amber);color:#1A1917;font-size:15px">RUN THIS TEST</button>';
+  if(g.src&&g.src!=='time')inner+='<button data-a="aclTest" data-v="'+g.src+'" class="big disp mt" style="background:var(--amber);color:#1A1917;font-size:15px">Run this test</button>';
   else if(g.manual)inner+='<button data-a="aclTick" data-v="'+g.ph+':'+g.key+'" class="btn mt" style="border-color:'+(g.met?'var(--line)':'var(--green)')+';color:'+(g.met?'var(--dim)':'var(--green)')+'">'+(g.met?'Mark as not met yet':'I have met this — tick it off')+'</button>';
   inner+='<button data-a="aclAsk" class="btn mt">Ask Allena about this criterion</button>';
   return wrapSheet('Criterion',inner)}
@@ -5676,7 +5680,7 @@ function dashTiles(){
   const out=[];
   const tile=(v,l,col,act,av)=>'<button '+(act?'data-a="'+act+'"'+(av!=null?' data-v="'+av+'"':''):'')+
     ' class="card" style="flex:1;min-width:0;padding:13px 10px;text-align:center;display:block">'+
-    '<p class="mono" style="font-size:17px;font-weight:700;line-height:1;color:'+(col||'var(--text)')+'">'+esc(String(v))+'</p>'+
+    '<p class="mono" style="font-size:21px;font-weight:800;line-height:1;color:'+(col||'var(--text)')+'">'+esc(String(v))+'</p>'+
     '<p class="mono" style="color:var(--faint);font-size:9px;letter-spacing:.04em;margin-top:5px">'+esc(l)+'</p></button>';
   if(p&&!p.acl){const a=weekAdherence(p,S.week);
     if(a&&a.setsPlanned)out.push(tile(a.pct==null?'—':a.pct+'%','THIS WEEK',adhTone(a.pct),'adhOpen'))}
@@ -5846,25 +5850,25 @@ function verdictCard(){
   if(done&&n&&t.revealed){
     inner+='<div class="an-rise" style="margin-top:11px">'+
       '<p class="mono" style="font-size:10px;color:var(--amber);letter-spacing:.08em">✦ ALLENA NOTICED</p>'+
-      '<p class="disp gradhead" style="font-size:22px;line-height:1.2;margin-top:7px">'+esc(n.t)+'</p>'+
+      '<p class="disp gradhead" style="font-size:24px;line-height:1.18;margin-top:7px">'+esc(n.t)+'</p>'+
       '<p style="color:var(--dim);font-size:13.5px;line-height:1.6;margin-top:6px">'+esc(n.d)+'</p></div>'+
       '<div style="display:flex;align-items:center;gap:9px;margin-top:13px;padding-top:12px;border-top:1px solid var(--line)">'+dots+
       '<span class="mono" style="color:var(--faint);font-size:10.5px">all done today</span></div>'}
   else if(done&&n){
-    inner+='<p class="disp gradhead" style="font-size:22px;line-height:1.2;margin-top:10px">All done today</p>'+
+    inner+='<p class="disp gradhead" style="font-size:24px;line-height:1.18;margin-top:10px">All done today</p>'+
       '<p style="color:var(--dim);font-size:13.5px;line-height:1.6;margin-top:5px">And Allena found something in your data.</p>'+
-      '<button data-a="noticedOpen" class="big disp mt" style="background:var(--amber);color:#1A1917;font-size:15px">SEE WHAT ALLENA NOTICED</button>'+
+      '<button data-a="noticedOpen" class="big disp mt" style="background:var(--amber);color:#1A1917;font-size:15px">See what Allena noticed</button>'+
       '<div style="display:flex;align-items:center;gap:9px;margin-top:12px">'+dots+'</div>'}
   else if(done){
-    inner+='<p class="disp gradhead" style="font-size:22px;line-height:1.2;margin-top:10px">All done today</p>'+
+    inner+='<p class="disp gradhead" style="font-size:24px;line-height:1.18;margin-top:10px">All done today</p>'+
       '<p style="color:var(--dim);font-size:13.5px;line-height:1.6;margin-top:5px">Everything Allena asked for is logged. Tomorrow it will have something new to say.</p>'+
       '<div style="display:flex;align-items:center;gap:9px;margin-top:12px">'+dots+'</div>'}
   else{
     const next=pr.tasks.filter(x=>!x.done)[0];
-    inner+='<p class="disp gradhead" style="font-size:22px;line-height:1.2;margin-top:10px">'+esc(next?next.n:'Today')+'</p>'+
+    inner+='<p class="disp gradhead" style="font-size:24px;line-height:1.18;margin-top:10px">'+esc(next?next.n:'Today')+'</p>'+
       (next?'<p style="color:var(--dim);font-size:13.5px;line-height:1.6;margin-top:5px">'+esc(next.sub)+'</p>':'')+
       '<button data-a="'+(next&&next.go?next.go:'todayOpen')+'" class="big disp mt" style="background:var(--amber);color:#1A1917;font-size:15px">'+
-        (next&&next.go?'DO IT NOW':'OPEN TODAY')+'</button>'+
+        (next&&next.go?'Do it now':'Open today')+'</button>'+
       '<div style="display:flex;align-items:center;gap:9px;margin-top:13px;padding-top:12px;border-top:1px solid var(--line)">'+dots+
       '<span class="mono" style="flex:1;color:var(--faint);font-size:10.5px">'+pr.done+' of '+pr.total+' · finishing the small ones is what unlocks tonight’s find</span>'+
       '<button data-a="todayOpen" class="mono" style="color:var(--amber);font-size:11px;flex:none">All</button></div>'}
@@ -6235,7 +6239,7 @@ function holdStates(){
   HOLD_MUSCLES.forEach(mu=>{
     const k=last[mu];
     if(!k){out[mu]={s:'open',days:null};return}
-    const d=Math.floor((Date.now()-new Date(k+'T12:00').getTime())/864e5);
+    const d=daysSince(k);
     out[mu]={s:d<=7?'held':d<=14?'fade':'open',days:d}});
   return out}
 function holdCounts(st){
@@ -6482,7 +6486,7 @@ function cbLastActivity(){
 function cbGap(){
   const last=cbLastActivity();
   if(!last)return 0;
-  return Math.floor((Date.now()-new Date(last+'T12:00').getTime())/864e5)}
+  return daysSince(last)}
 function cbState(){
   let cb=cbStore();
   const gap=cbGap();
@@ -6820,7 +6824,7 @@ function viewReview(){
     (rec==='repeat'
       ?'Allena would <b style="color:var(--text)">repeat this block</b>. At '+adh+'% adherence it never got a fair run, and progressing loads on top of missed sessions is how blocks fall apart.'
       :'Allena would <b style="color:var(--text)">build block 2</b>. Your logged loads become the new baseline, lifts that progressed step up, stalled lifts hold to consolidate, and volume shifts toward whatever was under-trained.')+'</p></div>'+
-    '<button data-a="nextBlock" class="big disp mt" style="background:'+(rec==='next'?'var(--amber)':'var(--raised)')+';color:'+(rec==='next'?'#1A1917':'var(--text)')+';font-size:15px">BUILD BLOCK 2 FROM THIS DATA</button>'+
+    '<button data-a="nextBlock" class="big disp mt" style="background:'+(rec==='next'?'var(--amber)':'var(--raised)')+';color:'+(rec==='next'?'#1A1917':'var(--text)')+';font-size:15px">Build block 2 from this data</button>'+
     '<button data-a="repeatBlock" class="btn mt" style="'+(rec==='repeat'?'border-color:var(--amber);color:var(--amber)':'')+'">Run this block again from week 1</button>'+
     '<button data-a="coachReview" class="btn mt">Talk it through with Allena first</button>'+
     '<button data-a="nav" data-v="home" style="width:100%;padding:12px;color:var(--faint);font-size:12px;margin-top:6px">Not now</button>';
@@ -7774,7 +7778,7 @@ function deepCard(){
     inner='<p style="color:var(--dim);font-size:12.5px;line-height:1.6;margin-top:8px">The rule engines find what was pre-imagined; the model finds the rest — lags, thresholds, relationships between your signals. Sign in (Settings → account) and this unlocks with no key needed.</p>';
   else
     inner='<p style="color:var(--dim);font-size:12.5px;line-height:1.6;margin-top:8px">Ten weeks of your numbers, handed to the model with one demand: find what the rules cannot, and cite the figures it stands on. Interpretation, clearly labelled — never dressed up as measurement.</p>'+
-      '<button data-a="deepRun" class="big disp mt" style="background:var(--amber);color:#1A1917">RUN A DEEP READ</button>'+
+      '<button data-a="deepRun" class="big disp mt" style="background:var(--amber);color:#1A1917">Run a deep read</button>'+
       '<p class="mono" style="color:var(--faint);font-size:10px;margin-top:8px;text-align:center">once a day · costs about a cent through your connection</p>';
   return '<div class="card mt2" style="padding:17px;border-radius:20px">'+
     '<div style="display:flex;align-items:center;gap:10px">'+
@@ -7851,8 +7855,8 @@ function viewToday(){
   let h='<div class="view pad stg" style="padding-top:22px">';
   h+='<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px">'+
     '<div style="min-width:0"><h1 class="disp brand" style="font-size:28px;font-weight:700;line-height:1">Allena</h1>'+
-    '<p style="color:var(--dim);font-size:13.5px;margin-top:3px">Welcome'+(S.prof&&S.prof.name?', '+esc(S.prof.name):'')+'</p>'+
-    '<p class="mono" style="color:var(--faint);font-size:10px;letter-spacing:.08em;text-transform:uppercase;margin-top:2px">'+esc(dateLine)+'</p></div>'+
+    '<p style="color:var(--text);font-weight:650;font-size:14px;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Welcome'+(S.prof&&S.prof.name?', '+esc(S.prof.name):'')+'</p>'+
+    '<p class="mono" style="color:var(--faint);font-size:10px;letter-spacing:.08em;text-transform:uppercase;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(dateLine)+'</p></div>'+
     '<div style="display:flex;gap:8px;flex:none;align-items:center">'+findingsBtn()+pointsChip()+
     '<button data-a="menuOpen" style="width:42px;height:42px;border-radius:13px;background:var(--surface);border:1px solid var(--line);color:var(--dim);display:flex;align-items:center;justify-content:center">'+
     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" style="width:19px;height:19px"><circle cx="12" cy="8" r="3.2"/><path d="M5 20c0-3.6 3.1-5.5 7-5.5s7 1.9 7 5.5"/></svg></button></div></div>';
@@ -7950,7 +7954,7 @@ function viewSession(){
         (S.note.knee===k?'background:'+(k==='Fine'?'var(--green)':'var(--red)')+';color:#fff':'background:var(--surface);color:var(--dim)')+'">'+k+'</button>').join('')+'</div>';
       if(S.note.knee==='Swollen'||S.note.knee==='Unstable')h+='<p style="color:var(--amber);font-size:12px;margin-top:8px">Log it and mention it to your physio. Don\'t train through a trend.</p>';
       h+='</div>'}
-    h+='</div><button data-a="complete" class="big disp mt3" style="background:var(--green);color:#1A1917;font-size:18px">FINISH AND SAVE</button>'+
+    h+='</div><button data-a="complete" class="big disp mt3" style="background:var(--green);color:#1A1917;font-size:18px">Finish and save</button>'+
        '<p style="text-align:center;color:var(--faint);font-size:11.5px;margin-top:12px">Every set was already saved as you logged it.</p>'+
        '<button data-a="discard" style="width:100%;padding:14px;color:var(--red);font-size:12.5px;margin-top:8px">Discard this session</button></div>';
     return h}
@@ -8004,7 +8008,7 @@ function viewSession(){
        '<div style="width:200px;height:200px;margin-top:24px;border-radius:200px;border:9px solid var(--green);display:flex;align-items:center;justify-content:center">'+
        '<span style="color:var(--green);font-size:60px">✓</span></div>'+
        '<p style="color:var(--dim);font-size:13px;margin-top:22px;text-align:center">Get set on the other side — the timer waits for you.</p>'+
-       '<button data-a="swapSide" class="big disp mt" style="background:'+acc+';color:#1A1917;font-size:18px">SWAP SIDE — START</button>'+
+       '<button data-a="swapSide" class="big disp mt" style="background:'+acc+';color:#1A1917;font-size:18px">Swap side — start</button>'+
        '<button data-a="finish" style="width:100%;padding:14px;color:var(--faint);font-size:12px;margin-top:8px">Log without the second side</button></div>';
       return h}
     const left=Math.ceil((S.holdEnd-Date.now())/1000);
@@ -8040,9 +8044,9 @@ function viewSession(){
   if(s.phase==='ready'){const wu=warmupPlan(s,cur);if(wu)h+=warmupHtml(wu,cur,s)}
 
   if(s.phase==='ready')h+='<button data-a="begin" class="big disp mt" style="background:'+acc+';color:#1A1917">'+
-    (cur.secs?'START '+cur.secs+'s HOLD':'START SET '+cur.setNo)+'</button>';
+    (cur.secs?'Start '+cur.secs+'s hold':'Start set '+cur.setNo)+'</button>';
   if(s.phase==='working')h+='<p class="mono" id="elapsed" style="text-align:center;color:var(--faint);font-size:13px;margin-top:24px">'+mmss((Date.now()-(S.setStart||Date.now()))/1000)+' under the bar</p>'+
-    '<button data-a="finish" class="big disp" style="background:var(--text);color:#1A1917;margin-top:12px">FINISH SET</button>';
+    '<button data-a="finish" class="big disp" style="background:var(--text);color:#1A1917;margin-top:12px">Finish set</button>';
   if(s.phase==='logging'){
     const timed=!!cur.secs;
     const ready=timed?(+S.draft.secs>0):(S.draft.rpe!=null&&S.draft.r);
@@ -8052,7 +8056,7 @@ function viewSession(){
       stepper('draft.w','Weight',S.draft.w,2.5,'kg')+stepper('draft.r','Reps'+(cur.perSide?' / side':''),S.draft.r,1,'')+'</div>'+
       '<p style="color:var(--dim);font-size:11px;letter-spacing:.1em;text-transform:uppercase;margin:16px 0 8px">RPE</p>'+rpeGrid('draft.rpe',S.draft.rpe);
     h+='<button data-a="commit" class="big disp mt" style="background:'+(ready?'var(--green)':'var(--raised)')+';color:'+(ready?'#1A1917':'var(--faint)')+';font-size:19px">'+
-     (s.idx>=s.sets.length-1?'LOG AND FINISH':(cur.rest>5?'LOG AND REST '+mmss(cur.rest):'LOG — NEXT'))+'</button></div>'}
+     (s.idx>=s.sets.length-1?'Log and finish':(cur.rest>5?'Log and rest '+mmss(cur.rest):'Log — next'))+'</button></div>'}
   if(isRehabSession()&&s.phase!=='logging')h+='<button data-a="flagOpen" class="btn mt" style="border-color:var(--red);color:var(--red);font-size:12.5px">Flag this for my physio</button>';
   if(s.phase!=='logging')h+='<div class="row" style="margin-top:12px">'+
     '<button data-a="modifyOpen" class="btn" style="flex:1;color:var(--amber);font-size:13px">Modify</button>'+
@@ -9029,7 +9033,7 @@ function sheetHtml(){
   if(S.sheet.t==='discard')return wrapSheet('Discard session',
     '<p style="color:var(--dim);font-size:14px;line-height:1.55">Throws away everything from this session, including the '+
     (S.sess?S.sess.log.length:0)+' sets already logged. Use Save &amp; exit instead if you want to keep them.</p>'+
-    '<button data-a="discardYes" class="big disp mt" style="background:var(--red);color:#fff;font-size:16px">DISCARD</button>');
+    '<button data-a="discardYes" class="big disp mt" style="background:var(--red);color:#fff;font-size:16px">Discard</button>');
   if(S.sheet.t==='histedit'){
     const r=S.history.find(x=>x.id===S.sheet.id);if(!r)return '';
     const f=S.hform||(S.hform={});
@@ -9046,14 +9050,14 @@ function sheetHtml(){
       ((f.complete!=null?f.complete:r.complete)?'background:var(--amber);color:#1A1917':'border:1.5px solid var(--line)')+'">'+((f.complete!=null?f.complete:r.complete)?'\u2713':'')+'</span>'+
       '<span style="flex:1"><span style="display:block;font-size:13.5px;font-weight:600">Counted as complete</span>'+
       '<span style="color:var(--faint);font-size:11.5px">Unfinished sessions stay in your log but are left out of adherence</span></span></button>'+
-      '<button data-a="histSave" class="big disp mt2" style="background:var(--amber);color:#1A1917;font-size:15px">SAVE CHANGES</button>'+
+      '<button data-a="histSave" class="big disp mt2" style="background:var(--amber);color:#1A1917;font-size:15px">Save changes</button>'+
       '<button data-a="delHist" data-v="'+esc(r.id)+'" class="btn mt" style="color:var(--red)">Delete this session</button>')}
   if(S.sheet.t==='delsession')return wrapSheet('Delete session',
     '<p style="color:var(--dim);font-size:14px;line-height:1.55">This removes the whole session and every set in it. It can\'t be undone.</p>'+
-    '<button data-a="delHistYes" data-v="'+S.sheet.id+'" class="big disp mt" style="background:var(--red);color:#fff;font-size:16px">DELETE</button>');
+    '<button data-a="delHistYes" data-v="'+S.sheet.id+'" class="big disp mt" style="background:var(--red);color:#fff;font-size:16px">Delete</button>');
   if(S.sheet.t==='removeprog')return wrapSheet('Remove program',
     '<p style="color:var(--dim);font-size:14px;line-height:1.55">Removes it from the library. Sessions already logged under it stay in History. You can re-import it any time from a backup.</p>'+
-    '<button data-a="removeProg" data-v="'+S.sheet.id+'" class="big disp mt" style="background:var(--red);color:#fff;font-size:16px">REMOVE</button>');
+    '<button data-a="removeProg" data-v="'+S.sheet.id+'" class="big disp mt" style="background:var(--red);color:#fff;font-size:16px">Remove</button>');
   if(S.sheet.t==='goals'){
     S.gform=S.gform||{ex:null,w:60,r:8};
     let inner='';
@@ -9069,7 +9073,7 @@ function sheetHtml(){
         '<button data-a="gEx" data-v="'+esc(x)+'" class="pill '+(S.gform.ex===x?'on':'')+'">'+esc(x)+'</button>').join('')+'</div>'+
       '<div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px;margin-top:14px">'+
       stepper('gform.w','Weight',S.gform.w,2.5,'kg')+stepper('gform.r','Reps',S.gform.r,1,'')+'</div>'+
-      '<button data-a="gAdd" class="big disp mt" style="background:'+(S.gform.ex?'var(--green)':'var(--raised)')+';color:'+(S.gform.ex?'#1A1917':'var(--faint)')+';font-size:16px">ADD GOAL</button>';
+      '<button data-a="gAdd" class="big disp mt" style="background:'+(S.gform.ex?'var(--green)':'var(--raised)')+';color:'+(S.gform.ex?'#1A1917':'var(--faint)')+';font-size:16px">Add goal</button>';
     }else inner+='<p style="color:var(--dim);font-size:12.5px;line-height:1.55;margin-top:14px">Three goals is the cap for a block. Spreading focus further dilutes the volume each lift gets — finish or drop one to add another.</p>';
     inner+='<p style="color:var(--faint);font-size:11.5px;line-height:1.5;margin-top:14px">Progress and projections use estimated 1RM from every logged set of that lift. The projection fits a line through your last ~4 months — strength gain flattens over time, so treat dates as optimistic. A goal only counts as DONE when you log the actual set.</p>';
     return wrapSheet('Lift goals',inner)}
@@ -9094,7 +9098,7 @@ function sheetHtml(){
       '<span style="width:22px;height:22px;border-radius:7px;flex:none;display:inline-flex;align-items:center;justify-content:center;font-size:12px;'+(f.perm?'background:var(--amber);color:#1A1917':'border:1.5px solid var(--line)')+'">'+(f.perm?'✓':'')+'</span>'+
       '<span style="font-size:13px;color:var(--dim)">Also add to this day permanently (every week)</span></button>';
     const nn=Math.max(1,Math.min(6,+f.sets||3));
-    inner+='<button data-a="axAdd" class="big disp mt" style="background:'+(f.name.trim()?'var(--green)':'var(--raised)')+';color:'+(f.name.trim()?'#1A1917':'var(--faint)')+';font-size:16px">ADD '+nn+' SET'+(nn===1?'':'S')+'</button>';
+    inner+='<button data-a="axAdd" class="big disp mt" style="background:'+(f.name.trim()?'var(--green)':'var(--raised)')+';color:'+(f.name.trim()?'#1A1917':'var(--faint)')+';font-size:16px">Add '+nn+' set'+(nn===1?'':'s')+'</button>';
     return wrapSheet('Add exercise',inner)}
   if(S.sheet.t==='qsub'){
     const r=S.quick.rows[S.sheet.i],f=subsFor(r.origEx||r.ex);
@@ -9124,7 +9128,7 @@ function sheetHtml(){
     return wrapSheet('Already done',
       '<p style="color:var(--dim);font-size:14px;line-height:1.55">You completed <b style="color:var(--text)">'+esc(d.name)+'</b> in week '+S.week+
       (prev?' on '+fmtDate(prev.date):'')+'. Starting again logs a second session for the same day.</p>'+
-      '<button data-a="redoYes" data-v="'+S.sheet.di+'" class="big disp mt" style="background:var(--amber);color:#1A1917;font-size:16px">DO IT AGAIN ANYWAY</button>'+
+      '<button data-a="redoYes" data-v="'+S.sheet.di+'" class="big disp mt" style="background:var(--amber);color:#1A1917;font-size:16px">Do it again anyway</button>'+
       (S.week<p.weeks?'<button data-a="redoNext" class="btn mt">Go to week '+(S.week+1)+' instead</button>':''))}
   if(S.sheet.t==='sub'){
     const s2=S.sess,cur=s2.sets[s2.idx],found=subsFor(cur.origEx||cur.ex);
@@ -9142,7 +9146,7 @@ function sheetHtml(){
             '<span style="color:var(--faint);font-size:11.5px">'+esc(x.why||'')+'</span></button>').join('')+'</div>'
           :'<p style="color:var(--faint);font-size:12.5px;margin-top:12px">Nothing suitable in your programme — type what you are doing instead.</p>')+
         '<input data-in="axf.name" value="'+esc(f2.name)+'" placeholder="Or type any exercise name" autocomplete="off" style="width:100%;margin-top:12px">'+
-        '<button data-a="subFreeTyped" class="big disp mt" style="background:'+(f2.name.trim()?'var(--green)':'var(--raised)')+';color:'+(f2.name.trim()?'#1A1917':'var(--faint)')+'">USE THIS</button>';
+        '<button data-a="subFreeTyped" class="big disp mt" style="background:'+(f2.name.trim()?'var(--green)':'var(--raised)')+';color:'+(f2.name.trim()?'#1A1917':'var(--faint)')+'">Use this</button>';
       if(cur.origEx)inner+='<button data-a="subRevert" class="btn mt">Revert to '+esc(cur.origEx)+'</button>';
       return wrapSheet('Swap exercise',inner)}
     const W=cur.origW===undefined?cur.targetW:cur.origW;
@@ -9166,7 +9170,7 @@ function sheetHtml(){
       '<div style="margin-top:8px;display:flex;flex-direction:column;gap:6px">'+
       nb.changes.slice(0,10).map(c=>'<p style="font-size:12.5px;color:var(--dim);line-height:1.5">· '+esc(c)+'</p>').join('')+'</div>';
     else inner+='<p style="color:var(--faint);font-size:12.5px;margin-top:12px">Clean progression — +2.5 kg across the board, nothing flagged.</p>';
-    inner+='<button data-a="nextBlockGo" class="big disp mt" style="background:var(--amber);color:#1A1917;font-size:15px">START THIS BLOCK</button>'+
+    inner+='<button data-a="nextBlockGo" class="big disp mt" style="background:var(--amber);color:#1A1917;font-size:15px">Start this block</button>'+
       '<p style="color:var(--faint);font-size:11px;line-height:1.5;margin-top:10px">Ask Allena to review it first if you want a second opinion — she sees the same stats.</p>';
     return wrapSheet('Next block',inner)}
   if(S.sheet.t==='playout'){
@@ -9226,7 +9230,7 @@ function sheetHtml(){
            :'When did you injure it? This is context rather than a gate: without a graft to heal, your timeline is set by how the knee behaves, not by the calendar.')+'</p>'+
       '<p class="eyebrow" style="margin-top:16px">'+(surg?'Surgery date':'Injury date')+'</p>'+
       '<input type="date" data-acldate="1" value="'+esc((S.adate&&S.adate.val)||'')+'" style="width:100%;margin-top:8px;background:var(--surface);border:1px solid var(--line);border-radius:10px;color:var(--text);padding:13px;font-size:16px;outline:none">'+
-      '<button data-a="aclDateSave" class="big disp mt" style="background:var(--amber);color:#1A1917;font-size:16px">SAVE</button>'+
+      '<button data-a="aclDateSave" class="big disp mt" style="background:var(--amber);color:#1A1917;font-size:16px">Save</button>'+
       '<button data-a="aclDateSkip" style="width:100%;padding:12px;color:var(--faint);font-size:12px;margin-top:4px">'+(surg?'I will add it later':'Skip')+'</button>';
     return wrapSheet(surg?'Surgery date':'Injury date',inner)}
   if(S.sheet.t==='menu'){
@@ -9260,7 +9264,7 @@ function sheetHtml(){
       '<div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap">'+
       [30,40,50,60,70,80,90,100].map(v=>'<button data-a="gamPick" data-v="'+v+'" class="pill mono" style="flex:1 0 20%;font-size:12px;padding:9px 0'+(+f.am===v?';background:var(--amber);color:#1A1917;border-color:var(--amber);font-weight:600':'')+'">'+v+'</button>').join('')+'</div>'+
       (base?'<p class="mono" style="color:var(--faint);font-size:11px;margin-top:10px">Your baseline is '+base+'.</p>':'')+
-      '<button data-a="gamSave" class="big disp mt" style="background:var(--amber);color:#1A1917;font-size:16px">SAVE</button>'+
+      '<button data-a="gamSave" class="big disp mt" style="background:var(--amber);color:#1A1917;font-size:16px">Save</button>'+
       '<button data-a="gamSkip" style="width:100%;padding:12px;color:var(--faint);font-size:12px;margin-top:4px">Not today</button>';
     return wrapSheet('Good '+part,inner)}
   if(S.sheet.t==='swapask'){
@@ -9279,7 +9283,7 @@ function sheetHtml(){
           opt('use',esc(sw.now),'what you did last time')+'</div>'+
           '<button data-a="swapPick" data-v="'+i+':perm" style="width:100%;text-align:left;margin-top:8px;padding:9px 2px;color:'+(on==='perm'?'var(--amber)':'var(--faint)')+';font-size:11.5px">'+
           (on==='perm'?'✓ ':'')+'Use '+esc(sw.now)+' and write it into the program permanently</button></div>'}).join('')+'</div>'+
-      '<button data-a="swapGo" class="big disp mt" style="background:var(--amber);color:#1A1917;font-size:15px">START THE SESSION</button>';
+      '<button data-a="swapGo" class="big disp mt" style="background:var(--amber);color:#1A1917;font-size:15px">Start the session</button>';
     return wrapSheet('Same as last time?',inner)}
   if(S.sheet.t==='gpre'){
     const f=S.gform,r=(f.pre!==''&&+f.pre>0)?readiness(+f.pre):null;
@@ -9291,9 +9295,9 @@ function sheetHtml(){
         '<p class="mono" style="font-size:10.5px;color:'+col+'">'+r.level.toUpperCase()+'</p>'+
         '<p style="font-size:13px;color:var(--dim);margin-top:3px">'+esc(r.note)+'</p></div>';
       if(r.level!=='ok')inner+='<p style="color:var(--dim);font-size:13px;line-height:1.55;margin-top:14px">How do you actually feel? Your read beats the watch.</p>'+
-        '<button data-a="gpreGo" data-v="asis" class="big disp mt" style="background:var(--amber);color:#1A1917;font-size:15px">I FEEL FINE — AS WRITTEN</button>'+
+        '<button data-a="gpreGo" data-v="asis" class="big disp mt" style="background:var(--amber);color:#1A1917;font-size:15px">I feel fine — as written</button>'+
         '<button data-a="gpreGo" data-v="ease" class="btn mt">Ease it'+(r.level==='low'?' — −10%, RPE 8, fewer sets':' — −5%, RPE 8')+'</button>';
-      else inner+='<button data-a="gpreGo" data-v="asis" class="big disp mt" style="background:var(--amber);color:#1A1917;font-size:15px">START THE SESSION</button>'}
+      else inner+='<button data-a="gpreGo" data-v="asis" class="big disp mt" style="background:var(--amber);color:#1A1917;font-size:15px">Start the session</button>'}
     inner+='<button data-a="gpreGo" data-v="skip" style="width:100%;padding:12px;color:var(--faint);font-size:12px;margin-top:6px">Skip this time</button>';
     return wrapSheet('Before you start',inner)}
   if(S.sheet.t==='gpost'){
@@ -9301,7 +9305,7 @@ function sheetHtml(){
     let inner='<p style="color:var(--dim);font-size:13px;line-height:1.55">Body Battery now — this is how Allena learns what a session actually costs you.</p>'+
       '<div style="margin-top:14px">'+stepper('gform.post','After session',f.post,5,'/100')+'</div>'+
       (drain!=null&&drain>=0?'<p class="mono" style="color:var(--amber);font-size:12px;margin-top:10px">Drain '+drain+' points (from '+d.pre+')</p>':'')+
-      '<button data-a="gpostSave" class="big disp mt" style="background:var(--amber);color:#1A1917;font-size:16px">SAVE</button>'+
+      '<button data-a="gpostSave" class="big disp mt" style="background:var(--amber);color:#1A1917;font-size:16px">Save</button>'+
       '<button data-a="sheetClose" style="width:100%;padding:12px;color:var(--faint);font-size:12px;margin-top:4px">Not now</button>';
     return wrapSheet('After the session',inner)}
   if(S.sheet.t==='editpt'){
@@ -9310,7 +9314,7 @@ function sheetHtml(){
     return wrapSheet('Fix this point',
       '<p style="color:var(--dim);font-size:13px;line-height:1.55">A single wrong number can bend a whole trend. Correct it here or remove it from the chart.</p>'+
       '<div style="margin-top:14px">'+stepper('sheet.val',lab,e.val,e.kind==='bw'?0.1:5,'')+'</div>'+
-      '<button data-a="editptSave" class="big disp mt" style="background:var(--amber);color:#1A1917;font-size:16px">SAVE</button>'+
+      '<button data-a="editptSave" class="big disp mt" style="background:var(--amber);color:#1A1917;font-size:16px">Save</button>'+
       '<button data-a="chartDel" data-v="'+esc(e.id)+'" class="btn mt" style="color:var(--red);font-size:12.5px">Remove this point</button>')}
   if(S.sheet.t==='sanity'){
     const q=S.sanity;if(!q)return '';
@@ -9324,7 +9328,7 @@ function sheetHtml(){
         (c.targetW!=null?' · target '+c.targetW+' kg × '+c.targetReps:'')+'</p></div>'+
       '<div class="card mt" style="padding:13px 15px;border-color:var(--amber)">'+
       q.flags.map(f=>'<p style="color:var(--dim);font-size:12.5px;line-height:1.55">· '+esc(f)+'</p>').join('')+'</div>'+
-      '<button data-a="sanityFix" class="big disp mt" style="background:var(--amber);color:#1A1917;font-size:15px">LET ME FIX IT</button>'+
+      '<button data-a="sanityFix" class="big disp mt" style="background:var(--amber);color:#1A1917;font-size:15px">Let me fix it</button>'+
       '<button data-a="sanityKeep" class="btn mt">That is correct — log it</button>'+
       '<p style="color:var(--faint);font-size:11px;line-height:1.5;margin-top:10px">If it is right, keep it. A deload, an injury, a different machine or a bad day are all real reasons for a number like this, and Allena will read it as such.</p>')}
   if(S.sheet.t==='rehabswap'){
@@ -9391,7 +9395,7 @@ function sheetHtml(){
       '<p style="color:var(--dim);font-size:13px;line-height:1.6">Same time of day each time is what makes the trend readable — first thing, before food, is the usual choice.</p>'+
       (last?'<p class="mono" style="color:var(--faint);font-size:11.5px;margin-top:8px">Last logged '+last+' kg</p>':'')+
       '<input data-in="gform.bw" value="'+esc(f.bw||'')+'" inputmode="decimal" placeholder="'+(last||'kg')+'" style="margin-top:12px;text-align:center;font-size:22px" class="mono">'+
-      '<button data-a="bwSave" class="big disp mt2" style="background:'+((f.bw||'').trim()?'var(--amber)':'var(--raised)')+';color:'+((f.bw||'').trim()?'#1A1917':'var(--faint)')+';font-size:15px">SAVE</button>')}
+      '<button data-a="bwSave" class="big disp mt2" style="background:'+((f.bw||'').trim()?'var(--amber)':'var(--raised)')+';color:'+((f.bw||'').trim()?'#1A1917':'var(--faint)')+';font-size:15px">Save</button>')}
   if(S.sheet.t==='signal'){
     const sg=signalScore(),lv=signalLevel(sg.pct),st=weekStreak();
     const parts=sg.parts.slice().sort((a,b)=>(a.have/a.need)-(b.have/b.need));
@@ -9463,7 +9467,7 @@ function sheetHtml(){
         :'')+
       '<p style="color:var(--faint);font-size:11px;line-height:1.55;margin-top:13px">Anchored to your own numbers — '+esc(q.basis.what)+' — so it is proven ground, not a stretch goal.</p>'+
       (Q.state==='offered'
-        ?'<button data-a="questAccept" class="big disp mt2" style="background:var(--amber);color:#1A1917;font-size:15px">I’M IN</button>'+
+        ?'<button data-a="questAccept" class="big disp mt2" style="background:var(--amber);color:#1A1917;font-size:15px">I’m in</button>'+
          '<button data-a="questPass" class="btn mt" style="color:var(--dim)">Not this week</button>'
         :'')+
       '<p style="color:var(--faint);font-size:11px;line-height:1.55;margin-top:12px">One per week, generated Monday from what you have already done. If it does not happen, nothing is lost and nothing turns red — a fresh one simply arrives Monday.</p>')}
@@ -9512,13 +9516,13 @@ function sheetHtml(){
           left+' check-in'+(left===1?'':'s')+' left, each one earns points.</p>'+
         '<div style="display:flex;gap:5px;margin-top:13px">'+
         pr.tasks.map(x=>'<span style="width:9px;height:9px;border-radius:9px;background:'+(x.done?'var(--green)':'var(--line)')+'"></span>').join('')+'</div>'+
-        (next?'<button data-a="'+(next.go||'todayOpen')+'" class="big disp mt2" style="background:var(--amber);color:#1A1917">'+esc((next.go?next.n:'Open today').toUpperCase())+'</button>':'')+
+        (next?'<button data-a="'+(next.go||'todayOpen')+'" class="big disp mt2" style="background:var(--amber);color:#1A1917">'+esc(next.go?next.n:'Open today')+'</button>':'')+
         '<button data-a="sheetClose" class="btn mt" style="color:var(--dim)">Later</button>');}
     return wrapSheet('Allena found something',
       '<p class="mono" style="font-size:9.5px;color:var(--green);letter-spacing:.08em">UNLOCKED · TODAY’S LOOP DONE</p>'+
       '<p class="disp" style="font-size:21px;font-weight:700;line-height:1.25;margin-top:8px">Allena has something on you</p>'+
       '<p style="color:var(--dim);font-size:13.5px;line-height:1.6;margin-top:6px">One observation, from your own numbers, different tomorrow.</p>'+
-      '<button data-a="dfReveal" class="big disp mt2" style="background:var(--amber);color:#1A1917">REVEAL IT</button>');}
+      '<button data-a="dfReveal" class="big disp mt2" style="background:var(--amber);color:#1A1917">Reveal it</button>');}
   if(S.sheet.t==='wrap'){
     if(S.think&&S.think.key==='wrap'&&!S.think.done)
       return wrapSheet('Month in review',thinkPanel('Reading the month back'));
@@ -9576,7 +9580,7 @@ function sheetHtml(){
     const c=S.confirm;if(!c)return '';
     return wrapSheet(c.t,
       '<p style="color:var(--dim);font-size:13px;line-height:1.6">'+esc(c.d||'')+'</p>'+
-      '<button data-a="'+c.go+'" data-v="'+esc(c.v||'')+'" class="big disp mt2" style="background:'+(c.soft?'var(--amber)':'var(--red)')+';color:'+(c.soft?'#1A1917':'#fff')+';font-size:15px">'+esc(c.ok||'DELETE')+'</button>'+
+      '<button data-a="'+c.go+'" data-v="'+esc(c.v||'')+'" class="big disp mt2" style="background:'+(c.soft?'var(--amber)':'var(--red)')+';color:'+(c.soft?'#1A1917':'#fff')+';font-size:15px">'+esc(c.ok||'Delete')+'</button>'+
       '<button data-a="closeSheet" class="btn mt">'+esc(c.no||'Keep it')+'</button>')}
   if(S.sheet.t==='runimp'){
     if(thinking('imp'))return wrapSheet('Reading your history',thinkPanel('Allena is reading it'));
@@ -9611,7 +9615,7 @@ function sheetHtml(){
             '<span class="mono" style="color:var(--faint);font-size:10.5px">'+esc(fmtDate(r.date+'T12:00'))+' · '+
             esc((RUN_TYPES.find(t2=>t2[0]===r.type)||['','run'])[1].toLowerCase())+(r.hr?' · '+Math.round(r.hr)+' bpm':'')+'</span></div>').join('')+
           (l.length>6?'<p class="mono" style="color:var(--faint);font-size:10.5px">and '+(l.length-6)+' more.</p>':'')+'</div>'+
-          '<button data-a="rimpGo" class="big disp mt2" style="background:var(--amber);color:#1A1917;font-size:15px">IMPORT ALL '+l.length+'</button>'
+          '<button data-a="rimpGo" class="big disp mt2" style="background:var(--amber);color:#1A1917;font-size:15px">Import all '+l.length+'</button>'
           :'<p style="color:var(--dim);font-size:13px;line-height:1.6">Nothing usable in that. '+
             (R.res.skipped?R.res.skipped+' row'+(R.res.skipped===1?' was':'s were')+' skipped. ':'')+
             'A distance and a time per activity is all it needs.</p>')+
@@ -9628,7 +9632,7 @@ function sheetHtml(){
         '<span style="font-size:13px;font-weight:600;display:block">'+esc(x[0])+'</span>'+
         '<span style="color:var(--faint);font-size:11.5px;line-height:1.45">'+esc(x[1])+'</span></div>').join('')+'</div>'+
       '<textarea data-in="rimp.text" rows="7" placeholder="Paste the CSV, the activity list, or a GPX file here" style="margin-top:12px;font-size:13px">'+esc(R.text||'')+'</textarea>'+
-      '<button data-a="rimpRead" class="big disp mt" style="background:'+((R.text||'').trim()?'var(--amber)':'var(--raised)')+';color:'+((R.text||'').trim()?'#1A1917':'var(--faint)')+';font-size:15px">READ IT</button>'+
+      '<button data-a="rimpRead" class="big disp mt" style="background:'+((R.text||'').trim()?'var(--amber)':'var(--raised)')+';color:'+((R.text||'').trim()?'#1A1917':'var(--faint)')+';font-size:15px">Read it</button>'+
       '<p style="color:var(--faint);font-size:11px;line-height:1.55;margin-top:10px">Rides, swims and walks are ignored. Anything already logged on the same day at the same distance is skipped rather than duplicated.</p>')}
   if(S.sheet.t==='runlog'){
     const f=S.rform;
@@ -9676,7 +9680,7 @@ function sheetHtml(){
       '<p style="color:var(--faint);font-size:11.5px;line-height:1.5;margin-top:3px">Copy the summary out of Garmin Connect or Strava and drop it here — Allena reads the numbers out.</p>'+
       '<textarea data-in="rform.paste" rows="3" placeholder="e.g. 10.42 km, 52:18, avg HR 148, 86 m elevation" style="margin-top:8px;font-size:14px">'+esc(f.paste||'')+'</textarea>'+
       (f.paste&&f.paste.trim()?'<button data-a="runParse" class="btn mt" style="border-color:var(--amber);color:var(--amber);font-size:13px">Read those numbers</button>':'')+
-      '<button data-a="runSaveGo" class="big disp mt2" style="background:'+((f.km>0&&f.mins>0)?'var(--amber)':'var(--raised)')+';color:'+((f.km>0&&f.mins>0)?'#1A1917':'var(--faint)')+';font-size:15px">'+(f.id?'SAVE CHANGES':'SAVE THE RUN')+'</button>')}
+      '<button data-a="runSaveGo" class="big disp mt2" style="background:'+((f.km>0&&f.mins>0)?'var(--amber)':'var(--raised)')+';color:'+((f.km>0&&f.mins>0)?'#1A1917':'var(--faint)')+';font-size:15px">'+(f.id?'Save changes':'Save the run')+'</button>')}
   if(S.sheet.t==='checkin'){
     const f=S.chk||(S.chk={pain:0,swell:false,stiff:0,conf:7,note:''});
     const scale=(k,label,hint)=>'<p class="eyebrow" style="margin-top:16px">'+label+'</p>'+
@@ -9696,7 +9700,7 @@ function sheetHtml(){
       '<span style="flex:1"><span style="display:block;font-size:13.5px;font-weight:600">Swollen or full today</span>'+
       '<span style="color:var(--faint);font-size:11.5px">The single most useful thing to record</span></span></button>'+
       '<input data-in="chk.note" value="'+esc(f.note||'')+'" placeholder="Anything else worth noting" autocomplete="off" style="width:100%;margin-top:12px">'+
-      '<button data-a="chkSave" class="big disp mt2" style="background:var(--amber);color:#1A1917;font-size:15px">SAVE TODAY</button>')}
+      '<button data-a="chkSave" class="big disp mt2" style="background:var(--amber);color:#1A1917;font-size:15px">Save today</button>')}
   if(S.sheet.t==='flag'){
     const cur=(S.sess&&S.sess.sets[S.sess.idx])||{};
     const opts=[['pain','It hurt during the set'],['after','It aches or swells afterwards'],
@@ -9708,7 +9712,7 @@ function sheetHtml(){
       '<div style="margin-top:12px;display:flex;flex-direction:column;gap:7px">'+
       opts.map(o=>'<button data-a="flagPick" data-v="'+o[0]+'" class="card" style="width:100%;text-align:left;padding:12px 14px;font-size:13.5px;display:block">'+esc(o[1])+'</button>').join('')+'</div>'+
       '<input data-in="flagNote" value="'+esc(S.flagNote||'')+'" placeholder="Or describe it in your own words" autocomplete="off" style="width:100%;margin-top:12px">'+
-      '<button data-a="flagTyped" class="big disp mt" style="background:'+((S.flagNote||'').trim()?'var(--amber)':'var(--raised)')+';color:'+((S.flagNote||'').trim()?'#1A1917':'var(--faint)')+';font-size:15px">SAVE THE NOTE</button>'+
+      '<button data-a="flagTyped" class="big disp mt" style="background:'+((S.flagNote||'').trim()?'var(--amber)':'var(--raised)')+';color:'+((S.flagNote||'').trim()?'#1A1917':'var(--faint)')+';font-size:15px">Save the note</button>'+
       '<button data-a="closeSheet" style="width:100%;padding:12px;color:var(--faint);font-size:12px;margin-top:4px">Never mind</button>')}
   if(S.sheet.t==='rehabskip'){
     const q=S.rskip;if(!q)return '';
@@ -9763,9 +9767,9 @@ function sheetHtml(){
       ', not even as an assister, so that work is simply gone. Effort cannot substitute for a muscle you are not training.</p></div>';
     inner+='<p style="color:var(--faint);font-size:11px;line-height:1.55;margin-top:12px">One rep closer to failure buys back a fraction of a set, not a whole one. It works for a small gap and not as a habit.</p>'+
       ((S.prev&&harderMapNow(S.prev)&&(!S.harderFor||(S.prev.harderFor||[]).indexOf(S.harderFor)>=0))
-        ?'<button data-a="harderCancel" class="big disp mt" style="background:var(--amber);color:#1A1917;font-size:15px">KEEP IT</button>'+
+        ?'<button data-a="harderCancel" class="big disp mt" style="background:var(--amber);color:#1A1917;font-size:15px">Keep it</button>'+
          '<button data-a="harderOff" class="btn mt" style="color:var(--dim)">Stop pushing harder — back to programmed efforts</button>'
-        :'<button data-a="harderApply" class="big disp mt" style="background:var(--amber);color:#1A1917;font-size:15px">DO IT</button>'+
+        :'<button data-a="harderApply" class="big disp mt" style="background:var(--amber);color:#1A1917;font-size:15px">Do it</button>'+
          '<button data-a="harderCancel" class="btn mt">Never mind</button>');
     return wrapSheet((S.prev&&harderMapNow(S.prev)&&(!S.harderFor||(S.prev.harderFor||[]).indexOf(S.harderFor)>=0))?'Where the effort goes now':'Where the effort goes',inner)}
   if(S.sheet.t==='cutplan'){
@@ -9789,9 +9793,9 @@ function sheetHtml(){
       '<p class="mono" style="font-size:10px;color:var(--amber)">A PATTERN, NOT A ONE-OFF</p>'+
       '<p style="color:var(--dim);font-size:12.5px;line-height:1.55;margin-top:4px">You have cut '+pl.cutHistory+' exercises from this block. That usually means the block asks for more than your week has room for. The fix is a smaller block next time, not patching this one.</p></div>';
     inner+=(pl.adds.length
-      ?'<button data-a="cutApply" class="big disp mt2" style="background:var(--amber);color:#1A1917;font-size:15px">ADD THEM BACK THIS WEEK</button>'+
+      ?'<button data-a="cutApply" class="big disp mt2" style="background:var(--amber);color:#1A1917;font-size:15px">Add them back this week</button>'+
        '<button data-a="cutSkipPlan" class="btn mt">Leave the week short</button>'
-      :'<button data-a="cutSkipPlan" class="big disp mt2" style="background:var(--amber);color:#1A1917;font-size:15px">GOT IT</button>');
+      :'<button data-a="cutSkipPlan" class="big disp mt2" style="background:var(--amber);color:#1A1917;font-size:15px">Got it</button>');
     return wrapSheet(pl.serious.length?'The week is short':'Cut from the week',inner)}
   if(S.sheet.t==='offload'){
     const q=S.moveq;if(!q)return '';
@@ -9842,7 +9846,7 @@ function sheetHtml(){
      const untouched=live.every(e=>e.keep&&!e.sets.some(s2=>s2.cut));
      const shown=untouched?(pv.mode==='full'?'full':pv.mode):null;
      inner+='<div class="row mt" style="gap:6px">'+
-      [['full','Full'],['short','~2/3'],['min','Key lifts only']].map(m=>
+      [['full','Full'],['short','~2/3'],['min','Key lifts']].map(m=>
         '<button data-a="prevMode" data-v="'+m[0]+'" class="pill" style="flex:1;font-size:12px'+(shown===m[0]?';background:var(--text);color:#1A1917;border-color:var(--text);font-weight:600':'')+'">'+m[1]+'</button>').join('')+'</div>';
      const cutN=pv.ex.filter(e=>e.cut).length;
      if(!untouched)inner+='<p class="mono" style="color:var(--faint);font-size:10.5px;margin-top:6px">Trimmed by hand — tap a preset to start over.</p>';
@@ -9915,7 +9919,7 @@ function sheetHtml(){
                '<button data-a="rehabEase" data-v="'+pv.ex.indexOf(e)+'" class="btn" style="flex:1;font-size:11.5px;padding:9px 0">Half the sets</button></div>')+
             '</div>').join('')+
           '<p style="color:var(--faint);font-size:11px;line-height:1.5;margin-top:9px">Leaving rehab work out is fine when something hurts — it is logged either way, so your physio sees the pattern rather than a gap.</p></div>';
-        inner+='<button data-a="prevGo" class="big disp mt2" style="background:var(--amber);color:#1A1917;font-size:16px">START · '+totalSets+' SETS</button>';
+        inner+='<button data-a="prevGo" class="big disp mt2" style="background:var(--amber);color:#1A1917;font-size:16px">Start · '+totalSets+' sets</button>';
         return wrapSheet('Before you start',inner)}
       const covered=stillOut.filter(e=>coveredBy(e,pv).length);
       const rest0=stillOut.filter(e=>!coveredBy(e,pv).length);
@@ -9982,9 +9986,9 @@ function sheetHtml(){
         ' unchecked but nothing has been decided about '+(unresolved.length===1?'it':'them')+
         '. Move '+(unresolved.length===1?'it':'them')+' to another day, cut '+(unresolved.length===1?'it':'them')+
         ' from the week, or push the right lifts harder — then start.</p></div>'+
-        '<button class="big disp mt" style="background:var(--raised);color:var(--faint);font-size:16px">START · '+totalSets+' SETS</button>';
+        '<button class="big disp mt" style="background:var(--raised);color:var(--faint);font-size:16px">Start · '+totalSets+' sets</button>';
     }else{
-      inner+='<button data-a="prevGo" class="big disp mt2" style="background:var(--amber);color:#1A1917;font-size:16px">START · '+totalSets+' SETS</button>'}
+      inner+='<button data-a="prevGo" class="big disp mt2" style="background:var(--amber);color:#1A1917;font-size:16px">Start · '+totalSets+' sets</button>'}
     return wrapSheet('Before you start',inner)}
   if(S.sheet.t==='modify'){
     const s2=S.sess,cur=s2.sets[Math.min(s2.idx,s2.sets.length-1)];
@@ -10064,10 +10068,10 @@ function sheetHtml(){
       '<button data-a="coachChip" data-v="'+esc(q)+'" class="pill">'+esc(q)+'</button>').join('')+'</div>';
     inner+='<textarea data-in="coach.input" rows="2" placeholder="Ask Allena…" style="margin-top:10px">'+esc(S.coach.input)+'</textarea>';
     if(S.ai.key){
-      inner+='<button data-a="coachSend" class="big disp mt" style="background:var(--blue);color:#fff;font-size:16px'+(S.coach.busy?';opacity:.5':'')+'">ASK ALLENA</button>'+
+      inner+='<button data-a="coachSend" class="big disp mt" style="background:var(--blue);color:#fff;font-size:16px'+(S.coach.busy?';opacity:.5':'')+'">Ask Allena</button>'+
         '<button data-a="coachApp" class="btn mt" style="border:none;color:var(--faint);font-size:12.5px;padding:8px">Open in the Claude app instead</button>';
     }else{
-      inner+='<button data-a="coachApp" class="big disp mt" style="background:var(--blue);color:#fff;font-size:16px">SEND TO CLAUDE APP</button>'+
+      inner+='<button data-a="coachApp" class="big disp mt" style="background:var(--blue);color:#fff;font-size:16px">Send to the Claude app</button>'+
         '<p style="color:var(--faint);font-size:12px;line-height:1.55;margin-top:10px">Opens the Claude app with your question and full session attached. To chat inside this app instead, add an API key under Data → Allena.</p>';
     }
     if(S.coach.thread.length)inner+='<button data-a="coachClear" style="width:100%;padding:10px;color:var(--faint);font-size:11.5px;margin-top:6px">Start a new conversation</button>';
@@ -10082,7 +10086,7 @@ function sheetHtml(){
         stepper('sheet.w','Weight',S.sheet.w,2.5,'kg')+stepper('sheet.r','Reps',S.sheet.r,1,'')+'</div>'+
         '<p style="color:var(--dim);font-size:11px;letter-spacing:.1em;text-transform:uppercase;margin:16px 0 8px">RPE</p>'+
         rpeGrid('sheet.rpe',S.sheet.rpe);
-    inner+='<button data-a="editSave" class="big disp mt" style="background:var(--green);color:#1A1917;font-size:17px">SAVE CHANGES</button>'+
+    inner+='<button data-a="editSave" class="big disp mt" style="background:var(--green);color:#1A1917;font-size:17px">Save changes</button>'+
       (S.sheet.scope==='hist'?'<button data-a="editDelete" class="btn" style="margin-top:12px;color:var(--red);background:transparent">Delete this set</button>':'');
     return wrapSheet(esc(e.ex)+' · set '+e.setNo,inner)}
   return ''}
@@ -10963,7 +10967,7 @@ function runAction(a,v,t,e){
       if(S.runOn&&runs().length){
         S.confirm={t:'Hide the Running tab?',
           d:'Your '+runs().length+' logged runs stay exactly where they are — the tab just stops showing. Turn it back on any time.',
-          go:'runOff',v:'',soft:true,ok:'HIDE THE TAB',no:'Leave it on'};S.sheet={t:'confirm'};render();break}
+          go:'runOff',v:'',soft:true,ok:'Hide the tab',no:'Leave it on'};S.sheet={t:'confirm'};render();break}
       S.runOn=true;lset('training-runon-v1',true);S.view='run';render();
       flash('Running is on. Log a run or import your history.');break}
     case 'runOff':{S.runOn=false;lset('training-runon-v1',false);
