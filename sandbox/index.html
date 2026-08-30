@@ -6607,7 +6607,8 @@ function demoLoad(){
   if(!S.prof)S.prof={name:'Demo',skipped:true},lset(K_PROF,S.prof);
   S.demo=true}
 function demoPresent(){return S.history.some(h=>h.demo)||S.scans.some(x=>x.demo)}
-function demoClear(){
+function demoWipe(){
+  // strip every trace of the sample account; safe to call silently
   S.history=S.history.filter(h=>!h.demo);lset(K_H,S.history);
   S.scans=S.scans.filter(x=>!x.demo);scanSave();
   S.goals=S.goals.filter(g=>!g.demo);lset(K_GOALS,S.goals);
@@ -6618,7 +6619,10 @@ function demoClear(){
   S.supp={on:false,days:{}};lset(K_SUPP,S.supp);
   S.daily={on:false,days:{}};lset(K_DAILY,S.daily);
   if(S.prof&&S.prof.name==='Demo'){S.prof=null;ldel(K_PROF)}
-  setWeek(1);S.demo=false;S.view='home';render();flash('Demo data removed.')}
+  S.demo=false}
+function demoClear(){
+  demoWipe();
+  setWeek(1);S.view='home';render();flash('Demo data removed.')}
 
 /* ══ view pieces ════════════════════════════════════════ */
 function plateHtml(w){const{ok,list}=platesFor(w);
@@ -10848,6 +10852,7 @@ function runAction(a,v,t,e){
       const prof={name:(st.name||'').trim(),sex:st.sex,age:+st.age||30,exp:st.exp,years:+st.years||0,
         days:st.days,mins:st.mins||60,eq:st.eq,eqx:st.eqx||{},goal:st.goal,focus:st.focus||{},
         style:st.style||'mixed',weeks:st.weeks||6,restr:st.restr||{},notes:(st.notes||'').trim()};
+      try{demoWipe()}catch(e){}   // a real program replaces the sample account entirely
       S.prof=prof;lset(K_PROF,prof);
       const pg=genProgram(prof);S.lib.programs.push(pg);S.lib.activeId=pg.id;
       if(prof.restr&&(prof.restr.disc||prof.restr.fused)){
@@ -10887,7 +10892,7 @@ function runAction(a,v,t,e){
       S.own.review=reviewOwn(S.own.prog);render();break}
     case 'ownSave':{const p=S.own.prog;p.baseWeeks=p.weeks;
       S.lib.programs.push(p);S.lib.activeId=p.id;saveLib();setWeek(1,p.id);
-      S.own=null;S.view='home';render();flash(p.block+' is live. Week 1 starts now.');break}
+      try{demoWipe()}catch(e){}S.own=null;S.view='home';render();flash(p.block+' is live. Week 1 starts now.');break}
     case 'ownCancel':{S.own=null;S.view='home';render();break}
     case 'plateMax':lset(K_PL,+v);PLATES=ALL_PLATES.filter(p=>p.kg<=+v);flash('Plates capped at '+v+' kg.');break;
     case 'redoYes':S.confirmRedo=true;S.sheet=null;A.start(v);break;
