@@ -6243,11 +6243,6 @@ function holdCounts(st){
   let held=0,fade=0,open=0;
   HOLD_MUSCLES.forEach(m=>{const x=st[m].s;if(x==='held')held++;else if(x==='fade')fade++;else open++});
   return{held:held,fade:fade,open:open,total:HOLD_MUSCLES.length}}
-function holdFill(st,m){
-  const x=st[m]||{s:'open'};
-  if(x.s==='held')return 'fill="#7FA86B" opacity=".8"';
-  if(x.s==='fade')return 'fill="#D97757" opacity=".45"';
-  return 'fill="var(--line)" opacity=".45"'}
 function groundOverlay(st,back,blend){
   /* colour overlays traced onto the owner's renders (245x560 frame).
      Held/fading muscles light the grayscaled base through a screen
@@ -6255,12 +6250,12 @@ function groundOverlay(st,back,blend){
   const col=m=>{const x=st[m]||{s:'open'};
     return x.s==='held'?'#8BE557':x.s==='fade'?'#FF9757':null};
   let g='';
+  const attrs=(m,c)=>' data-m="'+m+'" data-a="muscleOpen" data-v="'+m+'" style="cursor:pointer" fill="'+(c||'rgba(0,0,0,0.01)')+'"'+(c?'':' fill-opacity="0.01"');
   const E=(m,x,y,rx,ry,rot)=>{const c=col(m);
     g+='<ellipse cx="'+x+'" cy="'+y+'" rx="'+rx+'" ry="'+ry+'"'+
-      (rot?' transform="rotate('+rot+' '+x+' '+y+')"':'')+
-      ' fill="'+(c||'none')+'"'+(c?'':' pointer-events="none"')+' data-m="'+m+'"'+(c?'':' opacity="0"')+'/>'}
+      (rot?' transform="rotate('+rot+' '+x+' '+y+')"':'')+attrs(m,c)+'/>'}
   const D=(m,dd)=>{const c=col(m);
-    g+='<path d="'+dd+'" fill="'+(c||'none')+'" data-m="'+m+'"'+(c?'':' opacity="0"')+'/>'}
+    g+='<path d="'+dd+'"'+attrs(m,c)+'/>'}
   if(!back){
     E('Neck',122,100,11,8);
     E('Front delts',66,150,26,30,-6);E('Front delts',178,150,26,30,6);
@@ -6469,6 +6464,66 @@ function viewTerritory(){
         (x.s==='held'?'HELD':x.s==='fade'?'FADING · '+x.days+'d':x.days==null?'NEVER CLAIMED':'UNCLAIMED · '+x.days+'d')+'</span></div>'}).join('')+'</div>'+
     '<p style="color:var(--faint);font-size:11px;line-height:1.55;margin-top:12px">Holding all '+c.total+' inside one week banks an epic find — once a month at most. Quality work (balance, mobility, conditioning) keeps you moving but does not claim ground; only trained muscle does.</p>';
   return h+'</div>'}
+
+/* ══ the comeback (IDEAS I.2) ═══════════════════════════════
+   A gap is not a failure; it is a re-entry problem. After 7+
+   days away (with real history behind you), Allena offers a
+   three-session comeback at eased effort — and finishing it
+   banks a rare. The opposite of streak shame.
+   ══════════════════════════════════════════════════════════ */
+const K_CB='training-comeback-v1';
+function cbStore(){return lget(K_CB,null)}
+function cbLastActivity(){
+  let last=null;
+  (S.history||[]).forEach(h=>{const k=(h.date||'').slice(0,10);if(!last||k>last)last=k});
+  (S.runs||[]).forEach(r=>{if(!last||r.date>last)last=r.date});
+  ((S.acl&&S.acl.checks)||[]).forEach(c=>{if(!last||c.date>last)last=c.date});
+  return last}
+function cbGap(){
+  const last=cbLastActivity();
+  if(!last)return 0;
+  return Math.floor((Date.now()-new Date(last+'T12:00').getTime())/864e5)}
+function cbState(){
+  let cb=cbStore();
+  const gap=cbGap();
+  const sessions=(S.history||[]).filter(h=>h.complete&&!h.run).length;
+  if(cb&&cb.state==='on'){
+    const done=(S.history||[]).filter(h=>h.complete&&!h.run&&h.date.slice(0,10)>=cb.started).length;
+    if(done>=3){cb.state='done';cb.doneOn=today();lset(K_CB,cb);
+      try{const bank=discBank(),id='comeback:'+cb.started;
+        if(!bank[id]){bank[id]={t:'The comeback',
+          d:cb.gapDays+' days away, then three sessions straight back. The hardest rep is the first one back — you did thirty.',
+          rar:'rare',tag:'streak',found:today()};bankSave()}}catch(e){}}
+    else cb.progress=done}
+  if(cb&&cb.state==='done'&&cb.doneOn!==today())return null;      // celebrated, retired
+  if(cb&&(cb.state==='skip'||cb.state==='done')&&gap<7)return cb.state==='done'?cb:null;
+  if(!cb||((cb.state==='skip'||cb.state==='done')&&gap>=7&&cbLastActivity()!==cb.gapKey)){
+    if(gap>=7&&sessions>=8){
+      cb={state:'offered',gapDays:gap,gapKey:cbLastActivity(),started:null,progress:0};
+      lset(K_CB,cb)}else return cb&&cb.state==='on'?cb:null}
+  return cb&&cb.state!=='skip'?cb:null}
+function comebackCard(){
+  try{
+    const cb=cbState();
+    if(!cb)return '';
+    if(cb.state==='offered')return '<div class="card mt" style="padding:16px;border-radius:20px;border-color:rgba(217,119,87,.45)">'+
+      '<p class="eyebrow" style="color:var(--amber)">The comeback</p>'+
+      '<p class="disp gradhead" style="font-size:20px;margin-top:6px">'+cb.gapDays+' days away. Welcome back.</p>'+
+      '<p style="color:var(--dim);font-size:13px;line-height:1.6;margin-top:6px">No streak died — that is not how this app works. The way back in: three sessions, eased on purpose. Take about 10% off the loads and stop a rep earlier than usual; the fitness is still there, the tissue tolerance needs a minute. Finishing all three banks a rare find.</p>'+
+      '<div class="row mt" style="gap:10px">'+
+      '<button data-a="cbGo" class="btn" style="flex:1;color:var(--amber)">I’m back</button>'+
+      '<button data-a="cbSkip" class="btn" style="flex:1;color:var(--dim)">Just resume</button></div></div>';
+    if(cb.state==='on')return '<div class="card mt" style="padding:15px 16px;border-radius:20px">'+
+      '<div style="display:flex;justify-content:space-between;align-items:baseline">'+
+      '<p class="eyebrow" style="margin:0">The comeback</p>'+
+      '<span class="mono" style="color:var(--amber);font-size:11px">'+(cb.progress||0)+' OF 3</span></div>'+
+      '<div style="display:flex;gap:6px;margin-top:10px">'+
+      [0,1,2].map(i=>'<div style="flex:1;height:6px;border-radius:3px;background:'+((cb.progress||0)>i?'var(--green)':'var(--line)')+'"></div>').join('')+'</div>'+
+      '<p style="color:var(--faint);font-size:11.5px;line-height:1.5;margin-top:8px">Eased sessions — about 10% off, one rep in hand. The third one banks it.</p></div>';
+    if(cb.state==='done')return '<div class="card mt an-glow" style="padding:15px 16px;border-radius:20px;border-color:var(--green)">'+
+      '<p class="eyebrow" style="color:var(--green);margin:0">Comeback complete</p>'+
+      '<p style="color:var(--dim);font-size:12.5px;line-height:1.55;margin-top:5px">Three sessions after '+cb.gapDays+' days away. Banked as a rare find — the kind of thing most apps punish and this one keeps.</p></div>';
+    return ''}catch(e){return ''}}
 function analyseCard(){
   const P=allPatterns(),warn=P.filter(p=>p.tone==='warn').length;
   const st=S.anState||'idle';
@@ -7026,22 +7081,6 @@ function hoursSinceMuscle(m){
     h.log.forEach(l=>{if(!MUSCLE_RULES.some(r=>r[0]===m&&r[1].test(l.ex)))return;
       const hrs=(Date.now()-t)/36e5;if(best==null||hrs<best)best=hrs})});
   return best}
-function rehabToday(){
-  if(!S.acl||!S.acl.on)return null;
-  const rp=S.lib.programs.find(p=>p.acl);if(!rp)return null;
-  const t=today();
-  const doneToday=new Set(S.history.filter(h=>h.progId===rp.id&&h.complete&&h.date.slice(0,10)===t).map(h=>h.dayTitle));
-  const daily=rp.weeks===1;
-  const ws=weekState(rp,1);
-  const opts=[];
-  rp.days.forEach((d,i)=>{if(!buildSets(rp,i,1).length)return;
-    if(doneToday.has(d.name))return;
-    if(!daily&&ws.done.has(d.name))return;
-    const r=dayReadiness(rp,i,1);
-    opts.push({i:i,name:d.name,score:r.score,r:r,pid:rp.id,note:d.note||''})});
-  if(!opts.length)return{done:true,prog:rp};
-  opts.sort((a,b)=>b.score-a.score);
-  return{top:opts[0],rest:opts.slice(1),prog:rp,phase:S.acl.phase}}
 function listWords(a){return a.length<2?(a[0]||''):a.slice(0,-1).join(', ')+' and '+a[a.length-1]}
 function rehabVolume(days){ // rehab sets per muscle over a window — same units the lifting side uses
   const rp=rehabProg();if(!rp)return {};
@@ -7822,6 +7861,7 @@ function viewToday(){
     '<span style="flex:1;font-size:12px;color:var(--dim)">Sample data is loaded so you can see the trends — tap to remove it and start clean.</span></button>';
   h+=garCard();
   h+=verdictCard();
+  h+=comebackCard();
   h+=newFindsCard();
   h+=sessionCard();
   h+='<div class="row mt" style="gap:10px">'+dashTiles()+'</div>';
@@ -9427,6 +9467,26 @@ function sheetHtml(){
          '<button data-a="questPass" class="btn mt" style="color:var(--dim)">Not this week</button>'
         :'')+
       '<p style="color:var(--faint);font-size:11px;line-height:1.55;margin-top:12px">One per week, generated Monday from what you have already done. If it does not happen, nothing is lost and nothing turns red — a fresh one simply arrives Monday.</p>')}
+  if(S.sheet.t==='muscle'){
+    const m2=S.sheet.m,st=holdStates()[m2]||{s:'open',days:null};
+    const b=[];
+    try{const rule=MUSCLE_RULES.find(r=>r[0]===m2);
+      const seen={};
+      const scoop=name=>{const base=gBase(name);
+        if(rule&&rule[1].test(base)&&!seen[base]){seen[base]=1;b.push(base)}};
+      (activeProgSafe()&&activeProgSafe().days||[]).forEach(d=>(d.exercises||[]).forEach(e=>scoop(e.name)));
+      (S.history||[]).slice(-40).forEach(h=>(h.log||[]).forEach(l=>scoop(l.ex)))}catch(e){}
+    const col2=st.s==='held'?'var(--green)':st.s==='fade'?'var(--amber)':'var(--faint)';
+    return wrapSheet(m2,
+      '<p class="mono" style="color:'+col2+';font-size:11px;letter-spacing:.06em">'+
+      (st.s==='held'?'HELD — trained '+(st.days===0?'today':st.days+' day'+(st.days===1?'':'s')+' ago'):
+       st.s==='fade'?'FADING — '+st.days+' days since':
+       st.days==null?'NEVER CLAIMED':'UNCLAIMED — '+st.days+' days since')+'</p>'+
+      (b.length?'<p class="eyebrow mt2">What claims it, from your own training</p>'+
+        '<div class="card mt" style="padding:4px 15px">'+
+        b.slice(0,6).map((x,i)=>'<p style="padding:10px 0;font-size:13.5px'+(i?';border-top:1px solid var(--line)':'')+'">'+esc(x)+'</p>').join('')+'</div>'
+       :'<p style="color:var(--dim);font-size:13px;line-height:1.6;margin-top:10px">Nothing in your program or recent history trains this directly yet. The swap picker and program builder both know what does.</p>')+
+      '<p style="color:var(--faint);font-size:11px;line-height:1.55;margin-top:12px">Held by training inside a week, fading after eight days, unclaimed past a fortnight — an invitation, never a verdict.</p>')}
   if(S.sheet.t==='dset'){
     const body=dataChunks()[S.sheet.k];
     if(body==null)return '';
@@ -11289,6 +11349,9 @@ function runAction(a,v,t,e){
     case 'acctVerify':acctVerify(S.acctCode);break;
     case 'acctReset':lset(K_ACCT,null);S.acctPending=false;S.acctCode='';S.acctEmail='';render();break;
     case 'deepRun':deepRun();break;
+    case 'cbGo':{const cb=cbStore();if(cb&&cb.state==='offered'){cb.state='on';cb.started=today();cb.progress=0;lset(K_CB,cb);vib(12)}render();break}
+    case 'cbSkip':{const cb=cbStore();if(cb&&cb.state==='offered'){cb.state='skip';lset(K_CB,cb)}render();break}
+    case 'muscleOpen':S.sheet={t:'muscle',m:v};render();break;
     case 'hkDone':S.hkRes=null;S.sheet=null;render();break;
     case 'dsetOpen':S.sheet={t:'dset',k:v};render();break;
     case 'acctSync':acctSync(true);break;
