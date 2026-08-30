@@ -4434,11 +4434,12 @@ function runSave(){lset(K_RUN,S.runs)}
 function runAdd(r){
   runs().push(r);S.runs.sort((a,b)=>a.date.localeCompare(b.date));runSave();
   // mirror into training history so recovery, tonnage and Allena all see it
-  const label=(RUN_TYPES.find(x=>x[0]===r.type)||['','Run'])[1];
+  const isRun=isRunType(r.type);
+  const label=cardioLabel(r.type);
   S.history.push({id:'run-'+r.id,date:r.date+'T'+(r.time||'08:00')+':00',progId:'running',
-    block:'Running',dayIdx:0,dayTitle:label+' run',week:S.week,minutes:r.mins||0,complete:true,
+    block:isRun?'Running':'Cardio',dayIdx:0,dayTitle:isRun?label+' run':label,week:S.week,minutes:r.mins||0,complete:true,
     run:true,note:{},planned:1,
-    log:[{ex:'Running — '+label.toLowerCase(),setNo:1,w:0,r:0,km:r.km,mins:r.mins,rpe:r.rpe,secs:Math.round((r.mins||0)*60)}]});
+    log:[{ex:(isRun?'Running — '+label.toLowerCase():label+' — cardio'),setNo:1,w:0,r:0,km:r.km,mins:r.mins,rpe:r.rpe,secs:Math.round((r.mins||0)*60)}]});
   S.history.sort((a,b)=>a.date.localeCompare(b.date));saveHistory()}
 function runDel(id){
   S.runs=runs().filter(r=>r.id!==id);runSave();
@@ -4457,7 +4458,7 @@ function weeklyKm(weeksBack){
   const out=[];
   for(let w=weeksBack-1;w>=0;w--){
     const end=Date.now()-w*7*864e5,start=end-7*864e5;
-    const l=runs().filter(r=>{const t=new Date(r.date+'T12:00').getTime();return t>start&&t<=end});
+    const l=runs().filter(r=>{if(!isRunType(r.type))return false;const t=new Date(r.date+'T12:00').getTime();return t>start&&t<=end});
     out.push({km:Math.round(l.reduce((a,r)=>a+(r.km||0),0)*10)/10,
       load:l.reduce((a,r)=>a+runLoad(r),0),n:l.length,
       end:dayKey(end)})}
@@ -4883,6 +4884,104 @@ function adhWord(pct){
    Each one is rated by how hard it was to find, because a
    thing you see every week is not a discovery.
    ══════════════════════════════════════════════════════════ */
+
+/* ══ the intake (prompt 18) ═════════════════════════════════
+   Allena eats everything. Apple Health's export.xml — the file
+   every iPhone can produce, carrying every app's workouts —
+   parses client-side in chunks (exports run to hundreds of MB;
+   the file never leaves the phone). Swims, rides and rows come
+   in as LOAD for the recovery model: ingested, never coached.
+   Running stays the only coached cardio.
+   ══════════════════════════════════════════════════════════ */
+const CARDIO_TYPES=[['swim','Swim'],['ride','Ride'],['row','Row']];
+function cardioLabel(t){
+  const hit=RUN_TYPES.find(x=>x[0]===t)||CARDIO_TYPES.find(x=>x[0]===t);
+  return hit?hit[1]:'Cardio'}
+function isRunType(t){return !!RUN_TYPES.find(x=>x[0]===t)}
+const HK_MAP={Running:'easy',Cycling:'ride',Swimming:'swim',Rowing:'row'};
+function hkDist(v,unit){
+  v=parseFloat(v);if(isNaN(v)||v<=0)return 0;
+  if(unit==='mi')return v*1.60934;
+  if(unit==='m')return v/1000;
+  if(unit==='yd')return v*0.0009144;
+  return v}                                       // km
+function hkAttrs(tag){
+  const o={};tag.replace(/(\w+)="([^"]*)"/g,(m,k,v)=>{o[k]=v;return ''});return o}
+function hkParse(xml){
+  // stateful scan — works on a whole string or sequential chunks via hkScanner
+  const out=[],skipped={};
+  const re=/<Workout\b[^>]*?(\/?)>|<\/Workout>|<WorkoutStatistics\b[^>]*\/>/g;
+  let m,cur=null;
+  const flush=()=>{
+    if(!cur)return;
+    const t=HK_MAP[cur.act];
+    if(!t){skipped[cur.act]=(skipped[cur.act]||0)+1;cur=null;return}
+    const mins=cur.durUnit==='min'?cur.dur:(cur.durUnit==='s'?cur.dur/60:cur.dur*(cur.durUnit==='hr'?60:1));
+    if(!mins||mins<3){cur=null;return}
+    out.push({date:cur.date,time:cur.time,type:t,
+      km:Math.round((cur.km||0)*100)/100,mins:Math.round(mins),
+      rpe:t==='easy'?4:5,hr:0,elev:0,note:'via Apple Health',
+      id:'hk'+cur.date.replace(/-/g,'')+'t'+cur.time.replace(':','')});
+    cur=null};
+  while((m=re.exec(xml))){
+    const tag=m[0];
+    if(tag.indexOf('<Workout ')===0||tag.indexOf('<Workout\t')===0||/^<Workout\b/.test(tag)&&tag.indexOf('Statistics')<0&&tag.indexOf('</')!==0){
+      flush();
+      const a=hkAttrs(tag);
+      const act=String(a.workoutActivityType||'').replace('HKWorkoutActivityType','');
+      const sd=String(a.startDate||'');
+      cur={act:act,dur:parseFloat(a.duration)||0,durUnit:a.durationUnit||'min',
+        date:sd.slice(0,10),time:sd.slice(11,16)||'08:00',
+        km:hkDist(a.totalDistance,a.totalDistanceUnit)};
+      if(m[1]==='/'){flush()}                      // self-closing: old exports
+    }else if(tag.indexOf('<WorkoutStatistics')===0){
+      if(cur&&tag.indexOf('Distance')>=0){
+        const a=hkAttrs(tag);
+        const d=hkDist(a.sum,a.unit);
+        if(d)cur.km=Math.round(d*100)/100}
+    }else{flush()}                                 // </Workout>
+  }
+  flush();
+  return{workouts:out,skipped:skipped}}
+function hkImport(parsed){
+  const have=new Set(runs().map(r=>r.id));
+  let added=0;const byType={};
+  parsed.workouts.forEach(w=>{
+    if(have.has(w.id))return;
+    have.add(w.id);
+    runAdd(w);added++;byType[w.type]=(byType[w.type]||0)+1});
+  if(added&&!S.runOn){S.runOn=true;lset('training-runon-v1',true)}
+  return{added:added,dup:parsed.workouts.length-added,byType:byType,
+    skipped:Object.keys(parsed.skipped).reduce((a,k)=>a+parsed.skipped[k],0)}}
+function hkParseFile(file,done){
+  // chunked read with a carry-over tail so tags split across chunks survive
+  const CH=6*1024*1024,TAIL=64*1024;
+  let pos=0,carry='',all='';
+  const step=()=>{
+    const sl=file.slice(pos,pos+CH);
+    const fr=new FileReader();
+    fr.onload=()=>{
+      all=carry+String(fr.result);
+      pos+=CH;
+      if(pos<file.size){
+        carry=all.slice(-TAIL);
+        // parse the safe head now to keep memory flat
+        S.hkBuf=(S.hkBuf||'')+all.slice(0,-TAIL);
+        if(S.hkBuf.length>40*1024*1024){           // flush very large buffers early
+          const p=hkParse(S.hkBuf);S.hkFound=(S.hkFound||[]).concat(p.workouts);
+          Object.keys(p.skipped).forEach(k=>{S.hkSkip=S.hkSkip||{};S.hkSkip[k]=(S.hkSkip[k]||0)+p.skipped[k]});
+          S.hkBuf=''}
+        step()}
+      else{
+        const full=(S.hkBuf||'')+all;
+        const p=hkParse(full);
+        p.workouts=(S.hkFound||[]).concat(p.workouts);
+        Object.keys(S.hkSkip||{}).forEach(k=>{p.skipped[k]=(p.skipped[k]||0)+S.hkSkip[k]});
+        S.hkBuf='';S.hkFound=null;S.hkSkip=null;
+        done(p)}};
+    fr.onerror=()=>done(null);
+    fr.readAsText(sl)};
+  step()}
 const RARITY=[['common','#8A7F70','Noticed'],['uncommon','#7FA86B','Worth knowing'],
   ['rare','#6B9BD1','Rare find'],['epic','#D97757','Big one']];
 function rarityOf(k){return RARITY.find(x=>x[0]===k)||RARITY[0]}
@@ -6169,8 +6268,8 @@ function groundOverlay(st,back,blend){
     E('Biceps',52,205,16,28,14);E('Biceps',192,205,16,28,-14);
     E('Forearms',38,268,13,34,8);E('Forearms',206,268,13,34,-8);
     D('Core','M96 192 Q122 184 148 192 L146 262 Q122 272 98 262 Z');
-    E('Adductors',106,330,9,40,1);E('Adductors',138,330,9,40,-1);
-    E('Quads',88,340,19,54,3);E('Quads',156,340,19,54,-3);
+    E('Adductors',106,318,8,34,1);E('Adductors',138,318,8,34,-1);
+    E('Quads',88,326,18,48,3);E('Quads',156,326,18,48,-3);
   }else{
     D('Upper back','M122 106 L152 148 L122 176 L92 148 Z');
     E('Side delts',58,160,24,29,-4);E('Side delts',186,160,24,29,4);
@@ -6185,7 +6284,7 @@ function groundOverlay(st,back,blend){
   }
   return '<svg viewBox="0 0 245 560" '+
     (blend?'style="position:absolute;inset:0;width:100%;height:100%;mix-blend-mode:screen" ':'xmlns="http://www.w3.org/2000/svg" width="245" height="560" ')+
-    'aria-hidden="true"><g filter="url(#'+(back?'gbB':'gbF')+'")>'+
+    'aria-hidden="true"><g filter="url(#'+(back?'gbB':'gbF')+')">'+
     '<defs><filter id="'+(back?'gbB':'gbF')+'" x="-30%" y="-30%" width="160%" height="160%">'+
     '<feGaussianBlur stdDeviation="3"/></filter></defs>'+g+'</g></svg>'}
 function bodyMapSvg(st,W){
@@ -6224,6 +6323,19 @@ function holdCard(){
       '<div style="margin-top:10px">'+bodyMapSvg(st,240)+'</div>'+
       legsLine(st)+'</button>'}catch(e){return ''}}
 
+
+function drawGrayImg(x,img,dx,dy,dw,dh){
+  // grayscale draw with a pixel fallback for Safari without ctx.filter
+  x.save();x.filter='grayscale(1) brightness(.94)';
+  const supported=x.filter!=='none';
+  x.drawImage(img,dx,dy,dw,dh);x.restore();
+  if(supported)return;
+  const r=x.getImageData(dx,dy,dw,dh),d=r.data;
+  for(let i=0;i<d.length;i+=4){
+    const l=Math.round((d[i]*0.299+d[i+1]*0.587+d[i+2]*0.114)*0.94);
+    d[i]=d[i+1]=d[i+2]=l}
+  x.putImageData(r,dx,dy)}
+
 function groundShareRun(){
  try{
   const st=holdStates(),c=holdCounts(st);
@@ -6245,9 +6357,8 @@ function groundShareRun(){
     const FW=430,FH=Math.round(FW*560/245);      // 430 x 983 per figure
     const y0=430;
     [[ims[0],ims[2],70],[ims[1],ims[3],580]].forEach(function(t){
-      x.save();x.filter='grayscale(1) brightness(.92)';
-      x.drawImage(t[0],t[2],y0,FW,FH);
-      x.filter='none';x.globalCompositeOperation='screen';
+      x.save();drawGrayImg(x,t[0],t[2],y0,FW,FH);
+      x.globalCompositeOperation='screen';
       x.drawImage(t[1],t[2],y0,FW,FH);
       x.restore();x.globalCompositeOperation='source-over'});
     x.textAlign='center';
@@ -6276,6 +6387,61 @@ function groundShareRun(){
   .catch(function(){flash('Could not draw the card.')})
  }catch(e){flash('Could not draw the card.')}}
 
+
+function groundStickerRun(){
+ /* the NRC-style story sticker: transparent PNG, front figure + one
+    chip of truth. Drops onto anyone's Instagram story like it came
+    from the sticker drawer. */
+ try{
+  const st=holdStates(),c=holdCounts(st);
+  const legs=['Quads','Hamstrings','Glutes'].map(m=>st[m]);
+  const legsOut=legs.every(x=>x.s==='open'&&x.days!=null);
+  const legDays=legsOut?Math.min.apply(null,legs.map(x=>x.days)):0;
+  const load=src=>new Promise(function(res,rej){
+    const im=new Image();im.onload=function(){res(im)};im.onerror=rej;im.src=src});
+  const ovl='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(groundOverlay(st,false,false));
+  Promise.all([load(GROUND_FRONT),load(ovl)]).then(function(ims){
+    const cv=document.createElement('canvas');cv.width=760;cv.height=1780;
+    const x=cv.getContext('2d');
+    const FW=700,FH=Math.round(FW*560/245);        // taller than canvas; crop to torso+legs
+    x.save();
+    // round-mask the figure into a soft-cornered card region? keep free-floating:
+    drawGrayImg(x,ims[0],30,0,FW,FH);
+    x.globalCompositeOperation='screen';
+    x.drawImage(ims[1],30,0,FW,FH);
+    x.restore();x.globalCompositeOperation='source-over';
+    // knock out everything the figure's black backdrop brought along:
+    // the base jpeg is near-black; on a transparent canvas we approximate
+    // the die-cut by keying out near-black pixels.
+    const im=x.getImageData(0,0,760,1780),d=im.data;
+    for(let i=0;i<d.length;i+=4){
+      const l=d[i]*0.299+d[i+1]*0.587+d[i+2]*0.114;
+      if(l<26)d[i+3]=0;
+      else if(l<40)d[i+3]=Math.round((l-26)/14*255)}
+    x.putImageData(im,0,0);
+    // the chip
+    const chip=legsOut?('LEG DAY: MISSING · DAY '+legDays):(c.held+' / '+c.total+' HELD');
+    x.font='800 44px -apple-system,system-ui,sans-serif';
+    const tw=x.measureText(chip).width,pw=tw+76,px=(760-pw)/2,py=1650;
+    x.fillStyle='#D97757';
+    x.beginPath();x.roundRect(px,py,pw,84,42);x.fill();
+    x.fillStyle='#1A1917';x.textAlign='center';x.textBaseline='middle';
+    x.fillText(chip,380,py+44);
+    x.font='700 24px -apple-system,system-ui,sans-serif';
+    x.fillStyle='#D97757';x.textBaseline='alphabetic';
+    x.fillText('A L L E N A',380,py-18);
+    S.shareImg=cv.toDataURL('image/png');
+    S.shareTitle='Story sticker';
+    const openSheet=function(){S.sheet={t:'treeshare'};render()};
+    if(navigator.share&&navigator.canShare&&cv.toBlob){
+      cv.toBlob(function(bl){try{
+        const f=new File([bl],'allena-sticker.png',{type:'image/png'});
+        if(navigator.canShare({files:[f]}))navigator.share({files:[f]}).catch(function(){});
+        else openSheet()}catch(e){openSheet()}},'image/png')}
+    else openSheet()})
+  .catch(function(){flash('Could not draw the sticker.')})
+ }catch(e){flash('Could not draw the sticker.')}}
+
 function viewTerritory(){
   const st=holdStates(),c=holdCounts(st);
   holdBank(st);
@@ -6286,7 +6452,9 @@ function viewTerritory(){
     '<h1 class="disp" style="font-size:25px;font-weight:700">YOUR GROUND</h1>'+
     '<p style="color:var(--dim);font-size:13px;line-height:1.6;margin-top:8px">Every muscle you train this week, you hold. Leave one for over a week and it fades; past a fortnight it goes unclaimed — which is an invitation, not a verdict.</p>'+
     '<div class="card mt2" style="padding:18px 16px">'+bodyMapSvg(st,320)+legsLine(st)+
-    '<button data-a="groundShare" class="btn mt" style="width:100%;color:var(--amber);border-color:rgba(217,119,87,.42)">Share your ground</button></div>'+
+    '<div class="row mt" style="gap:10px">'+
+    '<button data-a="groundShare" class="btn" style="flex:1;color:var(--amber)">Share card</button>'+
+    '<button data-a="groundSticker" class="btn" style="flex:1;color:var(--amber)">Story sticker</button></div></div>'+
     '<div class="row mt" style="gap:10px">'+
     [[''+c.held,'HELD','var(--green)'],[''+c.fade,'FADING','var(--amber)'],[''+c.open,'UNCLAIMED','var(--faint)']].map(x=>
       '<div class="card" style="flex:1;padding:12px 10px;text-align:center">'+
@@ -9353,6 +9521,18 @@ function sheetHtml(){
   if(S.sheet.t==='runimp'){
     if(thinking('imp'))return wrapSheet('Reading your history',thinkPanel('Allena is reading it'));
     const R=S.rimp||(S.rimp={text:'',res:null});
+    if(S.hkRes){const hr=S.hkRes;
+      return wrapSheet('Apple Health import',
+        '<p class="eyebrow" style="color:var(--green)">Done</p>'+
+        '<p class="disp gradhead" style="font-size:22px;margin-top:6px">'+hr.added+' workout'+(hr.added===1?'':'s')+' in</p>'+
+        '<p style="color:var(--dim);font-size:13px;line-height:1.6;margin-top:8px">'+
+        Object.keys(hr.byType).map(k=>hr.byType[k]+' '+cardioLabel(k).toLowerCase()+(hr.byType[k]===1?'':'s')).join(' · ')+
+        (hr.dup?' · '+hr.dup+' already here (skipped)':'')+
+        (hr.skipped?' · '+hr.skipped+' other activity types left out':'')+
+        '. Swims, rides and rows count as load in your recovery picture — Allena reads them, it does not coach them.</p>'+
+        '<button data-a="hkDone" class="btn mt2" style="color:var(--amber)">Done</button>')}
+    if(S.hkBusy)return wrapSheet('Apple Health import',
+      '<p class="mono" style="color:var(--amber);font-size:12px">Reading the export — big files take a minute…</p>');
     if(R.res){
       const l=R.res.runs;
       const km=Math.round(l.reduce((a,r)=>a+r.km,0));
@@ -9428,6 +9608,10 @@ function sheetHtml(){
         :'')+
       '<p class="eyebrow mt2">Notes</p>'+
       '<input data-in="rform.note" value="'+esc(f.note||'')+'" placeholder="Route, weather, how it felt" autocomplete="off" style="margin-top:8px">'+
+      '<p class="eyebrow mt2">Or import everything from Apple Health</p>'+
+      '<p style="color:var(--faint);font-size:11.5px;line-height:1.55;margin-top:5px">Health app → your picture → Export All Health Data → save, then tap the zip in Files to unpack → choose export.xml here. Every app that syncs to Health comes along — Garmin, Strava, Apple Watch, all of it. The file never leaves this phone.</p>'+
+      '<label class="btn mt" style="display:block;color:var(--amber)">Choose export.xml'+
+      '<input type="file" accept=".xml,text/xml,application/xml" data-hkfile="1" style="display:none"></label>'+
       '<p class="eyebrow mt2">Or paste it from your watch</p>'+
       '<p style="color:var(--faint);font-size:11.5px;line-height:1.5;margin-top:3px">Copy the summary out of Garmin Connect or Strava and drop it here — Allena reads the numbers out.</p>'+
       '<textarea data-in="rform.paste" rows="3" placeholder="e.g. 10.42 km, 52:18, avg HR 148, 86 m elevation" style="margin-top:8px;font-size:14px">'+esc(f.paste||'')+'</textarea>'+
@@ -10007,6 +10191,13 @@ document.addEventListener('input',e=>{const d=e.target.dataset;
         S.imp.img=c.toDataURL('image/jpeg',0.78);render()};
       im.src=r.result};
     r.readAsDataURL(fl);return}
+  if(e.target.dataset.hkfile){const fl=e.target.files&&e.target.files[0];if(!fl)return;
+    S.hkBusy=true;S.hkRes=null;render();
+    hkParseFile(fl,function(parsed){
+      S.hkBusy=false;
+      if(!parsed){flash('Could not read that file.');render();return}
+      S.hkRes=hkImport(parsed);vib([20,40,20]);render()});
+    return}
   if(e.target.dataset.imptext){const fl=e.target.files&&e.target.files[0];if(!fl)return;
     const r=new FileReader();r.onload=()=>{S.imp.text=String(r.result).slice(0,6000);render()};
     r.readAsText(fl);return}
@@ -10195,6 +10386,7 @@ function runAction(a,v,t,e){
       if(r){try{navigator.clipboard.writeText(wrapText(r)).then(function(){flash('Copied.')})}catch(e){flash('Could not copy.')}}break}
     case 'treeShare':S.shareTitle='Your tree';treeShareRun();break;
     case 'groundShare':groundShareRun();break;
+    case 'groundSticker':groundStickerRun();break;
     case 'sigOpen':S.sheet={t:'signal'};render();break;
     case 'dpOpen':S.sheet=null;S.view='points';render();break;
     case 'collOpen':S.sheet=null;S.view='collection';render();break;
@@ -11097,6 +11289,7 @@ function runAction(a,v,t,e){
     case 'acctVerify':acctVerify(S.acctCode);break;
     case 'acctReset':lset(K_ACCT,null);S.acctPending=false;S.acctCode='';S.acctEmail='';render();break;
     case 'deepRun':deepRun();break;
+    case 'hkDone':S.hkRes=null;S.sheet=null;render();break;
     case 'dsetOpen':S.sheet={t:'dset',k:v};render();break;
     case 'acctSync':acctSync(true);break;
     case 'acctOut':lset(K_ACCT,null);S.acctPending=false;render();
