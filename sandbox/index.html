@@ -450,9 +450,6 @@ function entrySanity(e,c){
 function rpeLow(v){const m=String(v==null?'':v).match(/(\d+(?:\.\d+)?)/);return m?parseFloat(m[1]):NaN}
 function rpeHigh(v){const m=String(v==null?'':v).match(/(\d+(?:\.\d+)?)\s*[-–—to]+\s*(\d+(?:\.\d+)?)/);
   return m?parseFloat(m[2]):rpeLow(v)}
-function rpeMid(v){const lo=rpeLow(v),hi=rpeHigh(v);return isNaN(lo)?NaN:(lo+hi)/2}
-function rpeOver(rpe,target){const hi=rpeHigh(target);return isNaN(hi)||isNaN(rpe)?0:rpe-hi}
-function rpeUnder(rpe,target){const lo=rpeLow(target);return isNaN(lo)||isNaN(rpe)?0:lo-rpe}
 function rpeStr(v){const lo=rpeLow(v),hi=rpeHigh(v);return isNaN(lo)?'—':(lo===hi?String(lo):lo+'–'+hi)}
 function autoReg(e,c){
   if(e.secs!=null){
@@ -847,13 +844,6 @@ function coachStats(){ // the profile Allena reasons over — computed fresh fro
 function hintHtml(cls){if(!S.hint)return '';
   const col=S.hint.level==='warn'?'var(--amber)':S.hint.level==='good'?'var(--green)':'var(--line)';
   return '<div class="cue '+(cls||'')+'" style="border-left-color:'+col+'">'+esc('Allena: '+S.hint.msg)+'</div>'}
-function histDigest(n){
-  const hs=S.history.filter(h=>h.log.length).slice(-n);
-  if(!hs.length)return 'no sessions logged yet';
-  return hs.map(h=>{
-    const by={};h.log.forEach(l=>{(by[l.ex]=by[l.ex]||[]).push(entryStr(l))});
-    return h.date.slice(0,10)+' '+h.dayTitle+(h.week?' (wk'+h.week+')':'')+': '+
-      Object.keys(by).map(k=>k.replace(/ — .*/,'')+' '+by[k].join(', ')).join('; ')}).join('\n')}
 function sessLabel(h){const d=new Date(h.date);
   return (h.dayTitle||'Session')+' · '+d.toLocaleDateString(undefined,{day:'numeric',month:'short'})}
 function sessLine(h,full){
@@ -1424,7 +1414,6 @@ function blockedList(restr){
       const why=INJURIES.filter(i=>restr[i.k]&&i.x.some(t=>hit.indexOf(t)>=0)).map(i=>i.n);
       out.push({n:e.n,tags:hit,why:why})}}));
   return out}
-function allowOverride(name){S.allow=S.allow||{};S.allow[name]=1;lset(K_ALLOW,S.allow)}
 function isAllowed(name){return !!(S.allow&&S.allow[name])}
 const NOTE_HINTS=[
  [/\bacl\b|anterior cruciate/i,'acl'],[/\bmcl\b|medial collateral/i,'mcl'],
@@ -1731,10 +1720,6 @@ function dayKey(d){d=d?new Date(d):new Date();
   const t=d.getTime()-d.getTimezoneOffset()*60000;
   return new Date(t).toISOString().slice(0,10)}
 function today(){return dayKey()}
-function suppStreak(){let n=0,d=new Date();
-  if(!S.supp.days[today()])d.setDate(d.getDate()-1);
-  for(;;){const k=dayKey(d);if(!S.supp.days[k])break;n++;d.setDate(d.getDate()-1)}
-  return n}
 function creatineCard(){
   if(!S.supp.on)return '';
   const on=!!S.supp.days[today()];
@@ -2518,47 +2503,6 @@ function noticedToday(){
   const idx=t.seenIdx!=null?t.seenIdx:(parseInt(seed,10)%pool.length);
   if(t.seenIdx==null){t.seenIdx=idx;todaySave(t)}
   return pool[Math.min(idx,pool.length-1)]}
-function todayCard(){
-  const pr=todayProgress(),st=dayStreak(),pts=todayPoints();
-  if(!pr.total)return '';
-  const t=todayState();
-  const C=2*Math.PI*22;
-  const col=pr.complete?'var(--green)':'var(--amber)';
-  let h='<div class="card an-hero" style="padding:16px;border-radius:20px;border-color:'+(pr.complete?'var(--green)':'rgba(217,119,87,.42)')+'">'+
-    '<div style="display:flex;align-items:center;gap:13px">'+
-    '<div style="position:relative;width:50px;height:50px;flex:none">'+
-    '<svg viewBox="0 0 50 50" style="width:50px;height:50px;transform:rotate(-90deg)">'+
-    '<circle cx="25" cy="25" r="22" fill="none" stroke="var(--line)" stroke-width="3.5"/>'+
-    '<circle cx="25" cy="25" r="22" fill="none" stroke="'+col+'" stroke-width="3.5" stroke-linecap="round" '+
-      'stroke-dasharray="'+C.toFixed(1)+'" stroke-dashoffset="'+(C*(1-(pr.total?pr.done/pr.total:0))).toFixed(1)+'" '+
-      'style="transition:stroke-dashoffset .9s cubic-bezier(.22,1,.36,1)"/></svg>'+
-    '<span class="mono" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:'+col+'">'+pr.done+'/'+pr.total+'</span></div>'+
-    '<div style="flex:1;min-width:0">'+
-    '<p class="disp" style="font-size:15.5px;font-weight:700">'+(pr.complete?'Today is done':'Today')+'</p>'+
-    '<p class="mono" style="color:var(--faint);font-size:10.5px;margin-top:3px">'+
-      (st>1?st+' day'+(st===1?'':'s')+' in a row':'')+(st>1&&pts?' · ':'')+(pts?'+'+pts+' points today':'')+'</p></div></div>';
-  const showList=pr.done<pr.total;
-  if(showList)h+='<div style="margin-top:13px;display:flex;flex-direction:column;gap:7px">'+
-    pr.tasks.map(x=>'<div style="display:flex;align-items:center;gap:10px">'+
-      '<span style="width:19px;height:19px;border-radius:6px;flex:none;display:inline-flex;align-items:center;justify-content:center;font-size:11px;'+
-        (x.done?'background:var(--green);color:#1A1917':'border:1.5px solid var(--line)')+'">'+(x.done?'\u2713':'')+'</span>'+
-      '<span style="flex:1;min-width:0"><span style="display:block;font-size:12.5px'+(x.done?';color:var(--faint);text-decoration:line-through':'')+'">'+esc(x.n)+'</span>'+
-      (!x.done?'<span style="display:block;color:var(--faint);font-size:10.5px;line-height:1.4">'+esc(x.sub)+'</span>':'')+'</span>'+
-      (!x.done&&x.go?'<button data-a="'+x.go+'" class="mono" style="color:var(--amber);font-size:11px;flex:none">Do it</button>':'')+
-      (x.optional&&!x.done?'<span class="mono" style="color:var(--faint);font-size:9.5px;flex:none">optional</span>':'')+
-      '</div>').join('')+'</div>';
-  // the reward: something real, once the day is done
-  const n=noticedToday();
-  if(pr.complete&&n){
-    if(t.revealed)h+='<div class="card an-rise" style="margin-top:13px;padding:14px 15px;background:var(--surface)">'+
-      '<div style="display:flex;align-items:center;gap:9px"><img src="'+MARK+'" alt="" style="width:17px;height:17px;object-fit:contain">'+
-      '<p class="mono" style="font-size:9.5px;color:var(--amber);letter-spacing:.06em">ALLENA NOTICED</p></div>'+
-      '<p style="font-size:14px;font-weight:600;margin-top:7px">'+esc(n.t)+'</p>'+
-      '<p style="color:var(--dim);font-size:12.5px;line-height:1.6;margin-top:4px">'+esc(n.d)+'</p></div>';
-    else h+='<button data-a="noticedOpen" class="btn mt an-glow" style="border-color:var(--amber);color:var(--amber);font-size:13px;margin-top:13px">'+
-      'Allena noticed something \u203a</button>'}
-  else if(!pr.complete&&n)h+='<p class="mono" style="color:var(--faint);font-size:10px;margin-top:11px">Finish the check-ins and Allena will show you what it found in your data.</p>';
-  return h+'</div>'}
 
 /* ══ data points ════════════════════════════════════════════
    Every discrete fact you have given Allena, counted. It is a
@@ -2677,122 +2621,6 @@ function dpShareText(){
    of this that makes people quit is the one that takes
    something away.
    ══════════════════════════════════════════════════════════ */
-function signalParts(){
-  const P=[];
-  const wkAgo=n=>Date.now()-n*864e5;
-  const H=S.history||[];
-  const sessions7=H.filter(h=>h.complete&&!h.run&&new Date(h.date).getTime()>wkAgo(7)).length;
-  P.push({k:'sessions',n:'Sessions logged',w:30,
-    have:Math.min(3,sessions7),need:3,
-    val:sessions7+' this week',
-    unlocks:'Everything else is built on these. Three a week is where the load and recovery model starts being right.',
-    go:null});
-  // effort, the input that makes regulation possible
-  const recent=[];H.slice(-6).forEach(h=>h.log.forEach(l=>{if(l.w!=null)recent.push(l)}));
-  const withRpe=recent.filter(l=>l.rpe!=null).length;
-  const rpePct=recent.length?Math.round(withRpe/recent.length*100):0;
-  P.push({k:'rpe',n:'Effort on your sets',w:20,
-    have:Math.min(100,rpePct),need:100,
-    val:rpePct+'% of recent sets',
-    unlocks:'Without RPE, Allena can see what you lifted but not what it cost. It is the difference between a log and a coach.',
-    go:null});
-  const d=S.daily&&S.daily.days||{};
-  const bwDays=Object.keys(d).filter(k=>d[k]&&d[k].bw!=null&&new Date(k+'T12:00').getTime()>wkAgo(7)).length;
-  P.push({k:'bw',n:'Bodyweight',w:10,
-    have:Math.min(3,bwDays),need:3,
-    val:bwDays+' this week',
-    unlocks:'Lets Allena tell a stall apart from a deficit — holding strength while losing weight is a win, not a plateau.',
-    go:'sigBw'});
-  if(S.gar&&S.gar.on){
-    const g=S.gar.days||{};
-    const bbDays=Object.keys(g).filter(k=>g[k]&&g[k].am!=null&&new Date(k+'T12:00').getTime()>wkAgo(7)).length;
-    P.push({k:'bb',n:'Morning readiness',w:15,
-      have:Math.min(4,bbDays),need:4,
-      val:bbDays+' of the last 7 days',
-      unlocks:'Turns a bad session into a recovery signal instead of a mystery, and lets the app pick the right day to go hard.',
-      go:'sigBb'})}
-  if(S.runOn){
-    const r7=(S.runs||[]).filter(x=>new Date(x.date+'T12:00').getTime()>wkAgo(7));
-    const withZ=r7.filter(x=>zoneMins(x)).length;
-    P.push({k:'runs',n:'Runs logged',w:10,
-      have:Math.min(2,r7.length),need:2,
-      val:r7.length+' this week',
-      unlocks:'Running load feeds the same recovery model as your lifting, so leg day stops being planned in the dark.',
-      go:'runLog'});
-    P.push({k:'zones',n:'Time in zones',w:5,
-      have:r7.length?Math.min(1,withZ/Math.max(1,r7.length)):0,need:1,
-      val:withZ+' of '+r7.length+' runs',
-      unlocks:'The only way to know whether your easy runs are actually easy.',
-      go:'runLog'})}
-  if(S.acl&&S.acl.on){
-    const ch=(S.acl.checks||[]).filter(c=>new Date(c.date+'T12:00').getTime()>wkAgo(7)).length;
-    P.push({k:'rehab',n:'Rehab check-ins',w:15,
-      have:Math.min(5,ch),need:5,
-      val:ch+' of the last 7 days',
-      unlocks:'Builds the record your physio actually wants, and catches a knee going the wrong way two weeks before you would notice.',
-      go:'checkOpen'})}
-  const scans=(S.scans||[]).filter(x=>new Date(x.date).getTime()>wkAgo(28)).length;
-  P.push({k:'scan',n:'Body composition',w:5,
-    have:Math.min(1,scans),need:1,
-    val:scans?'up to date':'none in four weeks',
-    unlocks:'Separates muscle from weight, so a gain or a loss means something.',
-    go:'scanNew'});
-  return P}
-function signalScore(){
-  const P=signalParts();
-  const total=P.reduce((a,x)=>a+x.w,0);
-  const got=P.reduce((a,x)=>a+x.w*Math.min(1,x.have/x.need),0);
-  return{pct:Math.round(got/total*100),parts:P}}
-function signalLevel(pct){
-  if(pct>=90)return['Full picture','Allena can see everything it needs to.'];
-  if(pct>=70)return['Strong signal','Enough to spot patterns across your training.'];
-  if(pct>=45)return['Partial view','The basics are there, the connections are not yet.'];
-  if(pct>=20)return['Thin data','Allena is guessing at more than it should be.'];
-  return['Just started','Log a few sessions and this fills in.']}
-/* consistency, measured in weeks so one missed day costs nothing */
-function weekStreak(){
-  const H=(S.history||[]).filter(h=>h.complete);
-  if(!H.length)return{weeks:0,days:0,best:0};
-  const wk={};H.forEach(h=>{wk[isoWeek(h.date)]=1});
-  // count back from this week
-  let n=0,cur=new Date();
-  for(let i=0;i<104;i++){
-    const k=isoWeek(cur.toISOString());
-    if(wk[k])n++;
-    else if(i>0)break;                 // the current week not started yet is not a break
-    cur.setDate(cur.getDate()-7)}
-  const keys=Object.keys(wk).sort();
-  let best=0,run=0,prev=null;
-  keys.forEach(k=>{
-    if(prev){const a=new Date(prev+'-1'),b=new Date(k+'-1');run=1+run}
-    else run=1;
-    best=Math.max(best,run);prev=k});
-  const days=new Set(H.filter(h=>new Date(h.date).getTime()>Date.now()-28*864e5)
-    .map(h=>h.date.slice(0,10))).size;
-  return{weeks:n,days:days,best:Math.max(best,n)}}
-function signalCard(){
-  const sg=signalScore(),lv=signalLevel(sg.pct),st=weekStreak();
-  const missing=sg.parts.filter(p=>p.have<p.need).sort((a,b)=>b.w-a.w)[0];
-  const col=sg.pct>=70?'var(--green)':sg.pct>=45?'var(--amber)':'var(--dim)';
-  const C=2*Math.PI*26;
-  return '<button data-a="sigOpen" class="card" style="width:100%;text-align:left;padding:15px 16px;display:block;margin-top:2px">'+
-    '<div style="display:flex;align-items:center;gap:14px">'+
-    '<div style="position:relative;width:60px;height:60px;flex:none">'+
-    '<svg viewBox="0 0 60 60" style="width:60px;height:60px;transform:rotate(-90deg)">'+
-    '<circle cx="30" cy="30" r="26" fill="none" stroke="var(--line)" stroke-width="4"/>'+
-    '<circle cx="30" cy="30" r="26" fill="none" stroke="'+col+'" stroke-width="4" stroke-linecap="round" '+
-      'stroke-dasharray="'+C.toFixed(1)+'" stroke-dashoffset="'+(C*(1-sg.pct/100)).toFixed(1)+'" style="transition:stroke-dashoffset .9s cubic-bezier(.22,1,.36,1)"/></svg>'+
-    '<span class="mono" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:'+col+'">'+sg.pct+'</span>'+
-    '</div>'+
-    '<div style="flex:1;min-width:0">'+
-    '<p style="font-size:14.5px;font-weight:600">'+esc(lv[0])+'</p>'+
-    '<p style="color:var(--faint);font-size:11.5px;line-height:1.45;margin-top:2px">'+esc(lv[1])+'</p>'+
-    (st.weeks>1?'<p class="mono" style="color:var(--amber);font-size:10.5px;margin-top:5px">'+st.weeks+' weeks running · '+st.days+' days trained this month</p>':'')+
-    '</div>'+
-    '<span class="mono" style="color:var(--faint);font-size:13px;flex:none">›</span></div>'+
-    (missing?'<p style="color:var(--dim);font-size:11.5px;line-height:1.5;margin-top:11px;padding-top:11px;border-top:1px solid var(--line)">'+
-      '<span style="color:var(--amber)">Next:</span> '+esc(missing.n.toLowerCase())+' — '+esc(missing.unlocks.split('.')[0])+'.</p>':'')+
-    '</button>'}
 
 /* ══ adherence ══ */
 function rehabStartKey(){
@@ -3482,7 +3310,6 @@ function pointsChip(){
     '<span class="mono" style="display:block;font-size:14px;font-weight:700;color:'+t[2]+'">'+d.total.toLocaleString()+'</span>'+
     '<span class="mono" style="display:block;color:var(--faint);font-size:8.5px;letter-spacing:.06em">DATA POINTS</span></button>'+
     '</span>'}
-function allenaBtn(){return '<button data-a="coachOpen" style="width:40px;height:40px;border-radius:13px;background:var(--raised);border:1px solid var(--amber);display:flex;align-items:center;justify-content:center;padding:0;flex:none"><img src="'+MARK+'" alt="Ask Allena" style="width:25px;height:25px;object-fit:contain"></button>'}
 function viewRehabHub(){
   const protos=activeProtocols();
   let h='<div class="view pad stg" style="padding-top:24px">'+
@@ -4484,10 +4311,6 @@ function zoneMins(r){
   const asPct=Math.abs(t-100)<12&&r.mins&&Math.abs(t-r.mins)>5;
   const f=asPct?(r.mins/100):1;
   return{z1:(r.z.z1||0)*f,z2:(r.z.z2||0)*f,z3:(r.z.z3||0)*f,z4:(r.z.z4||0)*f,z5:(r.z.z5||0)*f}}
-function zoneLoad(r){
-  const z=zoneMins(r);if(!z)return null;
-  // time weighted by zone — the standard TRIMP shape
-  return Math.round(z.z1*1+z.z2*2+z.z3*3+z.z4*4+z.z5*5)}
 function intensitySplit(days){
   const l=runsIn(days||28).map(r=>({r:r,z:zoneMins(r)})).filter(x=>x.z);
   if(l.length<3)return null;
@@ -4748,29 +4571,6 @@ function weekStreak(){
   const days=new Set(H.filter(h=>new Date(h.date).getTime()>Date.now()-28*864e5)
     .map(h=>h.date.slice(0,10))).size;
   return{weeks:n,days:days,best:Math.max(best,n)}}
-function signalCard(){
-  const sg=signalScore(),lv=signalLevel(sg.pct),st=weekStreak();
-  const missing=sg.parts.filter(p=>p.have<p.need).sort((a,b)=>b.w-a.w)[0];
-  const col=sg.pct>=70?'var(--green)':sg.pct>=45?'var(--amber)':'var(--dim)';
-  const C=2*Math.PI*26;
-  return '<button data-a="sigOpen" class="card" style="width:100%;text-align:left;padding:15px 16px;display:block;margin-top:2px">'+
-    '<div style="display:flex;align-items:center;gap:14px">'+
-    '<div style="position:relative;width:60px;height:60px;flex:none">'+
-    '<svg viewBox="0 0 60 60" style="width:60px;height:60px;transform:rotate(-90deg)">'+
-    '<circle cx="30" cy="30" r="26" fill="none" stroke="var(--line)" stroke-width="4"/>'+
-    '<circle cx="30" cy="30" r="26" fill="none" stroke="'+col+'" stroke-width="4" stroke-linecap="round" '+
-      'stroke-dasharray="'+C.toFixed(1)+'" stroke-dashoffset="'+(C*(1-sg.pct/100)).toFixed(1)+'" style="transition:stroke-dashoffset .9s cubic-bezier(.22,1,.36,1)"/></svg>'+
-    '<span class="mono" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:'+col+'">'+sg.pct+'</span>'+
-    '</div>'+
-    '<div style="flex:1;min-width:0">'+
-    '<p style="font-size:14.5px;font-weight:600">'+esc(lv[0])+'</p>'+
-    '<p style="color:var(--faint);font-size:11.5px;line-height:1.45;margin-top:2px">'+esc(lv[1])+'</p>'+
-    (st.weeks>1?'<p class="mono" style="color:var(--amber);font-size:10.5px;margin-top:5px">'+st.weeks+' weeks running · '+st.days+' days trained this month</p>':'')+
-    '</div>'+
-    '<span class="mono" style="color:var(--faint);font-size:13px;flex:none">›</span></div>'+
-    (missing?'<p style="color:var(--dim);font-size:11.5px;line-height:1.5;margin-top:11px;padding-top:11px;border-top:1px solid var(--line)">'+
-      '<span style="color:var(--amber)">Next:</span> '+esc(missing.n.toLowerCase())+' — '+esc(missing.unlocks.split('.')[0])+'.</p>':'')+
-    '</button>'}
 
 /* ══ adherence ══════════════════════════════════════════════
    Doing most of the programme most weeks beats doing all of a
@@ -4833,20 +4633,6 @@ function adhWord(pct){
   if(pct>=70)return 'Enough to progress, but the gaps are starting to show.';
   if(pct>=50)return 'Half a programme produces about half a result. Worth asking whether it is too long rather than whether you are lazy.';
   return 'The block is not really happening. A shorter one you finish beats a better one you do not.'}
-function adhCard(p,wk){
-  const a=weekAdherence(p,wk);
-  if(!a||!a.setsPlanned)return '';
-  const col=adhTone(a.pct);
-  return '<button data-a="adhOpen" class="card mt" style="width:100%;text-align:left;padding:14px 16px;display:block">'+
-    '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px">'+
-    '<span style="flex:1;min-width:0"><span style="display:block;font-size:13.5px;font-weight:600">This week so far</span>'+
-    '<span class="mono" style="display:block;color:var(--faint);font-size:10.5px">'+
-      a.sessions+' of '+a.sessionsPlanned+' sessions · '+a.sets+' of '+a.setsPlanned+' sets'+
-      (a.cut?' · '+a.cut+' cut':'')+'</span></span>'+
-    '<span class="mono" style="font-size:19px;font-weight:700;color:'+col+';flex:none">'+(a.pct==null?'—':a.pct+'%')+'</span></div>'+
-    '<div style="height:5px;border-radius:3px;background:var(--line);overflow:hidden;margin-top:10px">'+
-    '<div class="an-bar" style="height:5px;width:'+Math.min(100,a.pct||0)+'%;background:'+col+'"></div></div>'+
-    '</button>'}
 
 
 /* ══ discoveries ════════════════════════════════════════════
@@ -5688,17 +5474,6 @@ function questLine(){
       (done?'✓':pr.have+'/'+pr.target)+'</span></button>'}
 
 
-function patternLine(){
-  // the pattern engine lives on Progress, but the moment of action is the
-  // Program tab. The single most actionable finding gets one quiet line here.
-  try{
-    const P=allPatterns().filter(p=>p.tone==='warn');
-    if(!P.length)return '';
-    const p=P[0];
-    return '<button data-a="patOpen" data-v="'+esc(p.t)+'" style="display:flex;align-items:center;gap:9px;margin-top:12px;padding-top:12px;border-top:1px solid var(--line);width:100%;text-align:left">'+
-      '<span class="mono" style="color:var(--amber);font-size:9px;letter-spacing:.06em;flex:none">PATTERN</span>'+
-      '<span style="flex:1;min-width:0;font-size:12px;color:var(--dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(p.t)+(P.length>1?' · +'+(P.length-1)+' more':'')+'</span>'+
-      '<span class="mono" style="color:var(--amber);font-size:11px;flex:none">Look</span></button>'}catch(e){return ''}}
 
 function verdictCard(){
   /* the Today hero: the daily loop and what it unlocks. The session
@@ -5777,7 +5552,7 @@ function unlockCard(){
           '<div style="height:4px;border-radius:2px;background:var(--line);overflow:hidden;margin-top:5px">'+
           '<div class="an-bar" style="height:4px;width:'+w.pct+'%;background:'+(w.pct>=80?'var(--amber)':'var(--dim)')+'"></div></div></div>').join('')+'</div>'
        :'<p style="color:var(--dim);font-size:12px;line-height:1.55;margin-top:8px">Everything Allena can currently analyse is unlocked. New ones appear when your training starts doing new things.</p>')+
-      '<button data-a="nav" data-v="progress" class="mono" style="margin-top:11px;color:var(--amber);font-size:11px">See what they found ›</button>'+
+      '<button data-a="nav" data-v="progress" class="mono" style="margin-top:11px;color:var(--amber);font-size:11px">The full watchlist ›</button>'+
       '<p class="mono" style="color:var(--faint);font-size:9.5px;margin-top:8px;line-height:1.5">Unlocked by logging, never by waiting — each one names exactly the data it needs.</p></div>'}catch(e){return ''}}
 
 /* ══ the watchlist ══════════════════════════════════════════
@@ -6040,10 +5815,6 @@ function thinkPanel(title){
       '<span style="flex:1;min-width:0"><span style="font-size:12.5px;display:block">'+esc(x[0])+'</span>'+
       (x[1]?'<span class="mono" style="color:var(--faint);font-size:10px">'+esc(x[1])+'</span>':'')+'</span></div>').join('')+
     '</div></div>'}
-function thinkOverlay(){
-  const k=S.think&&S.think.key;
-  return '<div class="view pad stg" style="padding-top:64px">'+
-    thinkPanel(k==='nb'?'Allena is building your next block':k==='rp'?'Allena is writing your report':'Allena is reading the block')+'</div>'}
 function thinking(key){return S.think&&S.think.key===key&&!S.think.done}
 function thought(key){return S.think&&S.think.key===key&&S.think.done}
 /* a number that counts itself in */
@@ -6536,17 +6307,6 @@ function supportProgs(){return S.lib.programs.filter(isSupport)}
 function doneTodayIn(p){const t=today();
   return new Set(S.history.filter(h=>h.progId===p.id&&h.complete&&h.date.slice(0,10)===t).map(h=>h.dayTitle))}
 function activeProgSafe(){const p=activeProg();return (isSupport(p)||p.acl||p.rehabProto)?(mainProgs()[0]||p):p}
-function checklistRow(){
-  if(!S.lay.checklist)return '';
-  const items=[];
-  supportProgs().forEach(p=>{const dn=doneTodayIn(p);
-    p.days.forEach(d=>{if(!buildSets(p,p.days.indexOf(d),1).length)return;
-      items.push({t:d.name.length>16?d.name.slice(0,15)+'…':d.name,on:dn.has(d.name)})})});
-  if(S.supp.on)items.push({t:'Creatine',on:!!S.supp.days[today()]});
-  if(!items.length)return '';
-  return '<div style="display:flex;flex-wrap:wrap;gap:5px;margin-top:14px">'+items.map(x=>
-    '<span class="mono" style="display:inline-flex;align-items:center;gap:4px;font-size:9.5px;color:'+(x.on?'var(--green)':'var(--faint)')+';border:1px solid '+(x.on?'var(--green)':'var(--line)')+';border-radius:20px;padding:3px 8px">'+
-    (x.on?'✓':'○')+' '+esc(x.t)+'</span>').join('')+'</div>'}
 function garCard(){
   if(!S.gar.on||!S.gar.morning)return '';
   const d=garDay();if(d.am!=null||d.pre!=null||d.day!=null)return '';
@@ -6692,21 +6452,6 @@ function recommendToday(){
     const need=Math.max(0,Math.round((48-(h||0))/24*10)/10);
     return o.name+' — '+o.r.worst.toLowerCase()+' at '+o.r.worstV+'%'+(need>0?', about '+(need<1?'a day':need+' days')+' away':'')});
   return{top:top,rest:rest,why:why,hold:hold,bb:bbToday,base:base}}
-function rehabCard(){
-  const r=rehabToday();if(!r)return '';
-  if(r.done)return '<div class="card mt" style="padding:13px 15px;border-color:var(--green)">'+
-    '<div style="display:flex;align-items:center;gap:10px">'+
-    '<span style="width:8px;height:8px;border-radius:8px;background:var(--green);flex:none"></span>'+
-    '<span style="flex:1;font-size:12.5px;color:var(--dim)">Rehab done for today — phase '+S.acl.phase+'. Lifting can go ahead.</span>'+
-    '<button data-a="nav" data-v="acl" class="mono" style="color:var(--faint);font-size:12px;flex:none">Rehab ›</button></div></div>';
-  return '<div class="card mt" style="padding:15px 16px;border-color:var(--green)">'+
-    '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px">'+
-    '<p class="eyebrow" style="color:var(--green)">Rehab first · phase '+S.acl.phase+'</p>'+
-    '<button data-a="readyWhy" data-v="'+r.top.i+'" class="mono" style="color:var(--faint);font-size:10px;flex:none">'+r.top.score+'% ready ⓘ</button></div>'+
-    '<button data-a="aclStartDay" data-v="'+r.top.pid+':'+r.top.i+'" style="width:100%;text-align:left;margin-top:6px">'+
-    '<span class="disp" style="font-size:17px;font-weight:600;display:block">'+esc(r.top.name)+'</span>'+
-    (r.top.note?'<span style="color:var(--dim);font-size:12px;line-height:1.5;display:block;margin-top:3px">'+esc(r.top.note)+'</span>':'')+'</button>'+
-    '<p style="color:var(--faint);font-size:11px;line-height:1.5;margin-top:8px">The knee work comes before the lifting. Skipping it to train is the trade that costs people their return.</p></div>'}
 
 /* ══ the week clock ═════════════════════════════════════════
    A programmed week is a 7-day container, not a to-do list.
@@ -7253,7 +6998,6 @@ function viewHome(){
     if(S.lay.hide&&S.lay.hide[k])return;const f=render1[k];if(f)h+=f()});
   h+='<button data-a="layoutOpen" style="width:100%;margin-top:26px;padding:12px;color:var(--faint);font-size:11.5px;letter-spacing:.04em">Rearrange this screen</button>';
   return h+'</div>'}
-function weekAgo(){const d=new Date(Date.now()-7*864e5);return dayKey(d)}
 
 function sessionPRs(s2){
   if(!s2)return[];
@@ -8022,17 +7766,6 @@ function viewProgress(){
   const charted=others.filter(b=>liftPts(b).length>=2);
 
   const SEC={};
-  SEC.patternsOld=()=>{
-    const P=allPatterns();
-    if(!P.length)return '';
-    const open=S.openSec.patterns!==false;
-    let inner='<div style="margin-top:10px;display:flex;flex-direction:column;gap:8px">'+
-      P.map(f=>patCard(f)).join('')+'</div>';
-    inner+='<p class="mono" style="color:var(--faint);font-size:10.5px;margin-top:10px">Recalculated after every session you log.</p>';
-    const warn=P.filter(x=>x.tone==='warn').length;
-    const unseen=unseenPatterns();
-    return collapser('patterns','Patterns across your data'+(unseen?'<span style="display:inline-block;width:8px;height:8px;border-radius:8px;background:var(--red);margin-left:7px;vertical-align:middle"></span>':''),
-      P.length+' found'+(warn?' · '+warn+' worth acting on':'')+(unseen?' · '+unseen+' new':'')+' · from every trend together',inner)};
   SEC.goals=()=>{if(!S.goals.length)return '';
     let h2='<p class="eyebrow" style="margin-top:24px;color:var(--amber)">Goal lifts</p>';
     S.goals.forEach(g=>{const st=goalStats(g),chart=liftChart(g.ex,g);
@@ -8124,7 +7857,7 @@ function viewProgress(){
     [['train','Training'],['rehab','Rehab']].map(x=>'<button data-a="progTab" data-v="'+x[0]+'" class="pill" style="flex:1;padding:11px 0'+((S.progTab||'train')===x[0]?';background:var(--text);color:#1A1917;border-color:var(--text);font-weight:600':'')+'">'+x[1]+'</button>').join('')+'</div>';
     if((S.progTab||'train')==='rehab')return h+rehabProgress()+'</div>'}
   (S.lay.porder||['goals','trends','tonnage','lifetime','bb','scan','recovery','bw','bests']).forEach(k=>{
-    if(k==='patterns'){h+=analyseCard();return}
+    if(k==='patterns')return;    // patterns live on Today now
     if(S.lay.phide&&S.lay.phide[k])return;const f=SEC[k];if(!f)return;
     const out=f()||'';
     if(!out)return;
@@ -8173,7 +7906,7 @@ const DATA_GROUPS=[
   ['Equipment',[
     ['Barbell weight','Bar, plates and the loading diagram']]],
   ['Allena',[
-    ['Allena — AI coach','API key, model and how context is sent']]],
+    ['Allena — AI coach','Allena cloud link or your own API key']]],
   ['Backup & data',[
     ['Export','Backup file and spreadsheet'],
     ['Restore','Bring a backup back'],
@@ -8217,8 +7950,7 @@ function viewData(){
         '<span class="mono" style="color:var(--faint);font-size:14px">'+(on?'⌄':'›')+'</span></button>'+
         (on?'<div style="padding:0 16px 16px;border-top:1px solid var(--line)">'+byTitle[k]+'</div>':'')+'</div>'});
     h+='</div>'}
-  h+='<div style="height:8px"></div>'+
-    '<button data-a="wipeAsk" style="width:100%;margin-top:18px;padding:12px;color:var(--faint);font-size:11.5px">Before you delete this app, read this ›</button>';
+  h+='<div style="height:8px"></div>';
   return h+'</div>'}
 function dataRaw(){
   const p=activeProg();
@@ -9667,7 +9399,6 @@ function runAction(a,v,t,e){
       S.hform=null;S.sheet=null;S.patCache=null;render();flash('Session updated.');break}
     case 'delHistYes':S.history=S.history.filter(h=>h.id!==v);saveHistory();S.sheet=null;S.open=null;render();break;
     case 'markDone':{const h=S.history.find(x=>x.id===v);if(h){h.complete=true;saveHistory()}render();break}
-    case 'resumeHist':A.resumeHist(v);break;
     case 'closeSheet':S.sheet=null;render();break;
     case 'exportXlsx':A.exportXlsx();break;
     case 'backup':A.backup();break;
@@ -9790,7 +9521,6 @@ function runAction(a,v,t,e){
     case 'secToggle':if(v==='patterns')markPatternsSeen();
       if(!S.openSec[v])S.scrollTo='sec-'+v;      // opening: bring it into view
       else S.scrollTo=null;
-    case 'secToggleGo':S.openSec[v]=!S.openSec[v];render();break;
     case 'pMove':{const [k,d]=t.dataset.v.split(':');const o=S.lay.porder.slice();
       const i2=o.indexOf(k),j2=i2+ +d;if(i2<0||j2<0||j2>=o.length)break;
       o.splice(j2,0,o.splice(i2,1)[0]);S.lay.porder=o;lset(K_LAY,S.lay);vib(10);render();break}
@@ -9801,7 +9531,6 @@ function runAction(a,v,t,e){
       o.splice(j2,0,o.splice(i2,1)[0]);S.lay.order=o;lset(K_LAY,S.lay);vib(10);render();break}
     case 'layHide':{S.lay.hide=S.lay.hide||{};S.lay.hide[v]=!S.lay.hide[v];lset(K_LAY,S.lay);render();break}
     case 'layPlates':S.lay.plates=!(S.lay.plates!==false);lset(K_LAY,S.lay);render();break;
-    case 'layCheck':S.lay.checklist=!S.lay.checklist;lset(K_LAY,S.lay);render();break;
     case 'layReset':S.lay={order:['stats','program','sessions','goals','habits','support'],hide:{},checklist:true};lset(K_LAY,S.lay);render();break;
     case 'menuOpen':S.sheet={t:'menu'};render();break;
     case 'rehabPick':{
@@ -10269,9 +9998,6 @@ function runAction(a,v,t,e){
     case 'runLog':{S.runOn=true;lset('training-runon-v1',true);
       S.rform={type:'easy',km:0,mins:0,rpe:5,hr:0,elev:0,note:'',paste:'',date:today()};
       S.sheet={t:'runlog'};render();break}
-    case 'runType':S.rform.type=v;
-      if(!S.rform.rpe||S.rform.rpe===5)S.rform.rpe=({easy:4,recovery:3,long:5,tempo:7,interval:8,hills:7,race:9})[v]||5;
-      render();break;
     case 'runRpe':S.rform.rpe=+v;render();break;
     case 'runZones':S.rform.zopen=!S.rform.zopen;render();break;
     case 'runParse':{const t2=String(S.rform.paste||'');
@@ -10417,7 +10143,6 @@ function runAction(a,v,t,e){
       if(S.ai.key&&!S.coach.busy){S.coach.input='';askClaude(q)}
       else{S.coach.input=q;render()}break}
     case 'coachSend':if(!(S.coach.input||'').trim()){flash('Type something first.');break}
-    case 'coachSendGo':if(!S.coach.busy&&S.coach.input.trim()&&S.ai.key)askClaude(S.coach.input.trim());break;
     case 'coachApp':{try{const q=coachContext()+'\n\nQuestion: '+(S.coach.input.trim()||'Coach me on my next set.');
       window.open('https://claude.ai/new?q='+encodeURIComponent(q),'_blank')}catch(e){}break}
     case 'aiModel':S.ai.model=v;lset(K_AI,S.ai);render();break;
@@ -10510,7 +10235,6 @@ function runAction(a,v,t,e){
       S.lib.programs.push(p);S.lib.activeId=p.id;saveLib();setWeek(1,p.id);
       S.own=null;S.view='home';render();flash(p.block+' is live. Week 1 starts now.');break}
     case 'ownCancel':{S.own=null;S.view='home';render();break}
-    case 'suSkip':S.prof={skipped:true};lset(K_PROF,S.prof);S.view='home';render();break;
     case 'plateMax':lset(K_PL,+v);PLATES=ALL_PLATES.filter(p=>p.kg<=+v);flash('Plates capped at '+v+' kg.');break;
     case 'redoYes':S.confirmRedo=true;S.sheet=null;A.start(v);break;
     case 'redoNext':{S.week=Math.min(activeProg().weeks,S.week+1);S.sheet=null;render();break}
@@ -10618,7 +10342,6 @@ function runAction(a,v,t,e){
       flash('Logged '+log.length+' sets for '+fmtDate(rec.date)+'.');
       if(S.autoBk.on)setTimeout(function(){A.backup(true)},400);break}
     case 'autoBkToggle':S.autoBk.on=!S.autoBk.on;lset('training-autobk-v1',S.autoBk);flash(S.autoBk.on?'Auto-backup on.':'Auto-backup off.');break;
-    case 'hapticTest':vib([90,60,90]);flash('Haptic fired — did you feel a tick?');break;
     case 'barSave':BAR=Math.max(5,+S.bar||20);lset(K_BAR,BAR);S.bar=BAR;flash('Bar set to '+BAR+' kg.');break;
     case 'aiSave':lset(K_AI,S.ai);flash('Allena settings saved to this phone.');break;
     case 'loadPasted':if(S.paste.trim())doImport(S.paste);break;
@@ -10664,7 +10387,6 @@ setInterval(()=>{
 },250);
 
 const MARK='data:image/png;base64,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';
-const LOGO=(function(){try{const l=document.querySelector('link[rel="apple-touch-icon"]');return l?l.href:''}catch(e){return ''}})();
 try{const stale=S.lib.programs.filter(p=>p.acl&&p.ver!==ACL_VER);
   if(stale.length){const wasActive=stale.some(p=>p.id===S.lib.activeId);
     S.lib.programs=S.lib.programs.filter(p=>!p.acl);
