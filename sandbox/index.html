@@ -5126,10 +5126,12 @@ function bootEnd(){
   try{const el=document.getElementById('boot');
     if(el&&el.classList){el.classList.add('out');
       setTimeout(function(){S.boot=null;render();
-        if(S.morningQueued){S.morningQueued=false;setTimeout(function(){morningAsk()},260)}},380);return}}catch(e){}
+        if(S.morningQueued){S.morningQueued=false;setTimeout(function(){morningAsk()},260)}
+        if(S.dfQueued){S.dfQueued=false;setTimeout(function(){dailyFindAsk()},900)}},380);return}}catch(e){}
   S.boot=null;render();
   // whatever was waiting behind the animation gets its turn now
-  if(S.morningQueued){S.morningQueued=false;setTimeout(function(){morningAsk()},260)}}
+  if(S.morningQueued){S.morningQueued=false;setTimeout(function(){morningAsk()},260)}
+  if(S.dfQueued){S.dfQueued=false;setTimeout(function(){dailyFindAsk()},900)}}
 
 /* ══ the tree ═══════════════════════════════════════════════
    Every number in this app is comparable — points, sets, weeks.
@@ -5711,7 +5713,7 @@ function verdictCard(){
     inner+='<p class="disp" style="font-size:22px;font-weight:700;line-height:1.2;margin-top:10px">All done today</p>'+
       '<p style="color:var(--dim);font-size:13.5px;line-height:1.6;margin-top:5px">And Allena found something in your data.</p>'+
       '<button data-a="noticedOpen" class="big disp mt" style="background:var(--amber);color:#1A1917;font-size:15px">SEE WHAT ALLENA NOTICED</button>'+
-      '<div style="display:flex;gap:5px;margin-top:12px">'+dots.slice(45,-7)+'</div>'}
+      '<div style="display:flex;align-items:center;gap:9px;margin-top:12px">'+dots+'</div>'}
   else if(done){
     inner+='<p class="disp" style="font-size:22px;font-weight:700;line-height:1.2;margin-top:10px">All done today</p>'+
       '<p style="color:var(--dim);font-size:13.5px;line-height:1.6;margin-top:5px">Everything Allena asked for is logged. Tomorrow it will have something new to say.</p>'+
@@ -6075,7 +6077,7 @@ function gateLockedCard(i){
   const pct=Math.min(100,Math.round(pts/need*100));
   return '<div class="card" style="padding:14px 16px;opacity:.8">'+
     '<div style="display:flex;align-items:center;gap:10px">'+
-    '<span class="mono" style="color:var(--faint);font-size:9px;letter-spacing:.08em;border:1px solid var(--line);padding:3px 8px;border-radius:999px;flex:none">LOCKED</span>'+
+    '<span class="mono" style="display:inline-flex;align-items:center;gap:5px;color:var(--faint);font-size:9px;letter-spacing:.08em;border:1px solid var(--line);padding:3px 9px;border-radius:999px;flex:none">'+lockIcon(9)+'LOCKED</span>'+
     '<span style="flex:1;color:var(--faint);font-size:12.5px">A pattern Allena has already found in your data</span></div>'+
     '<div style="display:flex;justify-content:space-between;align-items:baseline;margin-top:10px">'+
     '<span class="mono" style="color:var(--faint);font-size:10px">unlocks at '+need.toLocaleString()+' points</span>'+
@@ -6092,7 +6094,7 @@ function gateHeroCard(){
     const left=need-pts;
     return '<button data-a="nav" data-v="progress" class="card an-glow" style="width:100%;text-align:left;padding:16px;margin-top:12px;border-radius:18px;border-color:rgba(217,119,87,.55);display:block">'+
       '<div style="display:flex;align-items:center;gap:10px">'+
-      '<span class="mono" style="color:var(--amber);font-size:9.5px;letter-spacing:.08em;border:1px solid rgba(217,119,87,.5);padding:3px 9px;border-radius:999px;flex:none">🔒 LOCKED</span>'+
+      '<span class="mono" style="display:inline-flex;align-items:center;gap:6px;color:var(--amber);font-size:9.5px;letter-spacing:.08em;border:1px solid rgba(217,119,87,.5);padding:4px 10px;border-radius:999px;flex:none">'+lockIcon(10)+'LOCKED</span>'+
       '<span class="mono" style="flex:1;text-align:right;color:var(--faint);font-size:10px">'+(P.length-n)+' waiting</span></div>'+
       '<p class="disp" style="font-size:17px;font-weight:700;line-height:1.25;margin-top:9px">A pattern is waiting in your data</p>'+
       '<p style="color:var(--dim);font-size:12.5px;line-height:1.55;margin-top:4px">Already found. '+left.toLocaleString()+' points of logging unlocks it.</p>'+
@@ -8817,6 +8819,34 @@ function sheetHtml(){
          '<button data-a="questPass" class="btn mt" style="color:var(--dim)">Not this week</button>'
         :'')+
       '<p style="color:var(--faint);font-size:11px;line-height:1.55;margin-top:12px">One per week, generated Monday from what you have already done. If it does not happen, nothing is lost and nothing turns red — a fresh one simply arrives Monday.</p>')}
+  if(S.sheet.t==='dailyfind'){
+    const pr=todayProgress(),n=noticedToday(),t=todayState();
+    if(S.think&&S.think.key==='df'&&!S.think.done)
+      return wrapSheet('Allena found something',thinkPanel('Reading today back'));
+    if(t.revealed&&n)
+      return wrapSheet('Allena found something',
+        '<p class="mono" style="font-size:9.5px;color:var(--amber);letter-spacing:.08em">✦ TODAY’S FIND</p>'+
+        '<p class="disp" style="font-size:21px;font-weight:700;line-height:1.25;margin-top:8px">'+esc(n.t)+'</p>'+
+        '<p style="color:var(--dim);font-size:13.5px;line-height:1.6;margin-top:7px">'+esc(n.d)+'</p>'+
+        '<p style="color:var(--faint);font-size:11px;line-height:1.55;margin-top:14px">It stays on your Today card until tomorrow, when there will be a different one.</p>');
+    if(!pr.complete){
+      const next=pr.tasks.filter(x=>!x.done&&!x.optional)[0]||pr.tasks.filter(x=>!x.done)[0];
+      const left=pr.core-pr.coreDone;
+      return wrapSheet('Allena found something',
+        '<div style="display:flex;align-items:center;gap:8px">'+
+        '<span class="mono" style="display:inline-flex;align-items:center;gap:6px;color:var(--amber);font-size:9.5px;letter-spacing:.08em;border:1px solid rgba(217,119,87,.5);padding:4px 10px;border-radius:999px">'+lockIcon(10)+'LOCKED</span></div>'+
+        '<p class="disp" style="font-size:21px;font-weight:700;line-height:1.25;margin-top:10px">Something new about you is ready</p>'+
+        '<p style="color:var(--dim);font-size:13.5px;line-height:1.6;margin-top:6px">Found in your numbers overnight. It unlocks when today’s loop is done — '+
+          left+' check-in'+(left===1?'':'s')+' left, each one earns points.</p>'+
+        '<div style="display:flex;gap:5px;margin-top:13px">'+
+        pr.tasks.map(x=>'<span style="width:9px;height:9px;border-radius:9px;background:'+(x.done?'var(--green)':'var(--line)')+'"></span>').join('')+'</div>'+
+        (next?'<button data-a="'+(next.go||'todayOpen')+'" class="big disp mt2" style="background:var(--amber);color:#1A1917">'+esc((next.go?next.n:'Open today').toUpperCase())+'</button>':'')+
+        '<button data-a="sheetClose" class="btn mt" style="color:var(--dim)">Later</button>');}
+    return wrapSheet('Allena found something',
+      '<p class="mono" style="font-size:9.5px;color:var(--green);letter-spacing:.08em">UNLOCKED · TODAY’S LOOP DONE</p>'+
+      '<p class="disp" style="font-size:21px;font-weight:700;line-height:1.25;margin-top:8px">Allena has something on you</p>'+
+      '<p style="color:var(--dim);font-size:13.5px;line-height:1.6;margin-top:6px">One observation, from your own numbers, different tomorrow.</p>'+
+      '<button data-a="dfReveal" class="big disp mt2" style="background:var(--amber);color:#1A1917">REVEAL IT</button>');}
   if(S.sheet.t==='wrap'){
     if(S.think&&S.think.key==='wrap'&&!S.think.done)
       return wrapSheet('Month in review',thinkPanel('Reading the month back'));
@@ -9706,6 +9736,9 @@ function runAction(a,v,t,e){
     case 'questOpen':S.sheet={t:'quest'};render();break;
     case 'questAccept':{const Q=questCurrent();if(Q&&Q.state==='offered'){Q.state='on';questSave();vib(12)}render();break}
     case 'questPass':{const Q=questCurrent();if(Q&&Q.state==='offered'){Q.state='passed';questSave()}S.sheet=null;render();break}
+    case 'dfReveal':thinkStart('df',[['Reading last night'],['Lining it up against your history'],['Checking it is real']],
+      function(){const t2=todayState();t2.revealed=true;todaySave(t2)});render();break;
+    case 'sheetClose':S.sheet=null;render();break;
     case 'wrapGo':{const ym=v;S.sheet={t:'wrap',ym:ym};
       thinkStart('wrap',[['Reading '+ymName(ym)],['Comparing with '+ymName(prevYm(ym))],['Weighing what to say honestly']],function(){
         if(!wraps()[ym]){const r=wrapBuild(ym);if(r){wraps()[ym]=r;wrapSaveAll()}}});
@@ -10741,6 +10774,31 @@ try{if(SANDBOX&&!lget('training-sandbox-v1',null)){
     if(wks.length)setWeek(Math.max.apply(null,wks),p0.id)}}catch(e){}
   S.ai=S.ai||{};
 }}catch(e){}
+
+/* ══ the daily find ═════════════════════════════════════════
+   Once a day, when there genuinely is one: Allena announces a
+   fresh observation. Locked until today's loop is done (the
+   check-ins that earn points), then revealed with the thinking
+   sequence. Never fabricated — a day with nothing real to show
+   stays quiet, which is what keeps the real days believable.
+   ══════════════════════════════════════════════════════════ */
+function dailyFindDue(){
+  try{
+    if(!(S.history||[]).length&&!(S.runs||[]).length)return false;
+    const t=todayState();
+    if(t.dfShown)return false;
+    return !!noticedToday()}catch(e){return false}}
+function dailyFindAsk(){try{
+  if(!dailyFindDue())return false;
+  if(S.boot!=null){S.dfQueued=true;return false}
+  if(S.view==='setup'||S.view==='coach'||S.sess)return false;
+  if(S.sheet)return false;                 // never stack on another prompt
+  if(morningDue())return false;            // readiness goes first; we take the next open
+  const t=todayState();t.dfShown=true;todaySave(t);
+  S.sheet={t:'dailyfind'};vib(12);render();return true}catch(e){return false}}
+function lockIcon(sz){
+  return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" style="width:'+(sz||11)+'px;height:'+(sz||11)+'px;flex:none"><rect x="5.5" y="10.5" width="13" height="9" rx="2.5"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5"/></svg>'}
+
 function morningDue(){
   if(!S.gar||!S.gar.on||!S.gar.morning)return false;
   const d=(S.gar.days||{})[today()]||{};
@@ -10758,7 +10816,7 @@ let lastDay=today();
 function dayCheck(){
   const k=today();
   if(k!==lastDay){lastDay=k;S.garSkip=false}   // a new day: clear yesterday's skips
-  morningAsk()}
+  if(!morningAsk())dailyFindAsk()}
 // the app is suspended rather than closed, so re-check whenever it comes back
 try{document.addEventListener('visibilitychange',function(){if(document.visibilityState==='visible')dayCheck()})}catch(e){}
 try{window.addEventListener('pageshow',function(){dayCheck()})}catch(e){}
