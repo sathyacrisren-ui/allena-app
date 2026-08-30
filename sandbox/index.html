@@ -784,16 +784,14 @@ function scanSave(){lset(K_SCAN,S.scans)}
 function daysSinceScan(){const l=scansSorted().slice(-1)[0];if(!l)return null;
   return Math.floor((Date.now()-new Date(l.date+'T12:00').getTime())/864e5)}
 async function readScanWithAllena(){
-  const f=S.sform;if(!f||!f.img||!S.ai.key)return;
+  const f=S.sform;if(!f||!f.img||!aiReady())return;
   f.busy=true;render();
   const m=f.img.match(/^data:(image\/[a-z]+);base64,(.+)$/i);
   if(!m){f.busy=false;flash('Unsupported image.');render();return}
   try{
-    const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',
-      headers:{'content-type':'application/json','x-api-key':S.ai.key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
-      body:JSON.stringify({model:S.ai.model,max_tokens:300,
+    const res=await claudeFetch({model:S.ai.model,max_tokens:300,
         system:'Extract body-composition numbers from the scan image. Reply with JSON only, no prose, no code fences. Keys: w (weight kg), bf (body fat percent), smm (skeletal muscle mass kg), vf (visceral fat rating), bmr (kcal), tee (total energy expenditure kcal), date (YYYY-MM-DD if visible). Omit any key you cannot read. Numbers only, no units.',
-        messages:[{role:'user',content:[{type:'image',source:{type:'base64',media_type:m[1],data:m[2]}},{type:'text',text:'Extract the values.'}]}]})});
+        messages:[{role:'user',content:[{type:'image',source:{type:'base64',media_type:m[1],data:m[2]}},{type:'text',text:'Extract the values.'}]}]});
     const d=await res.json();
     let t=d.content?d.content.map(x=>x.text||'').join(''):'';
     t=t.replace(/```json|```/g,'').trim();
@@ -864,12 +862,31 @@ function sessLine(h,full){
   const parts=(full?keys:keys.slice(0,4)).map(k=>k.replace(/ — /,' ')+' '+by[k].join('/'));
   return h.date.slice(5,10)+' '+(h.dayTitle||'')+(h.week?' w'+h.week:'')+': '+parts.join('; ')+
     (!full&&keys.length>4?' +'+(keys.length-4)+' more':'')}
+
+/* one door to Claude: the user's own key, or the founder's proxy */
+function aiReady(){return !!(((S.ai&&S.ai.proxy)||'').trim()||(S.ai&&S.ai.key))}
+function claudeFetch(body){
+  const px=((S.ai&&S.ai.proxy)||'').trim();
+  if(px)return fetch(px,{method:'POST',headers:{'content-type':'application/json'},
+    body:JSON.stringify(body)});
+  return fetch('https://api.anthropic.com/v1/messages',{method:'POST',
+    headers:{'content-type':'application/json','x-api-key':S.ai.key,
+      'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+    body:JSON.stringify(body)})}
+
 function coachContext(){
   const s=S.sess,p=activeProg(),out=[];
   if(s){const cur=s.sets[Math.min(s.idx,s.sets.length-1)];
-    out.push('Now: '+s.dayName+' w'+s.week+', '+cur.ex+' set '+cur.setNo+'/'+cur.of+
-      ' target '+(cur.secs?cur.secs+'s':((cur.targetW!=null?cur.targetW+'kg×':'')+cur.targetReps+(cur.targetRpe!=null?'@'+cur.targetRpe:''))));
-    if(s.log.length)out.push('Today: '+s.log.slice(-8).map(l=>l.ex.replace(/ — /,' ')+' '+entryStr(l)).join('; '));
+    const phase=s.phase==='resting'?('resting ('+Math.max(0,Math.ceil(((S.restEnd||Date.now())-Date.now())/1000))+'s left) before'):
+      s.phase==='working'?'mid-set on':s.phase==='logging'?'just finished a set of':'about to start';
+    out.push('LIVE SESSION — '+s.dayName+' week '+s.week+': '+phase+' '+cur.ex+' set '+cur.setNo+' of '+cur.of+
+      ', target '+(cur.secs?cur.secs+'s hold':((cur.targetW!=null?cur.targetW+'kg × ':'')+cur.targetReps+(cur.targetRpe!=null?' @ RPE '+cur.targetRpe:'')))+
+      ' · '+s.log.length+' of '+s.sets.length+' sets logged so far');
+    const sameEx=s.log.filter(l=>l.ex===cur.ex);
+    if(sameEx.length)out.push('This exercise today: '+sameEx.map(l=>entryStr(l)+(l.rpe!=null?' @ RPE '+l.rpe:'')).join('; '));
+    if(s.log.length)out.push('All sets today: '+s.log.slice(-10).map(l=>l.ex.replace(/ — /,' ')+' '+entryStr(l)+(l.rpe!=null?'@'+l.rpe:'')).join('; '));
+    try{const lp=lastFor(cur.ex,cur.setNo);
+      if(lp)out.push('Same set last time: '+entryStr(lp)+(lp.rpe!=null?' @ RPE '+lp.rpe:'')+' ('+String(lp.date).slice(0,10)+')')}catch(e){}
     if(S.hint)out.push('App says: '+S.hint.msg);
   }else{
     const ws=weekState(p,S.week);
@@ -937,16 +954,11 @@ async function askClaude(q){
   S.coach.thread.push({r:'user',t:q});S.coach.input='';S.coach.busy=true;render();
   const th=S.coach.thread.slice(-8);
   const msgs=th.map((m,i)=>({role:m.r==='user'?'user':'assistant',content:m.t}));
-  const topicNow=S.coachTopic||'program';
-  const firstOfThread=S.coach.thread.filter(m=>m.r==='a').length===0;
-  if(msgs.length&&(firstOfThread||!S.coach.sent||S.coach.sentTopic!==topicNow)){
-    msgs[msgs.length-1].content='CONTEXT (the only data you have — never state a number that is not here):\n'+coachContext()+'\n\nQUESTION: '+msgs[msgs.length-1].content;
-    S.coach.sent=true;S.coach.sentTopic=topicNow}
+  // context is rebuilt fresh for EVERY message — the previous
+  // once-per-thread logic left the coach blind mid-session
+  if(msgs.length)msgs[msgs.length-1].content='CONTEXT (fresh as of this message — the only data you have; never state a number that is not here):\n'+coachContext()+'\n\nQUESTION: '+msgs[msgs.length-1].content;
   try{
-    const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',
-      headers:{'content-type':'application/json','x-api-key':S.ai.key,
-        'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
-      body:JSON.stringify({model:S.ai.model,max_tokens:320,system:coachSys(),messages:msgs})});
+    const res=await claudeFetch({model:S.ai.model,max_tokens:320,system:coachSys(),messages:msgs});
     const d=await res.json();
     let t=d.content?d.content.map(x=>x.text||'').join(''):(d.error?('Error: '+d.error.message):'No reply.');
     let act=null;
@@ -2019,7 +2031,7 @@ function viewCoach(){
   h+='<div class="chathead"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:12px 18px">'+
    '<div style="min-width:0;display:flex;align-items:center;gap:8px"><img src="'+MARK+'" alt="" style="width:22px;height:22px;object-fit:contain">'+
    '<span class="disp brand" style="font-size:19px;font-weight:700">Allena</span>'+
-   '<span class="mono" style="color:var(--faint);font-size:9px;letter-spacing:.06em;text-transform:uppercase">'+(S.ai.key?(S.ai.model.indexOf('haiku')>=0?'Haiku':'Sonnet'):'Claude app')+'</span></div>'+
+   '<span class="mono" style="color:var(--faint);font-size:9px;letter-spacing:.06em;text-transform:uppercase">'+(aiReady()?((S.ai.proxy||'').trim()?'Allena cloud':(S.ai.model.indexOf('haiku')>=0?'Haiku':'Sonnet')):'Claude app')+'</span></div>'+
    '<div style="display:flex;gap:6px;flex:none">'+
    (th.length?'<button data-a="coachClear" class="chatbtn">New</button>':'')+
    '<button data-a="coachClose" class="chatbtn">Close</button></div></div></div>';
@@ -2058,8 +2070,8 @@ function viewCoach(){
   h+='</div>';
   h+='<div class="chatbar"><div class="composer">'+
     '<textarea data-in="coach.input" rows="1" placeholder="Ask Allena…" style="flex:1;min-width:0;background:none;border:none;outline:none;color:var(--text);font-size:16px;line-height:1.45;padding:9px 2px;resize:none;max-height:120px">'+esc(S.coach.input)+'</textarea>'+
-    '<button data-a="'+(S.ai.key?'coachSend':'coachApp')+'" class="sendbtn" style="opacity:'+(S.coach.input.trim()?'1':'.35')+'">↑</button></div>'+
-    (S.ai.key?'':'<p style="color:var(--faint);font-size:10.5px;text-align:center;margin-top:7px">Sends to the Claude app · add a key in Data → Allena to chat here</p>')+
+    '<button data-a="'+(aiReady()?'coachSend':'coachApp')+'" class="sendbtn" style="opacity:'+(S.coach.input.trim()?'1':'.35')+'">↑</button></div>'+
+    (aiReady()?'':'<p style="color:var(--faint);font-size:10.5px;text-align:center;margin-top:7px">Sends to the Claude app · add a key or Allena cloud link in Data → Allena to chat here</p>')+
     '</div></div>';
   return h}
 
@@ -2068,16 +2080,14 @@ function viewCoach(){
 const IMPORT_SYS='Convert the training program into JSON only — no prose, no code fences. Shape: {"block":"name","weeks":N,"days":[{"name":"Day name","note":"","exercises":[{"name":"Exercise","bar":true|false,"rest":seconds,"sets":{"default":[{"w":kg|null,"reps":8|"8-12","rpe":8|null}]}}]}]}. One entry per set. If a week differs, use the week number as a key alongside "default". Use kg; convert lb by 0.4536 and round to 0.5. If a weight is not given use null. bar:true only for barbell lifts. rest in seconds, estimate if absent (compound 180, isolation 90). Keep the lifter\'s own exercise names. Never invent exercises that are not there.';
 function impNew(){S.imp={step:'pick',text:'',img:null,busy:false,draft:null,err:null,assess:null}}
 async function impParse(){
-  const f=S.imp;if(!S.ai.key)return flash('Add your API key under Data → Allena first.');
+  const f=S.imp;if(!aiReady())return flash('Add your API key or Allena cloud link under Data → Allena first.');
   f.busy=true;f.err=null;render();
   const content=[];
   if(f.img){const m=f.img.match(/^data:(image\/[a-z]+);base64,(.+)$/i);
     if(m)content.push({type:'image',source:{type:'base64',media_type:m[1],data:m[2]}})}
   content.push({type:'text',text:(f.text||'Convert this program.').slice(0,6000)});
   try{
-    const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',
-      headers:{'content-type':'application/json','x-api-key':S.ai.key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
-      body:JSON.stringify({model:S.ai.model,max_tokens:3000,system:IMPORT_SYS,messages:[{role:'user',content:content}]})});
+    const res=await claudeFetch({model:S.ai.model,max_tokens:3000,system:IMPORT_SYS,messages:[{role:'user',content:content}]});
     const d=await res.json();
     let t=d.content?d.content.map(x=>x.text||'').join(''):'';
     t=t.replace(/```json|```/g,'').trim();
@@ -8367,8 +8377,9 @@ function dataRaw(){
    '<span style="flex:1"><span style="display:block;font-size:13.5px;font-weight:600">Show the plate diagram</span>'+
    '<span style="color:var(--faint);font-size:11.5px">Bar and plates drawn on the set screen</span></span></button></div>'+
    '<div class="mt2"><p class="eyebrow">Allena — AI coach</p>'+
-   '<p style="color:var(--dim);font-size:13px;line-height:1.55;margin-top:8px">Paste an Anthropic API key (console.anthropic.com) and the Allena button in sessions becomes a live chat with your session context attached. The key lives only in this phone\'s storage — it is never inside the app file or on Netlify. Context is sent once per conversation, not per message, and only the last few turns are kept — a Haiku question costs a fraction of a cent.</p>'+
-   '<input data-in="ai.key" value="'+esc(S.ai.key)+'" placeholder="sk-ant-…" autocomplete="off" class="mono" style="width:100%;margin-top:10px;background:var(--surface);border:1px solid var(--line);border-radius:10px;color:var(--text);padding:12px;font-size:12px;outline:none">'+
+   '<p style="color:var(--dim);font-size:13px;line-height:1.55;margin-top:8px">Two ways to bring Allena\'s chat to life. Easiest: paste an <b>Allena cloud link</b> if you have one — no account, no key. Or paste your own Anthropic API key (console.anthropic.com). Either lives only in this phone\'s storage. Fresh session context rides along with every message, and only the last few turns are kept — a question costs a fraction of a cent.</p>'+
+   '<input data-in="ai.proxy" value="'+esc(S.ai.proxy||'')+'" placeholder="Allena cloud link (https://…)" autocomplete="off" class="mono" style="width:100%;margin-top:10px;background:var(--surface);border:1px solid var(--line);border-radius:10px;color:var(--text);padding:12px;font-size:12px;outline:none">'+
+   '<input data-in="ai.key" value="'+esc(S.ai.key)+'" placeholder="or your own key: sk-ant-…" autocomplete="off" class="mono" style="width:100%;margin-top:8px;background:var(--surface);border:1px solid var(--line);border-radius:10px;color:var(--text);padding:12px;font-size:12px;outline:none">'+
    '<div class="row" style="margin-top:8px">'+MODELS.map(m=>'<button data-a="aiModel" data-v="'+m[0]+'" class="pill" style="flex:1'+(S.ai.model===m[0]?';background:var(--text);color:#1A1917;border-color:var(--text);font-weight:600':'')+'">'+m[1]+'</button>').join('')+'</div>'+
    '<button data-a="aiSave" class="btn mt">Save Allena settings</button>'+
    '<p style="color:var(--faint);font-size:12px;line-height:1.5;margin-top:8px">Without a key, Allena still works — it opens the Claude app with your session pre-attached.</p></div>'+
