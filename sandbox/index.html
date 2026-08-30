@@ -6006,24 +6006,48 @@ function analyseCard(){
         return b.total?'<button data-a="collOpen" class="btn mt" style="font-size:12.5px;color:var(--dim)">'+
           b.total+' found in total · see the collection ›</button>':''})()+
       ((P.length||shown.length)?
-        (P.length?'<p class="eyebrow" style="margin-top:16px;color:var(--amber)">Worth acting on</p>'+
-          '<p style="color:var(--faint);font-size:11px;line-height:1.5;margin-top:3px">Connections between your lifting, running, readiness and rehab.</p>':'')+
-        '<div style="margin-top:10px;display:flex;flex-direction:column;gap:8px">'+
-        P.map((p,i)=>'<div class="an-rise" style="animation-delay:'+(i*0.06).toFixed(2)+'s">'+patCard(p)+'</div>').join('')+'</div>'+
-        (shown.length?'<p class="eyebrow" style="margin-top:18px">What you have earned</p>'+
-          '<p style="color:var(--faint);font-size:11px;line-height:1.5;margin-top:3px">Records and milestones, kept for good.</p>':'')+
-        '<div style="margin-top:10px;display:flex;flex-direction:column;gap:8px">'+
-        shown.slice(0,14).map((d,i)=>{const r=rarityOf(d.rar),isNew=fresh.indexOf(d)>=0;
-          return '<div class="an-rise" style="animation-delay:'+((P.length+i)*0.06).toFixed(2)+'s">'+
-          '<div class="card" style="padding:13px 15px;border-color:'+(isNew?r[1]:'var(--line)')+'">'+
-          '<div style="display:flex;align-items:center;gap:8px">'+
-          '<span class="mono" style="color:'+r[1]+';font-size:9px;letter-spacing:.06em">'+esc(r[2].toUpperCase())+'</span>'+
-          (isNew?'<span class="mono an-pop" style="background:'+r[1]+';color:#1A1917;font-size:8.5px;padding:2px 6px;border-radius:999px;letter-spacing:.05em">NEW</span>':'')+
-          '</div>'+
-          '<p style="font-size:14px;font-weight:600;margin-top:5px">'+esc(d.t)+'</p>'+
-          '<p style="color:var(--dim);font-size:12.5px;line-height:1.6;margin-top:3px">'+esc(d.d)+'</p></div></div>'}).join('')+
-        (shown.length>14?'<p class="mono" style="color:var(--faint);font-size:10.5px">and '+(shown.length-14)+' more in your history.</p>':'')+
-        '</div>'+watchCard()
+        (function(){
+          const dCard=d=>{const r=rarityOf(d.rar),isNew=fresh.indexOf(d)>=0;
+            return '<div class="card" style="padding:13px 15px;border-color:'+(isNew?r[1]:'var(--line)')+'">'+
+              '<div style="display:flex;align-items:center;gap:8px">'+
+              '<span class="mono" style="color:'+r[1]+';font-size:9px;letter-spacing:.06em">'+esc(r[2].toUpperCase())+'</span>'+
+              (isNew?'<span class="mono an-pop" style="background:'+r[1]+';color:#1A1917;font-size:8.5px;padding:2px 6px;border-radius:999px;letter-spacing:.05em">NEW</span>':'')+'</div>'+
+              '<p style="font-size:14px;font-weight:600;margin-top:5px">'+esc(d.t)+'</p>'+
+              '<p style="color:var(--dim);font-size:12.5px;line-height:1.6;margin-top:3px">'+esc(d.d)+'</p></div>'};
+          const grp=(key,label,color,items,render)=>{
+            if(!items.length)return '';
+            const on=!!S.openSec['an:'+key];
+            return '<div class="card" style="padding:0;overflow:hidden'+(on?';border-color:'+color:'')+'">'+
+              '<button data-a="secToggle" data-v="an:'+key+'" style="width:100%;text-align:left;padding:12px 15px;display:flex;align-items:center;gap:10px">'+
+              '<span class="mono" style="color:'+color+';font-size:9.5px;letter-spacing:.08em;flex:none">'+label+'</span>'+
+              '<span class="mono" style="flex:1;text-align:right;color:var(--faint);font-size:11px">'+items.length+'</span>'+
+              '<span class="mono" style="color:var(--faint);font-size:13px;flex:none">'+(on?'⌄':'›')+'</span></button>'+
+              (on?'<div style="border-top:1px solid var(--line);padding:10px 12px;display:flex;flex-direction:column;gap:8px">'+items.map(render).join('')+'</div>':'')+'</div>'};
+          let out2='';
+          // the actionable few, always in full
+          const warns=P.filter(p=>p.tone==='warn');
+          if(warns.length)out2+='<p class="eyebrow" style="margin-top:16px;color:var(--amber)">Worth acting on</p>'+
+            '<p style="color:var(--faint);font-size:11px;line-height:1.5;margin-top:3px">Connections between your lifting, running, readiness and rehab.</p>'+
+            '<div style="margin-top:10px;display:flex;flex-direction:column;gap:8px">'+
+            warns.map((p,i)=>'<div class="an-rise" style="animation-delay:'+(i*0.06).toFixed(2)+'s">'+patCard(p)+'</div>').join('')+'</div>';
+          // the rest of the patterns, condensed by kind
+          const goods=P.filter(p=>p.tone==='good'),rest=P.filter(p=>p.tone!=='warn'&&p.tone!=='good');
+          if(goods.length||rest.length)out2+='<div style="margin-top:10px;display:flex;flex-direction:column;gap:8px">'+
+            grp('good','GOING WELL','var(--green)',goods,patCard)+
+            grp('watch','WORTH KNOWING','var(--dim)',rest,patCard)+'</div>';
+          // new finds get the stage; the archive files by rarity
+          if(fresh.length)out2+='<p class="eyebrow" style="margin-top:18px">New since you last looked</p>'+
+            '<div style="margin-top:10px;display:flex;flex-direction:column;gap:8px">'+
+            fresh.slice(0,6).map((d,i)=>'<div class="an-rise" style="animation-delay:'+((warns.length+i)*0.06).toFixed(2)+'s">'+dCard(d)+'</div>').join('')+
+            (fresh.length>6?'<p class="mono" style="color:var(--faint);font-size:10.5px">and '+(fresh.length-6)+' more new, filed below.</p>':'')+'</div>';
+          const old=shown.filter(d=>fresh.indexOf(d)<0).concat(fresh.slice(6));
+          if(old.length){
+            out2+='<p class="eyebrow" style="margin-top:18px">What you have earned</p>'+
+              '<p style="color:var(--faint);font-size:11px;line-height:1.5;margin-top:3px">Records and milestones, kept for good.</p>'+
+              '<div style="margin-top:10px;display:flex;flex-direction:column;gap:8px">'+
+              ['epic','rare','uncommon','common'].map(rr=>{const r=rarityOf(rr);
+                return grp(rr,r[2].toUpperCase(),r[1],old.filter(d=>d.rar===rr),dCard)}).join('')+'</div>'}
+          return out2})()+watchCard()
         :'<p style="color:var(--dim);font-size:12.5px;line-height:1.6;margin-top:12px">Nothing in your data contradicts anything else in it. Keep logging and this gets sharper.</p>')+
       '</div>'}
   const s2=anStats();
@@ -9632,6 +9656,7 @@ function runAction(a,v,t,e){
     case 'secToggle':if(v==='patterns')markPatternsSeen();
       if(!S.openSec[v])S.scrollTo='sec-'+v;      // opening: bring it into view
       else S.scrollTo=null;
+      S.openSec[v]=!S.openSec[v];render();break;
     case 'pMove':{const [k,d]=t.dataset.v.split(':');const o=S.lay.porder.slice();
       const i2=o.indexOf(k),j2=i2+ +d;if(i2<0||j2<0||j2>=o.length)break;
       o.splice(j2,0,o.splice(i2,1)[0]);S.lay.porder=o;lset(K_LAY,S.lay);vib(10);render();break}
@@ -10254,6 +10279,7 @@ function runAction(a,v,t,e){
       if(S.ai.key&&!S.coach.busy){S.coach.input='';askClaude(q)}
       else{S.coach.input=q;render()}break}
     case 'coachSend':if(!(S.coach.input||'').trim()){flash('Type something first.');break}
+      if(!S.coach.busy&&aiReady())askClaude(S.coach.input.trim());break;
     case 'coachApp':{try{const q=coachContext()+'\n\nQuestion: '+(S.coach.input.trim()||'Coach me on my next set.');
       window.open('https://claude.ai/new?q='+encodeURIComponent(q),'_blank')}catch(e){}break}
     case 'aiModel':S.ai.model=v;lset(K_AI,S.ai);render();break;
