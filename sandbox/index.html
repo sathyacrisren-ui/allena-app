@@ -5689,41 +5689,85 @@ function patternLine(){
       '<span class="mono" style="color:var(--amber);font-size:11px;flex:none">Look</span></button>'}catch(e){return ''}}
 
 function verdictCard(){
-  const v=todayVerdict();
-  const col=v.tone==='good'?'var(--green)':v.tone==='warn'?'var(--amber)':'var(--text)';
+  /* the Today hero: the daily loop and what it unlocks. The session
+     moved to its own pill below (sessionCard) — owner call, Aug 2026. */
   const pr=todayProgress(),st=dayStreak();
   const n=noticedToday(),t=todayState();
-  return '<div class="card an-hero" style="padding:18px;border-radius:22px;border-color:'+
-    (v.tone==='warn'?'rgba(217,119,87,.42)':v.tone==='good'?'var(--green)':'var(--line)')+'">'+
-    '<div style="display:flex;align-items:center;gap:9px">'+
+  const done=pr.complete;
+  let inner='<div style="display:flex;align-items:center;gap:9px">'+
     '<img src="'+MARK+'" alt="" style="width:17px;height:17px;object-fit:contain">'+
-    '<p class="mono" style="flex:1;font-size:9.5px;color:'+col+';letter-spacing:.06em">TODAY</p>'+
-    (st>1?'<p class="mono" style="color:var(--faint);font-size:9.5px">'+st+' DAY'+(st===1?'':'S')+' RUNNING</p>':'')+'</div>'+
-    '<p class="disp" style="font-size:21px;font-weight:700;line-height:1.2;margin-top:9px">'+esc(v.t)+'</p>'+
-    '<p style="color:var(--dim);font-size:13px;line-height:1.6;margin-top:6px">'+esc(v.d)+'</p>'+
-    (v.cta?'<button data-a="'+v.cta.a+'" data-v="'+v.cta.v+'" class="big disp mt" style="background:var(--amber);color:#1A1917;font-size:15px">'+
-      esc(v.cta.label.toUpperCase())+'</button>':'')+
-    /* the small stuff, as a single line rather than its own card */
-    (pr.total?'<div style="display:flex;align-items:center;gap:9px;margin-top:14px;padding-top:13px;border-top:1px solid var(--line)">'+
-      '<span style="display:flex;gap:4px;flex:none">'+
-      pr.tasks.map(x=>'<span style="width:7px;height:7px;border-radius:7px;background:'+(x.done?'var(--green)':'var(--line)')+'"></span>').join('')+'</span>'+
-      '<span style="flex:1;min-width:0"><span class="mono" style="color:var(--faint);font-size:10.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block">'+
-        (pr.complete?(t.revealed?'all done today':'all done \u00b7 Allena found something')
-          :esc(pr.tasks.filter(x=>!x.done)[0].n.toLowerCase())+((pr.total-pr.done)>1?' and '+(pr.total-pr.done-1)+' more':''))+
-        '</span></span>'+
-      (pr.complete&&n&&!t.revealed
-        ?'<button data-a="noticedOpen" class="mono an-glow" style="color:#1A1917;background:var(--amber);padding:6px 13px;border-radius:999px;font-size:11px;font-weight:700;flex:none">See it</button>'
-        :!pr.complete?'<button data-a="todayOpen" class="mono" style="color:var(--amber);font-size:11px;flex:none">Open</button>'
-        :'')+
-      '</div>':'')+
-    (pr.complete&&n&&t.revealed?'<div class="an-rise" style="margin-top:12px;padding:13px 14px;border:1px solid rgba(217,119,87,.45);border-radius:14px;background:rgba(217,119,87,.06)">'+
-      '<p class="mono" style="font-size:9.5px;color:var(--amber);letter-spacing:.08em">\u2726 ALLENA NOTICED</p>'+
-      '<p class="disp" style="font-size:16.5px;font-weight:700;line-height:1.3;margin-top:6px">'+esc(n.t)+'</p>'+
-      '<p style="color:var(--dim);font-size:12.5px;line-height:1.6;margin-top:4px">'+esc(n.d)+'</p></div>':'')+
+    '<p class="mono" style="flex:1;font-size:9.5px;color:'+(done?'var(--green)':'var(--amber)')+';letter-spacing:.06em">TODAY</p>'+
+    (st>1?'<p class="mono" style="color:var(--faint);font-size:9.5px">'+st+' DAY'+(st===1?'':'S')+' RUNNING</p>':'')+'</div>';
+  const dots='<span style="display:flex;gap:5px">'+
+    pr.tasks.map(x=>'<span style="width:9px;height:9px;border-radius:9px;background:'+(x.done?'var(--green)':'var(--line)')+'"></span>').join('')+'</span>';
+  if(done&&n&&t.revealed){
+    inner+='<div class="an-rise" style="margin-top:11px">'+
+      '<p class="mono" style="font-size:10px;color:var(--amber);letter-spacing:.08em">✦ ALLENA NOTICED</p>'+
+      '<p class="disp" style="font-size:22px;font-weight:700;line-height:1.2;margin-top:7px">'+esc(n.t)+'</p>'+
+      '<p style="color:var(--dim);font-size:13.5px;line-height:1.6;margin-top:6px">'+esc(n.d)+'</p></div>'+
+      '<div style="display:flex;align-items:center;gap:9px;margin-top:13px;padding-top:12px;border-top:1px solid var(--line)">'+dots+
+      '<span class="mono" style="color:var(--faint);font-size:10.5px">all done today</span></div>'}
+  else if(done&&n){
+    inner+='<p class="disp" style="font-size:22px;font-weight:700;line-height:1.2;margin-top:10px">All done today</p>'+
+      '<p style="color:var(--dim);font-size:13.5px;line-height:1.6;margin-top:5px">And Allena found something in your data.</p>'+
+      '<button data-a="noticedOpen" class="big disp mt" style="background:var(--amber);color:#1A1917;font-size:15px">SEE WHAT ALLENA NOTICED</button>'+
+      '<div style="display:flex;gap:5px;margin-top:12px">'+dots.slice(45,-7)+'</div>'}
+  else if(done){
+    inner+='<p class="disp" style="font-size:22px;font-weight:700;line-height:1.2;margin-top:10px">All done today</p>'+
+      '<p style="color:var(--dim);font-size:13.5px;line-height:1.6;margin-top:5px">Everything Allena asked for is logged. Tomorrow it will have something new to say.</p>'+
+      '<div style="display:flex;align-items:center;gap:9px;margin-top:12px">'+dots+'</div>'}
+  else{
+    const next=pr.tasks.filter(x=>!x.done)[0];
+    inner+='<p class="disp" style="font-size:22px;font-weight:700;line-height:1.2;margin-top:10px">'+esc(next?next.n:'Today')+'</p>'+
+      (next?'<p style="color:var(--dim);font-size:13.5px;line-height:1.6;margin-top:5px">'+esc(next.sub)+'</p>':'')+
+      '<button data-a="'+(next&&next.go?next.go:'todayOpen')+'" class="big disp mt" style="background:var(--amber);color:#1A1917;font-size:15px">'+
+        (next&&next.go?'DO IT NOW':'OPEN TODAY')+'</button>'+
+      '<div style="display:flex;align-items:center;gap:9px;margin-top:13px;padding-top:12px;border-top:1px solid var(--line)">'+dots+
+      '<span class="mono" style="flex:1;color:var(--faint);font-size:10.5px">'+pr.done+' of '+pr.total+' · finishing the small ones is what unlocks tonight’s find</span>'+
+      '<button data-a="todayOpen" class="mono" style="color:var(--amber);font-size:11px;flex:none">All</button></div>'}
+  return '<div class="card an-hero" style="padding:18px;border-radius:22px;border-color:'+(done?'var(--green)':'var(--line)')+'">'+
+    inner+
     patternLine()+
     questLine()+
     wrapLine()+
     '</div>'}
+function sessionCard(){
+  /* the session, as its own pill under the hero */
+  const v=todayVerdict();
+  const col=v.tone==='good'?'var(--green)':v.tone==='warn'?'var(--amber)':'var(--text)';
+  return '<div class="card mt" style="padding:14px 16px;border-color:'+
+      (v.tone==='warn'?'rgba(217,119,87,.42)':v.tone==='good'?'var(--green)':'var(--line)')+'">'+
+    '<p class="mono" style="font-size:9px;color:'+col+';letter-spacing:.06em">THE SESSION</p>'+
+    '<div style="display:flex;align-items:center;gap:12px;margin-top:7px">'+
+    '<div style="flex:1;min-width:0">'+
+    '<p class="disp" style="font-size:16.5px;font-weight:700;line-height:1.2">'+esc(v.t)+'</p>'+
+    '<p style="color:var(--dim);font-size:12px;line-height:1.5;margin-top:3px">'+esc(v.d)+'</p></div>'+
+    (v.cta?'<button data-a="'+v.cta.a+'" data-v="'+v.cta.v+'" class="disp" style="flex:none;background:var(--amber);color:#1A1917;padding:12px 17px;border-radius:13px;font-size:13.5px;font-weight:700">START</button>':'')+
+    '</div></div>'}
+function unlockCard(){
+  /* the watchlist, worn as the game it honestly is: every analysis is
+     locked by DATA it genuinely needs — never by withheld findings.
+     Logging fills the bars (and happens to be what earns points). */
+  try{
+    const W=watchList();
+    const met=W.met||0;
+    if(!W.length&&!met)return '';
+    const total=W.length+met;
+    const top=W.slice(0,3);
+    return '<div class="card mt" style="padding:15px 16px">'+
+      '<div style="display:flex;justify-content:space-between;align-items:baseline">'+
+      '<p class="eyebrow" style="margin:0">Analyses</p>'+
+      '<span class="mono" style="color:'+(met?'var(--amber)':'var(--faint)')+';font-size:10px">'+met+' OF '+total+' UNLOCKED</span></div>'+
+      (top.length?'<div style="margin-top:11px;display:flex;flex-direction:column;gap:10px">'+
+        top.map(w=>'<div>'+
+          '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px">'+
+          '<span style="flex:1;min-width:0;font-size:12.5px;font-weight:600;color:'+(w.pct>=80?'var(--text)':'var(--dim)')+'">'+esc(w.t)+'</span>'+
+          '<span class="mono" style="color:'+(w.pct>=80?'var(--amber)':'var(--faint)')+';font-size:9.5px;flex:none">'+(w.pct>=80?'NEARLY THERE · ':'')+w.have+'/'+w.need+'</span></div>'+
+          '<div style="height:4px;border-radius:2px;background:var(--line);overflow:hidden;margin-top:5px">'+
+          '<div class="an-bar" style="height:4px;width:'+w.pct+'%;background:'+(w.pct>=80?'var(--amber)':'var(--dim)')+'"></div></div></div>').join('')+'</div>'
+       :'<p style="color:var(--dim);font-size:12px;line-height:1.55;margin-top:8px">Everything Allena can currently analyse is unlocked. New ones appear when your training starts doing new things.</p>')+
+      '<button data-a="nav" data-v="progress" class="mono" style="margin-top:11px;color:var(--amber);font-size:11px">See what they found ›</button>'+
+      '<p class="mono" style="color:var(--faint);font-size:9.5px;margin-top:8px;line-height:1.5">Unlocked by logging, never by waiting — each one names exactly the data it needs.</p></div>'}catch(e){return ''}}
 
 /* ══ the watchlist ══════════════════════════════════════════
    Patterns arrive all at once and then nothing happens for a
@@ -5740,7 +5784,7 @@ function watchList(){
   const H=(S.history||[]).filter(h=>h.complete&&!h.run);
   const R=(S.runs||[]);
   const add=(t,have,need,d,got)=>{
-    if(have>=need)return;                            // enough data: it either has answered or is about to
+    if(have>=need){W.met=(W.met||0)+1;return}        // unlocked: it has answered or is about to
     W.push({t:t,have:have,need:need,d:d,pct:Math.round(Math.min(1,have/need)*100)})};
   /* which day of the week suits you */
   {const byDow={};H.forEach(h=>{const r=h.log.filter(l=>l.rpe!=null);
@@ -7168,12 +7212,14 @@ function viewToday(){
     '<span style="flex:1;font-size:12px;color:var(--dim)">Sample data is loaded so you can see the trends — tap to remove it and start clean.</span></button>';
   h+=garCard();
   h+=verdictCard();
+  h+=sessionCard();
   h+='<div class="row mt" style="gap:10px">'+dashTiles()+'</div>';
   if(S.sess)h+='<button data-a="resume" class="card" style="width:100%;text-align:left;padding:16px;border-color:var(--amber);background:var(--raised);margin-top:18px">'+
     '<p class="eyebrow" style="color:var(--amber)">Session in progress</p>'+
     '<p class="disp" style="font-size:16.5px;font-weight:600;margin-top:4px">'+esc(S.sess.dayName)+'</p>'+
     '<p class="mono" style="color:var(--dim);font-size:12px;margin-top:4px">'+S.sess.log.length+' of '+S.sess.sets.length+' sets logged · tap to resume</p></button>';
   h+=calCard();
+  h+=unlockCard();
   h+=collectTeaser();
   if(backupDue())h+='<button data-a="nav" data-v="data" class="card" style="width:100%;text-align:left;padding:12px 16px;margin-top:14px;display:flex;align-items:center;gap:10px;border-color:var(--amber)">'+
     '<span style="width:8px;height:8px;border-radius:8px;background:var(--amber);flex:none"></span>'+
