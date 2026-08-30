@@ -1233,6 +1233,9 @@ function backupSummary(o){
   const sp=k[K_SUPP]||o.supp;if(sp&&sp.days)bits.push(Object.keys(sp.days).length+' creatine days');
   const dl=k[K_DAILY]||o.daily;if(dl&&dl.days)bits.push(Object.keys(dl.days).length+' check-ins');
   if(n(k[K_GOALS]||o.goals))bits.push(n(k[K_GOALS]||o.goals)+' goals');
+  const ac=k[K_ACL];if(ac&&ac.on)bits.push('rehab record ('+((ac.checks||[]).length)+' check-ins, '+((ac.tests||[]).length)+' tests)');
+  if(n(k[K_RUN]))bits.push(n(k[K_RUN])+' runs');
+  const bk=k['training-bank-v1'];if(bk&&Object.keys(bk).length)bits.push(Object.keys(bk).length+' discoveries');
   return bits.join(' · ')}
 function mergeById(cur,inc){const ids=new Set(cur.map(x=>x.id));
   return cur.concat((inc||[]).filter(x=>x&&!ids.has(x.id)))}
@@ -1265,6 +1268,32 @@ function doRestore(txt){try{const o=JSON.parse(txt);
     if(K[K_WEEKS]){S.weekMap=Object.assign({},K[K_WEEKS],S.weekMap);lset(K_WEEKS,S.weekMap);
       const cw=S.weekMap[S.lib.activeId];if(cw)S.week=cw}
     if(K[K_PL]!=null){const mp=+K[K_PL]||20;lset(K_PL,mp);PLATES=ALL_PLATES.filter(p=>p.kg<=mp)}
+    /* everything the whitelist above used to drop — rehab, runs, the collection */
+    if(K[K_ACL]&&K[K_ACL].on){const inc2=K[K_ACL];
+      if(!S.acl||!S.acl.on)S.acl=inc2;
+      else{const kf=x=>(x.date||'')+'|'+(x.kind||'');
+        ['tests','flares','checks'].forEach(f=>{const cur=S.acl[f]||[],have=new Set(cur.map(kf));
+          S.acl[f]=cur.concat((inc2[f]||[]).filter(x=>x&&!have.has(kf(x))))})}
+      aclSave()}
+    if(K[K_REH]){S.rehab=Object.assign({},K[K_REH],S.rehab||{});lset(K_REH,S.rehab)}
+    if(Array.isArray(K[K_RUN])&&K[K_RUN].length){const sig=r=>(r.date||'')+'|'+(r.km||0)+'|'+(r.mins||0);
+      const have=new Set((S.runs||[]).map(sig));
+      S.runs=(S.runs||[]).concat(K[K_RUN].filter(r=>r&&r.date&&!have.has(sig(r))))
+        .sort((a,b)=>a.date.localeCompare(b.date));runSave()}
+    if(K['training-runon-v1']!=null||((S.runs||[]).length&&!S.runOn)){
+      S.runOn=!!(K['training-runon-v1']!=null?K['training-runon-v1']:true)||S.runOn;
+      lset('training-runon-v1',S.runOn)}
+    if(K['training-bank-v1']){S.discBank=Object.assign({},K['training-bank-v1'],discBank());lset('training-bank-v1',S.discBank)}
+    if(K[K_WK]){S.weekStarts=Object.assign({},K[K_WK],S.weekStarts||{});lset(K_WK,S.weekStarts)}
+    [K_SUB,K_DROP,K_OFF,K_ALLOW,K_CUT,K_ADD,K_PSEEN,K_RUNSEEN].forEach(k2=>{
+      if(!K[k2])return;const cur=lget(k2,{})||{};lset(k2,Object.assign({},K[k2],cur))});
+    S.dropped=lget(K_DROP,{});S.offload=lget(K_OFF,{});S.allow=lget(K_ALLOW,{});
+    S.cut=lget(K_CUT,{});S.addback=lget(K_ADD,{});S.patSeen=lget(K_PSEEN,{});S.runSeen=lget(K_RUNSEEN,{});
+    /* and any training key this build does not know yet: keep it, never lose it */
+    Object.keys(K).forEach(k2=>{
+      if(k2.indexOf('training-')!==0)return;
+      if(k2==='training-sandbox-v1'||k2===K_A)return;   // device/demo state, not data
+      try{if(localStorage.getItem(k2)==null&&K[k2]!=null)lset(k2,K[k2])}catch(e){}});
   }
   flash('Restored — '+added+' new session'+(added===1?'':'s')+'. '+backupSummary(o));
   render()}catch(e){flash("Couldn't read that file.")}}
