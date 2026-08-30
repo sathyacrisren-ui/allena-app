@@ -7088,6 +7088,38 @@ function muscleChips(ex){
       prim.map(m=>'<span class="mono" style="font-size:9px;letter-spacing:.04em;padding:3px 8px;border-radius:999px;border:1px solid rgba(217,119,87,.5);color:var(--amber)">'+esc(m.toUpperCase())+'</span>').join('')+
       sec.slice(0,3).map(m=>'<span class="mono" style="font-size:9px;letter-spacing:.04em;padding:3px 8px;border-radius:999px;border:1px solid var(--line);color:var(--faint)">'+esc(m.toUpperCase())+'</span>').join('')+
       '</div>'}catch(e){return ''}}
+
+function unseenFindings(){try{return unseenPatterns()+unseenDiscoveries()}catch(e){return 0}}
+function findingsBtn(){
+  const n=unseenFindings();
+  return '<button data-a="findingsOpen" style="position:relative;width:42px;height:42px;border-radius:13px;background:var(--surface);border:1px solid '+(n?'rgba(217,119,87,.55)':'var(--line)')+';color:'+(n?'var(--amber)':'var(--dim)')+';display:flex;align-items:center;justify-content:center;flex:none">'+
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" style="width:20px;height:20px">'+
+    '<circle cx="6" cy="6" r="2.6"/><circle cx="18" cy="8" r="2.6"/><circle cx="10" cy="18" r="2.6"/>'+
+    '<path d="M8.2 7.2l7.2 0M7 8.4l2 7.2M16.3 10l-4.6 6"/></svg>'+
+    (n?'<span class="mono" style="position:absolute;top:-5px;right:-5px;min-width:17px;height:17px;padding:0 4px;border-radius:9px;background:var(--red);color:#fff;font-size:9.5px;font-weight:700;display:flex;align-items:center;justify-content:center">'+(n>9?'9+':n)+'</span>':'')+
+    '</button>'}
+function newFindsCard(){
+  // only exists while something is genuinely new — then it disappears
+  const p=unseenPatterns(),d=unseenDiscoveries();
+  if(!p&&!d)return '';
+  const bits=[];
+  if(d)bits.push(d+' new discover'+(d===1?'y':'ies'));
+  if(p)bits.push(p+' new pattern'+(p===1?'':'s'));
+  return '<button data-a="findingsGo" class="card an-glow mt" style="width:100%;text-align:left;padding:16px;border-radius:18px;border-color:rgba(217,119,87,.55);display:block">'+
+    '<div style="display:flex;align-items:center;gap:11px">'+
+    '<img src="'+MARK+'" alt="" style="width:22px;height:22px;object-fit:contain;flex:none">'+
+    '<div style="flex:1;min-width:0">'+
+    '<p class="disp" style="font-size:16px;font-weight:700;line-height:1.2">'+bits.join(' and ')+'</p>'+
+    '<p style="color:var(--dim);font-size:12px;margin-top:3px">Found since you last looked. Tap to reveal.</p></div>'+
+    '<span class="mono" style="color:var(--amber);font-size:14px;flex:none">›</span></div></button>'}
+function viewFindings(){
+  return '<div class="view pad stg" style="padding-top:24px">'+
+    '<button data-a="nav" data-v="today" class="btn" style="width:auto;padding:8px 14px;color:var(--dim);font-size:12.5px;margin-bottom:14px">‹ Back</button>'+
+    '<h1 class="disp" style="font-size:25px;font-weight:700">FINDINGS</h1>'+
+    '<p style="color:var(--dim);font-size:13px;line-height:1.6;margin-top:8px">Patterns across your lifting, running, readiness and rehab — the connections that only exist because they live in the same place.</p>'+
+    analyseCard()+
+    '</div>'}
+
 function viewToday(){
   const dateLine=new Date().toLocaleDateString(undefined,{weekday:'long',day:'numeric',month:'long'});
   let h='<div class="view pad stg" style="padding-top:22px">';
@@ -7095,7 +7127,7 @@ function viewToday(){
     '<div style="min-width:0"><h1 class="disp brand" style="font-size:28px;font-weight:700;line-height:1">Allena</h1>'+
     '<p style="color:var(--dim);font-size:13.5px;margin-top:3px">Welcome'+(S.prof&&S.prof.name?', '+esc(S.prof.name):'')+'</p>'+
     '<p class="mono" style="color:var(--faint);font-size:10px;letter-spacing:.08em;text-transform:uppercase;margin-top:2px">'+esc(dateLine)+'</p></div>'+
-    '<div style="display:flex;gap:8px;flex:none;align-items:center">'+pointsChip()+
+    '<div style="display:flex;gap:8px;flex:none;align-items:center">'+findingsBtn()+pointsChip()+
     '<button data-a="menuOpen" style="width:42px;height:42px;border-radius:13px;background:var(--surface);border:1px solid var(--line);color:var(--dim);display:flex;align-items:center;justify-content:center">'+
     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" style="width:19px;height:19px"><circle cx="12" cy="8" r="3.2"/><path d="M5 20c0-3.6 3.1-5.5 7-5.5s7 1.9 7 5.5"/></svg></button></div></div>';
   if(demoPresent())h+='<button data-a="demoClear" class="card" style="width:100%;text-align:left;padding:11px 15px;margin-top:14px;border-color:var(--amber);display:flex;align-items:center;gap:10px">'+
@@ -7103,7 +7135,7 @@ function viewToday(){
     '<span style="flex:1;font-size:12px;color:var(--dim)">Sample data is loaded so you can see the trends — tap to remove it and start clean.</span></button>';
   h+=garCard();
   h+=verdictCard();
-  h+=analyseCard();
+  h+=newFindsCard();
   h+=sessionCard();
   h+='<div class="row mt" style="gap:10px">'+dashTiles()+'</div>';
   if(S.sess)h+='<button data-a="resume" class="card" style="width:100%;text-align:left;padding:16px;border-color:var(--amber);background:var(--raised);margin-top:18px">'+
@@ -7639,8 +7671,11 @@ function unseenPatterns(){
     const seen=S.patSeen||{};
     return P.filter(p=>p.tone==='warn'&&!seen[p.t]).length}catch(e){return 0}}
 function markPatternsSeen(){
+  // mark the LIVE list — the cached one can be stale/partial, which left
+  // patterns permanently "new" (the badge counted live, marking used cache)
   S.patSeen=S.patSeen||{};
-  (patternsCached()||[]).forEach(p=>{S.patSeen[p.t]=1});
+  let P=[];try{P=allPatterns()}catch(e){P=patternsCached()||[]}
+  P.forEach(p=>{S.patSeen[p.t]=1});
   lset(K_PSEEN,S.patSeen)}
 function patternsCached(){
   try{
@@ -9251,6 +9286,7 @@ function render(){
   const pos=key&&ae.selectionStart!=null?ae.selectionStart:null;
   let body='';
   if(S.view==='today')body=viewToday();
+  else if(S.view==='findings')body=viewFindings();
   else if(S.view==='home')body=viewHome();
   else if(S.view==='session')body=S.sess?viewSession():viewHome();
   else if(S.view==='history')body=viewHistory();
@@ -9286,7 +9322,7 @@ function render(){
     hasRun?[['run','Running']]:[],[['progress','Progress']]);
   const DOT={acl:unseenRehab(),progress:unseenPatterns()+unseenDiscoveries(),run:unseenRun()};
   const nav=tabs.map(x=>{
-    const on=S.view===x[0]||(x[0]==='today'&&(S.view==='points'||S.view==='collection'))||(x[0]==='home'&&S.view==='quick')||(x[0]==='acl'&&(S.view==='proto'||S.view==='aclpath'||S.view==='diary'||S.view==='report'));
+    const on=S.view===x[0]||(x[0]==='today'&&(S.view==='points'||S.view==='collection'||S.view==='findings'))||(x[0]==='home'&&S.view==='quick')||(x[0]==='acl'&&(S.view==='proto'||S.view==='aclpath'||S.view==='diary'||S.view==='report'));
     if(x[0]==='today')return '<button data-a="nav" data-v="today" class="'+(on?'on':'')+'" style="position:relative">'+
       '<span style="display:flex;align-items:center;justify-content:center;width:46px;height:46px;border-radius:46px;margin:-14px auto 3px;'+
         (on?'background:var(--amber);color:#1A1917;border:1px solid var(--amber)':'background:var(--raised);color:var(--amber);border:1px solid rgba(217,119,87,.55)')+
@@ -9570,6 +9606,8 @@ function runAction(a,v,t,e){
         render();setTimeout(tick,620+Math.random()*260)};
       setTimeout(tick,700);break}
     case 'anReset':S.anState='idle';S.anStep=0;S.discShow=null;render();break;
+    case 'findingsOpen':S.sheet=null;S.view='findings';render();break;
+    case 'findingsGo':S.sheet=null;S.view='findings';runAction('anRun');break;
     case 'noticedOpen':{const t2=todayState();t2.revealed=true;todaySave(t2);vib(12);render();break}
     case 'todayOpen':S.sheet={t:'today'};render();break;
     case 'questOpen':S.sheet={t:'quest'};render();break;
