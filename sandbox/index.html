@@ -853,12 +853,18 @@ function sessLine(h,full){
   return h.date.slice(5,10)+' '+(h.dayTitle||'')+(h.week?' w'+h.week:'')+': '+parts.join('; ')+
     (!full&&keys.length>4?' +'+(keys.length-4)+' more':'')}
 
-/* one door to Claude: the user's own key, or the founder's proxy */
-function aiReady(){return !!(((S.ai&&S.ai.proxy)||'').trim()||(S.ai&&S.ai.key))}
-function claudeFetch(body){
+/* one door to Claude: manual proxy, the signed-in cloud, or the user's own key */
+function aiReady(){return !!(((S.ai&&S.ai.proxy)||'').trim()||(S.ai&&S.ai.key)||
+  (typeof acctReady==='function'&&acctReady()&&acct()&&acct().refresh))}
+async function claudeFetch(body){
   const px=((S.ai&&S.ai.proxy)||'').trim();
   if(px)return fetch(px,{method:'POST',headers:{'content-type':'application/json'},
     body:JSON.stringify(body)});
+  if(acctReady()&&acct()&&acct().refresh&&!(S.ai&&S.ai.key)){
+    const tok=await acctToken();
+    if(tok)return fetch(CLOUD.url+'/functions/v1/coach',{method:'POST',
+      headers:{'content-type':'application/json',apikey:CLOUD.anon,Authorization:'Bearer '+tok},
+      body:JSON.stringify(body)})}
   return fetch('https://api.anthropic.com/v1/messages',{method:'POST',
     headers:{'content-type':'application/json','x-api-key':S.ai.key,
       'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
@@ -966,6 +972,99 @@ function lastFor(ex,no){const cid=S.sess?String(S.sess.startedAt):null;
     if(h)return Object.assign({},h,{date:H.date,week:H.week,day:H.dayTitle})}return null}
 
 /* ══ actions ════════════════════════════════════════════ */
+
+/* ══ account & sync (prompt 6) ══════════════════════════════
+   Optional sign-in via Supabase magic link, spoken raw REST —
+   no SDK, keeping the zero-dependency rule. What syncs is the
+   score card only: points, tier, tree numbers, counts. Sets,
+   weights, body and rehab data never leave the phone; the
+   server-side table has no columns for them.
+   ══════════════════════════════════════════════════════════ */
+const CLOUD={url:'https://xpvgivjdkmmukmfbjojc.supabase.co',anon:'sb_publishable_KjqPjU0jPL-8fZZRlyLoVQ_gSZT7kPg',site:'https://sathyacrisren-ui.github.io/allena-app/'};
+const K_ACCT='training-account-v1';
+function acctReady(){return !!(CLOUD.url&&CLOUD.anon)}
+function acct(){return lget(K_ACCT,null)}
+function acctClaims(tok){try{
+  const b=tok.split('.')[1].replace(/-/g,'+').replace(/_/g,'/');
+  return JSON.parse(decodeURIComponent(escape(atob(b))))}catch(e){return null}}
+/* the magic link lands back here with tokens in the hash */
+try{
+  const h=location.hash||'';
+  if(h.indexOf('access_token=')>=0){
+    const q={};h.replace(/^#/,'').split('&').forEach(kv=>{const p=kv.split('=');q[p[0]]=decodeURIComponent(p[1]||'')});
+    if(q.access_token&&q.refresh_token){
+      const c=acctClaims(q.access_token);
+      lset(K_ACCT,{email:(c&&c.email)||'',access:q.access_token,refresh:q.refresh_token,
+        exp:Date.now()+((+q.expires_in||3600)-60)*1000,lastSync:null});
+      try{history.replaceState(null,'',location.pathname+location.search)}catch(e){}}}
+}catch(e){}
+async function acctToken(){
+  const a=acct();if(!a||!a.refresh)return null;
+  if(a.access&&Date.now()<(a.exp||0))return a.access;
+  try{
+    const r=await fetch(CLOUD.url+'/auth/v1/token?grant_type=refresh_token',{method:'POST',
+      headers:{'content-type':'application/json',apikey:CLOUD.anon},
+      body:JSON.stringify({refresh_token:a.refresh})});
+    const d=await r.json();
+    if(!d.access_token)return null;
+    lset(K_ACCT,Object.assign({},a,{access:d.access_token,refresh:d.refresh_token||a.refresh,
+      exp:Date.now()+((+d.expires_in||3600)-60)*1000}));
+    return d.access_token}catch(e){return null}}
+async function acctSend(email){
+  S.acctPending=true;render();
+  try{
+    const r=await fetch(CLOUD.url+'/auth/v1/otp?redirect_to='+encodeURIComponent(CLOUD.site),{method:'POST',
+      headers:{'content-type':'application/json',apikey:CLOUD.anon},
+      body:JSON.stringify({email:email,create_user:true,gotrue_meta_security:{}})});
+    if(r.ok)flash('Link sent — check your email on this phone and tap it.');
+    else{S.acctPending=false;const d=await r.json().catch(()=>({}));
+      flash(d.msg||d.error_description||'Could not send the link — try again in a minute.')}
+  }catch(e){S.acctPending=false;flash('No connection.')}
+  render()}
+function snapshotData(){
+  const d=dataPoints(),t=dpTier(d.total),tr=treeData(),st=bankStats();
+  // quest deliberately NOT synced: its title names an exercise, which is
+  // training data. The server column stays for a future anonymised form.
+  return{points:d.total,live_points:d.live,tier:t[1],
+    tree:{pts:tr.pts,sessions:tr.sessions,lifts:tr.liftCount,runs:tr.runs,
+      km:tr.km,rare:tr.rare,found:tr.found,weeks:tr.weeks,days:tr.days},
+    collection_count:st.total}}
+async function acctSync(loud){
+  if(!acctReady())return false;
+  const tok=await acctToken();if(!tok){if(loud)flash('Sign in first.');return false}
+  const c=acctClaims(tok);if(!c||!c.sub)return false;
+  try{
+    const row=Object.assign({user_id:c.sub,updated_at:new Date().toISOString()},snapshotData());
+    const r=await fetch(CLOUD.url+'/rest/v1/snapshots?on_conflict=user_id',{method:'POST',
+      headers:{'content-type':'application/json',apikey:CLOUD.anon,
+        Authorization:'Bearer '+tok,Prefer:'resolution=merge-duplicates,return=minimal'},
+      body:JSON.stringify([row])});
+    if(r.ok){lset(K_ACCT,Object.assign({},acct(),{lastSync:today()}));
+      if(loud){flash('Synced — score card only, nothing else leaves this phone.');render()}
+      return true}
+    if(loud)flash('Sync failed ('+r.status+').');
+    return false}catch(e){if(loud)flash('No connection.');return false}}
+let acctSyncT=null;
+function acctSyncSoon(){
+  if(!acctReady()||!acct())return;
+  clearTimeout(acctSyncT);acctSyncT=setTimeout(function(){acctSync(false)},1500)}
+function accountSection(){
+  if(!acctReady())return '<p style="color:var(--dim);font-size:13px;line-height:1.55;margin-top:8px">'+
+    'Cloud sign-in is not switched on in this build yet. When it is, signing in adds the no-key coach chat and backs up your score card — and only your score card. Sets, weights, body and rehab data never leave this phone.</p>';
+  const a=acct();
+  if(a&&a.refresh)return '<p style="color:var(--dim);font-size:13px;line-height:1.55;margin-top:8px">'+
+      'Signed in as <b style="color:var(--text)">'+esc(a.email||'you')+'</b>.'+
+      (a.lastSync?' Score card last synced '+esc(a.lastSync)+'.':' Not synced yet.')+
+      ' Syncing sends points, tier, tree numbers and counts — the server has no columns for anything else.</p>'+
+    '<button data-a="acctSync" class="btn mt" style="color:var(--amber)">Sync now</button>'+
+    '<button data-a="acctOut" class="btn mt" style="color:var(--dim)">Sign out</button>';
+  if(S.acctPending)return '<p style="color:var(--amber);font-size:13px;line-height:1.55;margin-top:8px">'+
+    'Check your email on this phone and tap the sign-in link. It brings you straight back here.</p>'+
+    '<button data-a="acctSend2" class="btn mt" style="color:var(--dim)">Send it again</button>';
+  return '<p style="color:var(--dim);font-size:13px;line-height:1.55;margin-top:8px">'+
+      'Sign in with just your email — a link, no password. It unlocks the coach chat without any API key, and backs up your score card (points, tier, tree, counts). Training data itself never leaves this phone.</p>'+
+    '<input data-in="acctEmail" value="'+esc(S.acctEmail||'')+'" placeholder="you@email.com" autocomplete="email" inputmode="email" class="mono" style="width:100%;margin-top:10px;background:var(--surface);border:1px solid var(--line);border-radius:10px;color:var(--text);padding:12px;font-size:13px;outline:none">'+
+    '<button data-a="acctSend" class="btn mt" style="color:var(--amber)">Send the sign-in link</button>'}
 const A={};
 A.nav=v=>{if(v!=='session'&&S.sess&&S.sess.phase==='resting'){/* the timer keeps running; the beep is rescheduled on return */}
   S.sheet=null;S.view=v;if(v!=='session')wakeOff();render()};
@@ -1154,7 +1253,7 @@ A.saveExit=complete=>{const s=S.sess;if(!s)return;
   S.view='history';render();
   if(wasComplete&&S.gar.on&&garDay().pre!=null&&garDay().post==null){
     S.gform={post:'',sid:recId};S.sheet={t:'gpost'};render()}
-  if(complete&&S.autoBk.on)setTimeout(function(){A.backup(true)},400);
+  if(complete&&S.autoBk.on)setTimeout(function(){A.backup(true)},400);try{acctSyncSoon()}catch(e){}
   flash(ok?(complete?'Session saved.':'Saved so far. Resume it any time from Train.'):'Storage is full or blocked — export a backup from Data.')};
 A.discardYes=()=>{if(S.sess){S.history=S.history.filter(h=>h.id!==String(S.sess.startedAt));saveHistory()}
   audioCancel();ldel(K_A);S.sess=null;S.restEnd=null;S.holdEnd=null;S.sheet=null;S.view='home';wakeOff();flash('Session discarded.')};
@@ -1219,6 +1318,7 @@ function backupObj(){
     if(k===K_GOALS&&Array.isArray(v))v=v.filter(skipDemo);
     if(k===K_LIB&&v&&Array.isArray(v.programs))v={programs:v.programs.filter(p=>p.id!=='demo-block'),activeId:v.activeId==='demo-block'?null:v.activeId};
     if(k===K_A)return; // a half-finished session is device state, not data
+    if(k===K_ACCT)return; // sign-in tokens are credentials, never data
     o.keys[k]=v});
   // legacy top-level mirrors so older builds can still read the file
   o.library=o.keys[K_LIB];o.history=o.keys[K_H]||[];o.profile=o.keys[K_PROF];
@@ -8142,6 +8242,7 @@ const DATA_GROUPS=[
   ['Equipment',[
     ['Barbell weight','Bar, plates and the loading diagram']]],
   ['Allena',[
+    ['Account & sync','Sign in for the coach chat and score-card sync'],
     ['Allena — AI coach','Allena cloud link or your own API key']]],
   ['Backup & data',[
     ['Export','Backup file and spreadsheet'],
@@ -8306,6 +8407,7 @@ function dataRaw(){
    (S.lay.plates!==false?'background:var(--amber);color:#1A1917':'border:1.5px solid var(--line)')+'">'+(S.lay.plates!==false?'✓':'')+'</span>'+
    '<span style="flex:1"><span style="display:block;font-size:13.5px;font-weight:600">Show the plate diagram</span>'+
    '<span style="color:var(--faint);font-size:11.5px">Bar and plates drawn on the set screen</span></span></button></div>'+
+   '<div class="mt2"><p class="eyebrow">Account &amp; sync</p>'+accountSection()+'</div>'+
    '<div class="mt2"><p class="eyebrow">Allena — AI coach</p>'+
    '<p style="color:var(--dim);font-size:13px;line-height:1.55;margin-top:8px">Two ways to bring Allena\'s chat to life. Easiest: paste an <b>Allena cloud link</b> if you have one — no account, no key. Or paste your own Anthropic API key (console.anthropic.com). Either lives only in this phone\'s storage. Fresh session context rides along with every message, and only the last few turns are kept — a question costs a fraction of a cent.</p>'+
    '<input data-in="ai.proxy" value="'+esc(S.ai.proxy||'')+'" placeholder="Allena cloud link (https://…)" autocomplete="off" class="mono" style="width:100%;margin-top:10px;background:var(--surface);border:1px solid var(--line);border-radius:10px;color:var(--text);padding:12px;font-size:12px;outline:none">'+
@@ -10581,10 +10683,16 @@ function runAction(a,v,t,e){
       upsert(rec);
       S.quick=null;S.view='history';render();
       flash('Logged '+log.length+' sets for '+fmtDate(rec.date)+'.');
-      if(S.autoBk.on)setTimeout(function(){A.backup(true)},400);break}
+      if(S.autoBk.on)setTimeout(function(){A.backup(true)},400);try{acctSyncSoon()}catch(e){}break}
     case 'autoBkToggle':S.autoBk.on=!S.autoBk.on;lset('training-autobk-v1',S.autoBk);flash(S.autoBk.on?'Auto-backup on.':'Auto-backup off.');break;
     case 'barSave':BAR=Math.max(5,+S.bar||20);lset(K_BAR,BAR);S.bar=BAR;flash('Bar set to '+BAR+' kg.');break;
     case 'aiSave':lset(K_AI,S.ai);flash('Allena settings saved to this phone.');break;
+    case 'acctSend':case 'acctSend2':{const e2=(S.acctEmail||(acct()&&acct().email)||'').trim();
+      if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e2)){flash('Enter a real email first.');break}
+      acctSend(e2);break}
+    case 'acctSync':acctSync(true);break;
+    case 'acctOut':lset(K_ACCT,null);S.acctPending=false;render();
+      flash('Signed out. Your training data never left this phone anyway.');break;
     case 'loadPasted':if(S.paste.trim())doImport(S.paste);break;
     case 'pickProgramFile':pick(doImport);break;
     case 'pickBackup':pick(doRestore);break;
