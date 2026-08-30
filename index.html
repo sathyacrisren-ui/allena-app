@@ -386,7 +386,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return (lget(K_RUN,[])||[]).length>0})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false}};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='3523a7';  // stamped by tools/build.py with the content hash
+const BUILD_ID='5ac4a7';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -2216,7 +2216,7 @@ async function impParse(){
   const content=[];
   if(f.img){const m=f.img.match(/^data:(image\/[a-z]+);base64,(.+)$/i);
     if(m)content.push({type:'image',source:{type:'base64',media_type:m[1],data:m[2]}})}
-  content.push({type:'text',text:(f.text||'Convert this program.').slice(0,6000)});
+  content.push({type:'text',text:(f.text||'Convert this program.').slice(0,26000)});
   try{
     const res=await claudeFetch({model:S.ai.model,max_tokens:3000,system:IMPORT_SYS,messages:[{role:'user',content:content}]});
     const d=await res.json();
@@ -2379,9 +2379,9 @@ function viewImport(){
     h+='<p class="eyebrow mt2">Or a photo / spreadsheet</p>'+
       '<label class="btn mt" style="display:block;text-align:center;cursor:pointer">'+(f.img?'Photo attached — choose another':'Choose a photo')+
       '<input type="file" accept="image/*" data-impfile="1" style="display:none"></label>'+
-      '<label class="btn mt" style="display:block;text-align:center;cursor:pointer">Choose a CSV or text file'+
-      '<input type="file" accept=".csv,.tsv,.txt,text/plain,text/csv" data-imptext="1" style="display:none"></label>'+
-      '<p style="color:var(--faint);font-size:11.5px;line-height:1.5;margin-top:8px">Excel .xlsx can\'t be read in the browser — in Excel choose File → Save As → CSV, or just photograph the sheet.</p>';
+      '<label class="btn mt" style="display:block;text-align:center;cursor:pointer">'+(f.fileName?esc(f.fileName)+' — choose another':'Choose the file — Excel, CSV or text')+
+      '<input type="file" accept=".xlsx,.csv,.tsv,.txt,text/plain,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" data-imptext="1" style="display:none"></label>'+
+      '<p style="color:var(--faint);font-size:11.5px;line-height:1.5;margin-top:8px">Excel files are read right on the phone — every sheet, nothing uploaded. The text lands above so you can trim it before Allena reads it.</p>';
     if(f.img)h+='<img src="'+f.img+'" style="width:100%;max-height:180px;object-fit:contain;border-radius:12px;margin-top:10px;background:var(--surface)">';
     if(f.err)h+='<p style="color:var(--red);font-size:12.5px;line-height:1.5;margin-top:12px">'+esc(f.err)+'</p>';
     h+='<button data-a="impParse" class="big disp mt2" style="background:'+((f.text.trim()||f.img)&&!f.busy?'var(--amber)':'var(--raised)')+';color:'+((f.text.trim()||f.img)&&!f.busy?'#1A1917':'var(--faint)')+';font-size:15px">'+(f.busy?'Reading…':'Read it with Allena')+'</button>'+
@@ -5058,6 +5058,112 @@ function hkNative(list){
     if(res.added){flash(res.added+' workout'+(res.added===1?'':'s')+' in from Apple Health.');render()}
   }catch(e){}}
 try{window.hkNative=hkNative}catch(e){}
+
+/* ── spreadsheet intake (.xlsx) ──────────────────────────────
+   A friend's program usually arrives as a spreadsheet. An .xlsx
+   is a ZIP of XML — the browser's own DecompressionStream
+   inflates it, no library needed — and the sheets come out as a
+   plain text grid for the program importer to read. Parsed on
+   the phone; the file never leaves it. */
+function xlsxUnesc(s){return String(s).replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"').replace(/&apos;/g,"'").replace(/&#(\d+);/g,function(_,d){return String.fromCharCode(+d)}).replace(/&amp;/g,'&')}
+function xlsxAttrs(tag){
+  const at={};let m;const re=/([\w:]+)="([^"]*)"/g;
+  while((m=re.exec(tag)))at[m[1]]=m[2];
+  return at}
+function xlsxStrings(xml){
+  const out=[];let m;const re=/<si>([\s\S]*?)<\/si>/g;
+  while((m=re.exec(xml))){
+    const ts=[];let tm;const tre=/<t[^>]*>([\s\S]*?)<\/t>/g;
+    while((tm=tre.exec(m[1])))ts.push(tm[1]);
+    out.push(xlsxUnesc(ts.join('')))}
+  return out}
+function xlsxCells(xml,strings){
+  const rows={};let m;const re=/<c ([^>]*?)(\/>|>([\s\S]*?)<\/c>)/g;
+  while((m=re.exec(xml))){
+    const at=xlsxAttrs(m[1]);
+    const ref=/^([A-Z]+)(\d+)$/.exec(at.r||'');if(!ref)continue;
+    const body=m[3]||'';
+    const vm=/<v>([\s\S]*?)<\/v>/.exec(body)||/<t[^>]*>([\s\S]*?)<\/t>/.exec(body);
+    if(!vm)continue;
+    let v=vm[1];
+    if(v==='')continue;
+    if(at.t==='s'){const i=parseInt(v,10);if(strings[i]!=null)v=strings[i];else continue}
+    else v=xlsxUnesc(v);
+    const col=ref[1].split('').reduce((a,ch)=>a*26+ch.charCodeAt(0)-64,0);
+    (rows[+ref[2]]=rows[+ref[2]]||{})[col]=String(v)}
+  return rows}
+function xlsxGridText(name,xml,strings,maxRows){
+  const rows=xlsxCells(xml,strings);
+  const keys=Object.keys(rows).map(Number).sort((a,b)=>a-b);
+  const lines=[];
+  keys.slice(0,maxRows||120).forEach(rn=>{
+    const r=rows[rn];const cols=Object.keys(r).map(Number).sort((a,b)=>a-b);
+    if(!cols.length)return;
+    const mx=Math.min(cols[cols.length-1],20),cells=[];
+    for(let c=1;c<=mx;c++){let cv=r[c]!=null?String(r[c]).trim():'';
+      if(cv.length>120)cv=cv.slice(0,120)+'…';   // instruction prose: gist only
+      cells.push(cv)}
+    const line=cells.join(' | ').replace(/(\s*\|\s*)+$/,'').trim();
+    if(line)lines.push(line)});
+  if(!lines.length)return '';
+  return '== '+name+' ==\n'+lines.join('\n')}
+function xlsxUnzip(buf,done,fail){
+  try{
+    if(typeof DecompressionStream==='undefined'){fail('nozip');return}
+    const dv=new DataView(buf),u8=new Uint8Array(buf);
+    let eo=-1;
+    for(let i=buf.byteLength-22;i>=Math.max(0,buf.byteLength-70000);i--){
+      if(dv.getUint32(i,true)===0x06054b50){eo=i;break}}
+    if(eo<0){fail('bad');return}
+    const n=dv.getUint16(eo+10,true);let off=dv.getUint32(eo+16,true);
+    const entries=[];
+    for(let i=0;i<n;i++){
+      if(dv.getUint32(off,true)!==0x02014b50)break;
+      const method=dv.getUint16(off+10,true);
+      const csz=dv.getUint32(off+20,true);
+      const nl=dv.getUint16(off+28,true),el=dv.getUint16(off+30,true),cl=dv.getUint16(off+32,true);
+      const lho=dv.getUint32(off+42,true);
+      entries.push({nm:new TextDecoder().decode(u8.subarray(off+46,off+46+nl)),method:method,csz:csz,lho:lho});
+      off+=46+nl+el+cl}
+    const read=ent=>{
+      const lo=ent.lho;
+      const nl=dv.getUint16(lo+26,true),el=dv.getUint16(lo+28,true);
+      const data=u8.slice(lo+30+nl+el,lo+30+nl+el+ent.csz);
+      if(ent.method===0)return Promise.resolve(new TextDecoder().decode(data));
+      return new Response(new Blob([data]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).text()};
+    done({entries:entries,read:read})
+  }catch(e){fail('bad')}}
+function xlsxExtract(file,done,fail){
+  const fr=new FileReader();
+  fr.onerror=function(){fail('read')};
+  fr.onload=function(){
+    xlsxUnzip(fr.result,function(z){
+      const find=nm=>z.entries.find(e=>e.nm===nm);
+      const wb=find('xl/workbook.xml'),rl=find('xl/_rels/workbook.xml.rels'),ss=find('xl/sharedStrings.xml');
+      Promise.all([wb?z.read(wb):'',rl?z.read(rl):'',ss?z.read(ss):''])
+      .then(function(base){
+        const strings=base[2]?xlsxStrings(base[2]):[];
+        const rels={};let m;const rre=/<Relationship\b[^>]*\/?>(?:<\/Relationship>)?/g;
+        while((m=rre.exec(base[1]||''))){const a=xlsxAttrs(m[0]);if(a.Id&&a.Target)rels[a.Id]=a.Target}
+        const sheets=[];const sre=/<sheet\b[^>]*\/?>(?:<\/sheet>)?/g;
+        while((m=sre.exec(base[0]||''))){const a=xlsxAttrs(m[0]);
+          let t=rels[a['r:id']]||'';t=t.replace(/^\//,'');if(t&&t.indexOf('xl/')!==0)t='xl/'+t;
+          const ent=find(t);if(ent&&a.name)sheets.push({name:a.name,ent:ent})}
+        if(!sheets.length)
+          z.entries.filter(e=>/^xl\/worksheets\/sheet\d+\.xml$/.test(e.nm))
+            .forEach((e,i)=>sheets.push({name:'Sheet '+(i+1),ent:e}));
+        if(!sheets.length){fail('bad');return}
+        Promise.all(sheets.map(s2=>z.read(s2.ent)))
+        .then(function(xmls){
+          const out=[];
+          sheets.forEach((s2,i)=>{const t=xlsxGridText(s2.name,xmls[i],strings,48);if(t)out.push(t)});
+          let txt=out.join('\n\n');
+          if(txt.length>26000)txt=txt.slice(0,26000)+'\n… (trimmed — long sheet; the days and targets above are what matter)';
+          if(txt)done(txt);else fail('empty')})
+        .catch(function(){fail('bad')})})
+      .catch(function(){fail('bad')})
+    },fail)};
+  fr.readAsArrayBuffer(file)}
 const RARITY=[['common','#8A7F70','Noticed'],['uncommon','#7FA86B','Worth knowing'],
   ['rare','#6B9BD1','Rare find'],['epic','#D97757','Big one']];
 function rarityOf(k){return RARITY.find(x=>x[0]===k)||RARITY[0]}
@@ -10414,7 +10520,17 @@ document.addEventListener('input',e=>{const d=e.target.dataset;
       S.hkRes=hkImport(parsed);vib([20,40,20]);render()});
     return}
   if(e.target.dataset.imptext){const fl=e.target.files&&e.target.files[0];if(!fl)return;
-    const r=new FileReader();r.onload=()=>{S.imp.text=String(r.result).slice(0,6000);render()};
+    if(/\.xlsx$/i.test(fl.name)){
+      S.imp.err=null;S.imp.fileName=fl.name;
+      xlsxExtract(fl,function(txt){S.imp.text=txt;S.imp.err=null;render()},
+        function(code){S.imp.fileName=null;
+          S.imp.err=code==='nozip'
+            ?'This browser cannot unpack Excel files — export the sheet as CSV, or photograph it.'
+            :'Could not read that spreadsheet. Export it as CSV from Excel, or photograph the sheet.';
+          render()});
+      return}
+    S.imp.fileName=fl.name;
+    const r=new FileReader();r.onload=()=>{S.imp.text=String(r.result).slice(0,20000);render()};
     r.readAsText(fl);return}
   if(e.target.dataset.impname!=null&&e.target.dataset.impname!==undefined&&e.target.dataset.impname==='1'){S.imp.draft.block=e.target.value;return}
   if(e.target.dataset.impday!=null){S.imp.draft.days[+e.target.dataset.impday].name=e.target.value;return}
