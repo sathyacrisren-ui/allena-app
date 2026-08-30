@@ -5201,60 +5201,81 @@ function growTree(W,Hh){
   const col=t.tier[2],leafCol=treeSeason().leaf;
   const groundY=Hh-26;
   let out='';
+  /* a soft pool of shadow under everything */
+  out+='<ellipse cx="'+(W/2)+'" cy="'+groundY+'" rx="'+(W*0.30).toFixed(0)+'" ry="7" fill="'+col+'" opacity=".07"/>';
   /* roots — consistency below the surface */
   const rootN=Math.min(7,1+Math.floor(t.weeks/2));
   for(let i=0;i<rootN;i++){
-    const dir=(i%2?1:-1),len=14+R()*20+t.days*0.25;
-    const x2=W/2+dir*(10+i*7+R()*10),y2=groundY+8+R()*12;
-    out+='<path d="M'+(W/2)+' '+groundY+' Q'+(W/2+dir*8)+' '+(groundY+6)+' '+x2.toFixed(1)+' '+Math.min(Hh-2,y2).toFixed(1)+'" '+
-      'stroke="'+col+'" stroke-width="'+(1.6-i*0.15).toFixed(2)+'" fill="none" opacity="'+(0.3-i*0.02).toFixed(2)+'" stroke-linecap="round"/>'}
+    const dir=(i%2?1:-1),x2=W/2+dir*(12+i*8+R()*10),y2=Math.min(Hh-2,groundY+9+R()*13);
+    out+='<path d="M'+(W/2)+' '+(groundY-2)+' Q'+(W/2+dir*(6+i*2))+' '+(groundY+7)+' '+x2.toFixed(1)+' '+y2.toFixed(1)+'" '+
+      'stroke="'+col+'" stroke-width="'+(2.0-i*0.2).toFixed(2)+'" fill="none" opacity="'+(0.4-i*0.04).toFixed(2)+'" stroke-linecap="round"/>'}
   out+='<line x1="'+(W*0.12)+'" y1="'+groundY+'" x2="'+(W*0.88)+'" y2="'+groundY+'" stroke="var(--line)" stroke-width="1" opacity=".5"/>';
-  /* the tree itself */
   const maxDepth=Math.max(1,Math.min(7,1+Math.floor(Math.log(Math.max(2,t.pts))/Math.log(3.1))));
-  const trunkH=Math.min(Hh*0.34,28+t.sessions*1.6);
-  const leafSize=t.pts>3000?2.6:t.pts>800?2.2:1.9;
-  let leaves=0,blossom=0;
+  const trunkH=Math.min(Hh*0.40,32+t.sessions*1.7);
+  const leafSize=t.pts>3000?2.7:t.pts>800?2.3:2.0;
+  let blossom=0,limbs=0;
   const budget=Math.min(220,20+Math.round(t.pts/9));
+  function limb(x,y,x2,y2,wd,op){
+    const mx=(x+x2)/2+(R()-0.5)*Math.abs(y-y2)*0.4,my=(y+y2)/2+(R()-0.5)*4;
+    out+='<path d="M'+x.toFixed(1)+' '+y.toFixed(1)+' Q'+mx.toFixed(1)+' '+my.toFixed(1)+' '+x2.toFixed(1)+' '+y2.toFixed(1)+
+      '" stroke="'+col+'" stroke-width="'+Math.max(0.7,wd).toFixed(2)+'" fill="none" stroke-linecap="round" opacity="'+op+'"/>'}
+  const tips=[];
   function branch(x,y,ang,len,wdt,depth){
-    if(depth>maxDepth||len<3||leaves>budget)return;
+    if(depth>maxDepth||len<3||limbs>=240)return;
+    limbs++;
+    ang=ang*0.86+(-Math.PI/2)*0.14;                 // the canopy reaches up, not out
+    if(ang<-Math.PI/2-1.1)ang=-Math.PI/2-1.1;       // and never slumps sideways
+    if(ang>-Math.PI/2+1.1)ang=-Math.PI/2+1.1;
     const x2=x+Math.cos(ang)*len,y2=y+Math.sin(ang)*len;
-    out+='<line x1="'+x.toFixed(1)+'" y1="'+y.toFixed(1)+'" x2="'+x2.toFixed(1)+'" y2="'+y2.toFixed(1)+
-      '" stroke="'+col+'" stroke-width="'+Math.max(0.7,wdt).toFixed(2)+'" stroke-linecap="round" opacity="'+
-      (0.55+depth*0.06).toFixed(2)+'"/>';
-    if(depth>=maxDepth-1||len<9){
-      // a leaf for the work, a blossom for a rare find
-      if(leaves<budget){
-        leaves++;
-        const isBloom=blossom<t.rare&&R()<0.16;
-        if(isBloom){blossom++;
-          out+='<circle cx="'+x2.toFixed(1)+'" cy="'+y2.toFixed(1)+'" r="'+(leafSize+1.4).toFixed(1)+
-            '" fill="var(--amber)" opacity=".9"/>'}
-        else out+='<circle cx="'+x2.toFixed(1)+'" cy="'+y2.toFixed(1)+'" r="'+
-          (leafSize*(0.7+R()*0.6)).toFixed(1)+'" fill="'+leafCol+'" opacity="'+(0.45+R()*0.4).toFixed(2)+'"/>'}
-      return}
+    limb(x,y,x2,y2,wdt,(0.5+depth*0.07).toFixed(2));
+    if(depth>=maxDepth-1||len<9){tips.push([x2,y2]);return}
     // how many ways it splits comes from how many lifts you train
     const forks=2+(t.liftCount>=6&&R()<0.35?1:0);
     for(let i=0;i<forks;i++){
-      const spread=(0.42+R()*0.34);
-      const a=ang+(i-(forks-1)/2)*spread+(R()-0.5)*0.18;
-      branch(x2,y2,a,len*(0.66+R()*0.16),wdt*0.68,depth+1)}}
+      const spread=(0.5+R()*0.38);
+      const a=ang+(i-(forks-1)/2)*spread+(R()-0.5)*0.2;
+      branch(x2,y2,a,len*(0.68+R()*0.14),wdt*0.66,depth+1)}}
   if(t.sessions<1&&t.pts<40){
     // nothing logged yet: a seed, and an honest one
     out+='<circle cx="'+(W/2)+'" cy="'+(groundY-9)+'" r="7" fill="'+col+'" opacity=".5"/>'+
       '<path d="M'+(W/2)+' '+(groundY-16)+' q6 -9 1 -16" stroke="'+col+'" stroke-width="1.6" fill="none" opacity=".7" stroke-linecap="round"/>'+
       '<ellipse cx="'+(W/2+7)+'" cy="'+(groundY-31)+'" rx="6" ry="3.4" fill="'+col+'" opacity=".6" transform="rotate(-24 '+(W/2+7)+' '+(groundY-31)+')"/>';
     return'<svg viewBox="0 0 '+W+' '+Hh+'" style="width:100%;aspect-ratio:'+W+'/'+Hh+';display:block" aria-hidden="true">'+out+'</svg>'}
-  branch(W/2,groundY,-Math.PI/2,trunkH,Math.max(1.6,2+t.sessions*0.06),0);
-  /* running shows as low sweeping growth rather than more canopy */
+  /* the trunk rises and tapers before it forks — a tree, not a broom */
+  const sway=(R()-0.5)*5,topX=W/2+sway,topY=groundY-trunkH;
+  const tw=Math.max(2.4,2.6+t.sessions*0.07);
+  out+='<path d="M'+(W/2-tw*0.95).toFixed(1)+' '+groundY+
+    ' Q'+(W/2+sway*0.4-tw*0.5).toFixed(1)+' '+(groundY-trunkH*0.55).toFixed(1)+' '+(topX-tw*0.35).toFixed(1)+' '+topY.toFixed(1)+
+    ' L'+(topX+tw*0.35).toFixed(1)+' '+topY.toFixed(1)+
+    ' Q'+(W/2+sway*0.4+tw*0.5).toFixed(1)+' '+(groundY-trunkH*0.55).toFixed(1)+' '+(W/2+tw*0.95).toFixed(1)+' '+groundY+
+    ' Z" fill="'+col+'" opacity=".85"/>';
+  const forks0=2+(t.liftCount>=4?1:0);
+  for(let i=0;i<forks0;i++){
+    const a=-Math.PI/2+(i-(forks0-1)/2)*0.62+(R()-0.5)*0.08;   // a symmetric first fan
+    branch(topX,topY,a,trunkH*0.58+R()*8,tw*0.72,1)}
+  /* blossoms first — every rare find gets its glow, spread across the crown */
+  const nBloom=Math.min(t.rare,tips.length);
+  for(let i=0;i<nBloom;i++){
+    const p2=tips[Math.floor(R()*tips.length)];
+    const lx=p2[0]+(R()-0.5)*7,ly=p2[1]+(R()-0.5)*7;
+    out+='<circle cx="'+lx.toFixed(1)+'" cy="'+ly.toFixed(1)+'" r="'+(leafSize+3.6).toFixed(1)+'" fill="var(--amber)" opacity=".16"/>'+
+         '<circle cx="'+lx.toFixed(1)+'" cy="'+ly.toFixed(1)+'" r="'+(leafSize+1.2).toFixed(1)+'" fill="var(--amber)" opacity=".92"/>';
+    blossom++}
+  /* then leaves settle evenly across the whole canopy */
+  for(let i=0;i<budget&&tips.length;i++){
+    const p2=tips[i%tips.length];
+    const lx=p2[0]+(R()-0.5)*10,ly=p2[1]+(R()-0.5)*10;
+    out+='<circle cx="'+lx.toFixed(1)+'" cy="'+ly.toFixed(1)+'" r="'+
+      (leafSize*(0.6+R()*0.7)).toFixed(1)+'" fill="'+leafCol+'" opacity="'+(0.4+R()*0.45).toFixed(2)+'"/>'}
+  /* running shows as low sweeping growth, rooted at the base */
   if(t.runs){
     const n=Math.min(5,1+Math.floor(t.km/60));
     for(let i=0;i<n;i++){
       const dir=(i%2?1:-1);
-      const x1=W/2,y1=groundY-6-i*4;
-      const x2=W/2+dir*(30+i*14+R()*18),y2=groundY-14-i*10-R()*14;
-      out+='<path d="M'+x1+' '+y1+' Q'+((x1+x2)/2)+' '+(y1-16)+' '+x2.toFixed(1)+' '+y2.toFixed(1)+'" '+
-        'stroke="#6B9BD1" stroke-width="1.2" fill="none" opacity=".5" stroke-linecap="round"/>'+
-        '<circle cx="'+x2.toFixed(1)+'" cy="'+y2.toFixed(1)+'" r="2" fill="#6B9BD1" opacity=".65"/>'}}
+      const x2=W/2+dir*(34+i*15+R()*18),y2=groundY-16-i*9-R()*12;
+      out+='<path d="M'+(W/2+dir*3)+' '+(groundY-1)+' Q'+((W/2+x2)/2)+' '+(y2+4)+' '+x2.toFixed(1)+' '+y2.toFixed(1)+'" '+
+        'stroke="#6B9BD1" stroke-width="1.3" fill="none" opacity=".55" stroke-linecap="round"/>'+
+        '<circle cx="'+x2.toFixed(1)+'" cy="'+y2.toFixed(1)+'" r="2.1" fill="#6B9BD1" opacity=".7"/>'}}
   return'<svg viewBox="0 0 '+W+' '+Hh+'" style="width:100%;aspect-ratio:'+W+'/'+Hh+';display:block" aria-hidden="true">'+out+'</svg>'}
 
 
@@ -10383,7 +10404,7 @@ try{if(!S.history.length&&!S.scans.length&&!S.prof)demoLoad()}catch(e){}
 try{if(SANDBOX&&!lget('training-sandbox-v1',null)){
   lset('training-sandbox-v1',{seeded:today()});
   if(!S.prof||!S.prof.goal){
-    S.prof={name:'Dodson',sex:'male',age:31,exp:'experienced',years:6,days:4,mins:70,
+    S.prof={name:'Demo',sex:'male',age:31,exp:'experienced',years:6,days:4,mins:70,
       eq:'full',eqx:{bb:1,rack:1,db:1,mc:1,cb:1,pullup:1,bench:1,band:1},
       goal:'muscle',focus:{Chest:1,Lats:1},style:'mixed',weeks:6,
       restr:{acl:1,patTendon:1},notes:'Left knee, ACL reconstruction. Physio-guided.'};
