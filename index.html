@@ -3310,6 +3310,103 @@ function pointsChip(){
     '<span class="mono" style="display:block;font-size:14px;font-weight:700;color:'+t[2]+'">'+d.total.toLocaleString()+'</span>'+
     '<span class="mono" style="display:block;color:var(--faint);font-size:8.5px;letter-spacing:.06em">DATA POINTS</span></button>'+
     '</span>'}
+
+/* ══ the climb — rehab as the game it already is ═════════════
+   Rehab has levels (phases), boss gates (criteria), a number
+   that goes up (symmetry) and a daily action (check-ins). It
+   was just never celebrated. Every banked moment below is a
+   real event — in rehab, honesty isn't only ethics, it's
+   safety: a fake milestone here misleads a healing knee.
+   ══════════════════════════════════════════════════════════ */
+function rehabStreakInfo(){
+  const has={};
+  ((S.acl&&S.acl.checks)||[]).forEach(c=>{if(c.date)has[c.date]=1});
+  let n=0,d=new Date();
+  for(let i=0;i<400;i++){
+    const k=dayKey(d);
+    if(has[k])n++;
+    else if(i>0)break;                    // today not yet logged is not a break
+    d.setDate(d.getDate()-1)}
+  return{n:n}}
+function rehabWeekSessions(){
+  const wk=questWeekKey();
+  const end=(function(){const d=new Date(wk+'T12:00');d.setDate(d.getDate()+7);return dayKey(d)})();
+  const rp=S.lib.programs.filter(p=>p.acl||p.rehabProto).map(p=>p.id);
+  return (S.history||[]).filter(h=>h.complete&&rp.indexOf(h.progId)>=0&&
+    h.date.slice(0,10)>=wk&&h.date.slice(0,10)<end).length}
+function rehabWeekTarget(){
+  let t=0;
+  if(S.acl&&S.acl.on)t+=(S.acl.phase===1?7:2);
+  activeProtocols().forEach(p=>{t+=(p.mode==='manage'?3:2)});
+  return Math.max(2,Math.min(7,t))}
+function rehabBankMoments(){
+  // idempotent: each real moment banks exactly once, with its numbers
+  try{
+    if(!(S.acl&&S.acl.on))return;
+    const bank=discBank();let dirty=false;
+    const put=(id,rar,t,d)=>{if(bank[id])return;
+      bank[id]={t:t,d:d,rar:rar,tag:'rehab',found:today()};dirty=true};
+    // gate criteria, as they flip met
+    for(let ph=1;ph<=S.acl.phase;ph++){
+      const st=aclGateState(ph);if(!st)continue;
+      st.forEach(g=>{if(g.met)put('aclgate:'+ph+':'+g.key,'rare',
+        'Gate cleared: '+g.label,
+        'Phase '+ph+' criterion, met and recorded'+(g.detail?' — '+g.detail:'')+'.')});
+      if(phaseMet(ph))put('aclphase:'+ph,'epic',
+        'Phase '+ph+' cleared',
+        'Every criterion met. Most people never see the gates, let alone clear them.')}
+    // symmetry thresholds
+    const q=aclLatest('quad');
+    if(q&&q.lsi>=80)put('lsi:80','rare','Quad symmetry past 80%',
+      'Measured at '+Math.round(q.lsi)+'%. Eighty is where running usually opens.');
+    if(q&&q.lsi>=90)put('lsi:90','epic','Quad symmetry past 90%',
+      'Measured at '+Math.round(q.lsi)+'%. Ninety is return-to-sport territory.');
+    // check-in consistency
+    const st2=rehabStreakInfo();
+    if(st2.n>=7)put('rehabstreak:7','uncommon','Seven days of check-ins',
+      'A week of honest answers. This is the record that makes the physio visits count.');
+    if(st2.n>=14)put('rehabstreak:14','rare','Fourteen days of check-ins',
+      'Two weeks without missing. Allena can now read symptoms against training.');
+    if(st2.n>=30)put('rehabstreak:30','epic','Thirty days of check-ins',
+      'A month of showing up for a knee. Very few people manage this.');
+    if(dirty)bankSave()}catch(e){}}
+function climbCard(){
+  try{
+    if(!(S.acl&&S.acl.on))return '';
+    rehabBankMoments();
+    const a=S.acl,st=rehabStreakInfo();
+    const q=aclLatest('quad');
+    const lsi=q?Math.round(q.lsi):null;
+    const nextT=lsi==null?80:(lsi<80?80:(lsi<90?90:null));
+    const sess=rehabWeekSessions(),targ=rehabWeekTarget();
+    const found=Object.keys(discBank()).filter(k=>k.indexOf('aclgate:')===0||k.indexOf('aclphase:')===0||k.indexOf('lsi:')===0).length;
+    let h='<div class="card mt" style="padding:16px;border-radius:18px">'+
+      '<div style="display:flex;justify-content:space-between;align-items:baseline">'+
+      '<p class="eyebrow" style="margin:0">The climb</p>'+
+      (found?'<span class="mono" style="color:var(--amber);font-size:10px">'+found+' GATES IN YOUR COLLECTION</span>':'')+'</div>';
+    // phases as levels
+    h+='<div style="display:flex;gap:6px;margin-top:12px">'+
+      [1,2,3,4,5].map(n=>{const met=phaseMet(n),cur=n===a.phase;
+        return '<div style="flex:1;text-align:center">'+
+          '<div style="height:6px;border-radius:3px;background:'+(met?'var(--green)':cur?'var(--amber)':'var(--line)')+'"></div>'+
+          '<span class="mono" style="font-size:9px;color:'+(met?'var(--green)':cur?'var(--amber)':'var(--faint)')+'">'+n+'</span></div>'}).join('')+'</div>';
+    // the number that goes up
+    if(lsi!=null&&nextT)h+='<div style="margin-top:13px">'+
+      '<div style="display:flex;justify-content:space-between;align-items:baseline">'+
+      '<span style="font-size:12.5px;font-weight:600">Quad symmetry</span>'+
+      '<span class="mono" style="color:var(--amber);font-size:11px">'+lsi+'% → '+nextT+'%</span></div>'+
+      '<div style="height:5px;border-radius:3px;background:var(--line);overflow:hidden;margin-top:6px">'+
+      '<div class="an-bar" style="height:5px;width:'+Math.min(100,Math.round(lsi/nextT*100))+'%;background:var(--amber)"></div></div>'+
+      '<p style="color:var(--faint);font-size:10.5px;margin-top:5px">'+(nextT===80?'Eighty is where running usually opens. The retest is how it moves.':'Ninety is return-to-sport territory.')+'</p></div>';
+    else if(lsi!=null)h+='<p class="mono" style="color:var(--green);font-size:11px;margin-top:12px">Quad symmetry '+lsi+'% — past every threshold.</p>';
+    // the weekly work + the streak
+    h+='<div style="display:flex;gap:12px;margin-top:13px;padding-top:12px;border-top:1px solid var(--line)">'+
+      '<div style="flex:1"><p class="mono" style="font-size:16px;font-weight:700;color:'+(sess>=targ?'var(--green)':'var(--text)')+'">'+sess+'<span style="color:var(--faint);font-size:11px"> / '+targ+'</span></p>'+
+      '<p class="mono" style="color:var(--faint);font-size:9px;letter-spacing:.04em">REHAB SESSIONS THIS WEEK</p></div>'+
+      '<div style="flex:1"><p class="mono" style="font-size:16px;font-weight:700">'+st.n+'</p>'+
+      '<p class="mono" style="color:var(--faint);font-size:9px;letter-spacing:.04em">CHECK-IN DAYS RUNNING</p></div></div>';
+    return h+'</div>'}catch(e){return ''}}
+
 function viewRehabHub(){
   const protos=activeProtocols();
   let h='<div class="view pad stg" style="padding-top:24px">'+
@@ -3326,6 +3423,7 @@ function viewRehabHub(){
         '. Tap to change.</p>'
        :'<p style="color:var(--dim);font-size:12.5px;line-height:1.5;margin-top:4px">Thirty seconds. Pain, swelling, stiffness and how much you trust it — this is the record your physio actually wants.</p>')+
      '</button>';
+   h+=climbCard();
    const tr=checkTrend(28).filter(x=>x.pain!=null);
    if(tr.length>=3)h+='<div class="card mt" style="padding:14px 16px">'+
      '<p class="eyebrow">Symptoms · 28 days</p>'+
@@ -5410,6 +5508,17 @@ function questGen(wk){
      t:target===7?'Log every morning this week':'Log '+target+' mornings this week',
      d:'You managed '+best+' in a week before. Readiness mornings are what let Allena pick your hard days.',
      target:target,basis:{what:'most readiness mornings in one week',proven:best,target:target}})}
+  // 5b. rehab sessions matching your best week
+  if((S.acl&&S.acl.on)||activeProtocols().length){
+    const rp=S.lib.programs.filter(p=>p.acl||p.rehabProto).map(p=>p.id);
+    const byWk={};(S.history||[]).forEach(h=>{if(!h.complete||rp.indexOf(h.progId)<0)return;
+      const k=questWeekKey(h.date);byWk[k]=(byWk[k]||0)+1});delete byWk[wk];
+    const best=Object.keys(byWk).reduce((a,k)=>Math.max(a,byWk[k]),0);
+    const target=Math.min(best,rehabWeekTarget());
+    if(target>=2)C.push({k:'rehabsess',
+      t:target+' rehab sessions this week',
+      d:'You have done '+best+' in a week before, and adherence predicts rehab outcome more than which exercises you pick.',
+      target:target,basis:{what:'most rehab sessions in one week',proven:best,target:target}})}
   // 5. rehab check-ins, same rule
   if(S.acl&&S.acl.on){const byWk={};
    ((S.acl.checks)||[]).forEach(c=>{const w=questWeekKey(c.date);byWk[w]=(byWk[w]||0)+1});
@@ -5440,6 +5549,8 @@ function questHave(q,wk){
   if(q.k==='runkm')return Math.round((S.runs||[]).filter(r=>inWk(r.date)).reduce((a,r)=>a+(r.km||0),0)*10)/10;
   if(q.k==='ready')return Object.keys((S.gar&&S.gar.days)||{}).filter(k=>inWk(k)&&S.gar.days[k].am!=null).length;
   if(q.k==='rehab')return ((S.acl&&S.acl.checks)||[]).filter(c=>inWk(c.date)).length;
+  if(q.k==='rehabsess'){const rp=S.lib.programs.filter(p=>p.acl||p.rehabProto).map(p=>p.id);
+    return (S.history||[]).filter(h=>h.complete&&rp.indexOf(h.progId)>=0&&inWk(h.date.slice(0,10))).length}
   return 0}
 function questProgress(){
   const Q=S.quest;if(!Q||!Q.q)return{have:0,target:1};
