@@ -5903,6 +5903,7 @@ const DISC_CATALOG=[
  ['milestone','Milestones','Sessions, sets and kilometres, totted up.','Just keep going.'],
  ['streak','Consistency','Runs of days and weeks without missing one.','Log something most days.'],
  ['quest','Quests','Weekly challenges taken on and finished.','Accept a weekly quest and see it through.'],
+ ['insight','Deep reads','What the model found between your numbers.','Run a deep read from Findings.'],
  ['timing','Timing','When in the day and week your training goes best.','Log effort across different days and times.'],
  ['block','Blocks','How one block compares with the last.','Finish a block and start another.'],
  ['session','Sessions','The outliers — longest, hardest, biggest.','Train.'],
@@ -6082,6 +6083,137 @@ function anStats(){
     lifts:Object.keys(lifts).length,
     runs:(S.runs||[]).length,km:Math.round((S.runs||[]).reduce((a,r)=>a+(r.km||0),0)),
     rehab:((S.acl&&S.acl.checks)||[]).length+((S.acl&&S.acl.issues)||[]).length}}
+
+/* ══ the muscle-map hold (prompt 16) ════════════════════════
+   Territory over your own body. A muscle trained this week is
+   HELD; 8–14 days untouched is FADING; longer is UNCLAIMED —
+   which is an invitation, never a failure. Driven entirely by
+   MUSCLE_RULES weekly volume, so it is literally true. Also
+   the marketing engine: faded legs are the leg-day joke made
+   visual. Colour law holds: green=held, amber=attention.
+   ══════════════════════════════════════════════════════════ */
+const HOLD_MUSCLES=['Chest','Front delts','Side delts','Rear delts','Rotator cuff','Triceps','Biceps','Forearms','Lats','Upper back','Lower back','Core','Glutes','Quads','Hamstrings','Adductors','Calves','Neck'];
+function holdStates(){
+  const last={};
+  (S.history||[]).forEach(h=>{
+    if(!h.complete)return;
+    const k=(h.date||'').slice(0,10);
+    (h.log||[]).forEach(l=>{
+      if(!(l.w||l.r||l.secs))return;
+      const b=gBase(l.ex);
+      MUSCLE_RULES.forEach(m=>{
+        if(HOLD_MUSCLES.indexOf(m[0])<0)return;
+        if(m[1].test(b)&&(!last[m[0]]||k>last[m[0]]))last[m[0]]=k})})});
+  const out={};
+  HOLD_MUSCLES.forEach(mu=>{
+    const k=last[mu];
+    if(!k){out[mu]={s:'open',days:null};return}
+    const d=Math.floor((Date.now()-new Date(k+'T12:00').getTime())/864e5);
+    out[mu]={s:d<=7?'held':d<=14?'fade':'open',days:d}});
+  return out}
+function holdCounts(st){
+  st=st||holdStates();
+  let held=0,fade=0,open=0;
+  HOLD_MUSCLES.forEach(m=>{const x=st[m].s;if(x==='held')held++;else if(x==='fade')fade++;else open++});
+  return{held:held,fade:fade,open:open,total:HOLD_MUSCLES.length}}
+function holdFill(st,m){
+  const x=st[m]||{s:'open'};
+  if(x.s==='held')return 'fill="#7FA86B" opacity=".8"';
+  if(x.s==='fade')return 'fill="#D97757" opacity=".45"';
+  return 'fill="var(--line)" opacity=".45"'}
+function bodyMapSvg(st,W){
+  st=st||holdStates();W=W||260;
+  const F=(m)=>holdFill(st,m);
+  const R=(x,y,w,h,rx,m)=>'<rect x="'+x+'" y="'+y+'" width="'+w+'" height="'+h+'" rx="'+rx+'" '+F(m)+' data-m="'+m+'"/>';
+  const C=(x,y,r,m)=>'<circle cx="'+x+'" cy="'+y+'" r="'+r+'" '+F(m)+' data-m="'+m+'"/>';
+  const sil='stroke="var(--faint)" stroke-width="1" fill="none" opacity=".35"';
+  let s='<svg viewBox="0 0 240 200" style="width:100%;max-width:'+W+'px;display:block;margin:0 auto" aria-hidden="true">';
+  /* ── front figure ── */
+  s+='<g>';
+  s+='<circle cx="55" cy="15" r="9" '+sil+'/>';
+  s+=R(48,25,14,7,3,'Neck');
+  s+=C(32,39,7.5,'Front delts')+C(78,39,7.5,'Front delts');
+  s+=R(39,35,15,15,4,'Chest')+R(56,35,15,15,4,'Chest');
+  s+=R(24,49,9,19,4.5,'Biceps')+R(77,49,9,19,4.5,'Biceps');
+  s+=R(22,70,8,20,4,'Forearms')+R(80,70,8,20,4,'Forearms');
+  s+=R(41,52,28,28,8,'Core');
+  s+=R(46,83,8,25,4,'Adductors')+R(56,83,8,25,4,'Adductors');
+  s+=R(33,82,11,30,5,'Quads')+R(66,82,11,30,5,'Quads');
+  s+='<path d="M38 114v26M46 114v24M64 114v24M72 114v26" '+sil+'/>';
+  s+='<text x="55" y="158" text-anchor="middle" class="mono" style="fill:var(--faint);font-size:7px;letter-spacing:.08em">FRONT</text>';
+  s+='</g>';
+  /* ── back figure ── */
+  s+='<g transform="translate(130,0)">';
+  s+='<circle cx="55" cy="15" r="9" '+sil+'/>';
+  s+=C(30,38,7,'Side delts')+C(80,38,7,'Side delts');
+  s+=C(40,40,4.5,'Rear delts')+C(70,40,4.5,'Rear delts');
+  s+=C(44,49,3.5,'Rotator cuff')+C(66,49,3.5,'Rotator cuff');
+  s+=R(44,28,22,13,5,'Upper back');
+  s+=R(36,45,13,22,5,'Lats')+R(61,45,13,22,5,'Lats');
+  s+=R(44,59,22,13,5,'Lower back');
+  s+=R(24,49,9,19,4.5,'Triceps')+R(77,49,9,19,4.5,'Triceps');
+  s+=R(38,74,16,14,6,'Glutes')+R(56,74,16,14,6,'Glutes');
+  s+=R(35,90,11,28,5,'Hamstrings')+R(64,90,11,28,5,'Hamstrings');
+  s+=R(37,120,10,20,5,'Calves')+R(63,120,10,20,5,'Calves');
+  s+='<text x="55" y="158" text-anchor="middle" class="mono" style="fill:var(--faint);font-size:7px;letter-spacing:.08em">BACK</text>';
+  s+='</g>';
+  /* legend */
+  s+='<g transform="translate(20,176)">'+
+    '<circle cx="0" cy="0" r="4" fill="#7FA86B" opacity=".8"/><text x="8" y="3" style="fill:var(--dim);font-size:8px">held</text>'+
+    '<circle cx="52" cy="0" r="4" fill="#D97757" opacity=".45"/><text x="60" y="3" style="fill:var(--dim);font-size:8px">fading</text>'+
+    '<circle cx="116" cy="0" r="4" fill="var(--line)" opacity=".45"/><text x="124" y="3" style="fill:var(--dim);font-size:8px">unclaimed</text></g>';
+  return s+'</svg>'}
+function holdBank(st){
+  try{
+    const c=holdCounts(st);
+    if(c.held<c.total)return;
+    const bank=discBank(),id='hold:'+today().slice(0,7);
+    if(bank[id])return;
+    bank[id]={t:'The whole map held',
+      d:'All '+c.total+' muscle groups trained inside one week. Complete territory.',
+      rar:'epic',tag:'balance',found:today()};
+    bankSave()}catch(e){}}
+function legsLine(st){
+  const legs=['Quads','Hamstrings','Glutes'].map(m=>st[m]);
+  if(legs.every(x=>x.s==='open'&&x.days!=null)){
+    const d=Math.min.apply(null,legs.map(x=>x.days));
+    return '<p style="color:var(--dim);font-size:12px;line-height:1.55;margin-top:9px">The legs have been unclaimed for '+d+' days. You know what to do.</p>'}
+  return ''}
+function holdCard(){
+  try{
+    if(!(S.history||[]).some(h=>h.complete&&!h.run))return '';
+    const st=holdStates(),c=holdCounts(st);
+    holdBank(st);
+    return '<button data-a="nav" data-v="territory" class="card mt" style="width:100%;text-align:left;padding:15px 16px;display:block">'+
+      '<div style="display:flex;justify-content:space-between;align-items:baseline">'+
+      '<p class="eyebrow" style="margin:0">Your ground</p>'+
+      '<span class="mono" style="color:'+(c.held===c.total?'var(--green)':'var(--faint)')+';font-size:10px">'+c.held+' OF '+c.total+' HELD'+(c.fade?' · '+c.fade+' FADING':'')+'</span></div>'+
+      '<div style="margin-top:10px">'+bodyMapSvg(st,240)+'</div>'+
+      legsLine(st)+'</button>'}catch(e){return ''}}
+function viewTerritory(){
+  const st=holdStates(),c=holdCounts(st);
+  holdBank(st);
+  const order={open:0,fade:1,held:2};
+  const rows=HOLD_MUSCLES.slice().sort((a,b)=>order[st[a].s]-order[st[b].s]||(st[b].days||999)-(st[a].days||999));
+  let h='<div class="view pad stg" style="padding-top:24px">'+
+    '<button data-a="nav" data-v="today" class="btn" style="width:auto;padding:8px 14px;color:var(--dim);font-size:12.5px;margin-bottom:14px">‹ Back</button>'+
+    '<h1 class="disp" style="font-size:25px;font-weight:700">YOUR GROUND</h1>'+
+    '<p style="color:var(--dim);font-size:13px;line-height:1.6;margin-top:8px">Every muscle you train this week, you hold. Leave one for over a week and it fades; past a fortnight it goes unclaimed — which is an invitation, not a verdict.</p>'+
+    '<div class="card mt2" style="padding:18px 16px">'+bodyMapSvg(st,320)+legsLine(st)+'</div>'+
+    '<div class="row mt" style="gap:10px">'+
+    [[''+c.held,'HELD','var(--green)'],[''+c.fade,'FADING','var(--amber)'],[''+c.open,'UNCLAIMED','var(--faint)']].map(x=>
+      '<div class="card" style="flex:1;padding:12px 10px;text-align:center">'+
+      '<p class="mono" style="font-size:18px;font-weight:700;color:'+x[2]+'">'+x[0]+'</p>'+
+      '<p class="mono" style="color:var(--faint);font-size:8.5px;letter-spacing:.05em;margin-top:3px">'+x[1]+'</p></div>').join('')+'</div>'+
+    '<div class="card mt" style="padding:4px 15px">'+
+    rows.map((m,i)=>{const x=st[m];
+      const col=x.s==='held'?'var(--green)':x.s==='fade'?'var(--amber)':'var(--faint)';
+      return '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px;padding:10px 0'+(i?';border-top:1px solid var(--line)':'')+'">'+
+        '<span style="flex:1;font-size:13px;font-weight:600;color:'+(x.s==='open'?'var(--dim)':'var(--text)')+'">'+esc(m)+'</span>'+
+        '<span class="mono" style="color:'+col+';font-size:10px;flex:none">'+
+        (x.s==='held'?'HELD':x.s==='fade'?'FADING · '+x.days+'d':x.days==null?'NEVER CLAIMED':'UNCLAIMED · '+x.days+'d')+'</span></div>'}).join('')+'</div>'+
+    '<p style="color:var(--faint);font-size:11px;line-height:1.55;margin-top:12px">Holding all '+c.total+' inside one week banks an epic find — once a month at most. Quality work (balance, mobility, conditioning) keeps you moving but does not claim ground; only trained muscle does.</p>';
+  return h+'</div>'}
 function analyseCard(){
   const P=allPatterns(),warn=P.filter(p=>p.tone==='warn').length;
   const st=S.anState||'idle';
@@ -7241,9 +7373,117 @@ function viewFindings(){
     '<h1 class="disp" style="font-size:25px;font-weight:700">FINDINGS</h1>'+
     '<p style="color:var(--dim);font-size:13px;line-height:1.6;margin-top:8px">Patterns across your lifting, running, readiness and rehab — the connections that only exist because they live in the same place.</p>'+
     analyseCard()+
+    deepCard()+
     '</div>'}
 
 
+
+/* ══ the deep read (prompt 19) ══════════════════════════════
+   The rule engines can only find what was pre-imagined. The
+   deep read hands the model a condensed, numbers-only account
+   and demands the NON-obvious: cross-signal relationships a
+   rule would never encode. Honesty contract: every finding
+   must cite the numbers it stands on, findings are labelled
+   as the model's reading (interpretation, not measurement),
+   and a run is capped at one per day. Uses the same trust
+   boundary the coach chat already has.
+   ══════════════════════════════════════════════════════════ */
+const K_DEEP='training-deepread-v1';
+function deepStore(){return lget(K_DEEP,{last:null,items:[]})}
+function deepContext(){
+  const L=[];
+  const H=(S.history||[]).filter(h=>h.complete&&!h.run);
+  // weekly series, last 10 weeks: sessions / tonnage / km / readiness / pain
+  const wkOf=d=>questWeekKey(d);
+  const wks={};
+  H.forEach(h=>{const w=wkOf(h.date);wks[w]=wks[w]||{s:0,t:0,km:0,rd:[],pn:[]};
+    wks[w].s++;h.log.forEach(l=>{if(l.w&&l.r)wks[w].t+=l.w*l.r})});
+  (S.runs||[]).forEach(r=>{const w=wkOf(r.date);wks[w]=wks[w]||{s:0,t:0,km:0,rd:[],pn:[]};wks[w].km+=r.km||0});
+  Object.keys((S.gar&&S.gar.days)||{}).forEach(k=>{const v=S.gar.days[k].am;
+    if(v==null)return;const w=wkOf(k);if(wks[w])wks[w].rd.push(v)});
+  ((S.acl&&S.acl.checks)||[]).forEach(c=>{if(c.pain==null)return;
+    const w=wkOf(c.date);if(wks[w])wks[w].pn.push(c.pain)});
+  const keys=Object.keys(wks).sort().slice(-10);
+  L.push('WEEKLY (mon date: sessions, tonnage kg, km, avg readiness, avg pain):');
+  keys.forEach(w=>{const x=wks[w];
+    const avg=a=>a.length?Math.round(a.reduce((p,q)=>p+q,0)/a.length):'-';
+    L.push(w+': '+x.s+', '+Math.round(x.t)+', '+Math.round(x.km)+', '+avg(x.rd)+', '+avg(x.pn))});
+  // main lifts: last 8 best-of-session e1rm points each
+  const lifts={};
+  H.forEach(h=>{let best={};
+    h.log.forEach(l=>{if(!l.w||!l.r)return;const b=gBase(l.ex),e=e1rm(l.w,l.r);
+      if(!best[b]||e>best[b])best[b]=e});
+    Object.keys(best).forEach(b=>{(lifts[b]=lifts[b]||[]).push([h.date.slice(5,10),Math.round(best[b])])})});
+  Object.keys(lifts).filter(b=>lifts[b].length>=5).slice(0,6).forEach(b=>{
+    L.push(b+' e1RM: '+lifts[b].slice(-8).map(p=>p[0]+'='+p[1]).join(' '))});
+  // session timing
+  const dow=[0,0,0,0,0,0,0],hr={m:0,d:0,e:0};
+  H.forEach(h=>{const d=new Date(h.date);dow[d.getDay()]++;
+    const x=d.getHours();hr[x<11?'m':x<16?'d':'e']++});
+  L.push('Sessions by weekday Sun..Sat: '+dow.join(','));
+  L.push('By time: morning '+hr.m+', midday '+hr.d+', evening '+hr.e);
+  if(S.acl&&S.acl.on){const q=aclLatest('quad');
+    L.push('ACL phase '+S.acl.phase+'/5'+(q?', quad LSI '+Math.round(q.lsi)+'%':''))}
+  return L.join('\n')}
+const DEEP_SYS='You are the analysis engine of a training app. You receive condensed weekly training data. '+
+'Find 2-4 NON-OBVIOUS findings: relationships BETWEEN signals (readiness vs load vs performance vs pain vs timing), lags, thresholds, divergences. '+
+'FORBIDDEN: restating any single statistic, anything a simple rule could flag (totals, bests, ratios), motivation talk, advice. '+
+'Every finding MUST cite at least two specific numbers from the data and name the relationship. If the data is too thin for real nuance, return fewer findings — never pad. '+
+'Reply with ONLY a JSON array, no fences: [{"t":"short title","d":"2 sentences citing the numbers","rar":"rare"}] . "rar" may be "epic" only when the pattern repeats 3+ times in the data.';
+function deepParse(txt){
+  try{
+    const m=String(txt).match(/\[[\s\S]*\]/);
+    if(!m)return [];
+    const arr=JSON.parse(m[0]);
+    if(!Array.isArray(arr))return [];
+    return arr.filter(x=>x&&x.t&&x.d).slice(0,4).map(x=>({
+      t:String(x.t).slice(0,80),d:String(x.d).slice(0,400),
+      rar:x.rar==='epic'?'epic':'rare'}))}catch(e){return []}}
+async function deepRun(){
+  if(!aiReady()){flash('Sign in (or add a key) first — the deep read uses your coach connection.');return}
+  const st=deepStore();
+  if(st.last===today()){flash('One deep read a day — tomorrow brings new data to read.');return}
+  if((S.history||[]).filter(h=>h.complete).length<8){flash('Too little data for nuance yet — log a couple more weeks first.');return}
+  S.deepBusy=true;render();
+  try{
+    const res=await claudeFetch({model:(S.ai&&S.ai.model)||'claude-haiku-4-5-20251001',
+      max_tokens:900,system:DEEP_SYS,
+      messages:[{role:'user',content:deepContext()}]});
+    const d=await res.json();
+    const txt=d.content?d.content.map(x=>x.text||'').join(''):'';
+    const items=deepParse(txt);
+    if(!items.length){S.deepBusy=false;flash(d.error?('Error: '+d.error.message):'The model found nothing it could stand behind today — honest answer, try after more logging.');render();return}
+    const bank=discBank();
+    items.forEach((x,i)=>{const id='insight:'+today()+':'+i;
+      if(!bank[id])bank[id]={t:x.t,d:x.d+' — the model’s reading of your numbers.',
+        rar:x.rar,tag:'insight',found:today()}});
+    bankSave();
+    lset(K_DEEP,{last:today(),items:items});
+    S.deepBusy=false;vib([25,45,25]);render();
+  }catch(e){S.deepBusy=false;flash('No connection.');render()}}
+function deepCard(){
+  const st=deepStore();
+  let inner;
+  if(S.deepBusy)inner='<p class="mono" style="color:var(--amber);font-size:11px;margin-top:9px">Reading ten weeks of numbers…</p>';
+  else if(st.last===today()&&st.items.length)
+    inner='<div style="margin-top:10px;display:flex;flex-direction:column;gap:8px">'+
+      st.items.map(x=>'<div class="card" style="padding:13px 15px;border-color:'+rarityOf(x.rar)[1]+'">'+
+        '<p class="mono" style="color:'+rarityOf(x.rar)[1]+';font-size:9px;letter-spacing:.06em">'+esc(x.rar.toUpperCase())+' · MODEL READ</p>'+
+        '<p style="font-size:14px;font-weight:600;margin-top:5px">'+esc(x.t)+'</p>'+
+        '<p style="color:var(--dim);font-size:12.5px;line-height:1.6;margin-top:3px">'+esc(x.d)+'</p></div>').join('')+
+      '</div><p class="mono" style="color:var(--faint);font-size:10px;margin-top:9px">Banked in your collection. A fresh read unlocks tomorrow.</p>';
+  else if(!aiReady())
+    inner='<p style="color:var(--dim);font-size:12.5px;line-height:1.6;margin-top:8px">The rule engines find what was pre-imagined; the model finds the rest — lags, thresholds, relationships between your signals. Sign in (Settings → account) and this unlocks with no key needed.</p>';
+  else
+    inner='<p style="color:var(--dim);font-size:12.5px;line-height:1.6;margin-top:8px">Ten weeks of your numbers, handed to the model with one demand: find what the rules cannot, and cite the figures it stands on. Interpretation, clearly labelled — never dressed up as measurement.</p>'+
+      '<button data-a="deepRun" class="big disp mt" style="background:var(--amber);color:#1A1917">RUN A DEEP READ</button>'+
+      '<p class="mono" style="color:var(--faint);font-size:10px;margin-top:8px;text-align:center">once a day · costs about a cent through your connection</p>';
+  return '<div class="card mt2" style="padding:17px;border-radius:20px">'+
+    '<div style="display:flex;align-items:center;gap:10px">'+
+    '<img src="'+MARK+'" alt="" style="width:20px;height:20px;object-fit:contain;flex:none">'+
+    '<p class="disp" style="flex:1;font-size:15.5px;font-weight:700">The deep read</p>'+
+    '<span class="mono" style="color:var(--faint);font-size:9px;letter-spacing:.06em">MODEL · NOT RULES</span></div>'+
+    inner+'</div>'}
 /* ══ the ghost (prompt 15) ══════════════════════════════════
    Your best-ever week, racing quietly beside this one. A
    target, never a judge: no red, no "behind", hidden until a
@@ -7331,6 +7571,7 @@ function viewToday(){
     '<p class="disp" style="font-size:16.5px;font-weight:600;margin-top:4px">'+esc(S.sess.dayName)+'</p>'+
     '<p class="mono" style="color:var(--dim);font-size:12px;margin-top:4px">'+S.sess.log.length+' of '+S.sess.sets.length+' sets logged · tap to resume</p></button>';
   h+=calCard();
+  h+=holdCard();
   h+=ghostCard();
   h+=unlockCard();
   h+=collectTeaser();
@@ -8271,45 +8512,87 @@ const DATA_GROUPS=[
     ['Export','Backup file and spreadsheet'],
     ['Restore','Bring a backup back'],
     ['Demo data','Sample data for the charts']]]];
-function viewData(){
+function dataChunks(){
   const raw=dataRaw();
   const parts=raw.split('<div class="mt2">');
   const byTitle={};
   parts.forEach(chunk=>{const m=chunk.match(/^<p class="eyebrow">([^<]+)<\/p>([\s\S]*)$/);
     if(!m)return;
     let body=m[2];
-    // each chunk ends with the closing div of its own wrapper
     body=body.replace(/<\/div>\s*$/,'');
     byTitle[m[1].replace(/&amp;/g,'&')]=body});
+  return byTitle}
+/* settings, the way good apps do it: a profile header, then flat rows —
+   icon, label, current value, chevron — each opening a focused sheet.
+   The rows reuse every existing control by rendering the old sections
+   as sheet content, so nothing behavioural changed in the overhaul. */
+function setRow(icon,label,value,chunk){
+  return '<button data-a="dsetOpen" data-v="'+esc(chunk||label)+'" style="width:100%;text-align:left;padding:13px 16px;display:flex;align-items:center;gap:12px;border-top:1px solid var(--line)">'+
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px;color:var(--dim);flex:none">'+icon+'</svg>'+
+    '<span style="flex:1;min-width:0;font-size:14px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(label)+'</span>'+
+    (value?'<span class="mono" style="color:var(--faint);font-size:11px;flex:none;max-width:40%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(value)+'</span>':'')+
+    '<span class="mono" style="color:var(--faint);font-size:13px;flex:none">›</span></button>'}
+function setGroup(title,rows){
+  return '<p class="eyebrow" style="margin-top:22px">'+esc(title)+'</p>'+
+    '<div class="card" style="margin-top:8px;padding:0;overflow:hidden">'+
+    rows.join('').replace('border-top:1px solid var(--line)','border-top:none')+'</div>'}
+const SET_ICONS={
+  prog:'<rect x="4" y="5" width="16" height="15" rx="2"/><path d="M8 3v4M16 3v4M4 10h16"/>',
+  own:'<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/>',
+  load:'<path d="M12 3v12M8 11l4 4 4-4"/><path d="M4 17v3h16v-3"/>',
+  rehab:'<path d="M12 3.2c2 1.7 4.2 2.5 6.6 2.6v5.4c0 4-2.6 7.2-6.6 9-4-1.8-6.6-5-6.6-9V5.8C7.8 5.7 10 4.9 12 3.2z"/>',
+  run:'<path d="M13 4.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3z"/><path d="M7 21l2.5-6 3-2.5-1.5-4-3.5 2L6 13"/><path d="M12.5 12.5l3.5 2 1.5 4"/>',
+  heart:'<path d="M12 20s-7-4.6-9-8.6C1.6 8.3 3.5 5 6.8 5c2 0 3.5 1.1 4.2 2.6h2C13.7 6.1 15.2 5 17.2 5c3.3 0 5.2 3.3 3.8 6.4-2 4-9 8.6-9 8.6z"/>',
+  check:'<path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="9"/>',
+  pill:'<rect x="3" y="9" width="18" height="6" rx="3"/><path d="M12 9v6"/>',
+  bar:'<path d="M2.6 10v4M21.4 10v4"/><rect x="4.6" y="7.2" width="3.2" height="9.6" rx="1.1"/><rect x="16.2" y="7.2" width="3.2" height="9.6" rx="1.1"/><path d="M7.8 12h8.4"/>',
+  ai:'<circle cx="12" cy="12" r="3.5"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.5 5.5l2 2M16.5 16.5l2 2M18.5 5.5l-2 2M7.5 16.5l-2 2"/>',
+  save:'<path d="M12 3v12M8 11l4 4 4-4"/><rect x="4" y="17" width="16" height="4" rx="1.5"/>',
+  back:'<path d="M12 21V9M8 13l4-4 4 4"/><rect x="4" y="3" width="16" height="4" rx="1.5"/>',
+  demo:'<circle cx="12" cy="12" r="9"/><path d="M9 9.5c0-3 6-3 6 0 0 2-3 2-3 4.5M12 17.5v.2"/>'};
+function viewData(){
+  const byTitle=dataChunks();
+  const a=(typeof acct==='function')?acct():null;
+  const signed=!!(a&&a.refresh);
+  const nm=(S.prof&&S.prof.name)||'You';
   let h='<div class="view pad stg" style="padding-top:24px">'+
-   '<button data-a="nav" data-v="home" class="btn" style="width:auto;padding:8px 14px;color:var(--dim);font-size:12.5px;margin-bottom:14px">‹ Back</button>'+
-   '<h1 class="disp" style="font-size:25px;font-weight:700">DATA &amp; SETTINGS</h1>';
-  const used={};
-  DATA_GROUPS.forEach(g=>{
-    const rows=g[1].filter(r=>byTitle[r[0]]!=null);
-    if(!rows.length)return;
-    h+='<p class="eyebrow" style="margin-top:26px">'+esc(g[0])+'</p>'+
-      '<div style="margin-top:10px;display:flex;flex-direction:column;gap:8px">';
-    rows.forEach(r=>{used[r[0]]=1;
-      const key='d:'+r[0],on=!!S.openSec[key];
-      h+='<div class="card" style="padding:0;overflow:hidden'+(on?';border-color:var(--text);border-width:2px':'')+'">'+
-        '<button data-a="secToggle" data-v="'+esc(key)+'" style="width:100%;text-align:left;padding:14px 16px;display:flex;align-items:center;gap:12px">'+
-        '<span style="flex:1;min-width:0"><span style="display:block;font-size:14px;font-weight:600">'+esc(r[0])+'</span>'+
-        '<span style="color:var(--faint);font-size:11.5px">'+esc(r[1])+'</span></span>'+
-        '<span class="mono" style="color:var(--faint);font-size:14px;flex:none">'+(on?'⌄':'›')+'</span></button>'+
-        (on?'<div style="padding:0 16px 16px;border-top:1px solid var(--line);margin-top:-1px">'+byTitle[r[0]]+'</div>':'')+
-        '</div>'});
-    h+='</div>'});
-  const leftovers=Object.keys(byTitle).filter(k=>!used[k]);
-  if(leftovers.length){h+='<p class="eyebrow" style="margin-top:26px">More</p>'+
-    '<div style="margin-top:10px;display:flex;flex-direction:column;gap:8px">';
-    leftovers.forEach(k=>{const key='d:'+k,on=!!S.openSec[key];
-      h+='<div class="card" style="padding:0;overflow:hidden'+(on?';border-color:var(--text);border-width:2px':'')+'">'+
-        '<button data-a="secToggle" data-v="'+esc(key)+'" style="width:100%;text-align:left;padding:14px 16px;display:flex;align-items:center;gap:12px">'+
-        '<span style="flex:1;font-size:14px;font-weight:600">'+esc(k)+'</span>'+
-        '<span class="mono" style="color:var(--faint);font-size:14px">'+(on?'⌄':'›')+'</span></button>'+
-        (on?'<div style="padding:0 16px 16px;border-top:1px solid var(--line)">'+byTitle[k]+'</div>':'')+'</div>'});
-    h+='</div>'}
+   '<button data-a="nav" data-v="today" class="btn" style="width:auto;padding:8px 14px;color:var(--dim);font-size:12.5px;margin-bottom:14px">‹ Back</button>'+
+   '<h1 class="disp" style="font-size:25px;font-weight:700">SETTINGS</h1>';
+  /* profile header → account sheet */
+  h+='<button data-a="dsetOpen" data-v="Account & sync" class="card mt2" style="width:100%;text-align:left;padding:15px 16px;display:flex;align-items:center;gap:13px">'+
+    '<span style="width:44px;height:44px;border-radius:44px;background:var(--raised);border:1px solid '+(signed?'var(--green)':'var(--line)')+';display:flex;align-items:center;justify-content:center;flex:none">'+
+    '<span class="disp" style="font-size:18px;font-weight:700;color:'+(signed?'var(--green)':'var(--dim)')+'">'+esc(String(nm).slice(0,1).toUpperCase())+'</span></span>'+
+    '<span style="flex:1;min-width:0"><span style="display:block;font-size:15.5px;font-weight:700">'+esc(nm)+'</span>'+
+    '<span class="mono" style="color:'+(signed?'var(--green)':'var(--faint)')+';font-size:10.5px">'+
+    (signed?esc(a.email||'signed in'):'Not signed in · tap to set up')+'</span></span>'+
+    '<span class="mono" style="color:var(--faint);font-size:13px;flex:none">›</span></button>';
+  const I=SET_ICONS;
+  const progCount=(S.lib.programs||[]).filter(p=>!p.acl&&!p.rehabProto).length;
+  h+=setGroup('Program',[
+    setRow(I.prog,'Program library',progCount+' program'+(progCount===1?'':'s'),'Program library'),
+    setRow(I.own,'Your own block','','Your own block'),
+    setRow(I.load,'Load a program','','Load a program'),
+    setRow(I.prog,'Program format','','Program format')]);
+  h+=setGroup('Tracking',[
+    setRow(I.rehab,'Rehab pathway',(S.acl&&S.acl.on)?('Phase '+S.acl.phase+' of 5'):'Off','Rehab pathway'),
+    setRow(I.run,'Running',S.runOn?'On':'Off','Running'),
+    setRow(I.heart,'Readiness — Body Battery',(S.gar&&S.gar.on)?'On':'Off','Garmin readiness'),
+    setRow(I.check,'Daily check-in',(S.daily&&S.daily.on)?'On':'Off','Daily creatine tracker'),
+    setRow(I.pill,'Creatine',(S.supp&&S.supp.on)?'On':'Off','Daily creatine tracker'),
+    setRow(I.check,'Profile & goals','','Profile')]);
+  h+=setGroup('Equipment',[
+    setRow(I.bar,'Bar & plates',BAR+' kg bar','Barbell weight')]);
+  h+=setGroup('Allena',[
+    setRow(I.ai,'AI coach',
+      ((S.ai&&(S.ai.proxy||'').trim())?'Cloud link':(S.ai&&S.ai.key)?'Own key':signed?'Signed in':'Claude app'),
+      'Allena — AI coach')]);
+  h+=setGroup('Your data',[
+    setRow(I.save,'Export a backup',backupDue()?'due':'','Export'),
+    setRow(I.back,'Restore','','Restore'),
+    setRow(I.demo,'Demo data',demoPresent()?'loaded':'','Demo data')]);
+  const KNOWN=['Account & sync','Program library','Your own block','Load a program','Program format','Rehab pathway','Running','Garmin readiness','Daily creatine tracker','Profile','Barbell weight','Allena — AI coach','Export','Restore','Demo data'];
+  const left=Object.keys(byTitle).filter(k=>KNOWN.indexOf(k)<0);
+  if(left.length)h+=setGroup('More',left.map(k=>setRow(I.prog,k,'',k)));
   h+='<div style="height:8px"></div>';
   return h+'</div>'}
 function dataRaw(){
@@ -8885,6 +9168,10 @@ function sheetHtml(){
          '<button data-a="questPass" class="btn mt" style="color:var(--dim)">Not this week</button>'
         :'')+
       '<p style="color:var(--faint);font-size:11px;line-height:1.55;margin-top:12px">One per week, generated Monday from what you have already done. If it does not happen, nothing is lost and nothing turns red — a fresh one simply arrives Monday.</p>')}
+  if(S.sheet.t==='dset'){
+    const body=dataChunks()[S.sheet.k];
+    if(body==null)return '';
+    return wrapSheet(S.sheet.k,'<div style="margin-top:-6px">'+body+'</div>')}
   if(S.sheet.t==='dailyfind'){
     const pr=todayProgress(),n=noticedToday(),t=todayState();
     if(S.think&&S.think.key==='df'&&!S.think.done)
@@ -9478,6 +9765,7 @@ function render(){
   let body='';
   if(S.view==='today')body=viewToday();
   else if(S.view==='findings')body=viewFindings();
+  else if(S.view==='territory')body=viewTerritory();
   else if(S.view==='home')body=viewHome();
   else if(S.view==='session')body=S.sess?viewSession():viewHome();
   else if(S.view==='history')body=viewHistory();
@@ -9513,7 +9801,7 @@ function render(){
     hasRun?[['run','Running']]:[],[['progress','Progress']]);
   const DOT={acl:unseenRehab(),progress:unseenPatterns()+unseenDiscoveries(),run:unseenRun()};
   const nav=tabs.map(x=>{
-    const on=S.view===x[0]||(x[0]==='today'&&(S.view==='points'||S.view==='collection'||S.view==='findings'))||(x[0]==='home'&&S.view==='quick')||(x[0]==='acl'&&(S.view==='proto'||S.view==='aclpath'||S.view==='diary'||S.view==='report'));
+    const on=S.view===x[0]||(x[0]==='today'&&(S.view==='points'||S.view==='collection'||S.view==='findings'||S.view==='territory'))||(x[0]==='home'&&S.view==='quick')||(x[0]==='acl'&&(S.view==='proto'||S.view==='aclpath'||S.view==='diary'||S.view==='report'));
     if(x[0]==='today')return '<button data-a="nav" data-v="today" class="'+(on?'on':'')+'" style="position:relative">'+
       '<span style="display:flex;align-items:center;justify-content:center;width:46px;height:46px;border-radius:46px;margin:-14px auto 3px;'+
         (on?'background:var(--amber);color:#1A1917;border:1px solid var(--amber)':'background:var(--raised);color:var(--amber);border:1px solid rgba(217,119,87,.55)')+
@@ -10715,6 +11003,8 @@ function runAction(a,v,t,e){
       acctSend(e2);break}
     case 'acctVerify':acctVerify(S.acctCode);break;
     case 'acctReset':lset(K_ACCT,null);S.acctPending=false;S.acctCode='';S.acctEmail='';render();break;
+    case 'deepRun':deepRun();break;
+    case 'dsetOpen':S.sheet={t:'dset',k:v};render();break;
     case 'acctSync':acctSync(true);break;
     case 'acctOut':lset(K_ACCT,null);S.acctPending=false;render();
       flash('Signed out. Your training data never left this phone anyway.');break;
