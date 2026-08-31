@@ -341,7 +341,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return (lget(K_RUN,[])||[]).length>0})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='897f7e';  // stamped by tools/build.py with the content hash
+const BUILD_ID='59d093';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -6247,6 +6247,53 @@ function discoveries(){
     if((S.acl&&S.acl.on)&&((S.acl.checks||[]).length>=1))add('common','First rehab check-in',
       'The start of the record your physio actually wants — dates and numbers rather than "it has been a bit sore".','first');
   }catch(e){}
+  /* ── the obscure tier: relationships a lifter would never compute ── */
+  // the rest-gap sweet spot per lift: how many days off makes a lift move best
+  try{lifts.forEach(b=>{
+    const l=byLift[b].slice().sort((a,c)=>a.h.date.localeCompare(c.h.date));
+    if(l.length<10)return;
+    const byGap={};
+    for(let i=1;i<l.length;i++){
+      const gap=Math.round((new Date(l[i].h.date)-new Date(l[i-1].h.date))/864e5);
+      if(gap<1||gap>7)continue;
+      const delta=l[i].e-l[i-1].e;
+      const bucket=gap<=2?'1\u20132':gap<=4?'3\u20134':'5\u20137';
+      (byGap[bucket]=byGap[bucket]||[]).push(delta)}
+    const ks=Object.keys(byGap).filter(k=>byGap[k].length>=3);
+    if(ks.length<2)return;
+    const avg=k=>byGap[k].reduce((x,y)=>x+y,0)/byGap[k].length;
+    const best=ks.sort((x,y)=>avg(y)-avg(x))[0],worst=ks[ks.length-1];
+    if(avg(best)-avg(worst)>1.5)
+      add('rare',b+' likes '+best+' days of rest',
+        'When you come back to '+b+' after '+best+' days it moves up by '+(Math.round(avg(best)*10)/10)+' kg est-max on average; after '+worst+' days it averages '+(Math.round(avg(worst)*10)/10)+' kg. Your recovery has a shape \u2014 this is it.','obscure')})}catch(e){}
+  // set-order fade: where in an exercise your reps actually die
+  try{const bySet={};
+    H.forEach(h=>h.log.forEach(l=>{if(!(l.r>0)||l.secs)return;
+      if(l.setNo>=1&&l.setNo<=5)(bySet[l.setNo]=bySet[l.setNo]||[]).push(l.r)}));
+    const ks=Object.keys(bySet).filter(k=>bySet[k].length>=8);
+    if(ks.length>=3){
+      const avg=k=>bySet[k].reduce((x,y)=>x+y,0)/bySet[k].length;
+      const first=avg(ks[0]);
+      const fadeAt=ks.find(k=>avg(k)<first*0.82);
+      if(fadeAt&&+fadeAt>=3)
+        add('uncommon','Set '+fadeAt+' is where your reps fade',
+          'Across everything you lift, set 1 averages '+(Math.round(avg(ks[0])*10)/10)+' reps and set '+fadeAt+' averages '+(Math.round(avg(fadeAt)*10)/10)+'. If a set has to go when time is short, you now know which one was doing the least.','obscure')}}catch(e){}
+  // the day-after-easy-run effect — cross-domain, the moat speaking
+  try{if(R.length>=8&&H.length>=8){
+    const easyDays=new Set(R.filter(r=>(r.type==='easy'||r.type==='recovery')&&r.km>=2&&r.km<=8)
+      .map(r=>{const d=new Date(String(r.date).slice(0,10)+'T12:00');d.setDate(d.getDate()+1);return dayKey(d)}));
+    const after=[],normal=[];
+    H.forEach(h=>{const rp=h.log.filter(l=>l.rpe!=null).map(l=>l.rpe);
+      if(!rp.length)return;const m=rp.reduce((x,y)=>x+y,0)/rp.length;
+      (easyDays.has(String(h.date).slice(0,10))?after:normal).push(m)});
+    if(after.length>=3&&normal.length>=5){
+      const aa=after.reduce((x,y)=>x+y,0)/after.length,na=normal.reduce((x,y)=>x+y,0)/normal.length;
+      if(na-aa>0.4)
+        add('rare','Lifting feels easier the day after an easy run',
+          'Sessions the day after a short easy run average RPE '+(Math.round(aa*10)/10)+' vs your usual '+(Math.round(na*10)/10)+'. Light movement is doing your recovery a favour \u2014 only an app that sees both sides could tell you this.','obscure')
+      else if(aa-na>0.4)
+        add('uncommon','Even easy runs cost your lifting a little',
+          'Sessions the day after an easy run average RPE '+(Math.round(aa*10)/10)+' vs your usual '+(Math.round(na*10)/10)+'. Worth keeping runs and hard lifts a day apart when it matters.','obscure')}}}catch(e){}
   return D}
 function discoverySeen(){return S.discSeen||(S.discSeen=lget('training-disc-v1',{}))}
 function markDiscoveries(){
@@ -8950,12 +8997,42 @@ function newFindsCard(){
     '<p class="disp" style="font-size:16px;font-weight:600;line-height:1.2">'+bits.join(' and ')+'</p>'+
     '<p style="color:var(--dim);font-size:12px;margin-top:3px">Found since you last looked. Tap to reveal.</p></div>'+
     '<span class="mono" style="color:var(--amber);font-size:14px;flex:none">›</span></div></button>'}
+function depthGlyph(d){
+  /* the increasing-complexity line: three rising points, lit to depth d */
+  const pts=[[5,13],[20,8],[35,3]];
+  let g='<svg viewBox="0 0 40 16" style="width:40px;height:16px;display:block">';
+  g+='<polyline points="'+pts.map(p=>p.join(',')).join(' ')+'" fill="none" stroke="var(--line)" stroke-width="1.5"/>';
+  if(d>1)g+='<polyline points="'+pts.slice(0,d).map(p=>p.join(',')).join(' ')+'" fill="none" stroke="var(--blue)" stroke-width="1.5"/>';
+  pts.forEach((p,i)=>{g+='<circle cx="'+p[0]+'" cy="'+p[1]+'" r="2.5" fill="'+(i<d?'var(--blue)':'var(--line)')+'"/>'});
+  return g+'</svg>'}
+function findLens(){
+  /* the three lenses, side by side, in increasing depth */
+  const st=bankStats();
+  const rareN=(st.rar&&((st.rar.rare||0)+(st.rar.epic||0)))||0;
+  let pat=0;try{pat=unseenPatterns()}catch(e){}
+  let patTotal=0;try{patTotal=allPatterns().length}catch(e){}
+  const ds=deepStore();
+  const rdy=(typeof deepReadyInfo==='function')?deepReadyInfo():null;
+  const deepStat=ds.last===today()?(ds.items.length+' read today'):rdy?'ready to run':'waiting on new data';
+  const col=(depth,name,stat,desc,act,val)=>
+    '<button data-a="'+act+'"'+(val?' data-v="'+val+'"':'')+' class="card" style="flex:1;min-width:0;text-align:left;padding:13px 12px;display:flex;flex-direction:column;gap:8px;min-height:148px">'+
+    depthGlyph(depth)+
+    '<span class="disp" style="font-size:13.5px;font-weight:600;line-height:1.2">'+name+'</span>'+
+    '<span class="mono" style="color:var(--blue);font-size:10px">'+stat+'</span>'+
+    '<span style="color:var(--faint);font-size:10.5px;line-height:1.45;flex:1">'+desc+'</span>'+
+    '<span class="mono" style="color:var(--faint);font-size:11px">\u203a</span></button>';
+  return '<div style="display:flex;gap:8px;margin-top:14px;align-items:stretch">'+
+    col(1,'Discoveries',st.total+' banked \u00b7 '+rareN+' rare+','Records and firsts the rules can prove. Yours to keep.','collOpen','')+
+    col(2,'Patterns',(pat?pat+' new \u00b7 ':'')+patTotal+' live','Connections between your sports \u2014 what to act on.','anRun','')+
+    col(3,'Deep read',deepStat,'The model reads what rules cannot. Every claim cited.','deepScroll','')+
+    '</div>'}
 function viewFindings(){
   try{bankDiscoveries()}catch(e){}   // found = banked, the day it happens — viewing counts
   return '<div class="view pad stg" style="padding-top:24px">'+
     '<button data-a="back" class="btn" style="width:auto;padding:8px 14px;color:var(--dim);font-size:12.5px;margin-bottom:14px">‹ Back</button>'+
     '<h1 class="disp" style="font-size:25px;font-weight:600">Findings</h1>'+
-    '<p style="color:var(--dim);font-size:13px;line-height:1.6;margin-top:8px">Patterns across your lifting, running, readiness and rehab — the connections that only exist because they live in the same place.</p>'+
+    '<p style="color:var(--dim);font-size:13px;line-height:1.6;margin-top:8px">Three lenses on the same data \u2014 each one deeper than the last.</p>'+
+    findLens()+
     nearRings()+
     analyseCard()+
     '<div id="deepcard" style="scroll-margin-top:14px">'+deepCard()+'</div>'+
@@ -13092,6 +13169,8 @@ function runAction(a,v,t,e){
       S.coachBack=S.view;S.sheet=null;chatNew();
       S.coach.input='About the deep-read finding \u201c'+it.t+'\u201d \u2014 '+(it.plain||it.d).slice(0,180)+' \u2026 what should I actually do with this?';
       render();break}
+    case 'deepScroll':{S.scrollTo='deepcard';render();
+      try{setTimeout(function(){var el=document.getElementById('deepcard');if(el)el.scrollIntoView({behavior:'smooth',block:'start'})},80)}catch(e){}break}
     case 'deepItemOpen':S.sheet={t:'deepitem',i:+v};render();break;
     case 'pvSubOpen':S.sheet={t:'pvsub',i:+v};render();break;
     case 'pvSubBack':S.sheet={t:'preview'};render();break;
