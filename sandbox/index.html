@@ -334,7 +334,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return (lget(K_RUN,[])||[]).length>0})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='d80f17';  // stamped by tools/build.py with the content hash
+const BUILD_ID='3bb799';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -10191,6 +10191,21 @@ function sheetHtml(){
     const nn=Math.max(1,Math.min(6,+f.sets||3));
     inner+='<button data-a="axAdd" class="big disp mt" style="background:'+(f.name.trim()?'var(--green)':'var(--raised)')+';color:'+(f.name.trim()?'#1F1E1D':'var(--faint)')+';font-size:16px">Add '+nn+' set'+(nn===1?'':'s')+'</button>';
     return wrapSheet('Add exercise',inner)}
+  if(S.sheet.t==='pvsub'){
+    const e=S.prev&&S.prev.ex[S.sheet.i];if(!e)return '';
+    const f=subsFor(e.origName||e.name);if(!f)return '';
+    const W=(e.sets[0]||{}).targetW;
+    let inner='<p style="color:var(--dim);font-size:13px;line-height:1.55">Swap '+esc(e.name)+' for something that trains the same thing \u2014 the weight converts across every set.</p>'+
+      '<div style="margin-top:12px;display:flex;flex-direction:column;gap:8px">'+
+      f.list.map((sb,j)=>{const w=subWeight(sb,W);
+        return '<button data-a="pvSubPick" data-v="'+j+'" class="card" style="width:100%;text-align:left;padding:14px 16px">'+
+          '<div style="display:flex;justify-content:space-between;gap:10px;align-items:baseline">'+
+          '<span style="font-size:14.5px;font-weight:600">'+esc(sb.n)+'</span>'+
+          '<span class="mono" style="color:var(--amber);font-size:13.5px;white-space:nowrap">'+(w?w+' kg':'\u2014')+'</span></div>'+
+          '<p style="color:var(--faint);font-size:11.5px;margin-top:4px">'+esc(sb.u)+' \u00b7 '+esc(sb.note)+'</p></button>'}).join('')+'</div>';
+    if(e.origName)inner+='<button data-a="pvSubRevert" class="btn mt">Revert to '+esc(e.origName)+'</button>';
+    inner+='<button data-a="pvSubBack" class="btn mt" style="color:var(--dim)">Back to the session</button>';
+    return wrapSheet('Swap it',inner)}
   if(S.sheet.t==='qsub'){
     const r=S.quick.rows[S.sheet.i],f=subsFor(r.origEx||r.ex);
     if(!f)return '';
@@ -11118,6 +11133,7 @@ function sheetHtml(){
             const m4=offloadAll(p4).find(x=>x.ex===e.name&&x.day===pv.di);
             if(m4&&(movedLogged(p4,m4)||sourceDone(p4,m4)))return '';
             return '<button data-a="offloadUndo" data-v="'+esc(e.name)+'" class="mono" style="color:var(--amber);font-size:10.5px;flex:none;padding:0 6px">Put back</button>'})()+
+          (e.keep&&subsFor(e.name)?'<button data-a="pvSubOpen" data-v="'+i+'" class="mono" style="width:26px;height:26px;border-radius:8px;border:1px solid var(--line);color:var(--dim);font-size:12px;flex:none" title="swap for a similar exercise">\u21c4</button>':'')+
           (e.keep&&e.sets.length>1?'<div style="display:flex;gap:4px;flex:none">'+
             '<button data-a="prevSets" data-v="'+i+':-1" class="mono" style="width:26px;height:26px;border-radius:8px;border:1px solid var(--line);color:var(--dim)">−</button>'+
             '<button data-a="prevSets" data-v="'+i+':1" class="mono" style="width:26px;height:26px;border-radius:8px;border:1px solid var(--line);color:var(--dim)">+</button></div>':'')+
@@ -11710,6 +11726,24 @@ document.addEventListener('click',e=>{if(S.boot!=null&&e.target&&e.target.closes
   vv.addEventListener('resize',fit);
   vv.addEventListener('scroll',fit);
 })();
+
+
+/* ── the iOS picker-reload witness ───────────────────────────
+   iOS sometimes evicts a home-screen web app while the file picker
+   is open; returning reloads the app and the user lands on Today
+   with no idea why. Leave a flag when a picker opens, clear it when
+   a file arrives, and on a fresh boot say honestly what happened. */
+document.addEventListener('click',function(e){
+  const t9=e.target;
+  if(t9&&t9.type==='file')try{localStorage.setItem('training-pickflag-v1',String(Date.now()))}catch(x){}},true);
+document.addEventListener('change',function(e){
+  if(e.target&&e.target.type==='file')try{localStorage.removeItem('training-pickflag-v1')}catch(x){}},true);
+try{
+  const pf=+localStorage.getItem('training-pickflag-v1')||0;
+  if(pf&&Date.now()-pf<5*60000){
+    localStorage.removeItem('training-pickflag-v1');
+    setTimeout(function(){flash('iOS reloaded Allena while the file picker was open \u2014 it happens when the phone is tight on memory. Nothing was lost; try the import again, second runs usually stick.')},2800)}
+}catch(e){}
 function runAction(a,v,t,e){
   t=t||{dataset:{a:a,v:v}};e=e||{preventDefault:function(){},target:t};
   switch(a){
@@ -12580,6 +12614,23 @@ function runAction(a,v,t,e){
       flash(clinical?'Left out and flagged for your physio. Do not work around it today.'
         :(v==='cant'?'Logged — it will be in your physio notes.':'Left out for today.'));break}
     case 'keyCancel':S.keyAsk=null;S.sheet={t:'preview'};render();break;
+    case 'pvSubOpen':S.sheet={t:'pvsub',i:+v};render();break;
+    case 'pvSubBack':S.sheet={t:'preview'};render();break;
+    case 'pvSubPick':{const sh=S.sheet,e=S.prev&&S.prev.ex[sh.i];if(!e)break;
+      const f=subsFor(e.origName||e.name);const sb=f&&f.list[+v];if(!sb)break;
+      e.origName=e.origName||e.name;
+      e.name=sb.n;
+      e.sets.forEach(st=>{st.ex=sb.n;if(st.targetW!=null)st.targetW=subWeight(sb,st.targetW)});
+      e.swapped=true;S.sheet={t:'preview'};render();
+      flash('Swapped to '+sb.n+' \u2014 weights converted; aim for the same effort.');break}
+    case 'pvSubRevert':{const sh=S.sheet,e=S.prev&&S.prev.ex[sh.i];if(!e||!e.origName)break;
+      const orig=e.origName;delete e.origName;e.swapped=false;
+      const p8=S.lib.programs.find(x=>x.id===S.prev.pid)||activeProgSafe();
+      const day8=p8&&p8.days[S.prev.di];
+      const ex8=day8&&day8.exercises.find(x=>x.name===orig);
+      e.name=orig;e.sets.forEach((st,si)=>{st.ex=orig;
+        const tpl=ex8&&setsForWeek(ex8,S.week);if(tpl&&tpl[si])st.targetW=tpl[si].w!=null?tpl[si].w:null});
+      S.sheet={t:'preview'};render();flash('Back to '+orig+'.');break}
     case 'keyDrop':{const k=S.keyAsk;S.keyAsk=null;S.keyOk=false;
       const e=S.prev.ex[k.i];e.keep=false;
       S.sheet={t:'preview'};render();break}
