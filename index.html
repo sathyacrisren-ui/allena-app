@@ -341,7 +341,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return (lget(K_RUN,[])||[]).length>0})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='e25494';  // stamped by tools/build.py with the content hash
+const BUILD_ID='3939c7';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -4441,6 +4441,13 @@ function runPlanGoal(goal,dateStr,timeStr){
     const paces=paced.map(r=>r.mins/r.km).sort((a,b)=>a-b);
     const easyP=paces.length?paces[Math.floor(paces.length/2)]*1.03:6.5;
     const pS=p=>{const m=Math.floor(p),s2=Math.round((p-m)*60);return m+':'+(s2<10?'0':'')+s2};
+    // the weekdays they actually run — so the brief can place the work
+    const dows=[0,0,0,0,0,0,0];
+    R.slice(-30).forEach(r=>{try{dows[new Date(r.date+'T12:00').getDay()]++}catch(e){}});
+    const DN=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+    const order=[1,2,3,4,5,6,0];
+    const days=order.map(dd=>({d:dd,n:dows[dd]})).sort((a2,b2)=>b2.n-a2.n).slice(0,freq)
+      .sort((a2,b2)=>order.indexOf(a2.d)-order.indexOf(b2.d)).map(x2=>DN[x2.d]);
     const tempoP=easyP*0.90,intP=easyP*0.84;
     // the time goal, and the honesty it demands
     const goalMins=parseGoalTime(timeStr,G.race);
@@ -4487,7 +4494,7 @@ function runPlanGoal(goal,dateStr,timeStr){
       if(!down&&!inTaper)km=km*1.08}
     const tStr=goalMins?(goalMins>=90?Math.floor(goalMins/60)+':'+String(Math.round(goalMins%60)).padStart(2,'0'):Math.floor(goalMins)+':'+String(Math.round((goalMins%1)*60)).padStart(2,'0')):null;
     return{goal:goal,goalName:G.name,date:dateStr||null,goalTime:tStr,goalPace:goalMins?pS(raceP):null,paceNote:paceNote,base:base,freq:freq,
-      days:null,pace:pS(easyP),items:items,
+      days:days,pace:pS(easyP),items:items,
       note:(paceNote?paceNote+' ':'')+'Weeks 1\u20132 are easy running plus strides only \u2014 pain-free volume is what earns the speed work (that is the intensity gate). Paces come from your own easy median: tempo \u224810% faster, intervals \u224816%. Tune by feel; the effort is the prescription. '+(S.acl&&S.acl.on?'With the knee in rehab, swap intervals for tempo until your physio clears sharp speed.':'')}}
   catch(e){return{block:'Could not read the history.'}}}
 function runPlanCard(){
@@ -9382,8 +9389,8 @@ function viewSession(){
        (remain.length>1?'<p class="mono" style="color:var(--faint);font-size:10px;margin-top:9px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">then '+
          esc(remain.filter(e=>e.exNo!==curNo).slice(0,3).map(e=>String(e.sets[0].st.ex).replace(/ — .*/,'')).join(' · '))+'</p>':'')+
        '</button>'}
-    h+='<div class="row mt2" style="width:100%"><button data-a="addRest" class="btn disp" style="flex:1;letter-spacing:.1em">+30 SEC</button>'+
-     '<button data-a="skipRest" class="btn disp" style="flex:1;background:var(--text);color:#1F1E1D;font-weight:600;letter-spacing:.1em;border:none">SKIP REST</button></div></div>';
+    h+='<div class="row mt2" style="width:100%"><button data-a="addRest" class="btn disp" style="flex:1">+30 sec</button>'+
+     '<button data-a="skipRest" class="btn disp" style="flex:1;background:var(--text);color:#1F1E1D;font-weight:600;border:none">Skip rest</button></div></div>';
     return h}
 
   if(s.phase==='hold'){
@@ -9403,7 +9410,7 @@ function viewSession(){
      '<p class="disp" style="font-size:19px;font-weight:600;margin-top:6px;text-align:center">'+esc(cur.ex)+'</p>'+
      ringHtml('hold',left,cur.secs,acc)+
      (cur.cue?'<div class="cue mt2" style="border-left-color:'+acc+'">'+esc(cur.cue)+'</div>':'')+
-     '<button data-a="finish" class="btn disp mt3" style="letter-spacing:.1em">END HOLD EARLY</button></div>';
+     '<button data-a="finish" class="btn disp mt3">End hold early</button></div>';
     return h}
 
   const last=lastFor(cur.ex,cur.setNo);
@@ -10305,6 +10312,7 @@ function viewData(){
   h+=setGroup('Equipment',[
     setRow(I.bar,'Bar & plates',BAR+' kg bar','Barbell weight')]);
   h+=setGroup('Allena',[
+    setRow(I.check,'Report something broken','','__beta'),
     setRow(I.ai,'AI coach',
       ((S.ai&&(S.ai.proxy||'').trim())?'Cloud link':(S.ai&&S.ai.key)?'Own key':signed?'Signed in':'Claude app'),
       'Allena — AI coach')]);
@@ -10532,6 +10540,19 @@ function sheetHtml(){
     const nn=Math.max(1,Math.min(6,+f.sets||3));
     inner+='<button data-a="axAdd" class="big disp mt" style="background:'+(f.name.trim()?'var(--green)':'var(--raised)')+';color:'+(f.name.trim()?'#1F1E1D':'var(--faint)')+';font-size:16px">Add '+nn+' set'+(nn===1?'':'s')+'</button>';
     return wrapSheet('Add exercise',inner)}
+  if(S.sheet.t==='beta'){
+    const rep=(function(){try{
+      const d=dataPoints();
+      return 'Allena beta report\n'+
+        'build '+BUILD_ID+(typeof SANDBOX!=='undefined'&&SANDBOX?' (sandbox)':'')+'\n'+
+        'screen: '+(S.betaFrom||S.view)+'\n'+
+        'programs '+(S.lib.programs||[]).length+' \u00b7 sessions '+S.history.filter(h=>!h.run).length+' \u00b7 runs '+runs().length+' \u00b7 points '+d.total+'\n'+
+        'device: '+String(navigator.userAgent||'').replace(/^Mozilla\/5\.0 \(([^)]+)\).*$/,'$1').slice(0,60)+'\n'+
+        'what happened: '}catch(e){return 'Allena beta report \u2014 build '+BUILD_ID}})();
+    return wrapSheet('Report something',
+      '<p style="color:var(--dim);font-size:13px;line-height:1.6">Copy this, add one line about what went wrong, and send it with a screenshot. Counts only \u2014 no exercise names, no training data.</p>'+
+      '<pre style="margin-top:10px;white-space:pre-wrap;font-size:11.5px;line-height:1.6;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px">'+esc(rep)+'</pre>'+
+      '<button data-a="betaCopy" data-v="'+esc(encodeURIComponent(rep))+'" class="big disp mt" style="background:var(--amber);color:#1F1E1D;font-size:15px">Copy the report</button>')}
   if(S.sheet.t==='deepitem'){
     const it=(deepStore().items||[])[S.sheet.i];if(!it)return '';
     const rc=rarityOf(it.rar)[1];
@@ -13314,7 +13335,9 @@ function runAction(a,v,t,e){
     case 'cbSkip':{const cb=cbStore();if(cb&&cb.state==='offered'){cb.state='skip';lset(K_CB,cb)}render();break}
     case 'muscleOpen':S.sheet={t:'muscle',m:v};render();break;
     case 'hkDone':S.hkRes=null;S.sheet=null;render();break;
-    case 'dsetOpen':S.sheet={t:'dset',k:v};render();break;
+    case 'betaCopy':{try{navigator.clipboard.writeText(decodeURIComponent(v)).then(()=>flash('Copied \u2014 paste it to Sathya with a screenshot.')).catch(()=>flash('Long-press the text to copy it.'))}catch(e){flash('Long-press the text to copy it.')}break}
+    case 'dsetOpen':{if(v==='__beta'){S.betaFrom=S.view;S.sheet={t:'beta'};render();break}
+      S.sheet={t:'dset',k:v};render();break}
     case 'acctSync':acctSync(true);break;
     case 'acctOut':lset(K_ACCT,null);S.acctPending=false;render();
       flash('Signed out. Your training data never left this phone anyway.');break;
