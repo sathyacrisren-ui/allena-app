@@ -390,7 +390,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return (lget(K_RUN,[])||[]).length>0})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='6d2b01';  // stamped by tools/build.py with the content hash
+const BUILD_ID='93b1fe';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -912,7 +912,6 @@ function coachContext(){
     out.push('Block '+p.block+', week '+S.week+', '+ws.n+'/'+ws.total+' days done');
   }
   const foc=S.coach.focus?S.history.find(h=>h.id===S.coach.focus):null;
-  if(foc)out.push('Asking about — '+sessLine(foc,true));
   const others=S.history.filter(h=>h.log.length&&(!foc||h.id!==foc.id)).slice(-(foc?2:4));
   if(others.length)out.push('Recent:\n'+others.map(h=>sessLine(h,false)).join('\n'));
   const g=S.goals.filter(x=>!x.done)[0];
@@ -968,6 +967,20 @@ function coachContext(){
      out.push('Running: '+wk[1].km+' km this week ('+wk[0].km+' last)'+(a!=null?', load '+a+'x four-week average':''));
      out.push('Recent runs: '+R.slice(-4).map(r=>r.km+'km '+paceStr(r.mins,r.km)+' '+r.type).join('; '))}}
   const cs=coachStats();if(cs)out.push(cs);
+  if(foc){
+    /* the chat was opened ABOUT a session — that session is the
+       foreground, everything else is walled off as background. The
+       coach naming the wrong day is the one unforgivable error. */
+    const fb=['=== THE SESSION UNDER DISCUSSION (this chat was opened about it) ==='];
+    fb.push(String(foc.date).slice(0,10)+' — '+(foc.dayTitle||'session')+(foc.week?', week '+foc.week:''));
+    const by={};(foc.log||[]).forEach(l=>{(by[l.ex]=by[l.ex]||[]).push(entryStr(l)+(l.rpe!=null?' @RPE '+l.rpe:''))});
+    Object.keys(by).forEach(k=>fb.push('  '+k+': '+by[k].join('; ')));
+    try{
+      const prior=S.history.filter(h=>h.id!==foc.id&&h.dayTitle===foc.dayTitle&&h.date<foc.date).slice(-1)[0];
+      if(prior)fb.push('Same day previously: '+sessLine(prior,true));
+    }catch(e){}
+    fb.push('=== RULES: the user\u2019s questions are about THIS session unless they clearly say otherwise. Below is BACKGROUND — if you use any of it, name the date or session it comes from. ===');
+    return fb.join('\n')+'\n'+out.join('\n')}
   return out.join('\n')}
 async function askClaude(q){
   S.coach.thread.push({r:'user',t:q});S.coach.input='';S.coach.busy=true;render();
@@ -1008,14 +1021,14 @@ function chatSaveCurrent(){
     S.chats=(S.chats||[]).filter(c=>c.id!==S.coach.chatId);
     S.chats.unshift({id:S.coach.chatId,
       title:String(first.t).trim().slice(0,48),
-      at:new Date().toISOString(),topic:S.coachTopic||'program',
+      at:new Date().toISOString(),topic:S.coachTopic||'program',focus:S.coach.focus||null,
       thread:th.slice(-40)});
     S.chats=S.chats.slice(0,30);
     lset(K_CHATS,S.chats)}catch(e){}}
 function chatOpen(id){
   const c=(S.chats||[]).find(x=>x.id===id);if(!c)return;
   chatSaveCurrent();
-  S.coach={thread:(c.thread||[]).slice(),busy:false,input:'',focus:null,sent:true,chatId:c.id};
+  S.coach={thread:(c.thread||[]).slice(),busy:false,input:'',focus:c.focus||null,sent:true,chatId:c.id};
   S.coachTopic=c.topic||'program';S.view='coach'}
 function chatNew(){
   chatSaveCurrent();
@@ -1717,9 +1730,9 @@ function trunkProgram(){return {id:'trunk-1',kind:'posture',block:'Trunk & Low B
      {name:'Walking',rest:0,cue:'Brisk, upright, arms swinging. The single best thing for a cranky back.',sets:{'default':hold(300,1)}}])}]}}
 function coachSys(){
   if(S.prof&&S.prof.goal){const p=S.prof;
-    return 'You are Allena, the coach inside this training app. User: '+(p.name||'user')+', '+(p.sex||'')+', age '+p.age+', experience '+p.exp+'. Goal: '+p.goal+'. Equipment: '+p.eq+'. Restrictions: '+(restrList(p)||'none')+(p.notes?'; notes: '+p.notes:'')+'. Double progression: top of rep range @RPE<=9 on all sets -> add load; wk6 deload. Never conflict with the restrictions. Pain/numbness/tingling -> stop, see a professional. Under 80 words; one concrete call first, then one line why. If a programmed load should change, end with a line exactly like ADJUST|<exercise name>|<number> where the number is kilograms, e.g. ADJUST|Bench — back-off|-2.5.'}
+    return 'You are Allena, the coach inside this training app. User: '+(p.name||'user')+', '+(p.sex||'')+', age '+p.age+', experience '+p.exp+'. Goal: '+p.goal+'. Equipment: '+p.eq+'. Restrictions: '+(restrList(p)||'none')+(p.notes?'; notes: '+p.notes:'')+'. Double progression: top of rep range @RPE<=9 on all sets -> add load; wk6 deload. Never conflict with the restrictions. Pain/numbness/tingling -> stop, see a professional. Under 80 words; one concrete call first, then one line why. If a programmed load should change, end with a line exactly like ADJUST|<exercise name>|<number> where the number is kilograms, e.g. ADJUST|Bench — back-off|-2.5. When the context contains A SESSION UNDER DISCUSSION, every answer is about that session unless the user clearly asks otherwise; background data may only be used by naming its date, and attributing a number to the wrong day or exercise is the one unforgivable error.'}
   if(S.lib.programs.some(p=>p.id==='bench-1'))return COACH_SYS;
-  return 'You are Allena, an evidence-based strength coach inside a training app. NEVER state a number you were not given — if it is not in the CONTEXT block, say what is missing instead of estimating. Ground calls in the strongest research (progressive overload, 10-20 hard sets/muscle/wk, RPE proximity-to-failure, 48-72h recovery) and the lifter\'s own logged data; admit when evidence is weak - never invent citations. Encourage balance across muscles. Double progression: top of range @RPE<=9 on all sets -> add load; wk6 deload. Pain/numbness/tingling -> stop, see a professional. Under 80 words; one concrete call first, then one line why. If a programmed load should change, end with ADJUST|<exercise>|<+/-kg>.'}
+  return 'You are Allena, an evidence-based strength coach inside a training app. NEVER state a number you were not given — if it is not in the CONTEXT block, say what is missing instead of estimating. Ground calls in the strongest research (progressive overload, 10-20 hard sets/muscle/wk, RPE proximity-to-failure, 48-72h recovery) and the lifter\'s own logged data; admit when evidence is weak - never invent citations. Encourage balance across muscles. Double progression: top of range @RPE<=9 on all sets -> add load; wk6 deload. Pain/numbness/tingling -> stop, see a professional. Under 80 words; one concrete call first, then one line why. If a programmed load should change, end with ADJUST|<exercise>|<+/-kg>. When the context contains A SESSION UNDER DISCUSSION, every answer is about that session unless the user clearly asks otherwise; background data may only be used by naming its date, and attributing a number to the wrong day or exercise is the one unforgivable error.'}
 function startSetup(pre){S.setup=Object.assign({step:0,name:'',sex:null,age:30,exp:null,years:1,days:3,mins:60,eq:'full',eqx:{},goal:null,focus:{},style:'mixed',weeks:6,restr:{},notes:''},pre||{},{step:0});S.view='setup';render()}
 function suPills(k,opts,multi){return '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:10px">'+opts.map(o=>{
   const on=multi?!!S.setup.restr[o[0]]:String(S.setup[k])===String(o[0]);
