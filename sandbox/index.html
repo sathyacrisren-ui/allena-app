@@ -390,7 +390,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return (lget(K_RUN,[])||[]).length>0})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='81fdeb';  // stamped by tools/build.py with the content hash
+const BUILD_ID='5b6dcb';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -2272,6 +2272,14 @@ async function impParse(){
   const f=S.imp;if(!f)return;
   /* a structured spreadsheet needs no AI: read the grid exactly, on the
      phone, instantly. Allena is the fallback for layouts this cannot see. */
+  if(!f.grid&&!f.img&&f.text&&typeof csvGrid==='function'){
+    const cg=csvGrid(f.text);if(cg)f.grid=[cg]}
+  if(f.grid&&f.kindHint!=='plan'&&typeof datedGridParse==='function'){
+    const dg=datedGridParse(f.grid);
+    if(dg){
+      S.histDated=dg;
+      S.imp=null;S.view='today';S.sheet={t:'histdated'};S.busyDone=1;render();
+      flash(dg.totalSets+' sets read straight off the file — real dates included.');return}}
   if(f.grid&&f.kindHint!=='plan'&&typeof liftGridParse==='function'){
     const g=liftGridParse(f.grid);
     if(g){
@@ -5388,6 +5396,117 @@ function xlsxExtract(file,done,fail){
     },fail)};
   fr.readAsArrayBuffer(file)}
 
+/* ── read anything: text tables become grids too ─────────────
+   CSV/TSV (Strong, Hevy, any app export) parses into the same grid
+   shape the xlsx reader emits, so every deterministic reader below
+   works on both. Returns null unless it genuinely looks tabular. */
+function csvGrid(text){
+  const lines=String(text||'').split(/\r?\n/).filter(l=>l.trim()).slice(0,4000);
+  if(lines.length<9)return null;
+  const head=lines.slice(0,20).join('\n');
+  const delim=[['\t',(head.match(/\t/g)||[]).length],[';',(head.match(/;/g)||[]).length],[',',(head.match(/,/g)||[]).length]]
+    .sort((a,b)=>b[1]-a[1])[0];
+  if(delim[1]<lines.length)return null;
+  const dc=delim[0];
+  const split=l=>{const out=[];let cur='',q=false;
+    for(let i=0;i<l.length;i++){const ch=l[i];
+      if(q){if(ch==='"'){if(l[i+1]==='"'){cur+='"';i++}else q=false}else cur+=ch}
+      else if(ch==='"')q=true;
+      else if(ch===dc){out.push(cur);cur=''}
+      else cur+=ch}
+    out.push(cur);return out};
+  const rows={};let widths={};
+  lines.forEach((l,i)=>{
+    const cells=split(l);widths[cells.length]=(widths[cells.length]||0)+1;
+    const r={};cells.forEach((v,ci)=>{v=v.trim();if(v!=='')r[ci+1]=v});
+    if(Object.keys(r).length)rows[i+1]=r});
+  const modal=+Object.keys(widths).sort((a,b)=>widths[b]-widths[a])[0];
+  if(modal<3)return null;
+  return {name:'Sheet 1',rows:rows}}
+
+/* dd/mm preferred over mm/dd — this app's market writes day first */
+function parseAnyDate(v){
+  v=String(v==null?'':v).trim();
+  let m=/^(\d{4})-(\d{2})-(\d{2})/.exec(v);
+  if(m)return m[1]+'-'+m[2]+'-'+m[3];
+  m=/^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{4})/.exec(v);
+  if(m){let d=+m[1],mo=+m[2];
+    if(mo>12&&d<=12){const t=d;d=mo;mo=t}
+    if(mo>=1&&mo<=12&&d>=1&&d<=31)
+      return m[3]+'-'+String(mo).padStart(2,'0')+'-'+String(d).padStart(2,'0')}
+  return null}
+
+/* map a header row's columns by name — the one vocabulary for every
+   reader: Strong, Hevy, hand-made sheets, anything header-driven */
+function gridColMap(r){
+  const map={ex:null,load:null,sets:[],rir:null,rpe:null,reps:null,date:null,workout:null,setType:null,lb:false};
+  Object.keys(r).map(Number).forEach(c=>{const v=String(r[c]).trim();
+    if(/^exercise/i.test(v)||/^(movement|lift)s?$/i.test(v))map.ex=c;
+    else if(/^(load|weight)([\s_(]|$)/i.test(v)||/^(kg|lbs?)$/i.test(v)){map.load=c;
+      if(/lb/i.test(v))map.lb=true}
+    else if(/^s(et)?\s*\d+$/i.test(v))map.sets.push(c);
+    else if(/^rir$/i.test(v))map.rir=c;
+    else if(/^rpe$/i.test(v))map.rpe=c;
+    else if(/^reps?\b/i.test(v))map.reps=c;
+    else if(/^(date|start.?time|day)\b/i.test(v))map.date=c;
+    else if(/^(workout|session|routine|title)\b/i.test(v))map.workout=c;
+    else if(/^set.?type$/i.test(v))map.setType=c});
+  if(map.ex==null||(!map.sets.length&&map.reps==null))return null;
+  return map}
+
+/* ── dated tabular history (Strong, Hevy, any dated export) ──
+   One row per set, a real date on each — lands directly, no anchor
+   question. Warm-up rows and cardio rows are left out. */
+function datedGridParse(grid){
+  const byKey={};let total=0;
+  (grid||[]).forEach(sh=>{
+    const rows=sh.rows||{};
+    const keys=Object.keys(rows).map(Number).sort((a,b)=>a-b);
+    let map=null;
+    for(let i=0;i<Math.min(8,keys.length);i++){
+      const m=gridColMap(rows[keys[i]]);
+      if(m&&m.date!=null){map=m;map._hdr=keys[i];break}}
+    if(!map)return;
+    keys.forEach(rn=>{
+      if(rn<=map._hdr)return;
+      const r=rows[rn];
+      const date=parseAnyDate(r[map.date]);if(!date)return;
+      const name=r[map.ex]!=null?String(r[map.ex]).trim():'';
+      if(!name||name.length>60)return;
+      if(map.setType!=null&&/warm/i.test(String(r[map.setType]||'')))return;
+      const num=c=>{if(c==null||r[c]==null)return null;
+        const v=parseFloat(String(r[c]).replace(',','.'));return isFinite(v)?v:null};
+      let w=num(map.load);
+      if(w!=null&&map.lb)w=Math.round(w*0.453592*2)/2;
+      let rpe=num(map.rpe);
+      const rir=num(map.rir);
+      if(rpe==null&&rir!=null)rpe=Math.max(4,Math.min(10,10-rir));
+      const reps=num(map.reps);
+      if(reps==null||reps<=0||reps>=200)return;
+      const wkName=map.workout!=null&&r[map.workout]?String(r[map.workout]).trim().slice(0,50):'Imported session';
+      const k=date+'|'+wkName.toLowerCase();
+      const ses=(byKey[k]=byKey[k]||{date:date,dayTitle:wkName,exs:{}});
+      const ex=(ses.exs[name]=ses.exs[name]||{name:name.slice(0,48),sets:[]});
+      ex.sets.push({w:(w&&w>0)?w:null,r:Math.round(reps),rpe:rpe});
+      total++})});
+  const sessions=Object.keys(byKey).sort().map(k=>{const s2=byKey[k];
+    return {date:s2.date,dayTitle:s2.dayTitle,exercises:Object.keys(s2.exs).map(n=>s2.exs[n])}});
+  const dates={};sessions.forEach(x=>dates[x.date]=1);
+  if(total<8||Object.keys(dates).length<2)return null;
+  return {dated:true,sessions:sessions,totalSets:total,
+    from:sessions[0].date,to:sessions[sessions.length-1].date}}
+function histFromDated(sessions){
+  const stamp=Date.now().toString(36);
+  return (sessions||[]).map((sn,i)=>{
+    const log=[];(sn.exercises||[]).forEach(ex=>(ex.sets||[]).forEach((st,si)=>{
+      if(!st||(!st.w&&!st.r))return;
+      log.push({ex:String(ex.name||'Exercise').slice(0,60),setNo:si+1,
+        w:st.w!=null?+st.w:null,r:st.r!=null?+st.r:null,rpe:st.rpe!=null?+st.rpe:null})}));
+    if(!log.length)return null;
+    return {id:'impd'+stamp+'s'+i,date:sn.date+'T18:00',progId:'imported',
+      dayTitle:String(sn.dayTitle||'Session').slice(0,50),
+      complete:true,approx:false,log:log}}).filter(Boolean)}
+
 /* ── the grid reader ─────────────────────────────────────────
    A structured tracker needs no AI: Week markers, an Exercise header
    row mapping the columns, data rows underneath. Read the numbers
@@ -5485,10 +5604,11 @@ function histCommit(recs){
   const key=h=>String(h.date).slice(0,10)+'|'+String(h.dayTitle||'').toLowerCase();
   const incoming=new Set(recs.map(key));
   let replaced=0,skipped=0;
+  const isImport=h=>h.approx||h.progId==='imported';
   S.history=S.history.filter(h=>{
-    if(h.approx&&incoming.has(key(h))){replaced++;return false}
+    if(isImport(h)&&incoming.has(key(h))){replaced++;return false}
     return true});
-  const real=new Set(S.history.filter(h=>!h.approx).map(key));
+  const real=new Set(S.history.filter(h=>!isImport(h)).map(key));
   const kept=recs.filter(r=>{if(real.has(key(r))){skipped++;return false}return true});
   kept.forEach(r=>S.history.push(r));
   S.history.sort((a,b)=>String(a.date).localeCompare(String(b.date)));
@@ -10050,6 +10170,15 @@ function sheetHtml(){
       '<div class="row mt" style="gap:10px">'+
       '<button data-a="ibRuns" class="btn" style="flex:1;color:var(--dim)">Only the runs</button>'+
       '<button data-a="ibLift" class="btn" style="flex:1;color:var(--dim)">Only the lifting</button></div>')}
+  if(S.sheet.t==='histdated'){
+    const hd=S.histDated||{};
+    return wrapSheet('History with its dates',
+      '<p style="color:var(--dim);font-size:13.5px;line-height:1.6">'+
+      (hd.sessions?hd.sessions.length:0)+' sessions, '+(hd.totalSets||0)+' sets, '+
+      esc(String(hd.from||''))+' to '+esc(String(hd.to||''))+' — read straight off the file with their real dates. '+
+      'Trends, patterns and deep reads start working on it the moment it lands.</p>'+
+      '<button data-a="histDatedGo" class="big disp mt2" style="background:var(--amber);color:#1F1E1D;font-size:15px">Bring it in</button>'+
+      '<p style="color:var(--faint);font-size:11.5px;line-height:1.55;margin-top:10px">Importing the same file again replaces these — nothing ever doubles up. Sessions you logged yourself always outrank an import.</p>')}
   if(S.sheet.t==='histdate'){
     const hi=S.histImp;if(!hi)return '';
     const f=S.hdate||(S.hdate={date:'',mode:'start'});
@@ -11415,6 +11544,13 @@ function runAction(a,v,t,e){
       S.sheet=null;S.view='import';render();
       flash(r9.added+' runs in'+(r9.dupe?' ('+r9.dupe+' already there, skipped)':'')+' — now the lifting.');
       impParse();break}
+    case 'histDatedGo':{const hd=S.histDated;if(!hd)break;
+      const recs=histFromDated(hd.sessions);
+      if(!recs.length){flash('Nothing usable in that file.');break}
+      const res=histCommit(recs);
+      S.histDated=null;S.sheet=null;S.view='today';render();
+      flash(res.added+' sessions in'+(res.replaced?' ('+res.replaced+' replaced)':'')+(res.skippedReal?' — '+res.skippedReal+' skipped, you had logged them yourself':'')+'.');
+      break}
     case 'hdateMode':{(S.hdate=S.hdate||{}).mode=v;render();break}
     case 'histImpGo':{const f=S.hdate||{};
       if(!(f.date||'').trim()){flash('Pick the date first.');break}
