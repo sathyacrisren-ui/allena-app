@@ -341,7 +341,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return (lget(K_RUN,[])||[]).length>0})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='742b6a';  // stamped by tools/build.py with the content hash
+const BUILD_ID='452e13';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -2994,17 +2994,39 @@ function bankLiveTier(){
    a session with a running clock and rests between sets.
    ── */
 function dpDayCap(){return 220}          // one honest day is nowhere near this
-function sessionLive(h){
-  // a session recorded as it happened: real duration, sets spread over time.
-  // demo and imported records can never be live — live means this phone
-  // ran the clock, and sample data or an upload did not.
-  if(!h||h.manual||h.imported||h.demo||h.approx||h.run||h.progId==='imported')return false;
-  if(!h.startedAt&&!h.minutes)return false;
+function sessionLiveWhy(h){
+  // a session recorded as it happened: real duration, sets spread over
+  // time. demo and imported records can never be live — live means this
+  // phone ran the clock, and sample data or an upload did not.
+  if(!h||h.manual||h.imported||h.demo||h.approx||h.run||h.progId==='imported')
+    return{live:false,why:'entered by hand or imported — the clock was not running'};
+  if(!h.startedAt&&!h.minutes)return{live:false,why:'no clock on this session'};
   const mins=h.minutes||0,sets=(h.log||[]).length;
-  if(!sets)return false;
-  if(mins<Math.max(2,sets*0.5))return false;   // 30s a set is not a session
-  if(mins>360)return false;                    // left running overnight
-  return true}
+  if(!sets)return{live:false,why:'nothing logged'};
+  if(mins<Math.max(2,sets*0.5))
+    return{live:false,why:'under 30 seconds a set across the whole session — no rest anywhere is not a session'};
+  if(mins>360)return{live:false,why:'left running for over six hours'};
+  /* the cadence check (Sep 2026): each live set carries a wall-clock
+     stamp. The session's minutes can be inflated by leaving the app
+     open, so the stamps must show the sets actually SPREAD across the
+     session — not one burst of tapping at the end. Bursts themselves
+     are fine (supersets, drop sets, circuits log fast); the whole
+     session being one burst is not. Older sessions without stamps are
+     judged on duration alone — the standard tightened, their history
+     did not. */
+  const ts=(h.log||[]).map(l=>l&&l.t).filter(t=>typeof t==='number'&&t>0).sort((a,b)=>a-b);
+  if(ts.length>=4&&ts.length>=sets*0.8){
+    const span=(ts[ts.length-1]-ts[0])/1000;
+    if(span<Math.max(90,ts.length*25))
+      return{live:false,why:'the sets landed too close together — logged in '+Math.round(span/60*10)/10+' min, which is tapping, not training'};
+    let maxBurst=1;
+    for(let i=0;i<ts.length;i++){let n=1;
+      for(let j=i+1;j<ts.length&&ts[j]-ts[i]<=60000;j++)n++;
+      if(n>maxBurst)maxBurst=n}
+    if(maxBurst>6)
+      return{live:false,why:maxBurst+' sets logged inside one minute — a superset is quick, a whole block at once is typing'};}
+  return{live:true,why:'witnessed — this phone ran the clock and the sets spread like a real session'}}
+function sessionLive(h){return sessionLiveWhy(h).live}
 function dpPlausible(h){
   // obvious nonsense earns nothing
   const bad=(h.log||[]).filter(l=>{
@@ -9514,6 +9536,14 @@ function viewSession(){
         if(gained!=null)h+='<div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px">'+
           '<p class="eyebrow" style="margin:0">Banked this session</p>'+
           '<span class="mono an-pop" style="color:var(--blue);font-size:15px;font-weight:600">+'+gained+' points</span></div>';
+        /* the witnessed verdict: was this session live by the clock and
+           the cadence of its set stamps? Said plainly either way — a
+           not-witnessed session keeps its points, it just is not
+           competition-grade. */
+        try{const lw=sessionLiveWhy({startedAt:s.startedAt,
+            minutes:Math.max(1,Math.round((Date.now()-s.startedAt)/60000)),log:s.log});
+          h+='<p class="mono" style="font-size:9px;letter-spacing:.06em;margin-top:7px;line-height:1.5;color:'+(lw.live?'var(--green)':'var(--faint)')+'">'+
+            (lw.live?'WITNESSED LIVE ✓':'NOT WITNESSED · '+esc(lw.why.toUpperCase()))+'</p>'}catch(e){}
         if(rows.length)h+='<div style="margin-top:11px;display:flex;flex-direction:column;gap:7px">'+
           rows.map((r9,i9)=>'<div style="display:flex;align-items:center;gap:8px">'+
             '<span class="mono" style="color:var(--faint);font-size:9px;letter-spacing:.05em;width:78px;flex:none;text-transform:uppercase;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">'+esc(r9.m)+'</span>'+
