@@ -341,7 +341,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return (lget(K_RUN,[])||[]).length>0})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='0975cd';  // stamped by tools/build.py with the content hash
+const BUILD_ID='4a39c5';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -2032,15 +2032,27 @@ const QUALITY_RULES=[
  ['Mobility',/stretch|rotations|slides|thoracic extension|ankle alphabet|alphabet/i],
  ['Activation',/lateral walk|monster walk|clam ?shell|hip er\b|band pull-?apart|glute bridge(?! .*barbell)|scap push/i]];
 function qualitiesOf(name){return QUALITY_RULES.filter(r=>r[1].test(String(name))).map(r=>r[0])}
+function muscleHits(ex){
+  /* every muscle an exercise touches: primes at 1, secondaries at 0.5.
+     One map, used by freshness, weekly dose and the payoff — so a
+     chin-up finally tells the upper back it happened. */
+  const out={};
+  MUSCLE_RULES.forEach(r=>{if(!r[1].test(ex))return;
+    if(r[0]==='Biceps'&&/leg curl|hamstring/i.test(ex))return;
+    out[r[0]]=1});
+  try{SECONDARY.forEach(r=>{if(!r[0].test(ex))return;
+    r[1].forEach(m=>{if(!out[m])out[m]=0.5})})}catch(e){}
+  return out}
 function muscleFresh(){
  const now=Date.now(),L={};
  S.history.forEach(h=>{const hrs=(now-new Date(h.date).getTime())/36e5;
   if(hrs>168||hrs<-2)return;
+  const TAU={};MUSCLE_RULES.forEach(r=>TAU[r[0]]=r[2]);
   h.log.forEach(l=>{if(!(l.r>0)&&!l.secs)return; // bodyweight (w:0) is real work
-   MUSCLE_RULES.forEach(r=>{if(!r[1].test(l.ex))return;
-    if(r[0]==='Biceps'&&/leg curl|hamstring/i.test(l.ex))return;
-    const eff=(l.r>0)?1:0.25;
-    L[r[0]]=(L[r[0]]||0)+eff*Math.exp(-Math.max(0,hrs)/r[2])})})});
+   const hits=muscleHits(l.ex);
+   Object.keys(hits).forEach(m=>{
+    const eff=((l.r>0)?1:0.25)*hits[m];
+    L[m]=(L[m]||0)+eff*Math.exp(-Math.max(0,hrs)/(TAU[m]||44))})})});
  /* running is leg load — the one-model promise. A half marathon the
     day before must show in the legs, whatever the lifting log says. */
  const RUN_M={'Quads':1,'Calves':1,'Hamstrings':0.8,'Glutes':0.6};
@@ -7853,8 +7865,8 @@ function analyseCard(){
     s2.rehab?'rehab notes':null,(S.scans||[]).length?(S.scans.length+' scans'):null].filter(Boolean);
   return '<button data-a="anRun" class="card mt2 an-hero" style="width:100%;text-align:left;padding:22px 20px;border-radius:22px;display:block;position:relative">'+
     (unseen?'<span style="position:absolute;top:16px;right:16px;width:9px;height:9px;border-radius:9px;background:var(--amber)"></span>':'')+
-    '<div style="display:flex;align-items:center;gap:13px">'+
-    '<img src="'+MARK+'" alt="" style="width:38px;height:38px;object-fit:contain;flex:none">'+
+    '<div style="display:flex;align-items:center;gap:15px">'+
+    '<div style="transform:scale(1.5);transform-origin:left center;width:66px;flex:none">'+depthGlyph(2)+'</div>'+
     '<div style="flex:1;min-width:0">'+
     '<p class="disp" style="font-size:18px;font-weight:600;line-height:1.2">Patterns across your data</p>'+
     '<p class="mono" style="color:var(--amber);font-size:10.5px;letter-spacing:.05em;margin-top:3px">THE THING NOTHING ELSE DOES</p>'+
@@ -8307,9 +8319,8 @@ function sessionStimulus(prog,di,wk){
   try{
     const per={};
     buildSets(prog,di,wk).forEach(st=>{
-      MUSCLE_RULES.forEach(r=>{if(!r[1].test(st.ex))return;
-        if(r[0]==='Biceps'&&/leg curl|hamstring/i.test(st.ex))return;
-        per[r[0]]=(per[r[0]]||0)+1})});
+      const hits=muscleHits(st.ex);
+      Object.keys(hits).forEach(m=>per[m]=(per[m]||0)+hits[m])});
     let units=0;
     Object.values(per).forEach(n=>{
       units+=Math.min(n,4)+Math.max(0,Math.min(n-4,4))*0.6+Math.max(0,Math.min(n-8,4))*0.25});
@@ -8330,9 +8341,8 @@ function muscleWeekUnits(){
       const t=new Date(h.date).getTime();if(!(t>=cut))return;
       const cnt={};
       (h.log||[]).forEach(l=>{if(!(l.r>0)&&!l.secs)return; // bodyweight counts
-        MUSCLE_RULES.forEach(r=>{if(!r[1].test(l.ex))return;
-          if(r[0]==='Biceps'&&/leg curl|hamstring/i.test(l.ex))return;
-          cnt[r[0]]=(cnt[r[0]]||0)+1})});
+        const hits=muscleHits(l.ex);
+        Object.keys(hits).forEach(m=>cnt[m]=(cnt[m]||0)+hits[m])});
       Object.keys(cnt).forEach(m=>per[m]=(per[m]||0)+muscleStimUnits(cnt[m]))})}catch(e){}
   return per}
 function sessionMuscleRows(prog,di,wk){
@@ -8341,9 +8351,8 @@ function sessionMuscleRows(prog,di,wk){
   try{
     const per={};
     buildSets(prog,di,wk).forEach(st=>{
-      MUSCLE_RULES.forEach(r=>{if(!r[1].test(st.ex))return;
-        if(r[0]==='Biceps'&&/leg curl|hamstring/i.test(st.ex))return;
-        per[r[0]]=(per[r[0]]||0)+1})});
+      const hits=muscleHits(st.ex);
+      Object.keys(hits).forEach(m=>per[m]=(per[m]||0)+hits[m])});
     const fresh={};muscleFresh().forEach(x=>fresh[x.m]=x.fresh);
     const wkU=muscleWeekUnits();
     return Object.keys(per).filter(m=>per[m]>=2)
@@ -8565,7 +8574,7 @@ const SECONDARY=[
  [/bench press|chest press|push-?up|dip|incline.*press|decline press|\bfly\b|pec deck/i,['Triceps','Front delts']],
  [/shoulder press|overhead press|military|landmine press|push press|arnold|half-kneeling db press|seated dumbbell press|standing barbell press|smith machine press/i,['Triceps','Upper back','Rotator cuff']],
  [/overhead carry|waiter carry/i,['Core','Upper back','Rotator cuff']],
- [/\brow\b|pulldown|pull-?up|chin-?up|pullover/i,['Biceps','Rear delts','Forearms']],
+ [/\brow\b|pulldown|pull[\s-]?up|chin[\s-]?up|pullover/i,['Biceps','Rear delts','Forearms','Upper back']],
  [/face pull|reverse fly|rear delt|band pull-?apart|prone y|prone t/i,['Rotator cuff','Upper back']],
  [/deadlift|\brdl\b|romanian|good morning|glute-?ham/i,['Lower back','Glutes','Hamstrings','Upper back','Forearms','Core']],
  [/squat|leg press|hack|lunge|split squat|step-?up|step-?down|sit-to-stand|wall sit/i,['Glutes','Quads','Hamstrings','Calves','Core']],
@@ -9436,9 +9445,8 @@ function viewSession(){
       const lvUp=s.dp0&&L1.lv>s.dp0.lv;
       // per-muscle units this session banked, from what was actually logged
       const cnt={};s.log.forEach(l=>{if(!(l.r>0)&&!l.secs)return; // bodyweight counts
-        MUSCLE_RULES.forEach(r=>{if(!r[1].test(l.ex))return;
-          if(r[0]==='Biceps'&&/leg curl|hamstring/i.test(l.ex))return;
-          cnt[r[0]]=(cnt[r[0]]||0)+1})});
+        const hits=muscleHits(l.ex);
+        Object.keys(hits).forEach(m=>cnt[m]=(cnt[m]||0)+hits[m])});
       const fr9={};muscleFresh().forEach(x=>fr9[x.m]=x.fresh);
       const rows=Object.keys(cnt).filter(m=>cnt[m]>=2).sort((a2,b2)=>cnt[b2]-cnt[a2]).slice(0,4)
         .map(m=>{const f=fr9[m]==null?100:fr9[m];
