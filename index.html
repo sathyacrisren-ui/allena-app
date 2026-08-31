@@ -333,7 +333,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return (lget(K_RUN,[])||[]).length>0})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='467567';  // stamped by tools/build.py with the content hash
+const BUILD_ID='e4663a';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -2758,8 +2758,10 @@ const DP_TIERS=[
    ── */
 function dpDayCap(){return 220}          // one honest day is nowhere near this
 function sessionLive(h){
-  // a session recorded as it happened: real duration, sets spread over time
-  if(!h||h.manual||h.imported)return false;
+  // a session recorded as it happened: real duration, sets spread over time.
+  // demo and imported records can never be live — live means this phone
+  // ran the clock, and sample data or an upload did not.
+  if(!h||h.manual||h.imported||h.demo||h.approx||h.run||h.progId==='imported')return false;
   if(!h.startedAt&&!h.minutes)return false;
   const mins=h.minutes||0,sets=(h.log||[]).length;
   if(!sets)return false;
@@ -4912,11 +4914,16 @@ function parseRunImport(text){
   return{runs:out,skipped:skipped}}
 function runImportCommit(list){
   const have=new Set(runs().map(r=>r.date+'|'+Math.round(r.km*10)));
+  /* the same run from two sources (watch vs spreadsheet) rarely agrees
+     to the metre — same day within 200m is the same run, not a double */
+  const byDay={};runs().forEach(r=>{(byDay[String(r.date).slice(0,10)]=byDay[String(r.date).slice(0,10)]||[]).push(r.km)});
   let added=0,dupe=0;
   list.forEach(r=>{
     const k=r.date+'|'+Math.round(r.km*10);
     if(have.has(k)){dupe++;return}
-    have.add(k);added++;
+    const day=String(r.date).slice(0,10);
+    if((byDay[day]||[]).some(km=>Math.abs(km-r.km)<=0.2)){dupe++;return}
+    have.add(k);(byDay[day]=byDay[day]||[]).push(r.km);added++;
     runAdd({id:'imp'+Date.now().toString(36)+added,date:r.date,type:r.type,km:r.km,mins:r.mins,
       rpe:({easy:4,recovery:3,long:5,tempo:7,interval:8,hills:7,race:9})[r.type]||5,
       hr:r.hr?Math.round(r.hr):null,elev:r.elev?Math.round(r.elev):null,note:r.note||''})});
