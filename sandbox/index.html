@@ -341,7 +341,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return (lget(K_RUN,[])||[]).length>0})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='3a679b';  // stamped by tools/build.py with the content hash
+const BUILD_ID='13b073';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -8106,14 +8106,17 @@ function sessionStimulus(prog,di,wk){
 function muscleStimUnits(n){
   return Math.min(n,4)+Math.max(0,Math.min(n-4,4))*0.6+Math.max(0,Math.min(n-8,4))*0.25}
 function muscleWeekUnits(){
-  /* stimulus already banked this calendar week, per prime muscle */
+  /* stimulus banked in the LAST 7 DAYS, per prime muscle — a rolling
+     window, not the calendar week: muscles do not know it is Monday,
+     and a bar that cliff-drops to zero at midnight Sunday would be
+     the calendar lying about the body. Saturday's squats are still
+     solid on Tuesday; they fade out as they age past a week. */
   const per={};
   try{
-    const now=new Date();const day=(now.getDay()+6)%7;
-    const mon=new Date(now);mon.setDate(now.getDate()-day);mon.setHours(0,0,0,0);
+    const cut=Date.now()-7*864e5;
     (S.history||[]).forEach(h=>{
       if(h.run)return;
-      const t=new Date(h.date).getTime();if(!(t>=mon.getTime()))return;
+      const t=new Date(h.date).getTime();if(!(t>=cut))return;
       const cnt={};
       (h.log||[]).forEach(l=>{if(!(l.w&&l.r)&&!l.secs)return;
         MUSCLE_RULES.forEach(r=>{if(!r[1].test(l.ex))return;
@@ -8620,7 +8623,7 @@ function dayCard(p,d,i,done,daily){
               '<div style="height:5px;width:'+addPct+'%;background:repeating-linear-gradient(90deg,var(--blue) 0 3px,transparent 3px 6px);opacity:.85"></div></div>'+
               '<span class="mono" style="color:'+col+';font-size:9px;width:30px;text-align:right;flex:none">'+sc+'%</span>'+
               '<span class="mono" style="color:var(--blue);font-size:9.5px;font-weight:600;width:30px;text-align:right;flex:none">+'+r9.stim+'</span></div>'}).join('')+
-          '<p class="mono" style="color:var(--faint);font-size:8.5px;letter-spacing:.05em;margin-top:2px">WEEK DOSE \u00b7 DASHED = THIS SESSION \u00b7 % FRESH</p></div>'
+          '<p class="mono" style="color:var(--faint);font-size:8.5px;letter-spacing:.05em;margin-top:2px">LAST 7 DAYS\u2019 DOSE \u00b7 DASHED = THIS SESSION \u00b7 % FRESH</p></div>'
       }catch(e){return ''}})()+
     (offloadFor(p,i).length?'<p class="mono" style="color:var(--amber);font-size:10.5px;margin-top:6px">+ '+offloadFor(p,i).length+' moved here: '+offloadFor(p,i).map(x=>esc(String(x.ex||'').replace(/ — .*/,''))).join(', ')+'</p>':'')+
     (function(){const ab=((S.addback||{})[offloadKey(p)]||[]).filter(a=>a.day===i);
