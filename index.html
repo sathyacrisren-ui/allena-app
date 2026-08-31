@@ -140,7 +140,7 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
   border-radius:26px 26px 0 0;max-height:88vh;overflow-y:auto;padding:26px 20px calc(32px + env(safe-area-inset-bottom));position:relative}
 .sheet::before{content:'';position:absolute;top:9px;left:50%;transform:translateX(-50%);
   width:38px;height:4px;border-radius:4px;background:var(--line)}
-.toast{position:fixed;bottom:92px;left:0;right:0;display:flex;justify-content:center;z-index:60;pointer-events:none}
+.toast{position:fixed;bottom:92px;left:0;right:0;display:flex;justify-content:center;z-index:95;pointer-events:none}
 .toast div{background:var(--raised);border:1px solid var(--line);border-radius:14px;box-shadow:0 10px 30px rgba(0,0,0,.4);
   padding:12px 16px;font-size:13px;max-width:400px;margin:0 16px;animation:fadeUp .18s ease}
 .logline{display:flex;justify-content:space-between;width:100%;padding:10px 0;
@@ -333,7 +333,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return (lget(K_RUN,[])||[]).length>0})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='65cdaa';  // stamped by tools/build.py with the content hash
+const BUILD_ID='0d1acc';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -9697,7 +9697,8 @@ function dataRaw(){
    '<input data-in="ai.proxy" value="'+esc(S.ai.proxy||'')+'" placeholder="Allena cloud link (https://…)" autocomplete="off" class="mono" style="width:100%;margin-top:10px;background:var(--surface);border:1px solid var(--line);border-radius:10px;color:var(--text);padding:12px;font-size:12px;outline:none">'+
    '<input data-in="ai.key" value="'+esc(S.ai.key)+'" placeholder="or your own key: sk-ant-…" autocomplete="off" class="mono" style="width:100%;margin-top:8px;background:var(--surface);border:1px solid var(--line);border-radius:10px;color:var(--text);padding:12px;font-size:12px;outline:none">'+
    '<div class="row" style="margin-top:8px">'+MODELS.map(m=>'<button data-a="aiModel" data-v="'+m[0]+'" class="pill" style="flex:1'+(S.ai.model===m[0]?';background:var(--text);color:#1F1E1D;border-color:var(--text);font-weight:600':'')+'">'+m[1]+'</button>').join('')+'</div>'+
-   '<button data-a="aiSave" class="btn mt">Save Allena settings</button>'+
+   (function(){const ready9=!!(((S.ai.proxy||'').trim())||((S.ai.key||'').trim()));
+     return '<button data-a="aiSave" class="btn mt" style="'+(ready9?'background:var(--amber);color:#1F1E1D;border:none;font-weight:600':'')+'">Save Allena settings</button>'})()+
    '<p style="color:var(--faint);font-size:12px;line-height:1.5;margin-top:8px">Without a key, Allena still works — it opens the Claude app with your session pre-attached.</p></div>'+
    '<div class="mt2"><p class="eyebrow">Program format</p><pre style="margin-top:12px">'+esc(
 '{\n  "block": "Bench Block 2",\n  "kind": "strength",   // or mobility / posture\n  "weeks": 6,           // 1 = no week selector\n  "note": "optional program-level note",\n  "days": [{\n    "name": "Heavy Press",\n    "accent": "#D42D2D",\n    "note": "optional subtitle",\n    "exercises": [{\n      "name": "Bench — top set",\n      "bar": true,       // shows plate loading\n      "rest": 270,       // seconds (0-5 = no rest step)\n      "cue": "optional form cue shown before the set",\n      "sets": {\n        "1": [{"w":102.5,"reps":4,"rpe":"8-9"}],\n        "default": [{"reps":"8-12","rpe":8}]\n      }\n    },{\n      "name": "Couch stretch",\n      "rest": 20,\n      "sets": { "default": [\n        {"secs":45,"perSide":true},\n        {"secs":45,"perSide":true}\n      ]}\n    }]\n  }]\n}')+'</pre>'+
@@ -12366,7 +12367,13 @@ function runAction(a,v,t,e){
       if(S.autoBk.on)setTimeout(function(){A.backup(true)},400);try{acctSyncSoon()}catch(e){}break}
     case 'autoBkToggle':S.autoBk.on=!S.autoBk.on;lset('training-autobk-v1',S.autoBk);flash(S.autoBk.on?'Auto-backup on.':'Auto-backup off.');break;
     case 'barSave':BAR=Math.max(5,+S.bar||20);lset(K_BAR,BAR);S.bar=BAR;flash('Bar set to '+BAR+' kg.');break;
-    case 'aiSave':lset(K_AI,S.ai);flash('Allena settings saved to this phone.');break;
+    case 'aiSave':{lset(K_AI,S.ai);
+      const px9=(S.ai.proxy||'').trim(),k9=(S.ai.key||'').trim();
+      if(S.sheet)S.sheet=null;
+      render();vib(15);
+      flash(px9?'Saved — Allena runs through your cloud link.'
+        :k9?'Saved — Allena runs on your own key ('+(S.ai.model&&S.ai.model.indexOf('haiku')>=0?'Haiku':'Sonnet')+').'
+        :'Saved. Without a key or link, chat opens in the Claude app.');break}
     case 'acctSend':case 'acctSend2':{const e2=(S.acctEmail||(acct()&&acct().email)||'').trim();
       if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e2)){flash('Enter a real email first.');break}
       acctSend(e2);break}
