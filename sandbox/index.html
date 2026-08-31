@@ -341,7 +341,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return (lget(K_RUN,[])||[]).length>0})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='f494ef';  // stamped by tools/build.py with the content hash
+const BUILD_ID='4e94bf';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -8998,12 +8998,17 @@ function newFindsCard(){
     '<p style="color:var(--dim);font-size:12px;margin-top:3px">Found since you last looked. Tap to reveal.</p></div>'+
     '<span class="mono" style="color:var(--amber);font-size:14px;flex:none">›</span></div></button>'}
 function depthGlyph(d){
-  /* the increasing-complexity line: three rising points, lit to depth d */
-  const pts=[[5,13],[20,8],[35,3]];
-  let g='<svg viewBox="0 0 40 16" style="width:40px;height:16px;display:block">';
-  g+='<polyline points="'+pts.map(p=>p.join(',')).join(' ')+'" fill="none" stroke="var(--line)" stroke-width="1.5"/>';
-  if(d>1)g+='<polyline points="'+pts.slice(0,d).map(p=>p.join(',')).join(' ')+'" fill="none" stroke="var(--blue)" stroke-width="1.5"/>';
-  pts.forEach((p,i)=>{g+='<circle cx="'+p[0]+'" cy="'+p[1]+'" r="2.5" fill="'+(i<d?'var(--blue)':'var(--line)')+'"/>'});
+  /* the mind, waking up layer by layer: a small neural net — input pair,
+     hidden trio, one output — lit to depth d. Depth 1 sees, depth 2
+     connects, depth 3 thinks. */
+  const L1=[[6,6],[6,16]],L2=[[22,3],[22,11],[22,19]],L3=[[38,11]];
+  const lit1=d>=1,lit2=d>=2,lit3=d>=3;
+  let g='<svg viewBox="0 0 44 22" style="width:44px;height:22px;display:block">';
+  L1.forEach(a2=>L2.forEach(b2=>{g+='<line x1="'+a2[0]+'" y1="'+a2[1]+'" x2="'+b2[0]+'" y2="'+b2[1]+'" stroke="'+(lit2?'var(--blue)':'var(--line)')+'" stroke-width="1" opacity="'+(lit2?'.7':'.6')+'"/>'}));
+  L2.forEach(a2=>L3.forEach(b2=>{g+='<line x1="'+a2[0]+'" y1="'+a2[1]+'" x2="'+b2[0]+'" y2="'+b2[1]+'" stroke="'+(lit3?'var(--blue)':'var(--line)')+'" stroke-width="1" opacity="'+(lit3?'.7':'.6')+'"/>'}));
+  L1.forEach(p=>{g+='<circle cx="'+p[0]+'" cy="'+p[1]+'" r="2.6" fill="'+(lit1?'var(--blue)':'var(--line)')+'"/>'});
+  L2.forEach(p=>{g+='<circle cx="'+p[0]+'" cy="'+p[1]+'" r="2.6" fill="'+(lit2?'var(--blue)':'var(--line)')+'"/>'});
+  L3.forEach(p=>{g+='<circle cx="'+p[0]+'" cy="'+p[1]+'" r="3" fill="'+(lit3?'var(--blue)':'var(--line)')+'"/>'});
   return g+'</svg>'}
 function findLens(){
   /* the three lenses, side by side, in increasing depth */
@@ -9024,8 +9029,13 @@ function findLens(){
   return '<div style="display:flex;gap:8px;margin-top:14px;align-items:stretch">'+
     col(1,'Discoveries',st.total+' banked \u00b7 '+rareN+' rare+','Records and firsts the rules can prove. Yours to keep.','collOpen','')+
     col(2,'Patterns',(pat?pat+' new \u00b7 ':'')+patTotal+' live','Connections between your sports \u2014 what to act on.','anRun','')+
-    col(3,'Deep read',deepStat,'The model reads what rules cannot. Every claim cited.','deepScroll','')+
-    '</div>'}
+    '</div>'+
+    '<button data-a="deepScroll" class="card" style="width:100%;text-align:left;padding:13px 14px;margin-top:8px;display:flex;align-items:center;gap:12px">'+
+    depthGlyph(3)+
+    '<span style="flex:1;min-width:0"><span class="disp" style="display:block;font-size:13.5px;font-weight:600">Deep read</span>'+
+    '<span style="color:var(--faint);font-size:10.5px;line-height:1.45">The model reads what rules cannot. Every claim cited.</span></span>'+
+    '<span class="mono" style="color:var(--blue);font-size:10px;flex:none">'+deepStat+'</span>'+
+    '<span class="mono" style="color:var(--faint);font-size:11px;flex:none">\u203a</span></button>'}
 function viewFindings(){
   try{bankDiscoveries()}catch(e){}   // found = banked, the day it happens — viewing counts
   return '<div class="view pad stg" style="padding-top:24px">'+
