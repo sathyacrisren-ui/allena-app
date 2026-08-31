@@ -264,7 +264,7 @@ const e1rm=(w,r)=>(r>0&&w>0?w*(1+r/30):0);
 const fmtDate=i=>new Date(i).toLocaleDateString(undefined,{day:'numeric',month:'short',year:'2-digit'});
 const rir=v=>{const n=parseFloat(v);return isFinite(n)?Math.max(0,10-n):null};
 const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const entryStr=l=>l.secs!=null?l.secs+'s'+(l.perSide?'/side':''):l.w+' × '+l.r+(l.rpe!=null?' @'+l.rpe:'');
+const entryStr=l=>l.secs!=null?l.secs+'s'+(l.perSide?'/side':''):(l.w?l.w:'BW')+' × '+l.r+(l.rpe!=null?' @'+l.rpe:'');
 function download(blob,name){const u=URL.createObjectURL(blob);const a=document.createElement('a');
   a.href=u;a.download=name;document.body.appendChild(a);a.click();
   setTimeout(()=>{URL.revokeObjectURL(u);a.remove()},1500)}
@@ -341,7 +341,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return (lget(K_RUN,[])||[]).length>0})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='a96e59';  // stamped by tools/build.py with the content hash
+const BUILD_ID='cab981';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -2036,10 +2036,10 @@ function muscleFresh(){
  const now=Date.now(),L={};
  S.history.forEach(h=>{const hrs=(now-new Date(h.date).getTime())/36e5;
   if(hrs>168||hrs<-2)return;
-  h.log.forEach(l=>{if(!(l.w&&l.r)&&!l.secs)return;
+  h.log.forEach(l=>{if(!(l.r>0)&&!l.secs)return; // bodyweight (w:0) is real work
    MUSCLE_RULES.forEach(r=>{if(!r[1].test(l.ex))return;
     if(r[0]==='Biceps'&&/leg curl|hamstring/i.test(l.ex))return;
-    const eff=(l.w&&l.r)?1:0.25;
+    const eff=(l.r>0)?1:0.25;
     L[r[0]]=(L[r[0]]||0)+eff*Math.exp(-Math.max(0,hrs)/r[2])})})});
  /* running is leg load — the one-model promise. A half marathon the
     day before must show in the legs, whatever the lifting log says. */
@@ -8282,7 +8282,7 @@ function muscleWeekUnits(){
       if(h.run)return;
       const t=new Date(h.date).getTime();if(!(t>=cut))return;
       const cnt={};
-      (h.log||[]).forEach(l=>{if(!(l.w&&l.r)&&!l.secs)return;
+      (h.log||[]).forEach(l=>{if(!(l.r>0)&&!l.secs)return; // bodyweight counts
         MUSCLE_RULES.forEach(r=>{if(!r[1].test(l.ex))return;
           if(r[0]==='Biceps'&&/leg curl|hamstring/i.test(l.ex))return;
           cnt[r[0]]=(cnt[r[0]]||0)+1})});
@@ -8792,14 +8792,15 @@ function dayCard(p,d,i,done,daily){
             const WEEK_U=12; // a full effective week of stimulus for one muscle
             const donePct=Math.min(100,Math.round((r9.weekU||0)/WEEK_U*100));
             const addPct=Math.max(0,Math.min(100-donePct,Math.round((r9.addU||0)/WEEK_U*100)));
-            return '<div style="display:flex;align-items:center;gap:8px">'+
-              '<span class="mono" style="color:var(--faint);font-size:9px;letter-spacing:.05em;width:78px;flex:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-transform:uppercase">'+esc(r9.m)+'</span>'+
-              '<div style="flex:1;height:5px;border-radius:5px;background:var(--line);overflow:hidden;display:flex">'+
+            return '<div style="display:flex;align-items:center;gap:7px">'+
+              '<span class="mono" style="color:var(--faint);font-size:9px;letter-spacing:.05em;width:72px;flex:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-transform:uppercase">'+esc(r9.m)+'</span>'+
+              '<div style="flex:2;height:5px;border-radius:5px;background:var(--line);overflow:hidden">'+
+              '<div style="height:5px;width:'+sc+'%;border-radius:5px;background:'+col+'"></div></div>'+
+              '<div style="flex:3;height:5px;border-radius:5px;background:var(--line);overflow:hidden;display:flex">'+
               '<div style="height:5px;width:'+donePct+'%;background:var(--blue)"></div>'+
               '<div style="height:5px;width:'+addPct+'%;background:repeating-linear-gradient(90deg,var(--blue) 0 3px,transparent 3px 6px);opacity:.85"></div></div>'+
-              '<span class="mono" style="color:'+col+';font-size:9px;width:30px;text-align:right;flex:none">'+sc+'%</span>'+
-              '<span class="mono" style="color:var(--blue);font-size:9.5px;font-weight:600;width:30px;text-align:right;flex:none">+'+r9.stim+'</span></div>'}).join('')+
-          '<p class="mono" style="color:var(--faint);font-size:8.5px;letter-spacing:.05em;margin-top:2px">LAST 7 DAYS\u2019 DOSE \u00b7 DASHED = THIS SESSION \u00b7 % FRESH</p></div>'
+              '<span class="mono" style="color:var(--blue);font-size:9.5px;font-weight:600;width:28px;text-align:right;flex:none">+'+r9.stim+'</span></div>'}).join('')+
+          '<p class="mono" style="color:var(--faint);font-size:8.5px;letter-spacing:.05em;margin-top:2px">FRESH \u00b7 LAST 7 DAYS\u2019 DOSE (DASHED = THIS SESSION) \u00b7 +STIMULUS</p></div>'
       }catch(e){return ''}})()+
     (offloadFor(p,i).length?'<p class="mono" style="color:var(--amber);font-size:10.5px;margin-top:6px">+ '+offloadFor(p,i).length+' moved here: '+offloadFor(p,i).map(x=>esc(String(x.ex||'').replace(/ — .*/,''))).join(', ')+'</p>':'')+
     (function(){const ab=((S.addback||{})[offloadKey(p)]||[]).filter(a=>a.day===i);
@@ -9357,15 +9358,12 @@ function viewSession(){
       const L1=dpLevel(d1.total);
       const lvUp=s.dp0&&L1.lv>s.dp0.lv;
       // per-muscle units this session banked, from what was actually logged
-      const cnt={};s.log.forEach(l=>{if(!(l.w&&l.r)&&!l.secs)return;
+      const cnt={};s.log.forEach(l=>{if(!(l.r>0)&&!l.secs)return; // bodyweight counts
         MUSCLE_RULES.forEach(r=>{if(!r[1].test(l.ex))return;
           if(r[0]==='Biceps'&&/leg curl|hamstring/i.test(l.ex))return;
           cnt[r[0]]=(cnt[r[0]]||0)+1})});
-      const wkNow=muscleWeekUnits();
       const rows=Object.keys(cnt).filter(m=>cnt[m]>=2).sort((a2,b2)=>cnt[b2]-cnt[a2]).slice(0,4)
-        .map(m=>{const add=muscleStimUnits(cnt[m]);
-          const after=Math.min(12,wkNow[m]||add);const before=Math.max(0,after-add);
-          return{m:m,b:Math.round(before/12*100),a:Math.round(after/12*100)}});
+        .map(m=>({m:m,stim:Math.round(muscleStimUnits(cnt[m])*2)}));
       if(rows.length||gained!=null){
         h+='<div class="card mt2 an-hero" style="padding:16px;border-radius:18px">';
         if(lvUp)h+='<div class="an-pop an-glow" style="text-align:center;padding:10px 0 14px">'+
@@ -9378,11 +9376,10 @@ function viewSession(){
         if(rows.length)h+='<div style="margin-top:11px;display:flex;flex-direction:column;gap:7px">'+
           rows.map((r9,i9)=>'<div style="display:flex;align-items:center;gap:8px">'+
             '<span class="mono" style="color:var(--faint);font-size:9px;letter-spacing:.05em;width:78px;flex:none;text-transform:uppercase;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">'+esc(r9.m)+'</span>'+
-            '<div style="flex:1;height:5px;border-radius:5px;background:var(--line);overflow:hidden;display:flex">'+
-            '<div style="height:5px;width:'+r9.b+'%;background:var(--blue)"></div>'+
-            '<div class="gainfill" style="height:5px;width:'+Math.max(0,r9.a-r9.b)+'%;background:var(--green);animation-delay:'+(0.35+i9*0.22).toFixed(2)+'s"></div></div>'+
-            '<span class="mono" style="color:var(--green);font-size:9px;width:34px;text-align:right;flex:none">'+r9.a+'%</span></div>').join('')+
-          '<p class="mono" style="color:var(--faint);font-size:8.5px;letter-spacing:.05em;margin-top:2px">WEEK DOSE \u2014 THE DASHES YOU JUST FILLED IN</p></div>';
+            '<div style="flex:1;height:5px;border-radius:5px;background:var(--line);overflow:hidden">'+
+            '<div class="gainfill" style="height:5px;width:100%;border-radius:5px;background:var(--blue);animation-delay:'+(0.35+i9*0.22).toFixed(2)+'s"></div></div>'+
+            '<span class="mono" style="color:var(--blue);font-size:10px;font-weight:600;width:34px;text-align:right;flex:none">+'+r9.stim+'</span></div>').join('')+
+          '<p class="mono" style="color:var(--faint);font-size:8.5px;letter-spacing:.05em;margin-top:2px">THIS SESSION\u2019S DOSE, BANKED \u2014 THE DASHES, FILLED</p></div>';
         h+='</div>'}
      }catch(e){}}
     {const rev=S.sessReveal;
