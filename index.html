@@ -390,7 +390,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return (lget(K_RUN,[])||[]).length>0})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='ef80a3';  // stamped by tools/build.py with the content hash
+const BUILD_ID='3c0ded';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -2269,7 +2269,9 @@ async function impParse(){
   const content=[];
   if(f.img){const m=f.img.match(/^data:(image\/[a-z]+);base64,(.+)$/i);
     if(m)content.push({type:'image',source:{type:'base64',media_type:m[1],data:m[2]}})}
-  content.push({type:'text',text:(f.text||'Convert this program.').slice(0,26000)});
+  const hint=f.kindHint==='plan'?'The user says this is A PLAN TO FOLLOW — return the program JSON, never the history form.\n\n'
+    :f.kindHint==='hist'?'The user says this is LOGGED TRAINING HISTORY — return the {"history":true,...} form, never a plan.\n\n':'';
+  content.push({type:'text',text:hint+(f.text||'Convert this program.').slice(0,26000)});
   try{
     const res=await claudeFetch({model:S.ai.model,max_tokens:8000,system:IMPORT_SYS,messages:[{role:'user',content:content}]});
     const d=await res.json();
@@ -2446,7 +2448,11 @@ function viewImport(){
    '<h1 class="disp" style="font-size:25px;font-weight:700">BRING YOUR Program</h1>';
   if(f.step==='pick'){
     h+='<p style="color:var(--dim);font-size:13.5px;line-height:1.6;margin-top:10px">Paste it, photograph it, or drop in a CSV export. Allena reads it into the app, then goes through it with you.</p>';
-    h+='<p class="eyebrow mt2">Paste it</p>'+
+    h+='<p class="eyebrow mt2">What is it?</p>'+
+      '<div class="row" style="gap:8px;margin-top:8px">'+
+      [['auto','Let Allena decide'],['plan','A plan to follow'],['hist','Logged history']].map(m9=>
+        '<button data-a="impKind" data-v="'+m9[0]+'" class="pill" style="flex:1;font-size:12px'+((f.kindHint||'auto')===m9[0]?';background:var(--text);color:#1F1E1D;border-color:var(--text);font-weight:600':'')+'">'+m9[1]+'</button>').join('')+'</div>'+
+      '<p class="eyebrow mt2">Paste it</p>'+
       '<textarea data-in="imp.text" rows="7" placeholder="Day 1 — Push&#10;Bench press 4 x 5 @ 100kg&#10;Incline DB press 3 x 10&#10;..." style="margin-top:8px;font-size:15px">'+esc(f.text)+'</textarea>';
     h+='<p class="eyebrow mt2">Or a photo / spreadsheet</p>'+
       '<label class="btn mt" style="display:block;text-align:center;cursor:pointer">'+(f.img?'Photo attached — choose another':'Choose a photo')+
@@ -10871,19 +10877,19 @@ document.addEventListener('input',e=>{const d=e.target.dataset;
   if(e.target.dataset.runsel){S.runGroup=e.target.value;render();return}
   if(e.target.dataset.intakefile){const fl=e.target.files&&e.target.files[0];if(!fl)return;
     const nm=String(fl.name||'').toLowerCase();
-    const routeText=function(txt,label){
+    const routeText=function(txt,raw){
       // Allena reads it and decides: runs, lifting, or both
       const r=parseRunImport(txt);
       const nRuns=(r&&r.runs)?r.runs.length:0;
       const liftSignal=(txt.match(/\b\d+\s*[x×]\s*\d+|\bRPE\b|\bRIR\b|\bsets?\b|\bbench|squat|deadlift|press\b/gi)||[]).length;
       if(nRuns>=3&&liftSignal>=6){
-        S.intakeBoth={text:txt,runs:r.runs,fileName:fl.name};
+        S.intakeBoth={text:(raw||txt),runs:r.runs,fileName:fl.name};
         S.sheet={t:'intakeboth'};render();return}
       if(nRuns>=3){
         S.rimp={text:txt.slice(0,120000),res:null,fileName:fl.name};
         S.sheet={t:'runimp'};render();runAction('rimpRead');
         flash('Reads like running history — '+nRuns+' runs found.');return}
-      if(typeof impNew==='function'){impNew();S.imp.text=txt.slice(0,26000);S.imp.fileName=fl.name;
+      if(typeof impNew==='function'){impNew();S.imp.text=(raw||txt).slice(0,26000);S.imp.fileName=fl.name;
         S.sheet=null;S.view='import';render();
         flash('Reads like a program — Allena converts it, then reviews it with you.')}};
     if(/\.(png|jpe?g|heic|webp)$/.test(nm)||/^image\//.test(fl.type)){
@@ -10900,7 +10906,8 @@ document.addEventListener('input',e=>{const d=e.target.dataset;
       return}
     if(/\.xlsx$/.test(nm)){
       xlsxExtract(fl,function(txt){
-        routeText(txt.replace(/^== .*==$/gm,'').replace(/ \| /g,',').replace(/\n{2,}/g,'\n').trim())},
+        const flat=txt.replace(/^== .*==$/gm,'').replace(/ \| /g,',').replace(/\n{2,}/g,'\n').trim();
+        routeText(flat,txt.replace(/ \| /g,',')) },
         function(){flash('Could not read that spreadsheet — export it as CSV and try again.')});
       return}
     const fr=new FileReader();
@@ -11446,6 +11453,7 @@ function runAction(a,v,t,e){
       flash('Logged. Hold the current step and let it settle before progressing.');render();break}
     case 'impOpen':impNew();S.impBack=(S.view==='own')?'own':null;S.view='import';render();break;
     case 'impCancel':{const b=S.impBack;S.imp=null;S.impBack=null;S.view=(b==='own'&&S.own)?'own':'home';render();break}
+    case 'impKind':{if(S.imp)S.imp.kindHint=v;render();break}
     case 'impParse':impParse();break;
     case 'impDelEx':{const [di,ei]=v.split(':').map(Number);S.imp.draft.days[di].exercises.splice(ei,1);
       S.imp.assess=assessProgram(S.imp.draft);render();break}
