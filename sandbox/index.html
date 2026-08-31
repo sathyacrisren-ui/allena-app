@@ -333,7 +333,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return (lget(K_RUN,[])||[]).length>0})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='e6b687';  // stamped by tools/build.py with the content hash
+const BUILD_ID='cfcf46';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -879,6 +879,17 @@ function coachContext(){
     out.push('Scan '+last.date+': '+bits.join(', '))}}
   const rec=muscleFresh().filter(x=>x.fresh<65).slice(0,3);
   if(rec.length)out.push('Recovery: '+rec.map(x=>x.m+' '+x.fresh+'%').join(', '));
+  {/* recent running is load the coach must never miss — the one-model law */
+   const now9=Date.now();
+   const rr=(typeof runs==='function'?runs():[]).filter(r2=>{
+     const h9=(now9-new Date(r2.date+(String(r2.date).length<=10?'T12:00':'')).getTime())/36e5;
+     return h9>=-2&&h9<=72&&r2.km>0});
+   if(rr.length){
+     out.push('RAN IN THE LAST 72H (weigh this against any recovery number): '+rr.map(r2=>{
+       const d9=String(r2.date).slice(0,10)===today()?'today':String(r2.date).slice(5,10);
+       return d9+' '+r2.km+'km '+(r2.type||'run')+(r2.rpe?' @rpe'+r2.rpe:'')}).join('; '));
+     const big=rr.find(r2=>r2.km>=15||r2.type==='race');
+     if(big)out.push('NOTE: a '+(big.type==='race'?'RACE':'long run')+' of '+big.km+'km this recent means the legs and the whole system are NOT fully recovered, whatever the per-muscle numbers say. Say so.')}}
   if(S.acl&&S.acl.on){const ph=ACL_PHASES[S.acl.phase-1],g=aclGateState(S.acl.phase);
     const miss=g.filter(x=>!x.met).map(x=>x.key);
     out.unshift('ACL '+(S.acl.mode==='deficient'?'non-op':'reconstruction')+' phase '+S.acl.phase+'/5 ('+ph.name+')'+
@@ -1908,6 +1919,17 @@ function muscleFresh(){
     if(r[0]==='Biceps'&&/leg curl|hamstring/i.test(l.ex))return;
     const eff=(l.w&&l.r)?1:0.25;
     L[r[0]]=(L[r[0]]||0)+eff*Math.exp(-Math.max(0,hrs)/r[2])})})});
+ /* running is leg load — the one-model promise. A half marathon the
+    day before must show in the legs, whatever the lifting log says. */
+ const RUN_M={'Quads':1,'Calves':1,'Hamstrings':0.8,'Glutes':0.6};
+ (typeof runs==='function'?runs():[]).forEach(r2=>{
+  const hrs=(now-new Date(r2.date+(r2.date.length<=10?'T12:00':'')).getTime())/36e5;
+  if(hrs>168||hrs<-2||!(r2.km>0))return;
+  const hard=(r2.rpe||5)>=8||r2.type==='race'||r2.type==='interval';
+  const eff=Math.min(6,(r2.km/6)*(hard?1.6:(r2.rpe||5)>=6.5?1.2:1));
+  Object.keys(RUN_M).forEach(m=>{
+   const rule=MUSCLE_RULES.find(x=>x[0]===m);if(!rule)return;
+   L[m]=(L[m]||0)+eff*RUN_M[m]*Math.exp(-Math.max(0,hrs)/rule[2])})});
  return MUSCLE_RULES.map(r=>({m:r[0],fresh:Math.max(0,Math.min(100,Math.round(100-(L[r[0]]||0)*16)))}))}
 function freshCol(f){return f>=80?'#7FA86B':f>=50?'#E0A458':'#C1554A'}
 function bodySvg(F){
@@ -11244,6 +11266,30 @@ document.addEventListener('click',e=>{
   if(a==='closeSheet'&&e.target.closest('[data-stop]')&&e.target.tagName!=='BUTTON')return;
   runAction(a,v,t,e)});
 document.addEventListener('click',e=>{if(S.boot!=null&&e.target&&e.target.closest&&e.target.closest('#boot'))bootEnd()},true);
+
+
+/* ── the chat rides the keyboard ─────────────────────────────
+   iOS pans the layout viewport when the keyboard opens, dragging a
+   fixed chat off screen. The visual viewport tracks the keyboard
+   exactly: pin the chat to it and keep the thread at the bottom. */
+(function(){
+  const vv=window.visualViewport;if(!vv)return;
+  let raf=null;
+  const fit=function(){
+    if(raf)return;raf=requestAnimationFrame(function(){raf=null;
+      const w=document.querySelector('.chatwrap');if(!w)return;
+      const kb=Math.max(0,window.innerHeight-vv.height-vv.offsetTop);
+      if(kb>40||w.style.height){
+        w.style.height=vv.height+'px';
+        w.style.top=vv.offsetTop+'px';
+        w.style.bottom='auto';
+        if(kb<=40){w.style.height='';w.style.top='';w.style.bottom=''}}
+      window.scrollTo(0,0);
+      const b=document.getElementById('coachThread');
+      if(b&&kb>40)b.scrollTop=b.scrollHeight})};
+  vv.addEventListener('resize',fit);
+  vv.addEventListener('scroll',fit);
+})();
 function runAction(a,v,t,e){
   t=t||{dataset:{a:a,v:v}};e=e||{preventDefault:function(){},target:t};
   switch(a){
