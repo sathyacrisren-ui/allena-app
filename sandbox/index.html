@@ -341,7 +341,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return (lget(K_RUN,[])||[]).length>0})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='fb9d87';  // stamped by tools/build.py with the content hash
+const BUILD_ID='b23660';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -920,6 +920,8 @@ function coachContext(){
       (miss.length?'; gate outstanding: '+miss.join(', '):'; all gate criteria met'));
     const hd=aclHold();if(hd)out.push('Knee flaring: '+hd.msg.slice(0,90));
     const q=aclLatest('quad');if(q)out.push('Quad symmetry '+Math.round(q.lsi)+'%');}
+  {try{const bl=(typeof dailyBrief==='function')?dailyBrief():[];
+    if(bl.length)out.push('TODAY\u2019S BRIEF (the app has already resolved today \u2014 agree with it or explain why not): '+bl.map(x=>x.tag+': '+x.line).join(' | '))}catch(e){}}
   {const rc=recommendToday();
    if(rc&&!rc.empty)out.push('Best session today by recovery: '+rc.top.name+' ('+rc.top.score+'% ready)'+
      (rc.hold.length?'; holding: '+rc.hold.slice(0,2).join('; '):''));
@@ -2314,7 +2316,7 @@ function viewCoach(){
     const CHIPS={
       progress:['Am I actually progressing?','Which lift is stalling and why?','Is my body composition going the right way?','What should I change next block?'],
       rehab:['What is holding me back from the next phase?','How do I train to pass the quad test?','Is my knee reacting too much?','What does this test actually measure?'],
-      program:['What should I train today?','Am I recovered enough for this?','Should I add weight anywhere?','I missed a session — what now?'],
+      program:['What should I train today?','Should I run today?','Am I recovered enough for this?','I missed a session — what now?'],
       session:['Missed my reps — what now?','Feeling flat today','Something hurts','Add weight or hold?']};
     h+='<p style="color:var(--dim);font-size:14px;line-height:1.6">'+
       (topic==='progress'?'Ask me about your progress — I can see your trends, goals and scans.'
@@ -4645,11 +4647,16 @@ function viewPoints(){
    '</div>';
   /* keep it climbing: what today could still earn, each row a door */
   {const room=d.room||0;
+   const tk=today();
+   const doneSess=S.history.some(h=>!h.run&&h.complete&&String(h.date).slice(0,10)===tk&&!h.demo);
+   const doneRun=runs().some(r=>String(r.date).slice(0,10)===tk);
+   const doneChecks=(function(){try{return todayProgress().complete}catch(e){return false}})();
+   const doneFinds=(function(){try{return unseenPatterns()===0&&!bankDiscoveries().length}catch(e){return false}})();
    const earn=[
-     ['nav','home','Log a session live','the biggest earner — every set, rep and effort counts, witnessed'],
-     ['runLog','','Log a run','distance, time, heart rate and zones all count'],
-     ['todayOpen','','The daily check-ins','readiness, weight, check-in — small, but they compound'],
-     ['drawerNav','findings','Visit your findings','new discoveries bank into the collection when seen']];
+     ['nav','home','Log a session live','the biggest earner — every set, rep and effort counts, witnessed',doneSess],
+     ['runLog','','Log a run','distance, time, heart rate and zones all count',doneRun],
+     ['todayOpen','','The daily check-ins','readiness, weight, check-in — small, but they compound',doneChecks],
+     ['drawerNav','findings','Visit your findings','new discoveries bank into the collection when seen',doneFinds]];
    h+='<div class="card mt2" style="padding:15px 16px">'+
      '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px">'+
      '<p class="eyebrow" style="margin:0">Keep it climbing</p>'+
@@ -4657,9 +4664,10 @@ function viewPoints(){
      (room>0?'<p style="color:var(--dim);font-size:12px;line-height:1.5;margin-top:5px">The blue ring on your points chip is this — what today could still earn. A day caps at '+dpDayCap()+' so the number stays honest.</p>'
        :'<p style="color:var(--dim);font-size:12px;line-height:1.5;margin-top:5px">You have hit today\u2019s cap — one honest day, fully banked. It resets at midnight.</p>')+
      (room>0?'<div style="margin-top:10px">'+earn.map((e9,i9)=>
-       '<button data-a="'+e9[0]+'"'+(e9[1]?' data-v="'+e9[1]+'"':'')+' style="width:100%;text-align:left;display:flex;align-items:center;gap:10px;padding:10px 0'+(i9?';border-top:1px solid var(--line)':'')+'">'+
+       '<button data-a="'+e9[0]+'"'+(e9[1]?' data-v="'+e9[1]+'"':'')+' style="width:100%;text-align:left;display:flex;align-items:center;gap:10px;padding:10px 0'+(i9?';border-top:1px solid var(--line)':'')+(e9[4]?';opacity:.5':'')+'">'+
+       '<span style="width:18px;flex:none;text-align:center;color:'+(e9[4]?'var(--green)':'var(--line)')+';font-size:12px">'+(e9[4]?'\u2713':'\u25cb')+'</span>'+
        '<span style="flex:1;min-width:0"><span style="display:block;font-size:13px;font-weight:600">'+e9[2]+'</span>'+
-       '<span style="color:var(--faint);font-size:11px;line-height:1.4">'+e9[3]+'</span></span>'+
+       '<span style="color:var(--faint);font-size:11px;line-height:1.4">'+(e9[4]?'done today':e9[3])+'</span></span>'+
        '<span class="mono" style="color:var(--faint);font-size:13px;flex:none">\u203a</span></button>').join('')+'</div>':'')+
      '</div>';}
   h+='<p class="eyebrow mt2">Why yours looks like that</p>'+
@@ -6417,6 +6425,7 @@ function shareLevelRun(gained,lv){
     x.textAlign='center';
     x.fillStyle='#8A8578';x.font='600 30px -apple-system,system-ui,sans-serif';
     x.fillText('A  L  L  E  N  A',540,150);
+    try{const mk=new Image();mk.src=MARK;if(mk.complete||mk.width)x.drawImage(mk,510,190,60,60)}catch(e){}
     x.fillStyle='#30D158';x.font='600 40px -apple-system,system-ui,sans-serif';
     x.fillText('L E V E L   U P',540,560);
     const grad=x.createLinearGradient(140,0,940,0);
@@ -6917,7 +6926,9 @@ function dailyBrief(){
     if(rp&&rp.raceDate){
       const dd=Math.round((new Date(rp.raceDate+'T12:00').getTime()-Date.now())/864e5);
       if(dd>=0&&dd<=21)out.push({tag:'RACE',a:'nav',v:'run',
-        line:(rp.goalName||'Race')+' in '+dd+' day'+(dd===1?'':'s')+(rp.goalTime?' \u00b7 goal '+rp.goalTime:'')+(dd<=7?' \u2014 nothing new this week':'')})}
+        line:(rp.goalName||'Race')+' in '+dd+' day'+(dd===1?'':'s')+(rp.goalTime?' \u00b7 goal '+rp.goalTime:'')+(dd<=7?' \u2014 nothing new this week':'')});
+      if(dd>=0&&dd<=3)out.push({tag:'LIFT',hold:true,a:'nav',v:'home',
+        line:'Race in '+dd+' day'+(dd===1?'':'s')+' \u2014 legs stay out of the gym, upper stays light. Fitness is banked; freshness is the job now'})}
     // running, resolved against the legs and the load band
     if(S.runOn&&(runs().length>=3||rp)){
       const a2=(typeof acwr==='function')?acwr():null;
