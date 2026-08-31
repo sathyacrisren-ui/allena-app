@@ -390,7 +390,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return (lget(K_RUN,[])||[]).length>0})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='49a9b4';  // stamped by tools/build.py with the content hash
+const BUILD_ID='b80180';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -5374,6 +5374,23 @@ function histMaterialize(hi,mode,dateStr){
         progId:'imported',week:w,dayTitle:String(sn.name||'Session').slice(0,50),
         complete:true,approx:true,log:log})})});
   return out}
+
+function histCommit(recs){
+  /* replace, never compound: a re-import of the same days replaces the
+     earlier IMPORT; a hand-logged real session always outranks an
+     import and the colliding import row is dropped. */
+  const key=h=>String(h.date).slice(0,10)+'|'+String(h.dayTitle||'').toLowerCase();
+  const incoming=new Set(recs.map(key));
+  let replaced=0,skipped=0;
+  S.history=S.history.filter(h=>{
+    if(h.approx&&incoming.has(key(h))){replaced++;return false}
+    return true});
+  const real=new Set(S.history.filter(h=>!h.approx).map(key));
+  const kept=recs.filter(r=>{if(real.has(key(r))){skipped++;return false}return true});
+  kept.forEach(r=>S.history.push(r));
+  S.history.sort((a,b)=>String(a.date).localeCompare(String(b.date)));
+  saveHistory();
+  return{added:kept.length,replaced:replaced,skippedReal:skipped}}
 const RARITY=[['common','#8A8782','Noticed'],['uncommon','#93B08A','Worth knowing'],
   ['rare','#D9D6CD','Rare find'],['epic','#FFFFFF','Big one']];
 function rarityOf(k){return RARITY.find(x=>x[0]===k)||RARITY[0]}
@@ -9917,6 +9934,14 @@ function sheetHtml(){
          '<button data-a="questPass" class="btn mt" style="color:var(--dim)">Not this week</button>'
         :'')+
       '<p style="color:var(--faint);font-size:11px;line-height:1.55;margin-top:12px">One per week, generated Monday from what you have already done. If it does not happen, nothing is lost and nothing turns red — a fresh one simply arrives Monday.</p>')}
+  if(S.sheet.t==='intakeboth'){
+    const ib=S.intakeBoth;if(!ib)return '';
+    return wrapSheet('This file has both',
+      '<p style="color:var(--dim);font-size:13.5px;line-height:1.6">'+ib.runs.length+' runs of running history, and what reads like lifting content. Runs are deduplicated against what you already have — imports replace their own kind, they never double up.</p>'+
+      '<button data-a="ibBoth" class="big disp mt2" style="background:var(--amber);color:#1F1E1D;font-size:15px">Import both</button>'+
+      '<div class="row mt" style="gap:10px">'+
+      '<button data-a="ibRuns" class="btn" style="flex:1;color:var(--dim)">Only the runs</button>'+
+      '<button data-a="ibLift" class="btn" style="flex:1;color:var(--dim)">Only the lifting</button></div>')}
   if(S.sheet.t==='histdate'){
     const hi=S.histImp;if(!hi)return '';
     const f=S.hdate||(S.hdate={date:'',mode:'start'});
@@ -10847,12 +10872,17 @@ document.addEventListener('input',e=>{const d=e.target.dataset;
   if(e.target.dataset.intakefile){const fl=e.target.files&&e.target.files[0];if(!fl)return;
     const nm=String(fl.name||'').toLowerCase();
     const routeText=function(txt,label){
-      // Allena reads it and decides: run history or a program
+      // Allena reads it and decides: runs, lifting, or both
       const r=parseRunImport(txt);
-      if(r&&r.runs&&r.runs.length>=3){
+      const nRuns=(r&&r.runs)?r.runs.length:0;
+      const liftSignal=(txt.match(/\b\d+\s*[x×]\s*\d+|\bRPE\b|\bRIR\b|\bsets?\b|\bbench|squat|deadlift|press\b/gi)||[]).length;
+      if(nRuns>=3&&liftSignal>=6){
+        S.intakeBoth={text:txt,runs:r.runs,fileName:fl.name};
+        S.sheet={t:'intakeboth'};render();return}
+      if(nRuns>=3){
         S.rimp={text:txt.slice(0,120000),res:null,fileName:fl.name};
         S.sheet={t:'runimp'};render();runAction('rimpRead');
-        flash('Reads like running history — '+r.runs.length+' runs found.');return}
+        flash('Reads like running history — '+nRuns+' runs found.');return}
       if(typeof impNew==='function'){impNew();S.imp.text=txt.slice(0,26000);S.imp.fileName=fl.name;
         S.sheet=null;S.view='import';render();
         flash('Reads like a program — Allena converts it, then reviews it with you.')}};
@@ -11260,16 +11290,28 @@ function runAction(a,v,t,e){
     case 'chatNew':{S.coachBack=S.view;S.drawerOpen=false;chatNew();render();break}
     case 'chatOpen':{S.coachBack=S.view;S.drawerOpen=false;chatOpen(v);render();break}
     case 'coachSessToggle':{S.coachSessOpen=!S.coachSessOpen;render();break}
+    case 'ibRuns':{const ib=S.intakeBoth;if(!ib)break;
+      S.intakeBoth=null;
+      S.rimp={text:ib.text.slice(0,120000),res:null,fileName:ib.fileName};
+      S.sheet={t:'runimp'};render();runAction('rimpRead');break}
+    case 'ibLift':{const ib=S.intakeBoth;if(!ib)break;
+      S.intakeBoth=null;impNew();S.imp.text=ib.text.slice(0,26000);S.imp.fileName=ib.fileName;
+      S.sheet=null;S.view='import';render();break}
+    case 'ibBoth':{const ib=S.intakeBoth;if(!ib)break;
+      S.intakeBoth=null;
+      const r9=runImportCommit(ib.runs);
+      S.runOn=true;lset('training-runon-v1',true);
+      impNew();S.imp.text=ib.text.slice(0,26000);S.imp.fileName=ib.fileName;
+      S.sheet=null;S.view='import';render();
+      flash(r9.added+' runs in'+(r9.dupe?' ('+r9.dupe+' already there, skipped)':'')+' — now the lifting: tap Read it with Allena.');break}
     case 'hdateMode':{(S.hdate=S.hdate||{}).mode=v;render();break}
     case 'histImpGo':{const f=S.hdate||{};
       if(!(f.date||'').trim()){flash('Pick the date first.');break}
       const recs=histMaterialize(S.histImp,f.mode||'start',f.date);
       if(!recs.length){flash('Nothing usable in that history.');break}
-      const have=new Set(S.history.map(h=>h.id));
-      recs.forEach(r=>{if(!have.has(r.id))S.history.push(r)});
-      S.history.sort((a2,b2)=>String(a2.date).localeCompare(String(b2.date)));
-      saveHistory();S.patCache=null;S.histImp=null;S.hdate=null;S.sheet=null;render();
-      flash(recs.length+' sessions in, dates deduced — trends and deep reads can see them now.');break}
+      const res=histCommit(recs);
+      S.patCache=null;S.histImp=null;S.hdate=null;S.sheet=null;render();
+      flash(res.added+' sessions in, dates deduced'+(res.replaced?' — '+res.replaced+' from an earlier import replaced, never doubled':'')+(res.skippedReal?' · '+res.skippedReal+' skipped where you had real logs':'')+'.');break}
     case 'intakeOpen':{S.drawerOpen=false;S.sheet={t:'intake'};render();break}
     case 'runplanGenAsk':{S.rpgen=runPlanGen();S.sheet={t:'runplangen'};render();break}
     case 'runplanGenGo':{const g=S.rpgen;if(!g||g.block)break;
