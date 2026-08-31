@@ -390,7 +390,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return (lget(K_RUN,[])||[]).length>0})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='da2e69';  // stamped by tools/build.py with the content hash
+const BUILD_ID='085d4e';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -2261,11 +2261,22 @@ function viewCoach(){
 
 
 /* ══ import an existing program ═════════════════════════ */
-const IMPORT_SYS='Convert the training program into JSON only — no prose, no code fences. Shape: {"block":"name","weeks":N,"days":[{"name":"Day name","note":"","exercises":[{"name":"Exercise","bar":true|false,"rest":seconds,"sets":{"default":[{"w":kg|null,"reps":8|"8-12","rpe":8|null}]}}]}]}. One entry per set. If a week differs, use the week number as a key alongside "default". Use kg; convert lb by 0.4536 and round to 0.5. If a weight is not given use null. bar:true only for barbell lifts. rest in seconds, estimate if absent (compound 180, isolation 90). Keep the lifter\'s own exercise names. Never invent exercises that are not there. Output COMPACT JSON (no spaces or newlines). Spreadsheets often repeat each day as empty per-week template blocks (loads of 0 or blank) — those are future weeks: use them only to count "weeks", and build each day ONCE from the filled-in block, preferring "default" sets over per-week keys unless the plan genuinely changes week to week. Logged results columns (S1/S2/Best) are history, not targets. TERMINOLOGY: RIR means reps in reserve — convert to RPE as 10 minus RIR (\"2 RIR\"→rpe 8, \"1-2 RIR\"→rpe \"8-9\"); %1RM with no RPE stays w:null with the percent in the exercise note; write day notes in PLAIN language — expand shorthand like SS/superset (\"Bench pairs with Chin-up\"), GS/giant set, AMRAP, EMOM rather than copying codes. If the program includes a RUNNING or cardio progression, do NOT turn it into gym exercises — add a top-level \"running\":[{\"week\":1,\"desc\":\"one line\"}] array (one entry per week, plain words) so the app can carry the plan. If the document is LOGGED TRAINING HISTORY — performed sets with achieved results (filled result columns, weights x reps that happened) rather than a plan to follow — return instead {\"history\":true,\"block\":\"name\",\"weeks\":[{\"week\":1,\"sessions\":[{\"name\":\"day name\",\"exercises\":[{\"name\":\"...\",\"sets\":[{\"w\":kg|null,\"r\":reps,\"rpe\":n|null}]}]}]}]} — one entry per performed set, weeks in order, empty template weeks omitted.';
+const IMPORT_SYS='Convert the training program into JSON only — no prose, no code fences. Shape: {"block":"name","weeks":N,"days":[{"name":"Day name","note":"","exercises":[{"name":"Exercise","bar":true|false,"rest":seconds,"sets":{"default":[{"w":kg|null,"reps":8|"8-12","rpe":8|null}]}}]}]}. One entry per set. If a week differs, use the week number as a key alongside "default". Use kg; convert lb by 0.4536 and round to 0.5. If a weight is not given use null. bar:true only for barbell lifts. rest in seconds, estimate if absent (compound 180, isolation 90). Keep the lifter\'s own exercise names. Never invent exercises that are not there. Output COMPACT JSON (no spaces or newlines). Spreadsheets often repeat each day as empty per-week template blocks (loads of 0 or blank) — those are future weeks: use them only to count "weeks", and build each day ONCE from the filled-in block, preferring "default" sets over per-week keys unless the plan genuinely changes week to week. Logged results columns (S1/S2/Best) are history, not targets. TERMINOLOGY: RIR means reps in reserve — convert to RPE as 10 minus RIR (\"2 RIR\"→rpe 8, \"1-2 RIR\"→rpe \"8-9\"); %1RM with no RPE stays w:null with the percent in the exercise note; write day notes in PLAIN language — expand shorthand like SS/superset (\"Bench pairs with Chin-up\"), GS/giant set, AMRAP, EMOM rather than copying codes. If the program includes a RUNNING or cardio progression, do NOT turn it into gym exercises — add a top-level \"running\":[{\"week\":1,\"desc\":\"one line\"}] array (one entry per week, plain words) so the app can carry the plan. If the document is LOGGED TRAINING HISTORY — performed sets with achieved results (filled result columns, weights x reps that happened) rather than a plan to follow — return instead {\"history\":true,\"block\":\"name\",\"weeks\":[{\"week\":1,\"sessions\":[{\"name\":\"day name\",\"exercises\":[{\"name\":\"...\",\"sets\":[{\"w\":kg|null,\"r\":reps,\"rpe\":rpeValue|null,\"n\":count}]}]}]}]} — weeks in order, empty template weeks omitted. CRITICAL for size: \"n\" is how many identical sets were performed — write {\"w\":100,\"r\":6,\"n\":4} for 4x6@100, NEVER four separate objects; omit n when it is 1. Keep the reply well under the token limit this way.';
+function midName(n){
+  /* long filenames fit on one line: keep the start and the extension */
+  n=String(n||'');if(n.length<=26)return n;
+  const m=n.match(/\.[a-z0-9]{2,5}$/i),ext=m?m[0]:'';
+  return n.slice(0,Math.max(8,22-ext.length))+'\u2026'+ext}
 function impNew(){S.imp={step:'pick',text:'',img:null,busy:false,draft:null,err:null,assess:null}}
 async function impParse(){
   const f=S.imp;if(!aiReady())return flash('Add your API key or Allena cloud link under Data → Allena first.');
-  f.busy=true;f.err=null;render();
+  f.busy=true;f.err=null;
+  if(typeof thinkStart==='function')thinkStart('impread',[
+    ['Reading what you gave her'],
+    ['Sorting days and exercises'],
+    ['Converting sets, weights and effort','RIR becomes RPE, kg stays kg'],
+    ['Checking it makes sense']],null);
+  render();
   const content=[];
   if(f.img){const m=f.img.match(/^data:(image\/[a-z]+);base64,(.+)$/i);
     if(m)content.push({type:'image',source:{type:'base64',media_type:m[1],data:m[2]}})}
@@ -2275,20 +2286,21 @@ async function impParse(){
   try{
     const res=await claudeFetch({model:S.ai.model,max_tokens:8000,system:IMPORT_SYS,messages:[{role:'user',content:content}]});
     const d=await res.json();
-    if(d.error){f.err='Allena could not be reached: '+(d.error.message||'unknown error')+'.';f.busy=false;return render()}
+    if(d.error){f.err='Allena could not be reached: '+(d.error.message||'unknown error')+'.';f.busy=false;if(S.think&&S.think.key==='impread')S.think=null;return render()}
     let t=d.content?d.content.map(x=>x.text||'').join(''):'';
     t=t.replace(/```json|```/g,'').trim();
     const b0=t.indexOf('{'),b1=t.lastIndexOf('}');
     if(b0>=0&&b1>b0)t=t.slice(b0,b1+1);
     if(d.stop_reason==='max_tokens'){
-      f.err='That program is big and the conversion ran out of room. Trim the pasted text above to the sheets that matter (the day tabs) and read it again.';
-      f.busy=false;return render()}
+      f.err='The reply ran out of room before the JSON finished. Tap Read it again — Allena now compacts repeated sets, so a retry usually fits. Still failing? Trim the pasted text to the day sheets.';
+      f.busy=false;if(S.think&&S.think.key==='impread')S.think=null;return render()}
     const o=JSON.parse(t);
     if(f.kindHint==='hist'&&!(o.history&&o.weeks&&o.weeks.length)){
       f.err='You said this is logged history, but the conversion came back as a plan. Tap Read it again — the instruction is now firmer — or trim the text to just the logged weeks.';
-      f.busy=false;return render()}
+      f.busy=false;if(S.think&&S.think.key==='impread')S.think=null;return render()}
     if(o.history&&o.weeks&&o.weeks.length){
       // logged history, no dates: one question and Allena deduces them
+      histExpandSets(o);
       S.histImp={block:String(o.block||'Imported history').slice(0,60),weeks:o.weeks.slice(0,52)};
       S.hdate={date:'',mode:'start'};
       S.imp=null;S.view='today';S.sheet={t:'histdate'};S.busyDone=1;render();return}
@@ -2304,12 +2316,16 @@ async function impParse(){
     (o.days||[]).forEach(dd=>(dd.exercises||[]).forEach(e=>{e.rest=e.rest||90;
       if(!e.sets||!Object.keys(e.sets).length)e.sets={'default':[{reps:'8-12',rpe:8}]}}));
     const errs=validateProgram(o);
-    if(errs.length&&!(o.days&&o.days.length)){f.err=errs.join(' ');f.busy=false;return render()}
+    if(errs.length&&!(o.days&&o.days.length)){f.err=errs.join(' ');f.busy=false;if(S.think&&S.think.key==='impread')S.think=null;return render()}
     o.own=true;
     S.own={prog:o,review:null};
     S.imp=null;S.view='own';S.busyDone=1;render();return;
-  }catch(e){f.err=f.img?"Couldn't read that as a program — try a clearer photo, or paste the text.":"Couldn't read that as a program. Trimming the pasted text to just the training-day sheets usually fixes it."}
-  f.busy=false;render()}
+  }catch(e){
+    f.err=(e&&e.name==='SyntaxError')
+      ?'Allena replied, but the reply was not JSON the app could load. Tap Read it again — a fresh attempt usually lands. If it keeps failing, trim the pasted text to the training-day sheets.'
+      :(f.img?"The photo could not be read — try a clearer one, or paste the text."
+        :'The read failed before Allena answered ('+String((e&&e.message)||'connection error').slice(0,80)+'). Check the connection and tap Read it again.')}
+  f.busy=false;if(S.think&&S.think.key==='impread')S.think=null;render()}
 function assessProgram(p){
   // local, deterministic: weekly sets per muscle from the written program
   const excl=exclFor((S.prof&&S.prof.restr)||{});
@@ -2448,19 +2464,21 @@ function viewImport(){
   const f=S.imp;if(!f)return '';
   let h='<div class="view pad stg" style="padding-top:24px">'+
    '<button data-a="impCancel" class="btn" style="width:auto;padding:8px 14px;color:var(--dim);font-size:12.5px;margin-bottom:14px">‹ Back</button>'+
-   '<h1 class="disp" style="font-size:25px;font-weight:700">BRING YOUR Program</h1>';
+   '<h1 class="disp" style="font-size:25px;font-weight:700">Bring your program</h1>';
+  if(f.busy){
+    return h+'<div style="padding-top:24px">'+thinkPanel('Allena is reading it')+'</div></div>'}
   if(f.step==='pick'){
     h+='<p style="color:var(--dim);font-size:13.5px;line-height:1.6;margin-top:10px">Paste it, photograph it, or drop in a CSV export. Allena reads it into the app, then goes through it with you.</p>';
     h+='<p class="eyebrow mt2">What is it?</p>'+
-      '<div class="row" style="gap:8px;margin-top:8px">'+
+      '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px">'+
       [['auto','Let Allena decide'],['plan','A plan to follow'],['hist','Logged history']].map(m9=>
-        '<button data-a="impKind" data-v="'+m9[0]+'" class="pill" style="flex:1;font-size:12px'+((f.kindHint||'auto')===m9[0]?';background:var(--text);color:#1F1E1D;border-color:var(--text);font-weight:600':'')+'">'+m9[1]+'</button>').join('')+'</div>'+
+        '<button data-a="impKind" data-v="'+m9[0]+'" class="pill" style="flex:none;white-space:nowrap;font-size:12.5px'+((f.kindHint||'auto')===m9[0]?';background:var(--text);color:#1F1E1D;border-color:var(--text);font-weight:600':'')+'">'+m9[1]+'</button>').join('')+'</div>'+
       '<p class="eyebrow mt2">Paste it</p>'+
       '<textarea data-in="imp.text" rows="7" placeholder="Day 1 — Push&#10;Bench press 4 x 5 @ 100kg&#10;Incline DB press 3 x 10&#10;..." style="margin-top:8px;font-size:15px">'+esc(f.text)+'</textarea>';
     h+='<p class="eyebrow mt2">Or a photo / spreadsheet</p>'+
       '<label class="btn mt" style="display:block;text-align:center;cursor:pointer">'+(f.img?'Photo attached — choose another':'Choose a photo')+
       '<input type="file" accept="image/*" data-impfile="1" style="display:none"></label>'+
-      '<label class="btn mt" style="display:block;text-align:center;cursor:pointer">'+(f.fileName?esc(f.fileName)+' — choose another':'Choose the file — Excel, CSV or text')+
+      '<label class="btn mt" style="display:block;text-align:center;cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(f.fileName?esc(midName(f.fileName))+' — choose another':'Choose the file — Excel, CSV or text')+
       '<input type="file" accept=".xlsx,.csv,.tsv,.txt,text/plain,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" data-imptext="1" style="display:none"></label>'+
       '<p style="color:var(--faint);font-size:11.5px;line-height:1.5;margin-top:8px">Excel files are read right on the phone — every sheet, nothing uploaded. The text lands above so you can trim it before Allena reads it.</p>';
     if(f.img)h+='<img src="'+f.img+'" style="width:100%;max-height:180px;object-fit:contain;border-radius:12px;margin-top:10px;background:var(--surface)">';
@@ -5361,6 +5379,14 @@ function xlsxExtract(file,done,fail){
 /* ── history without dates ───────────────────────────────────
    A friend's log often has weeks but no calendar. One anchor date
    and the dates are deduced — approximate on purpose, and said so. */
+function histExpandSets(o){
+  /* the converter compacts identical sets as {w,r,rpe,n}; expand locally */
+  (o.weeks||[]).forEach(w=>((w.sessions||[]).forEach(sn=>((sn.exercises||[]).forEach(e=>{
+    const out=[];(e.sets||[]).forEach(st=>{
+      const n=Math.min(15,Math.max(1,Math.round(+st.n||1)));
+      for(let i=0;i<n;i++)out.push({w:st.w,r:st.r,rpe:st.rpe})});
+    e.sets=out})))));
+  return o}
 function histMaterialize(hi,mode,dateStr){
   const weeks=(hi&&hi.weeks)||[];if(!weeks.length||!dateStr)return[];
   const maxW=Math.max.apply(null,weeks.map(w=>+w.week||1));
@@ -10221,7 +10247,7 @@ function sheetHtml(){
         '<span style="font-size:13px;font-weight:600;display:block">'+esc(x[0])+'</span>'+
         '<span style="color:var(--faint);font-size:11.5px;line-height:1.45">'+esc(x[1])+'</span></div>').join('')+'</div>'+
       '<textarea data-in="rimp.text" rows="7" placeholder="Paste the CSV, the activity list, or a GPX file here" style="margin-top:12px;font-size:13px">'+esc(R.text||'')+'</textarea>'+
-      '<label class="btn mt" style="display:block;text-align:center;cursor:pointer">'+(R.fileName?esc(R.fileName)+' — choose another':'Or choose a file — Excel, CSV, GPX, TCX')+
+      '<label class="btn mt" style="display:block;text-align:center;cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(R.fileName?esc(midName(R.fileName))+' — choose another':'Or choose a file — Excel, CSV, GPX, TCX')+
       '<input type="file" accept=".xlsx,.csv,.tsv,.txt,.gpx,.tcx,text/plain,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" data-rimpfile="1" style="display:none"></label>'+
       (R.err?'<p style="color:var(--red);font-size:12px;line-height:1.5;margin-top:8px">'+esc(R.err)+'</p>':'')+
       '<button data-a="rimpRead" class="big disp mt" style="background:'+((R.text||'').trim()?'var(--amber)':'var(--raised)')+';color:'+((R.text||'').trim()?'#1F1E1D':'var(--faint)')+';font-size:15px">Read it</button>'+
@@ -11311,14 +11337,16 @@ function runAction(a,v,t,e){
       S.sheet={t:'runimp'};render();runAction('rimpRead');break}
     case 'ibLift':{const ib=S.intakeBoth;if(!ib)break;
       S.intakeBoth=null;impNew();S.imp.text=ib.text.slice(0,26000);S.imp.fileName=ib.fileName;
-      S.sheet=null;S.view='import';render();break}
+      S.sheet=null;S.view='import';render();
+      if(aiReady())impParse();break}
     case 'ibBoth':{const ib=S.intakeBoth;if(!ib)break;
       S.intakeBoth=null;
       const r9=runImportCommit(ib.runs);
       S.runOn=true;lset('training-runon-v1',true);
       impNew();S.imp.text=ib.text.slice(0,26000);S.imp.fileName=ib.fileName;
       S.sheet=null;S.view='import';render();
-      flash(r9.added+' runs in'+(r9.dupe?' ('+r9.dupe+' already there, skipped)':'')+' — now the lifting: tap Read it with Allena.');break}
+      flash(r9.added+' runs in'+(r9.dupe?' ('+r9.dupe+' already there, skipped)':'')+' — now the lifting.');
+      if(aiReady())impParse();break}
     case 'hdateMode':{(S.hdate=S.hdate||{}).mode=v;render();break}
     case 'histImpGo':{const f=S.hdate||{};
       if(!(f.date||'').trim()){flash('Pick the date first.');break}
