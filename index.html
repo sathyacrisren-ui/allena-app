@@ -334,7 +334,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return (lget(K_RUN,[])||[]).length>0})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='47ab78';  // stamped by tools/build.py with the content hash
+const BUILD_ID='7e9aef';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -11957,6 +11957,9 @@ function runAction(a,v,t,e){
       d:'The week-by-week progression card goes; your logged runs are untouched. Re-import the program to bring it back.',
       go:'runplanOff',v:'',soft:true,ok:'Remove the plan',no:'Keep it'};S.sheet={t:'confirm'};render();break}
     case 'runplanOff':{S.runplan=null;lset('training-runplan-v1',null);S.sheet=null;render();flash('Plan removed.');break}
+    case 'cloudAccept':{if(S.pendingCloud){S.ai.proxy=S.pendingCloud;S.pendingCloud=null;lset(K_AI,S.ai);
+      try{history.replaceState(null,'',location.pathname)}catch(e){}}
+      S.sheet=null;render();flash('Connected — Allena answers here now.');break}
     case 'wipeAsk':{S.confirm={t:'Erase everything?',
       d:'Every training-side record on this device goes — sessions, programs, runs, rehab, chats, settings. The app restarts as a brand-new install. There is no undo.',
       go:'wipeGo',v:'',ok:'Erase it all',no:'Keep my data'};
@@ -12837,6 +12840,18 @@ try{const stale=S.lib.programs.filter(p=>p.acl&&p.ver!==ACL_VER);
     else if(wasActive)S.lib.activeId=(S.lib.programs[0]||{}).id;
     saveLib()}}catch(e){}
 ensureHaptic();
+/* the beta invite link: ?cloud=<url> offers the Allena cloud connection
+   with one tap — never silently, so a crafted link cannot reroute
+   anyone's coach without them reading where it points. */
+try{
+  const cp=new URLSearchParams(location.search).get('cloud');
+  if(cp&&/^https:\/\//.test(cp)&&!(S.ai.proxy||'').trim()){
+    S.pendingCloud=cp.slice(0,200);
+    S.confirm={t:'Connect to Allena cloud?',
+      d:'This link sets up the coach through '+new URL(cp).host+' — no key needed, nothing else changes. Only accept links from someone you trust.',
+      go:'cloudAccept',v:'',ok:'Connect',no:'Not now'};
+    S.sheet={t:'confirm'}}
+}catch(e){}
 /* the silent boot-time demoLoad() for empty accounts was removed Aug 2026:
    a fresh or wiped install starts truly empty — the wizard, the importer
    and Settings → Demo data are the honest doors in. */
