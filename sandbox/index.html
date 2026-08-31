@@ -341,7 +341,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return (lget(K_RUN,[])||[]).length>0})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='35cc51';  // stamped by tools/build.py with the content hash
+const BUILD_ID='fa1fa5';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -12346,6 +12346,13 @@ try{
     localStorage.removeItem('training-pickflag-v1');
     setTimeout(function(){flash('iOS reloaded Allena while the file picker was open \u2014 it happens when the phone is tight on memory. Nothing was lost; try the import again, second runs usually stick.')},2800)}
 }catch(e){}
+function sheetScrollBack(){
+  /* returning to the preview sheet should land where you were —
+     render() may run inside a view transition, so restore on a
+     couple of ticks and clear the stash once done */
+  const y=S.prevScroll;if(!y)return;
+  const put=()=>{try{const el=document.querySelector('.sheet');if(el)el.scrollTop=y}catch(e){}};
+  requestAnimationFrame(put);setTimeout(()=>{put();S.prevScroll=0},140)}
 function runAction(a,v,t,e){
   t=t||{dataset:{a:a,v:v}};e=e||{preventDefault:function(){},target:t};
   switch(a){
@@ -12402,7 +12409,13 @@ function runAction(a,v,t,e){
       S.hform=null;S.sheet=null;S.patCache=null;render();flash('Session updated.');break}
     case 'delHistYes':S.history=S.history.filter(h=>h.id!==v);saveHistory();S.sheet=null;S.open=null;render();break;
     case 'markDone':{const h=S.history.find(x=>x.id===v);if(h){h.complete=true;saveHistory()}render();break}
-    case 'closeSheet':S.sheet=null;render();break;
+    case 'closeSheet':{
+      /* the cut-plan popup sits on top of the preview flow — closing
+         it returns to the preview where you were, never to the view
+         underneath (owner-reported, Sep 2026) */
+      if(S.sheet&&S.sheet.t==='cutplan'&&S.prev){
+        S.cutPlan=null;S.sheet={t:'preview'};render();sheetScrollBack();break}
+      S.sheet=null;render();break}
     case 'exportXlsx':A.exportXlsx();break;
     case 'backup':A.backup();break;
     case 'copyProgram':A.copyProgram();break;
@@ -13021,6 +13034,7 @@ function runAction(a,v,t,e){
       if(!drop.length){flash('Those are already cut.');break}
       S.cut[ck]=(S.cut[ck]||[]).concat(drop);lset(K_CUT,S.cut);
       S.cutPlan=planForCut(p5,drop,pv.di);
+      try{const el9=document.querySelector('.sheet');S.prevScroll=el9?el9.scrollTop:0}catch(e){S.prevScroll=0}
       S.sheet={t:'cutplan'};render();break}
     case 'cutApply':{const p5=activeProgSafe(),plan=S.cutPlan;
       const ak=offloadKey(p5)+':'+(S.prev?S.prev.di:0);
@@ -13038,12 +13052,12 @@ function runAction(a,v,t,e){
         if(n){const where=[...new Set(plan.adds.map(a=>a.dayName))];
           done.push(n+' set'+(n===1?'':'s')+' added back in '+where.join(' and '))}}
       S.cutApplied[ak]=done.length?done.join('; ')+'.':'No change was needed.';
-      S.cutPlan=null;S.sheet={t:'preview'};render();
+      S.cutPlan=null;S.sheet={t:'preview'};render();sheetScrollBack();
       flash(done.length?done.join('; ').charAt(0).toUpperCase()+done.join('; ').slice(1)+'.':'No change needed.');break}
     case 'cutSkipPlan':{const p5=activeProgSafe();
       S.cutApplied=S.cutApplied||{};
       S.cutApplied[offloadKey(p5)+':'+(S.prev?S.prev.di:0)]='The block was left as written.';
-      S.cutPlan=null;S.sheet={t:'preview'};render();break}
+      S.cutPlan=null;S.sheet={t:'preview'};render();sheetScrollBack();break}
     case 'cutUndo':{const p5=activeProgSafe(),ck=offloadKey(p5),di3=S.prev?S.prev.di:-1;
       const undone=(S.cut[ck]||[]).filter(c=>c.day===di3).map(c=>c.ex);
       S.cut[ck]=(S.cut[ck]||[]).filter(c=>c.day!==di3);lset(K_CUT,S.cut);
