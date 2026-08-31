@@ -334,7 +334,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return (lget(K_RUN,[])||[]).length>0})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='3d8ef3';  // stamped by tools/build.py with the content hash
+const BUILD_ID='aada8a';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -754,6 +754,7 @@ async function readScanWithAllena(){
   const m=f.img.match(/^data:(image\/[a-z]+);base64,(.+)$/i);
   if(!m){f.busy=false;flash('Unsupported image.');render();return}
   try{
+    if(!aiSpend('scan'))return;
     const res=await claudeFetch({model:S.ai.model,max_tokens:300,
         system:'Extract body-composition numbers from the scan image. Reply with JSON only, no prose, no code fences. Keys: w (weight kg), bf (body fat percent), smm (skeletal muscle mass kg), vf (visceral fat rating), bmr (kcal), tee (total energy expenditure kcal), date (YYYY-MM-DD if visible). Omit any key you cannot read. Numbers only, no units.',
         messages:[{role:'user',content:[{type:'image',source:{type:'base64',media_type:m[1],data:m[2]}},{type:'text',text:'Extract the values.'}]}]});
@@ -821,6 +822,18 @@ function sessLine(h,full){
   return h.date.slice(5,10)+' '+(h.dayTitle||'')+(h.week?' w'+h.week:'')+': '+parts.join('; ')+
     (!full&&keys.length>4?' +'+(keys.length-4)+' more':'')}
 
+/* the token ledger: every AI door counts itself per day and refuses
+   honestly at its cap — the arbitrage only works if no path can run
+   unmetered. Caps are generous for a human, impossible for a loop. */
+const AI_CAPS={coach:80,imp:15,scan:10,deep:2};
+function aiSpend(kind){
+  const d=today();S.ai.spend=S.ai.spend||{};
+  if(S.ai.spend.day!==d)S.ai.spend={day:d};
+  const n=S.ai.spend[kind]||0;
+  if(n>=(AI_CAPS[kind]||20)){
+    flash('That is today\u2019s limit for this ('+(AI_CAPS[kind]||20)+' a day) \u2014 it resets at midnight. The cap is what keeps Allena affordable.');
+    return false}
+  S.ai.spend[kind]=n+1;lset(K_AI,S.ai);return true}
 /* one door to Claude: manual proxy, the signed-in cloud, or the user's own key */
 function aiReady(){return !!(((S.ai&&S.ai.proxy)||'').trim()||(S.ai&&S.ai.key)||
   (typeof acctReady==='function'&&acctReady()&&acct()&&acct().refresh))}
@@ -948,6 +961,7 @@ async function askClaude(q){
   // once-per-thread logic left the coach blind mid-session
   if(msgs.length)msgs[msgs.length-1].content='CONTEXT (fresh as of this message — the only data you have; never state a number that is not here):\n'+coachContext()+'\n\nQUESTION: '+msgs[msgs.length-1].content;
   try{
+    if(!aiSpend('coach')){S.coach.busy=false;return render()}
     const res=await claudeFetch({model:S.ai.model,max_tokens:320,system:coachSys(),messages:msgs});
     const d=await res.json();
     let t=d.content?d.content.map(x=>x.text||'').join(''):(d.error?('Error: '+d.error.message):'No reply.');
@@ -2238,6 +2252,38 @@ function midName(n){
   const m=n.match(/\.[a-z0-9]{2,5}$/i),ext=m?m[0]:'';
   return n.slice(0,Math.max(8,22-ext.length))+'\u2026'+ext}
 function impNew(){S.imp={step:'pick',text:'',img:null,busy:false,draft:null,err:null,assess:null}}
+function impApplyParsed(f,o){
+  /* one router for a fresh conversion and a cached one alike */
+    if(f.kindHint==='hist'&&!(o.history&&o.weeks&&o.weeks.length)){
+      f.err='You said this is logged history, but the conversion came back as a plan. Tap Read it again — the instruction is now firmer — or trim the text to just the logged weeks.';
+      f.busy=false;if(S.think&&S.think.key==='impread')S.think=null;return render()}
+    if(o.history&&o.weeks&&o.weeks.length){
+      // logged history, no dates: one question and Allena deduces them
+      histExpandSets(o);
+      S.histImp={block:String(o.block||'Imported history').slice(0,60),weeks:o.weeks.slice(0,52)};
+      S.hdate={date:'',mode:'start'};
+      S.imp=null;S.view='today';S.sheet={t:'histdate'};S.busyDone=1;render();return}
+    if(o.running&&o.running.length){
+      // the sheet's running progression survives the import — rule 4:
+      // nothing silently disappears
+      lset('training-runplan-v1',{src:String(o.block||'Imported plan').slice(0,60),
+        started:today(),items:o.running.slice(0,24).map(r2=>({week:+r2.week||0,desc:String(r2.desc||'').slice(0,140)}))});
+      S.runplan=lget('training-runplan-v1',null);
+      if(!S.runOn){S.runOn=true;lset('training-runon-v1',true)}
+      delete o.running}
+    (o.days||[]).forEach(dd=>{dd.name=String(dd.name||'').replace(/^\s*(mon|tues?|wed(nes)?|thur?s?|fri|satur?|sun)(day)?\s*[-\u2013\u2014:.\/]*\s*/i,'')||dd.name});
+    o.id='imp'+Date.now().toString(36);o.kind=o.kind||'strength';o.weeks=o.weeks||4;
+    (o.days||[]).forEach(dd=>(dd.exercises||[]).forEach(e=>{e.rest=e.rest||90;
+      if(!e.sets||!Object.keys(e.sets).length)e.sets={'default':[{reps:'8-12',rpe:8}]}}));
+    const errs=validateProgram(o);
+    if(errs.length&&!(o.days&&o.days.length)){f.err=errs.join(' ');f.busy=false;if(S.think&&S.think.key==='impread')S.think=null;return render()}
+    o.own=true;
+    S.own={prog:o,review:null};
+    S.imp=null;S.view='own';S.busyDone=1;render();return;
+}
+function impApplyCached(f,o){
+  flash('Same file as before \u2014 reused the last conversion, no tokens spent.');
+  impApplyParsed(f,JSON.parse(JSON.stringify(o)))}
 async function impParse(){
   const f=S.imp;if(!f)return;
   /* a structured spreadsheet needs no AI: read the grid exactly, on the
@@ -2277,6 +2323,17 @@ async function impParse(){
   const hint=f.kindHint==='plan'?'The user says this is A PLAN TO FOLLOW — return the program JSON, never the history form.\n\n'
     :f.kindHint==='hist'?'The user says this is LOGGED TRAINING HISTORY — return the {"history":true,...} form, never a plan.\n\n':'';
   content.push({type:'text',text:hint+(f.text||'Convert this program.').slice(0,26000)});
+  // same content converted before = same answer, zero tokens
+  const sig=(function(){let h9=5381;const str=(f.kindHint||'')+'|'+(f.text||'')+'|'+((f.img||'').length);
+    for(let i=0;i<str.length;i++)h9=((h9<<5)+h9+str.charCodeAt(i))|0;return String(h9)})();
+  try{
+    const cache=lget('training-aicache-v1',{});
+    const hit=cache[sig];
+    if(hit&&Date.now()-hit.t<7*864e5){
+      f.busy=false;if(S.think&&S.think.key==='impread')S.think=null;
+      impApplyCached(f,hit.o);return}
+  }catch(e){}
+  if(!aiSpend('imp')){f.busy=false;if(S.think&&S.think.key==='impread')S.think=null;return render()}
   try{
     const res=await claudeFetch({model:S.ai.model,max_tokens:8000,system:IMPORT_SYS,messages:[{role:'user',content:content}]});
     const d=await res.json();
@@ -2289,32 +2346,10 @@ async function impParse(){
       f.err='The reply ran out of room before the JSON finished. Tap Read it again — Allena now compacts repeated sets, so a retry usually fits. Still failing? Trim the pasted text to the day sheets.';
       f.busy=false;if(S.think&&S.think.key==='impread')S.think=null;return render()}
     const o=JSON.parse(t);
-    if(f.kindHint==='hist'&&!(o.history&&o.weeks&&o.weeks.length)){
-      f.err='You said this is logged history, but the conversion came back as a plan. Tap Read it again — the instruction is now firmer — or trim the text to just the logged weeks.';
-      f.busy=false;if(S.think&&S.think.key==='impread')S.think=null;return render()}
-    if(o.history&&o.weeks&&o.weeks.length){
-      // logged history, no dates: one question and Allena deduces them
-      histExpandSets(o);
-      S.histImp={block:String(o.block||'Imported history').slice(0,60),weeks:o.weeks.slice(0,52)};
-      S.hdate={date:'',mode:'start'};
-      S.imp=null;S.view='today';S.sheet={t:'histdate'};S.busyDone=1;render();return}
-    if(o.running&&o.running.length){
-      // the sheet's running progression survives the import — rule 4:
-      // nothing silently disappears
-      lset('training-runplan-v1',{src:String(o.block||'Imported plan').slice(0,60),
-        started:today(),items:o.running.slice(0,24).map(r2=>({week:+r2.week||0,desc:String(r2.desc||'').slice(0,140)}))});
-      S.runplan=lget('training-runplan-v1',null);
-      if(!S.runOn){S.runOn=true;lset('training-runon-v1',true)}
-      delete o.running}
-    (o.days||[]).forEach(dd=>{dd.name=String(dd.name||'').replace(/^\s*(mon|tues?|wed(nes)?|thur?s?|fri|satur?|sun)(day)?\s*[-\u2013\u2014:.\/]*\s*/i,'')||dd.name});
-    o.id='imp'+Date.now().toString(36);o.kind=o.kind||'strength';o.weeks=o.weeks||4;
-    (o.days||[]).forEach(dd=>(dd.exercises||[]).forEach(e=>{e.rest=e.rest||90;
-      if(!e.sets||!Object.keys(e.sets).length)e.sets={'default':[{reps:'8-12',rpe:8}]}}));
-    const errs=validateProgram(o);
-    if(errs.length&&!(o.days&&o.days.length)){f.err=errs.join(' ');f.busy=false;if(S.think&&S.think.key==='impread')S.think=null;return render()}
-    o.own=true;
-    S.own={prog:o,review:null};
-    S.imp=null;S.view='own';S.busyDone=1;render();return;
+    try{const cache=lget('training-aicache-v1',{});
+      const ks=Object.keys(cache);if(ks.length>12)delete cache[ks.sort((x,y)=>cache[x].t-cache[y].t)[0]];
+      cache[sig]={t:Date.now(),o:o};lset('training-aicache-v1',cache)}catch(e){}
+    return impApplyParsed(f,o);
   }catch(e){
     f.err=(e&&e.name==='SyntaxError')
       ?'Allena replied, but the reply was not JSON the app could load. Tap Read it again — a fresh attempt usually lands. If it keeps failing, trim the pasted text to the training-day sheets.'
@@ -8525,7 +8560,8 @@ async function deepRun(){
   { // the same gate the card shows — no button path spends tokens on old data
     const st0=deepStore();
     if(st0.last===today())return flash('Today\u2019s read is done — a fresh one unlocks tomorrow.');
-    if(!deepReadyInfo())return flash(st0.last?'Nothing new since the last read — it reopens when new data lands.':'Not enough logged data for a first read yet.')}
+    if(!deepReadyInfo())return flash(st0.last?'Nothing new since the last read — it reopens when new data lands.':'Not enough logged data for a first read yet.');
+    if(!aiSpend('deep'))return}
   if(!aiReady()){flash('Sign in (or add a key) first — the deep read uses your coach connection.');return}
   const st=deepStore();
   if(st.last===today()){flash('One deep read a day — tomorrow brings new data to read.');return}
