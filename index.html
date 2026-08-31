@@ -334,7 +334,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return (lget(K_RUN,[])||[]).length>0})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='62f681';  // stamped by tools/build.py with the content hash
+const BUILD_ID='05ba3a';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -1366,7 +1366,7 @@ function doImport(txt){S.errs=[];let o;
 function backupObj(){
   const skipDemo=x=>!x.demo;
   const o={app:'Allena',format:3,exportedAt:new Date().toISOString(),
-    note:'Complete export. Contains your API key if one was saved — treat this file as private.',
+    note:'Complete export of your training data. Credentials (sign-in tokens, API keys, cloud links) are never included — they are not data.',
     keys:{}};
   const all=[];
   try{for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);if(k&&k.indexOf('training-')===0)all.push(k)}}catch(e){}
@@ -1377,6 +1377,7 @@ function backupObj(){
     if(k===K_LIB&&v&&Array.isArray(v.programs))v={programs:v.programs.filter(p=>p.id!=='demo-block'),activeId:v.activeId==='demo-block'?null:v.activeId};
     if(k===K_A)return; // a half-finished session is device state, not data
     if(k===K_ACCT)return; // sign-in tokens are credentials, never data
+    if(k===K_AI){o.keys[k]={model:(v&&v.model)||null};return} // the key and cloud link are credentials too — only the model preference is data
     o.keys[k]=v});
   // legacy top-level mirrors so older builds can still read the file
   o.library=o.keys[K_LIB];o.history=o.keys[K_H]||[];o.profile=o.keys[K_PROF];
@@ -1423,7 +1424,10 @@ function doRestore(txt){try{const o=JSON.parse(txt);
   const ga=get(K_GAR,o.gar);if(ga){S.gar=mergeDays(S.gar,ga);garSave()}
   if(K){
     if(K[K_LAY]){S.lay=Object.assign(S.lay,K[K_LAY]);lset(K_LAY,S.lay)}
-    if(K[K_AI]){S.ai=Object.assign({},K[K_AI],{key:S.ai.key||K[K_AI].key});lset(K_AI,S.ai)}
+    if(K[K_AI]){/* credentials never travel: an incoming backup can set the
+      model preference, but the key and cloud link on THIS device stay
+      exactly as they are — old backups in the wild still carry keys. */
+      S.ai=Object.assign({},S.ai,{model:K[K_AI].model||S.ai.model});lset(K_AI,S.ai)}
     if(K[K_BAR]!=null){BAR=+K[K_BAR]||BAR;lset(K_BAR,BAR)}
     if(K[K_WEEKS]){S.weekMap=Object.assign({},K[K_WEEKS],S.weekMap);lset(K_WEEKS,S.weekMap);
       const cw=S.weekMap[S.lib.activeId];if(cw)S.week=cw}
