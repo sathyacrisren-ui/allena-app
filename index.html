@@ -390,7 +390,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return (lget(K_RUN,[])||[]).length>0})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='e52b35';  // stamped by tools/build.py with the content hash
+const BUILD_ID='8a6dc0';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -9265,7 +9265,8 @@ const DATA_GROUPS=[
   ['Backup & data',[
     ['Export','Backup file and spreadsheet'],
     ['Restore','Bring a backup back'],
-    ['Demo data','Sample data for the charts']]]];
+    ['Demo data','Sample data for the charts'],
+    ['Start fresh','Erase everything on this device']]]];
 function dataChunks(){
   const raw=dataRaw();
   const parts=raw.split('<div class="mt2">');
@@ -9360,8 +9361,9 @@ function viewData(){
   h+=setGroup('Your data',[
     setRow(I.save,'Export a backup',backupDue()?'due':'','Export'),
     setRow(I.back,'Restore','','Restore'),
-    setRow(I.demo,'Demo data',demoPresent()?'loaded':'','Demo data')]);
-  const KNOWN=['Account & sync','Program library','Your own block','Load a program','Program format','Rehab pathway','Running','Garmin readiness','Daily creatine tracker','Profile','Barbell weight','Allena — AI coach','Export','Restore','Demo data'];
+    setRow(I.demo,'Demo data',demoPresent()?'loaded':'','Demo data'),
+    setRow(I.back,'Start fresh','','Start fresh')]);
+  const KNOWN=['Account & sync','Program library','Your own block','Load a program','Program format','Rehab pathway','Running','Garmin readiness','Daily creatine tracker','Profile','Barbell weight','Allena — AI coach','Export','Restore','Demo data','Start fresh'];
   const left=Object.keys(byTitle).filter(k=>KNOWN.indexOf(k)<0);
   if(left.length)h+=setGroup('More',left.map(k=>setRow(I.prog,k,'',k)));
   h+='<div style="height:8px"></div>';
@@ -9462,6 +9464,9 @@ function dataRaw(){
    (demoPresent()?'<button data-a="demoClear" class="btn mt" style="border-color:var(--red);color:var(--red)">Remove all demo data</button>'
      :'<button data-a="demoLoad" class="btn mt">Load demo data</button>')+
    '<p style="color:var(--faint);font-size:12px;line-height:1.55;margin-top:8px">Five weeks of sample sessions, Body Battery, scans and habits so every chart has something in it. It never touches sessions you logged yourself.</p></div>'+
+   '<div class="mt2"><p class="eyebrow">Start fresh</p>'+
+   '<p style="color:var(--dim);font-size:12.5px;line-height:1.55;margin-top:8px">Erases every session, program, run, rehab record, chat and setting on this device and restarts the app as a new install. There is no undo — export a backup first if any of it matters.</p>'+
+   '<button data-a="wipeAsk" class="btn mt" style="border-color:var(--red);color:var(--red)">Erase everything on this device</button></div>'+
    '<div class="mt2"><p class="eyebrow">Garmin readiness</p>'+
    '<button data-a="garToggle" class="btn mt" style="'+(S.gar.on?'border-color:var(--amber);color:var(--amber)':'')+'">'+(S.gar.on?'On — asks before and after sessions':'Off — turn on')+'</button>'+
    '<p style="color:var(--faint);font-size:12px;line-height:1.55;margin-top:8px">Enter your Body Battery before a session; Allena compares it to your own baseline and offers to ease the workout. Enter it again after, so she learns what each session costs.</p>'+
@@ -11332,6 +11337,16 @@ function runAction(a,v,t,e){
       d:'The week-by-week progression card goes; your logged runs are untouched. Re-import the program to bring it back.',
       go:'runplanOff',v:'',soft:true,ok:'Remove the plan',no:'Keep it'};S.sheet={t:'confirm'};render();break}
     case 'runplanOff':{S.runplan=null;lset('training-runplan-v1',null);S.sheet=null;render();flash('Plan removed.');break}
+    case 'wipeAsk':{S.confirm={t:'Erase everything?',
+      d:'Every training-side record on this device goes — sessions, programs, runs, rehab, chats, settings. The app restarts as a brand-new install. There is no undo.',
+      go:'wipeGo',v:'',ok:'Erase it all',no:'Keep my data'};
+      S.sheet={t:'confirm'};render();break}
+    case 'wipeGo':{try{
+        const ks=[];for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);if(k&&k.indexOf('training-')===0)ks.push(k)}
+        ks.forEach(k=>localStorage.removeItem(k));
+      }catch(e){}
+      if(typeof location!=='undefined'&&location.reload)location.reload();
+      break}
     case 'chatDelAsk':{const c=(S.chats||[]).find(x=>x.id===v);
       S.confirm={t:'Delete this chat?',d:'“'+String((c&&c.title)||'This conversation').slice(0,60)+'” goes for good. Your training data is untouched — chats are just the conversation.',
         go:'chatDel',v:v,soft:true,ok:'Delete the chat',no:'Keep it'};
