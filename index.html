@@ -334,7 +334,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return (lget(K_RUN,[])||[]).length>0})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='a126cf';  // stamped by tools/build.py with the content hash
+const BUILD_ID='708b38';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -2809,6 +2809,36 @@ const DP_TIERS=[
  [8000,'Serious archive','#E4E1D8'],
  [20000,'Few people have this','#F5F3EC'],
  [50000,'Obsessive, in the good way','#FFFFFF']];
+/* the LIVE ladder — tiers on the one number that cannot be typed in.
+   Monochrome climb like everything else; the flame terracotta is
+   reserved for the very top: the single drop of warmth, earned only
+   under a running clock. */
+const LIVE_TIERS=[
+ [0,'No live sets yet','#7C7973'],
+ [100,'Witnessed','#95928B'],
+ [500,'Shows up','#93B08A'],
+ [1500,'Consistent under the clock','#C9C6BE'],
+ [4000,'Forged live','#E4E1D8'],
+ [10000,'Iron habit','#F5F3EC'],
+ [25000,'The real thing','#C96342']];
+function liveTier(n){let t=LIVE_TIERS[0];LIVE_TIERS.forEach(x=>{if(n>=x[0])t=x});return t}
+function liveNext(n){return LIVE_TIERS.find(x=>x[0]>n)||null}
+function bankLiveTier(){
+  /* crossing a live tier is a real moment — banked once, like the
+     rehab climb. Never for tier zero. */
+  try{
+    const live=dataPoints().live;if(!(live>0))return;
+    const bank=discBank();let hit=null;
+    LIVE_TIERS.forEach(x=>{
+      if(!x[0]||live<x[0])return;
+      const id='livetier-'+x[0];
+      if(bank[id])return;
+      bank[id]={t:'Live tier: '+x[1],
+        d:live.toLocaleString()+' points recorded with the clock running. This number cannot be typed in — every one was witnessed.',
+        rar:x[0]>=10000?'epic':'rare',tag:'milestone',found:today()};
+      hit=x});
+    if(hit)bankSave()}catch(e){}}
+
 /* ── what stops the number being nonsense ────────────────────
    On a device that holds its own data there is no way to stop
    someone editing it, and pretending otherwise would be worse
@@ -4432,7 +4462,12 @@ function viewPoints(){
    '<div style="height:1px;background:var(--line);margin:16px 0"></div>'+
    '<p class="mono disp an-pop grad" style="font-size:42px;font-weight:800;line-height:1">'+d.total.toLocaleString()+'</p>'+
    '<p class="mono" style="color:var(--faint);font-size:10.5px;letter-spacing:.06em;margin-top:6px">DATA POINTS</p>'+
-   '<p class="mono" style="color:var(--green);font-size:11px;margin-top:8px">'+d.live.toLocaleString()+' recorded live ('+d.livePct+'%)</p>'+
+   (function(){const lt=liveTier(d.live),ln=liveNext(d.live);
+     return '<div style="display:inline-flex;align-items:center;gap:8px;margin-top:10px;padding:7px 14px;border:1.5px solid '+lt[2]+';border-radius:999px">'+
+       '<span class="mono" style="color:'+lt[2]+';font-size:11px;font-weight:600">'+d.live.toLocaleString()+' LIVE</span>'+
+       '<span style="color:var(--dim);font-size:11px">'+esc(lt[1])+'</span></div>'+
+       (ln?'<p class="mono" style="color:var(--faint);font-size:10px;margin-top:6px">'+(ln[0]-d.live).toLocaleString()+' live to '+esc(ln[1])+' \u00b7 live means this phone ran the clock</p>'
+          :'<p class="mono" style="color:var(--faint);font-size:10px;margin-top:6px">the top of the live ladder \u00b7 every point witnessed</p>')})()+
    '<p class="disp" style="font-size:16px;font-weight:600;margin-top:12px">'+esc(t[1])+'</p>'+
    (nx?'<div style="height:5px;border-radius:3px;background:var(--line);overflow:hidden;margin-top:14px">'+
      '<div class="an-bar" style="height:5px;width:'+Math.min(100,Math.round((d.total-t[0])/(nx[0]-t[0])*100))+'%;background:'+t[2]+'"></div></div>'+
@@ -6846,6 +6881,7 @@ function discBank(){return S.discBank||(S.discBank=lget('training-bank-v1',{}))}
 function bankSave(){lset('training-bank-v1',S.discBank)}
 function bankDiscoveries(){
   // returns the ones newly banked by this call
+  try{bankLiveTier()}catch(e){}
   const bank=discBank(),fresh=[];
   discoveries().forEach(d=>{
     if(bank[d.id])return;
@@ -11276,7 +11312,7 @@ function render(){
       '<h1 class="disp brand" style="font-size:26px;margin:0">Allena</h1></span>'+pointsChip()+'</div>'+
       '<div style="flex:1;min-width:0">'+rows+'</div>'+
       '<div style="display:flex;align-items:center;gap:12px;margin-top:16px;flex:none">'+
-      '<button data-a="drawerNav" data-v="data" style="width:40px;height:40px;border-radius:40px;background:var(--raised);color:var(--dim);font-size:15px;font-weight:600;flex:none">'+
+      '<button data-a="drawerNav" data-v="data" style="width:40px;height:40px;border-radius:40px;background:var(--raised);border:1.5px solid '+liveTier(dataPoints().live)[2]+';color:var(--dim);font-size:15px;font-weight:600;flex:none">'+
         esc(((S.prof&&S.prof.name)||'Y').slice(0,1).toUpperCase())+'</button>'+
       '<button data-a="chatNew" class="pill on" style="flex:1;padding:12px 16px;font-size:14.5px;text-align:center">+ New chat with Allena</button>'+
       '</div></div></div>'};
