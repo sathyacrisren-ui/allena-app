@@ -341,7 +341,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return (lget(K_RUN,[])||[]).length>0})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='4e94bf';  // stamped by tools/build.py with the content hash
+const BUILD_ID='6ec044';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -9019,23 +9019,27 @@ function findLens(){
   const ds=deepStore();
   const rdy=(typeof deepReadyInfo==='function')?deepReadyInfo():null;
   const deepStat=ds.last===today()?(ds.items.length+' read today'):rdy?'ready to run':'waiting on new data';
-  const col=(depth,name,stat,desc,act,val)=>
-    '<button data-a="'+act+'"'+(val?' data-v="'+val+'"':'')+' class="card" style="flex:1;min-width:0;text-align:left;padding:13px 12px;display:flex;flex-direction:column;gap:8px;min-height:148px">'+
-    depthGlyph(depth)+
-    '<span class="disp" style="font-size:13.5px;font-weight:600;line-height:1.2">'+name+'</span>'+
-    '<span class="mono" style="color:var(--blue);font-size:10px">'+stat+'</span>'+
-    '<span style="color:var(--faint);font-size:10.5px;line-height:1.45;flex:1">'+desc+'</span>'+
-    '<span class="mono" style="color:var(--faint);font-size:11px">\u203a</span></button>';
-  return '<div style="display:flex;gap:8px;margin-top:14px;align-items:stretch">'+
-    col(1,'Discoveries',st.total+' banked \u00b7 '+rareN+' rare+','Records and firsts the rules can prove. Yours to keep.','collOpen','')+
-    col(2,'Patterns',(pat?pat+' new \u00b7 ':'')+patTotal+' live','Connections between your sports \u2014 what to act on.','anRun','')+
+  const col=(depth,name,tag,stat,desc,cta,act,val)=>
+    '<button data-a="'+act+'"'+(val?' data-v="'+val+'"':'')+' class="card an-hero" style="flex:1;min-width:0;text-align:left;padding:17px 15px;border-radius:20px;display:flex;flex-direction:column;gap:9px;min-height:224px">'+
+    '<div style="transform:scale(1.5);transform-origin:left top;margin-bottom:8px">'+depthGlyph(depth)+'</div>'+
+    '<span class="disp gradhead" style="font-size:20px;line-height:1.1">'+name+'</span>'+
+    '<span class="mono" style="color:var(--faint);font-size:8.5px;letter-spacing:.08em">'+tag+'</span>'+
+    '<span class="mono" style="color:var(--blue);font-size:12px;font-weight:600">'+stat+'</span>'+
+    '<span style="color:var(--dim);font-size:11.5px;line-height:1.5;flex:1">'+desc+'</span>'+
+    '<span class="mono" style="color:var(--amber);font-size:11.5px;font-weight:600">'+cta+' \u203a</span></button>';
+  return '<div style="display:flex;gap:9px;margin-top:16px;align-items:stretch">'+
+    col(1,'Discoveries','PROVEN \u00b7 YOURS TO KEEP',st.total+' banked \u00b7 '+rareN+' rare+','Records and firsts the rules can prove.','Open the collection','collOpen','')+
+    col(2,'Patterns','ACROSS YOUR SPORTS',(pat?pat+' new \u00b7 ':'')+patTotal+' live','Connections that only exist because it all lives here.','Find the links','anRun','')+
     '</div>'+
-    '<button data-a="deepScroll" class="card" style="width:100%;text-align:left;padding:13px 14px;margin-top:8px;display:flex;align-items:center;gap:12px">'+
-    depthGlyph(3)+
-    '<span style="flex:1;min-width:0"><span class="disp" style="display:block;font-size:13.5px;font-weight:600">Deep read</span>'+
-    '<span style="color:var(--faint);font-size:10.5px;line-height:1.45">The model reads what rules cannot. Every claim cited.</span></span>'+
-    '<span class="mono" style="color:var(--blue);font-size:10px;flex:none">'+deepStat+'</span>'+
-    '<span class="mono" style="color:var(--faint);font-size:11px;flex:none">\u203a</span></button>'}
+    '<button data-a="deepScroll" class="card an-hero" style="width:100%;text-align:left;padding:17px 16px;margin-top:9px;border-radius:20px;display:block">'+
+    '<div style="display:flex;align-items:center;gap:18px">'+
+    '<div style="transform:scale(1.6);transform-origin:left center;width:72px;flex:none">'+depthGlyph(3)+'</div>'+
+    '<span style="flex:1;min-width:0"><span class="disp gradhead" style="display:block;font-size:20px;line-height:1.1">Deep read</span>'+
+    '<span class="mono" style="color:var(--faint);font-size:8.5px;letter-spacing:.08em;display:block;margin-top:4px">MODEL \u00b7 NOT RULES</span></span></div>'+
+    '<p style="color:var(--dim);font-size:11.5px;line-height:1.5;margin-top:10px">The model reads ten weeks of your numbers and finds what rules cannot \u2014 lags, thresholds, relationships. Every claim cited.</p>'+
+    '<div style="display:flex;justify-content:space-between;align-items:baseline;margin-top:10px">'+
+    '<span class="mono" style="color:var(--blue);font-size:12px;font-weight:600">'+deepStat+'</span>'+
+    '<span class="mono" style="color:var(--amber);font-size:11.5px;font-weight:600">Run it \u203a</span></div></button>'}
 function viewFindings(){
   try{bankDiscoveries()}catch(e){}   // found = banked, the day it happens — viewing counts
   return '<div class="view pad stg" style="padding-top:24px">'+
