@@ -334,7 +334,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return (lget(K_RUN,[])||[]).length>0})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='05ba3a';  // stamped by tools/build.py with the content hash
+const BUILD_ID='a329e5';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -2996,7 +2996,9 @@ function dataPoints(){
   Object.keys(a.gates||{}).forEach(()=>{B.rehab+=1});
   (S.goals||[]).forEach(()=>{B.notes+=2});
   const total=Object.keys(B).reduce((x,k)=>x+B[k],0);
+  const todayEarned=byDay[today()]||0;
   return{total:total,by:B,live:Math.min(live,total),
+    today:todayEarned,room:Math.max(0,dpDayCap()-todayEarned),
     livePct:total?Math.round(Math.min(live,total)/total*100):0}}
 function dpTier(n){let t=DP_TIERS[0];DP_TIERS.forEach(x=>{if(n>=x[0])t=x});return t}
 function dpNext(n){const nx=DP_TIERS.find(x=>x[0]>n);return nx||null}
@@ -3721,7 +3723,12 @@ function pointsChip(){
     '<svg viewBox="0 0 30 30" style="width:30px;height:30px;transform:rotate(-90deg);display:block;flex:none">'+
     '<circle cx="15" cy="15" r="13" fill="none" stroke="var(--line)" stroke-width="2.5"/>'+
     '<circle cx="15" cy="15" r="13" fill="none" stroke="'+t[2]+'" stroke-width="2.5" stroke-linecap="round" '+
-    'stroke-dasharray="'+C.toFixed(1)+'" stroke-dashoffset="'+(C*(1-pct/100)).toFixed(1)+'"/></svg>'+
+    'stroke-dasharray="'+C.toFixed(1)+'" stroke-dashoffset="'+(C*(1-pct/100)).toFixed(1)+'"/>'+
+    (function(){/* the blue inner ring: what today could still earn */
+      const room=d.room||0;if(!(room>0))return '';
+      const C2=2*Math.PI*9;const frac=Math.min(1,room/dpDayCap());
+      return '<circle cx="15" cy="15" r="9" fill="none" stroke="var(--blue)" stroke-width="2" stroke-linecap="round" '+
+        'stroke-dasharray="'+(C2*frac).toFixed(1)+' '+C2.toFixed(1)+'" opacity=".85"/>'})()+'</svg>'+
     '<span style="text-align:left;line-height:1.15"><span class="mono" style="display:block;font-size:14px;font-weight:600;color:'+t[2]+'">'+d.total.toLocaleString()+'</span>'+
     '<span class="mono" style="display:block;color:var(--faint);font-size:8.5px;letter-spacing:.08em">DATA POINTS</span></span></button>'}
 
@@ -4582,6 +4589,25 @@ function viewPoints(){
      '<p class="mono" style="color:var(--faint);font-size:10.5px;margin-top:10px">Top tier. There is nothing above this.</p>')+
    '<button data-a="treeShare" class="btn mt2" style="color:var(--amber);border-color:rgba(240,238,230,.42)">Share the tree</button>'+
    '</div>';
+  /* keep it climbing: what today could still earn, each row a door */
+  {const room=d.room||0;
+   const earn=[
+     ['nav','home','Log a session live','the biggest earner — every set, rep and effort counts, witnessed'],
+     ['runLog','','Log a run','distance, time, heart rate and zones all count'],
+     ['todayOpen','','The daily check-ins','readiness, weight, check-in — small, but they compound'],
+     ['drawerNav','findings','Visit your findings','new discoveries bank into the collection when seen']];
+   h+='<div class="card mt2" style="padding:15px 16px">'+
+     '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px">'+
+     '<p class="eyebrow" style="margin:0">Keep it climbing</p>'+
+     '<span class="mono" style="color:var(--blue);font-size:10px">'+(room>0?('ROOM FOR +'+room+' TODAY'):'TODAY IS FULL')+'</span></div>'+
+     (room>0?'<p style="color:var(--dim);font-size:12px;line-height:1.5;margin-top:5px">The blue ring on your points chip is this — what today could still earn. A day caps at '+dpDayCap()+' so the number stays honest.</p>'
+       :'<p style="color:var(--dim);font-size:12px;line-height:1.5;margin-top:5px">You have hit today\u2019s cap — one honest day, fully banked. It resets at midnight.</p>')+
+     (room>0?'<div style="margin-top:10px">'+earn.map((e9,i9)=>
+       '<button data-a="'+e9[0]+'"'+(e9[1]?' data-v="'+e9[1]+'"':'')+' style="width:100%;text-align:left;display:flex;align-items:center;gap:10px;padding:10px 0'+(i9?';border-top:1px solid var(--line)':'')+'">'+
+       '<span style="flex:1;min-width:0"><span style="display:block;font-size:13px;font-weight:600">'+e9[2]+'</span>'+
+       '<span style="color:var(--faint);font-size:11px;line-height:1.4">'+e9[3]+'</span></span>'+
+       '<span class="mono" style="color:var(--faint);font-size:13px;flex:none">\u203a</span></button>').join('')+'</div>':'')+
+     '</div>';}
   h+='<p class="eyebrow mt2">Why yours looks like that</p>'+
     '<div class="card mt" style="padding:6px 16px">'+
     [['Trunk',tr.sessions+' sessions'],
