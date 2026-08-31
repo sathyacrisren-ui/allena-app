@@ -390,7 +390,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return (lget(K_RUN,[])||[]).length>0})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='82cf5c';  // stamped by tools/build.py with the content hash
+const BUILD_ID='49a9b4';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -2261,7 +2261,7 @@ function viewCoach(){
 
 
 /* ══ import an existing program ═════════════════════════ */
-const IMPORT_SYS='Convert the training program into JSON only — no prose, no code fences. Shape: {"block":"name","weeks":N,"days":[{"name":"Day name","note":"","exercises":[{"name":"Exercise","bar":true|false,"rest":seconds,"sets":{"default":[{"w":kg|null,"reps":8|"8-12","rpe":8|null}]}}]}]}. One entry per set. If a week differs, use the week number as a key alongside "default". Use kg; convert lb by 0.4536 and round to 0.5. If a weight is not given use null. bar:true only for barbell lifts. rest in seconds, estimate if absent (compound 180, isolation 90). Keep the lifter\'s own exercise names. Never invent exercises that are not there. Output COMPACT JSON (no spaces or newlines). Spreadsheets often repeat each day as empty per-week template blocks (loads of 0 or blank) — those are future weeks: use them only to count "weeks", and build each day ONCE from the filled-in block, preferring "default" sets over per-week keys unless the plan genuinely changes week to week. Logged results columns (S1/S2/Best) are history, not targets. TERMINOLOGY: RIR means reps in reserve — convert to RPE as 10 minus RIR (\"2 RIR\"→rpe 8, \"1-2 RIR\"→rpe \"8-9\"); %1RM with no RPE stays w:null with the percent in the exercise note; write day notes in PLAIN language — expand shorthand like SS/superset (\"Bench pairs with Chin-up\"), GS/giant set, AMRAP, EMOM rather than copying codes. If the program includes a RUNNING or cardio progression, do NOT turn it into gym exercises — add a top-level \"running\":[{\"week\":1,\"desc\":\"one line\"}] array (one entry per week, plain words) so the app can carry the plan.';
+const IMPORT_SYS='Convert the training program into JSON only — no prose, no code fences. Shape: {"block":"name","weeks":N,"days":[{"name":"Day name","note":"","exercises":[{"name":"Exercise","bar":true|false,"rest":seconds,"sets":{"default":[{"w":kg|null,"reps":8|"8-12","rpe":8|null}]}}]}]}. One entry per set. If a week differs, use the week number as a key alongside "default". Use kg; convert lb by 0.4536 and round to 0.5. If a weight is not given use null. bar:true only for barbell lifts. rest in seconds, estimate if absent (compound 180, isolation 90). Keep the lifter\'s own exercise names. Never invent exercises that are not there. Output COMPACT JSON (no spaces or newlines). Spreadsheets often repeat each day as empty per-week template blocks (loads of 0 or blank) — those are future weeks: use them only to count "weeks", and build each day ONCE from the filled-in block, preferring "default" sets over per-week keys unless the plan genuinely changes week to week. Logged results columns (S1/S2/Best) are history, not targets. TERMINOLOGY: RIR means reps in reserve — convert to RPE as 10 minus RIR (\"2 RIR\"→rpe 8, \"1-2 RIR\"→rpe \"8-9\"); %1RM with no RPE stays w:null with the percent in the exercise note; write day notes in PLAIN language — expand shorthand like SS/superset (\"Bench pairs with Chin-up\"), GS/giant set, AMRAP, EMOM rather than copying codes. If the program includes a RUNNING or cardio progression, do NOT turn it into gym exercises — add a top-level \"running\":[{\"week\":1,\"desc\":\"one line\"}] array (one entry per week, plain words) so the app can carry the plan. If the document is LOGGED TRAINING HISTORY — performed sets with achieved results (filled result columns, weights x reps that happened) rather than a plan to follow — return instead {\"history\":true,\"block\":\"name\",\"weeks\":[{\"week\":1,\"sessions\":[{\"name\":\"day name\",\"exercises\":[{\"name\":\"...\",\"sets\":[{\"w\":kg|null,\"r\":reps,\"rpe\":n|null}]}]}]}]} — one entry per performed set, weeks in order, empty template weeks omitted.';
 function impNew(){S.imp={step:'pick',text:'',img:null,busy:false,draft:null,err:null,assess:null}}
 async function impParse(){
   const f=S.imp;if(!aiReady())return flash('Add your API key or Allena cloud link under Data → Allena first.');
@@ -2282,6 +2282,11 @@ async function impParse(){
       f.err='That program is big and the conversion ran out of room. Trim the pasted text above to the sheets that matter (the day tabs) and read it again.';
       f.busy=false;return render()}
     const o=JSON.parse(t);
+    if(o.history&&o.weeks&&o.weeks.length){
+      // logged history, no dates: one question and Allena deduces them
+      S.histImp={block:String(o.block||'Imported history').slice(0,60),weeks:o.weeks.slice(0,52)};
+      S.hdate={date:'',mode:'start'};
+      S.imp=null;S.view='today';S.sheet={t:'histdate'};S.busyDone=1;render();return}
     if(o.running&&o.running.length){
       // the sheet's running progression survives the import — rule 4:
       // nothing silently disappears
@@ -4181,7 +4186,30 @@ function runPlanGen(){
       if(p9&&p9.days&&p9.days.some((d9,i9)=>{const m9=dayMuscles(p9,i9,S.week)||{};return m9.Quads||m9.Hamstrings||m9.Glutes}))
         note='Keep the long run at least a day clear of leg work — heavy legs the day after '+Math.round(km*0.38)+' km is where the lifting and the running both lose.';
     }catch(e){}
-    return{base:base,freq:freq,days:days,pace:easyP?pStr(easyP):null,note:note,items:items}}catch(e){return{block:'Could not read the history.'}}}
+    // one week, both sides: lifts and runs arranged so they help each other
+    let template=null;
+    try{
+      const p9=activeProgSafe();
+      if(p9&&p9.days&&p9.days.length){
+        const DN7=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+        const L2=Math.min(5,p9.days.length);
+        const slots={2:[0,3],3:[0,2,4],4:[0,1,3,4],5:[0,1,2,3,4]}[Math.max(2,L2)]||[0,2,4];
+        const legIdx=new Set();
+        p9.days.forEach((d9,i9)=>{try{const m9=dayMuscles(p9,i9,S.week)||{};if(m9.Quads||m9.Hamstrings||m9.Glutes)legIdx.add(i9)}catch(e){}});
+        const week={};slots.slice(0,L2).forEach((s9,i9)=>{week[s9]={i:i9}});
+        const legDays=Object.keys(week).filter(k=>legIdx.has(week[k].i)).map(Number);
+        const adjLeg=d9=>legDays.some(ld=>Math.abs(ld-d9)<=1);
+        const free=[0,1,2,3,4,5,6].filter(d9=>!week[d9]);
+        const runsN=Math.min(freq,free.length);
+        const longDay=free.slice().sort((a9,b9)=>(adjLeg(a9)?1:0)-(adjLeg(b9)?1:0)||b9-a9)[0];
+        const easyDays=free.filter(d9=>d9!==longDay).slice(0,Math.max(0,runsN-1));
+        template=[0,1,2,3,4,5,6].map(d9=>{
+          if(week[d9])return DN7[d9]+' — '+String(p9.days[week[d9].i].name||('Day '+(week[d9].i+1))).replace(/ — .*/,'')+(legIdx.has(week[d9].i)?' (legs)':'');
+          if(d9===longDay&&runsN>0)return DN7[d9]+' — long run';
+          if(easyDays.indexOf(d9)>=0)return DN7[d9]+' — easy run';
+          return null}).filter(Boolean)}
+    }catch(e){}
+    return{base:base,freq:freq,days:days,pace:easyP?pStr(easyP):null,note:note,template:template,items:items}}catch(e){return{block:'Could not read the history.'}}}
 function viewPoints(){
   const d=dataPoints(),t=dpTier(d.total),nx=dpNext(d.total),L=dpLabels(),st=weekStreak();
   const keys=Object.keys(d.by).filter(k=>d.by[k]).sort((a,b)=>d.by[b]-d.by[a]);
@@ -4860,6 +4888,9 @@ function parseRunImport(text){
           const m2=dRaw.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/);
           if(m2)dt=new Date(+((m2[3].length===2?'20':'')+m2[3]),+m2[2]-1,+m2[1])}
         if(isNaN(dt.getTime())||!(km>0)||!(mins>0)){skipped++;return}
+        // a "time" faster than world-record pace is a PACE, not a duration
+        if(km>1&&mins/km<2.5)mins=mins*km;
+        if(mins/km<2.5||mins/km>15){skipped++;return}
         out.push({date:dayKey(dt),km:Math.round(km*100)/100,
           mins:Math.round(mins*10)/10,type:guessType(iName>=0?c[iName]:typeCell),
           hr:iHr>=0?num(c[iHr]):null,elev:iEl>=0?num(c[iEl]):null,
@@ -4875,9 +4906,13 @@ function parseRunImport(text){
       m=l.match(/(\d+(?:\.\d+)?)\s*(?:min|minutes)/i);return m?parseFloat(m[1]):null})();
     const dm=l.match(/(\d{4}-\d{2}-\d{2})/)||l.match(/(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/);
     if(!(km>0)||!(mins>0)){skipped++;return}
+    // a "time" faster than world-record pace is a PACE (5:45/km), not a duration
+    let mm=mins;
+    if(km>1&&mm/km<2.5)mm=mm*km;
+    if(mm/km<2.5||mm/km>15){skipped++;return}
     let dt=dm?new Date(dm[1].indexOf('-')===4?dm[1]:dm[1].split(/[\/\-]/).reverse().join('-')):null;
     if(!dt||isNaN(dt.getTime()))dt=new Date();
-    out.push({date:dayKey(dt),km:Math.round(km*100)/100,mins:Math.round(mins*10)/10,
+    out.push({date:dayKey(dt),km:Math.round(km*100)/100,mins:Math.round(mm*10)/10,
       type:guessType(l),hr:(l.match(/(\d{2,3})\s*bpm/i)||[])[1]||null,elev:null,note:''})});
   return{runs:out,skipped:skipped}}
 function runImportCommit(list){
@@ -5230,7 +5265,14 @@ function xlsxCells(xml,strings){
     let v=vm[1];
     if(v==='')continue;
     if(at.t==='s'){const i=parseInt(v,10);if(strings[i]!=null)v=strings[i];else continue}
-    else v=xlsxUnesc(v);
+    else{
+      v=xlsxUnesc(v);
+      // Excel stores dates as day serials — 35000..60000 is 1995..2064,
+      // far above any weight or km, so the conversion is safe
+      const nv=+v;
+      if(isFinite(nv)&&nv>=35000&&nv<=60000&&/^\d+(\.0*)?$/.test(String(v).trim())){
+        const d=new Date(Date.UTC(1899,11,30)+nv*864e5);
+        v=d.toISOString().slice(0,10)}}
     const col=ref[1].split('').reduce((a,ch)=>a*26+ch.charCodeAt(0)-64,0);
     (rows[+ref[2]]=rows[+ref[2]]||{})[col]=String(v)}
   return rows}
@@ -5306,6 +5348,32 @@ function xlsxExtract(file,done,fail){
       .catch(function(){fail('bad')})
     },fail)};
   fr.readAsArrayBuffer(file)}
+
+/* ── history without dates ───────────────────────────────────
+   A friend's log often has weeks but no calendar. One anchor date
+   and the dates are deduced — approximate on purpose, and said so. */
+function histMaterialize(hi,mode,dateStr){
+  const weeks=(hi&&hi.weeks)||[];if(!weeks.length||!dateStr)return[];
+  const maxW=Math.max.apply(null,weeks.map(w=>+w.week||1));
+  const d0=new Date(dateStr+'T12:00');if(isNaN(d0.getTime()))return[];
+  const anchor=new Date(d0);
+  if(mode==='end')anchor.setDate(anchor.getDate()-(maxW-1)*7-6);
+  const out=[],stamp=Date.now().toString(36);
+  weeks.forEach(wk=>{
+    const w=+wk.week||1,ses=(wk.sessions||[]);
+    ses.forEach((sn,i)=>{
+      const off=ses.length>1?Math.round(6*i/(ses.length-1)):2;
+      const d=new Date(anchor);d.setDate(d.getDate()+(w-1)*7+off);
+      const log=[];
+      (sn.exercises||[]).forEach(ex=>{(ex.sets||[]).forEach((st,si)=>{
+        if(!st||(!st.w&&!st.r))return;
+        log.push({ex:String(ex.name||'Exercise').slice(0,60),setNo:si+1,
+          w:st.w!=null?+st.w:null,r:st.r!=null?+st.r:null,rpe:st.rpe!=null?+st.rpe:null})})});
+      if(!log.length)return;
+      out.push({id:'imph'+stamp+'w'+w+'s'+i,date:dayKey(d)+'T18:00',
+        progId:'imported',week:w,dayTitle:String(sn.name||'Session').slice(0,50),
+        complete:true,approx:true,log:log})})});
+  return out}
 const RARITY=[['common','#8A8782','Noticed'],['uncommon','#93B08A','Worth knowing'],
   ['rare','#D9D6CD','Rare find'],['epic','#FFFFFF','Big one']];
 function rarityOf(k){return RARITY.find(x=>x[0]===k)||RARITY[0]}
@@ -9849,6 +9917,19 @@ function sheetHtml(){
          '<button data-a="questPass" class="btn mt" style="color:var(--dim)">Not this week</button>'
         :'')+
       '<p style="color:var(--faint);font-size:11px;line-height:1.55;margin-top:12px">One per week, generated Monday from what you have already done. If it does not happen, nothing is lost and nothing turns red — a fresh one simply arrives Monday.</p>')}
+  if(S.sheet.t==='histdate'){
+    const hi=S.histImp;if(!hi)return '';
+    const f=S.hdate||(S.hdate={date:'',mode:'start'});
+    const nW=Math.max.apply(null,hi.weeks.map(w=>+w.week||1));
+    const nS=hi.weeks.reduce((a2,w)=>a2+((w.sessions||[]).length),0);
+    return wrapSheet('One date and it all lands',
+      '<p style="color:var(--dim);font-size:13.5px;line-height:1.6">'+esc(hi.block)+' — '+nW+' weeks, '+nS+' sessions of logged lifting, no calendar. Give Allena one anchor and the dates are deduced, marked approximate, and everything starts working on it: trends, patterns, deep reads, the next block.</p>'+
+      '<div class="row mt2" style="gap:8px">'+
+      [['start','Week 1 started on\u2026'],['end','The last week ended on\u2026']].map(m2=>
+        '<button data-a="hdateMode" data-v="'+m2[0]+'" class="pill" style="flex:1;font-size:12px'+(f.mode===m2[0]?';background:var(--text);color:#1F1E1D;border-color:var(--text);font-weight:600':'')+'">'+m2[1]+'</button>').join('')+'</div>'+
+      '<input type="date" data-in="hdate.date" value="'+esc(f.date||'')+'" style="margin-top:10px">'+
+      '<button data-a="histImpGo" class="big disp mt" style="background:'+((f.date||'').trim()?'var(--amber)':'var(--raised)')+';color:'+((f.date||'').trim()?'#1F1E1D':'var(--faint)')+';font-size:15px">Bring it in</button>'+
+      '<p style="color:var(--faint);font-size:11px;line-height:1.55;margin-top:10px">Sessions are spread across each week and marked as imported with approximate dates — honest labels, real data.</p>')}
   if(S.sheet.t==='intake'){
     if(S.hkBusy)return wrapSheet('Import your data',
       '<p class="mono" style="color:var(--amber);font-size:12px">Reading the export — big files take a minute…</p>');
@@ -9878,7 +9959,7 @@ function sheetHtml(){
     if(g.block)return wrapSheet('The running plan',
       '<p style="color:var(--dim);font-size:13.5px;line-height:1.6">'+esc(g.block)+'</p>');
     return wrapSheet('Eight weeks, built from you',
-      '<p style="color:var(--dim);font-size:13px;line-height:1.6">Base: your own average of about '+g.base+' km a week across '+g.freq+' runs'+(g.days?' on your usual days ('+g.days.join(', ')+')':'')+(g.pace?', paced off your own easy average of '+g.pace+'/km':'')+'. It grows 8% a week with a down week every fourth — and the 0.8\u20131.3 load band always outranks it.</p>'+(g.note?'<p style="color:var(--dim);font-size:12.5px;line-height:1.55;margin-top:8px">'+esc(g.note)+'</p>':'')+
+      '<p style="color:var(--dim);font-size:13px;line-height:1.6">Base: your own average of about '+g.base+' km a week across '+g.freq+' runs'+(g.days?' on your usual days ('+g.days.join(', ')+')':'')+(g.pace?', paced off your own easy average of '+g.pace+'/km':'')+'. It grows 8% a week with a down week every fourth — and the 0.8\u20131.3 load band always outranks it.</p>'+(g.note?'<p style="color:var(--dim);font-size:12.5px;line-height:1.55;margin-top:8px">'+esc(g.note)+'</p>':'')+(g.template?'<p class="eyebrow mt2">One week, both sides</p>'+'<div class="card mt" style="padding:4px 15px">'+g.template.map((l2,i2)=>'<p style="padding:8px 0;font-size:12.5px;color:var(--dim)'+(i2?';border-top:1px solid var(--line)':'')+'">'+esc(l2)+'</p>').join('')+'</div>'+'<p style="color:var(--faint);font-size:11px;line-height:1.5;margin-top:6px">Lift days are your program\u2019s own \u2014 slide the week around your life, keep the spacing.</p>':'')+
       '<div class="card mt" style="padding:4px 15px">'+
       g.items.map((it,i)=>'<div style="display:flex;gap:11px;padding:9px 0'+(i?';border-top:1px solid var(--line)':'')+'">'+
         '<span class="mono" style="color:var(--faint);font-size:11px;flex:none;width:20px">W'+it.week+'</span>'+
@@ -11179,10 +11260,20 @@ function runAction(a,v,t,e){
     case 'chatNew':{S.coachBack=S.view;S.drawerOpen=false;chatNew();render();break}
     case 'chatOpen':{S.coachBack=S.view;S.drawerOpen=false;chatOpen(v);render();break}
     case 'coachSessToggle':{S.coachSessOpen=!S.coachSessOpen;render();break}
+    case 'hdateMode':{(S.hdate=S.hdate||{}).mode=v;render();break}
+    case 'histImpGo':{const f=S.hdate||{};
+      if(!(f.date||'').trim()){flash('Pick the date first.');break}
+      const recs=histMaterialize(S.histImp,f.mode||'start',f.date);
+      if(!recs.length){flash('Nothing usable in that history.');break}
+      const have=new Set(S.history.map(h=>h.id));
+      recs.forEach(r=>{if(!have.has(r.id))S.history.push(r)});
+      S.history.sort((a2,b2)=>String(a2.date).localeCompare(String(b2.date)));
+      saveHistory();S.patCache=null;S.histImp=null;S.hdate=null;S.sheet=null;render();
+      flash(recs.length+' sessions in, dates deduced — trends and deep reads can see them now.');break}
     case 'intakeOpen':{S.drawerOpen=false;S.sheet={t:'intake'};render();break}
     case 'runplanGenAsk':{S.rpgen=runPlanGen();S.sheet={t:'runplangen'};render();break}
     case 'runplanGenGo':{const g=S.rpgen;if(!g||g.block)break;
-      lset('training-runplan-v1',{src:'Built from your history',started:today(),note:g.note||null,items:g.items});
+      lset('training-runplan-v1',{src:'Built from your history',started:today(),note:g.note||null,template:g.template||null,items:g.items});
       S.runplan=lget('training-runplan-v1',null);S.rpgen=null;S.sheet=null;render();
       flash('Eight weeks on the board — week 1 starts where you already are.');break}
     case 'runplanOffAsk':{S.confirm={t:'Remove the running plan?',
