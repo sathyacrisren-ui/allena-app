@@ -334,7 +334,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return (lget(K_RUN,[])||[]).length>0})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='073d9c';  // stamped by tools/build.py with the content hash
+const BUILD_ID='c2fecf';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -1624,8 +1624,9 @@ function genProgram(prof){
   const easy=(prof.restr&&prof.restr.machines)||prof.exp==='new';
   const cap=r=>easy?Math.min(r,8):r;
   const style=prof.style||'mixed',weeks=prof.weeks||6,mins=prof.mins||60;
-  const strong=prof.goal==='strength'||style==='heavy';
-  const lean=prof.goal==='lean';
+  const gset=prof.goals&&Object.keys(prof.goals).length?prof.goals:(prof.goal?{[prof.goal]:1}:{});
+  const strong=!!gset.strength||prof.goal==='strength'||style==='heavy';
+  const lean=!!gset.lean||prof.goal==='lean';
   // volume budget: sets that fit the time, trimmed in a deficit, raised for the experienced
   const budget=Math.max(9,Math.round(mins/(strong?4.4:3.4))-(lean?2:0)+(prof.exp==='experienced'?2:0));
   const mainSets=prof.exp==='new'?2:(strong?3:3);
@@ -1652,7 +1653,7 @@ function genProgram(prof){
   const mcgDay=()=>POOL.mcg.map(p=>({name:p.n,rest:30,cue:p.cue,
     sets:{'default':p.secs?hold(p.secs,2,p.perSide):reps(8,2,p.perSide),[weeks]:p.secs?hold(p.secs,1,p.perSide):reps(8,1,p.perSide)}}));
   const trunk=prof.restr&&(prof.restr.disc||prof.restr.fused);
-  const gl=prof.goal==='glutes';
+  const gl=prof.goal==='glutes'||!!(prof.goals&&prof.goals.glutes);
   function day(name,slots,note){const ex=[],here=new Set();let sets=0;
     slots.forEach(sl=>{if(!sl)return;
       if(sets>=budget&&!sl[1])return;              // heavy slots always fit; accessories yield to the clock
@@ -1683,7 +1684,11 @@ function genProgram(prof){
     else days.push(day('Upper',[['pushH',1],['pullH',1],['side',0],['bi',0],['tri',0]],'Weak points'),
       day('Lower',[['squat',1],['ham',0],[gl?'glute':'calf',0]],'Second legs'));
   }
-  const label={muscle:'Muscle',glutes:'Glute & Lower',upper:'Upper Body',strength:'Strength',lean:'Lean',fit:'Fitness'}[prof.goal]||'Training';
+  const LBL={muscle:'Muscle',glutes:'Glute & Lower',upper:'Upper Body',strength:'Strength',lean:'Lean',fit:'Fitness'};
+  const gks=Object.keys(prof.goals||{}).filter(k=>prof.goals[k]);
+  const label=(gks.includes('strength')&&gks.includes('muscle'))?'Power & Size'
+    :gks.length>1?gks.slice(0,2).map(k=>LBL[k]).join(' + ')
+    :LBL[gks[0]||prof.goal]||'Training';
   const notes=[];
   notes.push('Weights are not guessed. In round one find a load that lands on the target effort — the app remembers it and drives progression from there.');
   if(focus.length)notes.push('Extra weekly sets on '+focus.join(', ')+'.');
@@ -1706,13 +1711,48 @@ function coachSys(){
     return 'You are Allena, the coach inside this training app. User: '+(p.name||'user')+', '+(p.sex||'')+', age '+p.age+', experience '+p.exp+'. Goal: '+p.goal+'. Equipment: '+p.eq+'. Restrictions: '+(restrList(p)||'none')+(p.notes?'; notes: '+p.notes:'')+'. Double progression: top of rep range @RPE<=9 on all sets -> add load; wk6 deload. Never conflict with the restrictions. Pain/numbness/tingling -> stop, see a professional. Under 80 words; one concrete call first, then one line why. If a programmed load should change, end with a line exactly like ADJUST|<exercise name>|<number> where the number is kilograms, e.g. ADJUST|Bench — back-off|-2.5. When the context contains A SESSION UNDER DISCUSSION, every answer is about that session unless the user clearly asks otherwise; background data may only be used by naming its date, and attributing a number to the wrong day or exercise is the one unforgivable error.'}
   if(S.lib.programs.some(p=>p.id==='bench-1'))return COACH_SYS;
   return 'You are Allena, an evidence-based strength coach inside a training app. NEVER state a number you were not given — if it is not in the CONTEXT block, say what is missing instead of estimating. Ground calls in the strongest research (progressive overload, 10-20 hard sets/muscle/wk, RPE proximity-to-failure, 48-72h recovery) and the lifter\'s own logged data; admit when evidence is weak - never invent citations. Encourage balance across muscles. Double progression: top of range @RPE<=9 on all sets -> add load; wk6 deload. Pain/numbness/tingling -> stop, see a professional. Under 80 words; one concrete call first, then one line why. If a programmed load should change, end with ADJUST|<exercise>|<+/-kg>. When the context contains A SESSION UNDER DISCUSSION, every answer is about that session unless the user clearly asks otherwise; background data may only be used by naming its date, and attributing a number to the wrong day or exercise is the one unforgivable error.'}
-function startSetup(pre){S.setup=Object.assign({step:0,name:'',sex:null,age:30,exp:null,years:1,days:3,mins:60,eq:'full',eqx:{},goal:null,focus:{},style:'mixed',weeks:6,restr:{},notes:''},pre||{},{step:0});S.sheet=null;S.view='setup';render()}
+function profDeduce(){
+  /* the first flex: Allena reads the imported history and fills the
+     questionnaire from evidence — frequency from real weeks, style
+     from real rep ranges, experience from how often added load
+     actually stuck. Returns null when there is too little to say. */
+  try{
+    const H=(S.history||[]).filter(h=>h.complete&&!h.run&&(h.log||[]).length);
+    if(H.length<6)return null;
+    const byWk={};H.forEach(h=>{const k=questWeekKey(h.date);byWk[k]=(byWk[k]||0)+1});
+    const counts=Object.values(byWk).sort((a,b)=>a-b);
+    const days=Math.max(2,Math.min(6,counts[Math.floor(counts.length/2)]||3));
+    let lo=0,hi=0,mid=0;
+    H.forEach(h=>h.log.forEach(l=>{if(!l.r)return;if(l.r<8)lo++;else if(l.r>12)hi++;else mid++}));
+    const style=lo>mid+hi?'heavy':hi>lo+mid?'pump':'mixed';
+    // rate of adaptation: across each lift, how often did added weight stick?
+    const byEx={};H.forEach(h=>h.log.forEach(l=>{if(l.w&&l.r)(byEx[l.ex]=byEx[l.ex]||[]).push({d:h.date,w:l.w})}));
+    let up=0,pairs=0;
+    Object.values(byEx).forEach(rows=>{const seen={};rows.forEach(r=>{const k=String(r.d).slice(0,10);seen[k]=Math.max(seen[k]||0,r.w)});
+      const dsx=Object.keys(seen).sort();
+      for(let i=1;i<dsx.length;i++){pairs++;if(seen[dsx[i]]>seen[dsx[i-1]])up++}});
+    const gapDays=(Date.now()-new Date(H[H.length-1].date).getTime())/864e5;
+    const exp=gapDays>21?'returning':(pairs>=8&&up/pairs>0.4)?'new':'experienced';
+    const spanY=Math.max(1,Math.round((new Date(H[H.length-1].date)-new Date(H[0].date))/(365*864e5))||1);
+    const goals={};if(lo>=mid)goals.strength=1;if(mid+hi>=lo)goals.muscle=1;
+    return{n:H.length,days:days,style:style,exp:exp,years:spanY,goals:goals,
+      upPct:pairs?Math.round(up/pairs*100):null}}catch(e){return null}}
+function startSetup(pre){
+  S.setup=Object.assign({step:0,name:'',sex:null,age:30,exp:null,years:1,days:3,mins:60,eq:'full',eqx:{},goal:null,goals:{},focus:{},style:'mixed',weeks:6,restr:{},notes:''},pre||{},{step:0});
+  if(!pre){const d=profDeduce();
+    if(d){Object.assign(S.setup,{days:d.days,style:d.style,exp:d.exp,years:d.years,goals:d.goals,goal:Object.keys(d.goals)[0]||null,_deduced:d})}}
+  S.sheet=null;S.view='setup';render()}
 function suPills(k,opts,multi){return '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:10px">'+opts.map(o=>{
   const on=multi?!!S.setup.restr[o[0]]:String(S.setup[k])===String(o[0]);
   return '<button data-a="'+(multi?'suRestr':'suPick')+'" data-k="'+k+'" data-v="'+o[0]+'" class="pill" style="'+(on?'background:var(--text);color:#1F1E1D;border-color:var(--text);font-weight:600':'')+'">'+o[1]+'</button>'}).join('')+'</div>'}
 function viewSetup(){
   const st=S.setup||(S.setup={step:0,name:'',sex:null,age:30,exp:null,years:1,days:3,mins:60,eq:'full',eqx:{},goal:null,focus:{},style:'mixed',weeks:6,restr:{},notes:''});
   const T=['About you','Experience','Schedule','Equipment','Your goal','Emphasis','Health','Review'];
+  const ded=st._deduced?'<div class="card" style="padding:11px 14px;margin-top:12px;border-color:var(--green)">'+
+    '<p class="mono" style="color:var(--green);font-size:9px;letter-spacing:.06em">READ FROM YOUR DATA \u00b7 '+st._deduced.n+' SESSIONS</p>'+
+    '<p style="color:var(--dim);font-size:12px;line-height:1.55;margin-top:4px">You train ~'+st._deduced.days+' days a week'+
+    (st._deduced.upPct!=null?'; added weight stuck '+st._deduced.upPct+'% of the time \u2014 '+(st._deduced.exp==='new'?'still on session-to-session gains':st._deduced.exp==='returning'?'rebuilding after a gap':'a trained adapter')+'':'')+
+    '. Every answer below is prefilled from evidence \u2014 correct anything.</p></div>':'';
   const chk=(obj,k,label,sub)=>{const on=!!(st[obj]&&st[obj][k]);
     return '<button data-a="suMulti" data-k="'+obj+'" data-v="'+k+'" style="display:flex;align-items:center;gap:11px;width:100%;text-align:left;margin-top:9px">'+
       '<span style="width:22px;height:22px;border-radius:7px;flex:none;display:inline-flex;align-items:center;justify-content:center;font-size:12px;'+
@@ -1720,13 +1760,17 @@ function viewSetup(){
       '<span style="flex:1"><span style="display:block;font-size:13.5px;font-weight:600">'+label+'</span>'+
       (sub?'<span style="color:var(--faint);font-size:11.5px">'+sub+'</span>':'')+'</span></button>'};
   let b='';
-  if(st.step===0)b='<p style="color:var(--dim);font-size:13px;line-height:1.55;margin-top:8px">Eight quick screens and Allena builds the block around you. Everything stays on this phone.</p>'+
+  if(st.step===0)b=(st._deduced?ded:'<button data-a="setupImport" class="card" style="width:100%;text-align:left;padding:13px 15px;margin-top:12px;display:flex;align-items:center;gap:11px;border-style:dashed">'+
+    '<span style="flex:1;min-width:0"><span style="display:block;font-size:13px;font-weight:600">Already have training history?</span>'+
+    '<span style="color:var(--faint);font-size:11px;line-height:1.4">Bring it in first \u2014 Hevy, Strong, Garmin, a spreadsheet \u2014 and Allena fills these questions out from the evidence.</span></span>'+
+    '<span class="mono" style="color:var(--amber);font-size:13px;flex:none">\u203a</span></button>')+'<p style="color:var(--dim);font-size:13px;line-height:1.55;margin-top:8px">Eight quick screens and Allena builds the block around you. Everything stays on this phone.</p>'+
     '<p class="eyebrow" style="margin-top:20px">Name</p><input data-in="setup.name" value="'+esc(st.name)+'" placeholder="Optional" style="width:100%;margin-top:8px;background:var(--surface);border:1px solid var(--line);border-radius:10px;color:var(--text);padding:12px;font-size:16px;outline:none">'+
     '<p class="eyebrow" style="margin-top:18px">Sex</p>'+suPills('sex',[['female','Female'],['male','Male'],['na','Prefer not to say']])+
     '<div style="margin-top:18px;max-width:210px">'+stepper('setup.age','Age',st.age,1,'yrs')+'</div>'+
     '<p style="color:var(--faint);font-size:11.5px;line-height:1.5;margin-top:12px">These shape starting effort and rest, nothing else.</p>';
-  if(st.step===1)b='<p class="eyebrow" style="margin-top:12px">How much lifting have you done?</p>'+
-    suPills('exp',[['new','New to it'],['returning','Coming back'],['experienced','Experienced']])+
+  if(st.step===1)b=ded+'<p class="eyebrow" style="margin-top:12px">When you train consistently, how does progress come?</p>'+
+    suPills('exp',[['new','I\u2019m new \u2014 or it comes almost every session'],['returning','Coming back after time away'],['experienced','It takes weeks of planning now']])+
+    '<p style="color:var(--faint);font-size:11.5px;line-height:1.55;margin-top:10px">This is the honest measure of training age \u2014 how fast you adapt, not how long you\u2019ve owned a membership. Novices progress session to session; the more trained you are, the slower gains stick.</p>'+
     '<div style="margin-top:18px;max-width:230px">'+stepper('setup.years','Years training',st.years,1,'yrs')+'</div>'+
     '<p class="eyebrow" style="margin-top:20px">How do you like to train?</p>'+
     suPills('style',[['heavy','Heavy, low rep'],['mixed','A mix'],['pump','Higher rep']])+
@@ -1763,10 +1807,21 @@ function viewSetup(){
       '<button data-a="suEqNone" class="btn mt" style="color:var(--dim);font-size:12.5px">I have none of these — bodyweight only</button>';
     const n=Object.keys(st.eqx||{}).filter(k=>st.eqx[k]).length;
     b+='<p class="mono" style="color:var(--faint);font-size:11px;margin-top:10px">'+(n?n+' selected':'nothing selected yet')+'</p>'}
-  if(st.step===4)b='<p class="eyebrow" style="margin-top:12px">Main goal</p>'+
-    suPills('goal',[['muscle','Build muscle'],['strength','Get stronger'],['glutes','Glutes & lower'],['upper','Upper body'],['lean','Lose fat, keep muscle'],['fit','General fitness']])+
+  if(st.step===4)b='<p class="eyebrow" style="margin-top:12px">Goals — pick every one that is true</p>'+
+    '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:10px">'+
+    [['muscle','Build muscle'],['strength','Get stronger'],['glutes','Glutes & lower'],['upper','Upper body'],['lean','Lose fat, keep muscle'],['fit','General fitness']].map(o=>{
+      const on=!!(st.goals||{})[o[0]];
+      return '<button data-a="suGoal" data-v="'+o[0]+'" class="pill" style="'+(on?'background:var(--text);color:#1F1E1D;border-color:var(--text);font-weight:600':'')+'">'+o[1]+'</button>'}).join('')+'</div>'+
     '<p class="eyebrow" style="margin-top:20px">Block length</p>'+suPills('weeks',[[4,'4 weeks'],[6,'6 weeks'],[8,'8 weeks']])+
     '<p style="color:var(--faint);font-size:11.5px;line-height:1.55;margin-top:12px">'+
+    (function(){const g=st.goals||{};const bits=[];
+      if(g.strength&&g.muscle)bits.push('Strength and size together is the classic powerbuilding shape: main lifts heavy with long rest, accessories in growth ranges — the two goals feed each other.');
+      else if(g.strength)bits.push('Lower reps and longer rest on the main lifts, accessories kept for size and joint health.');
+      else if(g.muscle)bits.push('Hard sets near failure in growth ranges; the weight on the bar follows.');
+      if(g.lean)bits.push('In a deficit the job is holding strength while food does the fat loss — volume trims a little to protect recovery.');
+      if(g.glutes)bits.push('Extra glute and hip work sits inside the full plan.');
+      if(g.upper)bits.push('Upper body gets the extra sets; legs stay in for the base.');
+      if(bits.length)return bits.join(' ');return ''})()||
     (st.goal==='lean'?'Training barely changes in a deficit - the job is holding strength while food does the fat loss. Volume is trimmed a little to protect recovery.'
      :st.goal==='glutes'?'Extra glute and hip work sits inside a full plan; pressing, pulling and quads stay in.'
      :st.goal==='strength'?'Lower reps and longer rest on the main lifts, accessories kept for size and joint health.'
@@ -1827,7 +1882,17 @@ function viewSetup(){
         const N={bb:'barbell',rack:'rack',db:'dumbbells',mc:'machines',cb:'cables',pullup:'pull-up bar',bench:'bench',band:'bands',kb:'kettlebells',cardio:'cardio'};
         const list=Object.keys(N).filter(k=>x[k]).map(k=>N[k]);
         return list.length?list.join(', '):'bodyweight only'})())+
-      line('Goal',(st.goal||'—')+' · '+st.weeks+' weeks')+
+      line('Goals',(Object.keys(st.goals||{}).filter(k=>st.goals[k]).join(' + ')||st.goal||'—')+' · '+st.weeks+' weeks')+
+      (function(){const strong=!!(st.goals||{}).strength||st.style==='heavy';
+        const lean=!!(st.goals||{}).lean;
+        const budget=Math.max(9,Math.round((st.mins||60)/(strong?4.4:3.4))-(lean?2:0)+(st.exp==='experienced'?2:0));
+        const mr=strong?(st.style==='heavy'?'4-6':'5-8'):(st.style==='pump'?'10-15':'8-12');
+        return '<div style="border-top:1px solid var(--line);margin-top:10px;padding-top:10px">'+
+        '<p class="mono" style="color:var(--faint);font-size:9px;letter-spacing:.06em">HOW IT WILL BE BUILT</p>'+
+        '<p class="mono" style="color:var(--dim);font-size:11px;line-height:1.7;margin-top:4px">'+
+        '~'+budget+' hard sets a session from your '+(st.mins||60)+' minutes'+(lean?' (trimmed for the deficit)':'')+'<br>'+
+        'main lifts '+mr+' reps \u00b7 accessories in growth ranges<br>'+
+        (st.exp==='new'?'2 sets per main lift while gains come every session':'volume raised for a trained adapter')+'</p></div>'})()+
       line('Emphasis',foc.length?foc.join(', '):'balanced')+
       line('Working around',restrList(st)||'nothing')+'</div>'+
       '<p style="color:var(--dim);font-size:12.5px;line-height:1.6;margin-top:14px">No weights are guessed. In round one you find a load that lands on the target effort; progression runs off your own numbers from then on.</p>'+
@@ -11927,7 +11992,9 @@ function runAction(a,v,t,e){
       const recs=histFromDated(hd.sessions);
       if(!recs.length){flash('Nothing usable in that file.');break}
       const res=histCommit(recs);
-      S.histDated=null;S.sheet=null;S.view='today';render();
+      S.histDated=null;S.sheet=null;
+      if(S.setupResume){S.setupResume=false;startSetup();flash('Read '+res.added+' sessions — the questions are filled from your data.');break}
+      S.view='today';render();
       flash(res.added+' sessions in'+(res.replaced?' ('+res.replaced+' replaced)':'')+(res.skippedReal?' — '+res.skippedReal+' skipped, you had logged them yourself':'')+'.');
       break}
     case 'hdateMode':{(S.hdate=S.hdate||{}).mode=v;render();break}
@@ -11936,7 +12003,9 @@ function runAction(a,v,t,e){
       const recs=histMaterialize(S.histImp,f.mode||'start',f.date);
       if(!recs.length){flash('Nothing usable in that history.');break}
       const res=histCommit(recs);
-      S.patCache=null;S.histImp=null;S.hdate=null;S.sheet=null;render();
+      S.patCache=null;S.histImp=null;S.hdate=null;S.sheet=null;
+      if(S.setupResume){S.setupResume=false;startSetup();flash('Read '+res.added+' sessions — the questions are filled from your data.');break}
+      render();
       flash(res.added+' sessions in, dates deduced'+(res.replaced?' — '+res.replaced+' from an earlier import replaced, never doubled':'')+(res.skippedReal?' · '+res.skippedReal+' skipped where you had real logs':'')+'.');break}
     case 'intakeOpen':{S.drawerOpen=false;S.sheet={t:'intake'};render();break}
     case 'runScratchOpen':{S.rscr={freq:3,comfort:'2'};S.sheet={t:'runscratch'};render();break}
@@ -12587,6 +12656,11 @@ function runAction(a,v,t,e){
       if(!nm)break;S.prof=Object.assign({},S.prof||{skipped:true},{name:nm});lset(K_PROF,S.prof);
       flash('Welcome, '+nm+'.');break}
     case 'setupOpen':startSetup(S.prof&&S.prof.goal?S.prof:null);break;
+    case 'setupImport':{S.setupResume=true;S.sheet={t:'intake'};render();break}
+    case 'suGoal':{const st=S.setup;st.goals=st.goals||{};
+      st.goals[v]=!st.goals[v];if(!st.goals[v])delete st.goals[v];
+      st.goal=Object.keys(st.goals)[0]||null; // primary, for every existing reader
+      render();break}
     case 'suPick':{const k=t.dataset.k;let val=t.dataset.v;if(k==='days'||k==='age')val=+val;S.setup[k]=val;render();break}
     case 'suAllow':{const n=t.dataset.v;S.allow=S.allow||{};
       if(S.allow[n])delete S.allow[n];else S.allow[n]=1;lset(K_ALLOW,S.allow);vib(10);render();break}
@@ -12607,7 +12681,7 @@ function runAction(a,v,t,e){
           const n=Object.keys(x).filter(k=>x[k]).length;
           if(!n&&!st.bwOnly){flash('Tick what you have, or choose bodyweight only.');break}
           st.eq=(x.bb&&x.rack)?'full':(x.db&&x.mc)?'dbm':(x.mc||x.cb)?'mach':(x.db||x.kb||x.band||x.pullup)?'min':'min'}
-        if(st.step===4&&!st.goal){flash('Pick a goal to continue.');break}
+        if(st.step===4&&!st.goal&&!Object.keys(st.goals||{}).length){flash('Pick at least one goal to continue.');break}
         if(st.step===6){const found=scanNotes(st.notes).filter(k=>!st.restr[k]);
           if(found.length){st.restr=st.restr||{};found.forEach(k=>st.restr[k]=1);
             const names=found.map(k=>(INJURIES.find(i=>i.k===k)||{}).n).filter(Boolean);
@@ -12616,7 +12690,7 @@ function runAction(a,v,t,e){
     case 'suGen':case 'suBuild':{const st=S.setup;
       if(st&&st.restr&&(st.restr.rehabWanted||st.restr.acl)&&!S.acl.on){S.acl.on=true;S.acl.phase=S.acl.phase||1;S.acl.gates=S.acl.gates||{};aclSave()}
       const prof={name:(st.name||'').trim(),sex:st.sex,age:+st.age||30,exp:st.exp,years:+st.years||0,
-        days:st.days,mins:st.mins||60,eq:st.eq,eqx:st.eqx||{},goal:st.goal,focus:st.focus||{},
+        days:st.days,mins:st.mins||60,eq:st.eq,eqx:st.eqx||{},goal:st.goal,goals:st.goals||{},focus:st.focus||{},
         style:st.style||'mixed',weeks:st.weeks||6,restr:st.restr||{},notes:(st.notes||'').trim()};
       try{demoWipe()}catch(e){}   // a real program replaces the sample account entirely
       S.prof=prof;lset(K_PROF,prof);
