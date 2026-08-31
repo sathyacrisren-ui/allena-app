@@ -334,7 +334,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return (lget(K_RUN,[])||[]).length>0})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='b1e760';  // stamped by tools/build.py with the content hash
+const BUILD_ID='5749b6';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -3903,6 +3903,10 @@ function viewRun(){
     '<button data-a="runImport" class="btn mt">Import my history</button></div></div>';
   // this week at a glance
   h+=runPlanCard();
+  if(!S.runplan&&runs().length<6)h+='<button data-a="runScratchOpen" class="card mt" style="width:100%;text-align:left;padding:14px 16px;display:flex;align-items:center;gap:12px;border-style:dashed">'+
+    '<span style="flex:1;min-width:0"><span style="display:block;font-size:13.5px;font-weight:600">Start running \u2014 build a plan from scratch</span>'+
+    '<span style="color:var(--faint);font-size:11.5px">Two questions, eight beginner-safe weeks. It adapts to what you actually run.</span></span>'+
+    '<span class="mono" style="color:var(--amber);font-size:13px;flex:none">\u203a</span></button>';
   if(!S.runplan&&runs().length>=6)h+='<button data-a="runplanGenAsk" class="card mt" style="width:100%;text-align:left;padding:14px 16px;display:flex;align-items:center;gap:12px;border-style:dashed">'+
     '<span style="flex:1;min-width:0"><span style="display:block;font-size:14px;font-weight:600;color:var(--dim)">Build a progression from your history</span>'+
     '<span style="color:var(--faint);font-size:11.5px">Eight weeks from your own average — the 10% rule, down weeks included</span></span></button>';
@@ -4142,14 +4146,88 @@ function runRow(r){
       '<button data-a="runDelAsk" data-v="'+esc(r.id)+'" class="btn" style="flex:1;color:var(--red);font-size:12.5px">Delete</button></div>'+
       '</div>':'')+'</div>'}
 
+function rpDescBuild(km,freq,days,pace,down){
+  const half=x=>Math.max(1,Math.round(x*2)/2);
+  if(down){const each=half(km/freq);
+    return days.map(d=>d+' '+each+' km easy').join(' \u00b7 ')+' \u2014 down week on purpose (~'+km+' km, no long run); the adaptation happens here.'}
+  const lng=half(km*0.38),each=half((km-lng)/Math.max(1,freq-1));
+  return days.map((d,i)=>i===days.length-1?(d+' '+lng+' km long'):(d+' '+each+' km easy')).join(' \u00b7 ')+
+    ' \u2014 ~'+km+' km'+(pace?', all around '+pace+'/km':'')+'.'}
+function runPlanScratch(freq,comfort){
+  /* no history to read: build from the honest floor instead. comfort is
+     'walkrun' or the km they can run comfortably today. */
+  if(S.acl&&S.acl.on&&S.acl.phase<3)
+    return{block:'Running waits for the criteria \u2014 phase 3 is where it usually opens, and quad symmetry near 80% matters more than any plan.'};
+  freq=Math.max(2,Math.min(4,+freq||3));
+  const DN=['Mon','Wed','Fri','Sat'].slice(0,freq);
+  const items=[];
+  if(comfort==='walkrun'){
+    const WR=[['1 min jog / 2 min walk \u00d7 7 (21 min)',2],['90s jog / 90s walk \u00d7 8 (24 min)',3],
+      ['3 min jog / 90s walk \u00d7 5 (22 min)',4],['5 min jog / 2 min walk \u00d7 3 \u2014 down week on purpose',3],
+      ['8 min jog / 2 min walk \u00d7 2, then 5 min jog',5],['10 min jog / 1 min walk \u00d7 2',6],
+      ['15 min continuous, walk as needed',7],['20\u201325 min continuous \u2014 you are a runner now',8]];
+    WR.forEach((w2,i)=>items.push({week:i+1,km:w2[1],down:i===3,
+      desc:DN.join(' / ')+': '+w2[0]+'.'}));
+    return{scratch:true,freq:freq,days:DN,base:2,pace:null,items:items,
+      note:'Every session conversational \u2014 if you cannot talk, slow down. Walking breaks are the plan, not a failure of it.'}}
+  const startKm=Math.max(1,Math.min(12,+comfort||3));
+  let km=Math.round(startKm*freq*0.6);
+  for(let w=1;w<=8;w++){
+    const down=(w%4===0);
+    const wkKm=down?Math.round(km*0.7):Math.round(km);
+    items.push({week:w,km:wkKm,down:down,desc:rpDescBuild(wkKm,freq,DN,null,down)});
+    if(!down)km=km*1.08}
+  return{scratch:true,freq:freq,days:DN,base:Math.round(startKm*freq*0.6),pace:null,items:items,
+    note:'Built conservatively from what you can run today \u2014 8% growth, a down week every fourth. Effort stays easy; the distance does the work.'}}
+function rpWeek(rp){
+  /* the plan's own week, from its start date \u2014 never the lifting week */
+  try{const d0=new Date(rp.started+'T12:00');
+    const day0=(d0.getDay()+6)%7;d0.setDate(d0.getDate()-day0);
+    return Math.max(1,Math.floor((Date.now()-d0.getTime())/(7*864e5))+1)}catch(e){return 1}}
+function rpWeekKm(offsetWeeks){
+  const now=new Date();const day=(now.getDay()+6)%7;
+  const mon=new Date(now);mon.setDate(now.getDate()-day-(offsetWeeks||0)*7);mon.setHours(0,0,0,0);
+  const sun=new Date(mon);sun.setDate(mon.getDate()+7);
+  return Math.round(runs().filter(r=>{const t=new Date(r.date+(String(r.date).length<=10?'T12:00':'')).getTime();
+    return t>=mon.getTime()&&t<sun.getTime()}).reduce((a,r)=>a+(r.km||0),0)*10)/10}
+function runPlanAdjust(){
+  /* the adaptive loop: every Monday the plan reconciles with what was
+     actually run, and says what it changed and why. Only plans whose
+     weeks carry structured km can adapt; imported text plans keep the
+     ACWR guardrail only. */
+  const rp=S.runplan;if(!rp||!(rp.items||[]).length)return null;
+  const wk=rpWeek(rp);
+  if(!(rp.items[0]&&rp.items[0].km!=null))return null;
+  if(wk<2||rp.adjWk===wk)return null;
+  const prev=rp.items.find(i=>+i.week===wk-1);
+  if(!prev){rp.adjWk=wk;lset('training-runplan-v1',rp);S.runplan=rp;return null}
+  const actual=rpWeekKm(1);
+  const planned=prev.km;
+  let why=null;
+  const a=acwr();
+  if(actual<planned*0.5){
+    // the week did not happen: the plan waits instead of piling on
+    const d2=new Date(rp.started+'T12:00');d2.setDate(d2.getDate()+7);
+    rp.started=dayKey(d2);
+    why='Week '+(wk-1)+' saw '+actual+' of ~'+planned+' km \u2014 the plan waits and runs that week again. No punishment, just sequence.';
+  }else if((a!=null&&a>1.3)||actual>planned*1.5){
+    rp.items.forEach(i=>{if(+i.week>=wk&&i.km!=null){i.km=Math.max(3,Math.round(i.km*0.9));
+      i.desc=rpDescBuild(i.km,rp.freq||3,rp.days||['Mon','Wed','Sat'],rp.pace||null,!!i.down)}});
+    why='Load ran ahead of the plan ('+actual+' km vs ~'+planned+') \u2014 the remaining weeks eased 10% to keep the 0.8\u20131.3 band.';
+  }
+  rp.adjWk=wk;
+  if(why){rp.adjLog=(rp.adjLog||[]).slice(-5);rp.adjLog.push({wk:wk,why:why});}
+  lset('training-runplan-v1',rp);S.runplan=rp;
+  return why}
 function runPlanCard(){
   /* the imported running progression, week by week — carried from the
      spreadsheet instead of silently dropped. The ACWR band outranks
      the plan: that is the science, stated on the card when it bites. */
   try{
     const rp=S.runplan;if(!rp||!(rp.items||[]).length)return '';
+    try{runPlanAdjust()}catch(e){}
     const top=Math.max.apply(null,rp.items.map(i=>+i.week||1));
-    const wk=Math.min(Math.max(1,S.week||1),top);
+    const wk=Math.min(rpWeek(rp),top);
     const cur=rp.items.find(i=>+i.week===wk)||rp.items[0];
     const a=acwr();
     return '<div class="card mt" style="padding:15px 16px">'+
@@ -4158,6 +4236,8 @@ function runPlanCard(){
       '<span class="mono" style="color:var(--faint);font-size:10px">WEEK '+wk+' OF '+top+'</span></div>'+
       '<p style="font-size:13.5px;line-height:1.55;margin-top:6px">'+esc((cur&&cur.desc)||'')+'</p>'+
       (a!=null&&a>1.3?'<p style="color:var(--dim);font-size:12px;line-height:1.5;margin-top:6px">Load is already '+a+'\u00d7 your four-week average — the 0.8\u20131.3 band outranks the plan this week. Ease it.</p>':'')+
+      ((rp.adjLog&&rp.adjLog.length)?'<p style="color:var(--dim);font-size:11.5px;line-height:1.5;margin-top:6px;border-top:1px solid var(--line);padding-top:6px">'+esc(rp.adjLog[rp.adjLog.length-1].why)+'</p>':'')+
+      ((rp.items.find(i=>+i.week===wk)||{}).km!=null?'<p class="mono" style="color:var(--faint);font-size:10.5px;margin-top:6px">'+rpWeekKm(0)+' of ~'+(rp.items.find(i=>+i.week===wk)||{}).km+' km this week</p>':'')+
       (rp.note?'<p style="color:var(--faint);font-size:11px;line-height:1.5;margin-top:6px">'+esc(rp.note)+'</p>':'')+
       '<button data-a="runplanOffAsk" class="mono" style="color:var(--faint);font-size:10.5px;margin-top:8px;padding:2px 0">Remove the plan</button></div>'}catch(e){return ''}}
 
@@ -4198,11 +4278,11 @@ function runPlanGen(){
       if(down){
         const each=half(wkKm/freq);
         parts=days.map(d2=>d2+' '+each+' km easy');
-        items.push({week:w,desc:parts.join(' · ')+' — down week on purpose (~'+wkKm+' km, no long run); the adaptation happens here.'});
+        items.push({week:w,km:wkKm,down:true,desc:parts.join(' · ')+' — down week on purpose (~'+wkKm+' km, no long run); the adaptation happens here.'});
       }else{
         const lng=half(wkKm*0.38),each=half((wkKm-lng)/Math.max(1,freq-1));
         parts=days.map((d2,i2)=>i2===days.length-1?(d2+' '+lng+' km long'):(d2+' '+each+' km easy'));
-        items.push({week:w,desc:parts.join(' · ')+' — ~'+wkKm+' km'+(easyP?', all around '+pStr(easyP)+'/km (your own easy average)':'')+'.'});
+        items.push({week:w,km:wkKm,desc:parts.join(' · ')+' — ~'+wkKm+' km'+(easyP?', all around '+pStr(easyP)+'/km (your own easy average)':'')+'.'});
       }
       if(!down)km=km*1.08}
     let note=null;
@@ -10257,6 +10337,21 @@ function sheetHtml(){
        '<span style="font-size:13px;font-weight:600;display:block">'+x[0]+'</span>'+
        '<span style="color:var(--faint);font-size:11.5px;line-height:1.45">'+x[1]+'</span></div>').join('')+'</div>'+
       '<p style="color:var(--faint);font-size:11px;line-height:1.55;margin-top:10px">Backup files restore from Settings → Restore — that one replaces data, so it lives behind its own door. Nothing here uploads anywhere; files are read on this phone.</p>')}
+  if(S.sheet.t==='runscratch'){
+    const f=S.rscr||(S.rscr={freq:3,comfort:'2'});
+    const pill=(on,label,act,val)=>'<button data-a="'+act+'" data-v="'+val+'" class="pill" style="flex:1;white-space:nowrap'+(on?';background:var(--text);color:#1F1E1D;border-color:var(--text);font-weight:600':'')+'">'+label+'</button>';
+    return wrapSheet('Start running',
+      '<p style="color:var(--dim);font-size:13px;line-height:1.6">Two questions and Allena builds eight beginner-safe weeks. It watches what you actually run and adjusts every Monday.</p>'+
+      '<p class="eyebrow mt2">Days a week</p>'+
+      '<div class="row" style="gap:8px;margin-top:8px">'+[2,3,4].map(n=>pill(f.freq===n,n+' days','rscrFreq',n)).join('')+'</div>'+
+      '<p class="eyebrow mt2">Right now you can run</p>'+
+      '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px">'+
+      pill(f.comfort==='walkrun','Not 10 min yet','rscrComfort','walkrun')+
+      pill(f.comfort==='2','~2 km','rscrComfort','2')+
+      pill(f.comfort==='5','~5 km','rscrComfort','5')+
+      pill(f.comfort==='10','~10 km','rscrComfort','10')+'</div>'+
+      '<button data-a="runScratchGo" class="big disp mt2" style="background:var(--amber);color:#1F1E1D;font-size:15px">Build the plan</button>'+
+      '<p style="color:var(--faint);font-size:11px;line-height:1.5;margin-top:8px">Honest floor, 8% growth, a down week every fourth. A missed week is repeated, never punished.</p>')}
   if(S.sheet.t==='runplangen'){
     const g=S.rpgen;if(!g)return '';
     if(g.block)return wrapSheet('The running plan',
@@ -11629,9 +11724,14 @@ function runAction(a,v,t,e){
       S.patCache=null;S.histImp=null;S.hdate=null;S.sheet=null;render();
       flash(res.added+' sessions in, dates deduced'+(res.replaced?' — '+res.replaced+' from an earlier import replaced, never doubled':'')+(res.skippedReal?' · '+res.skippedReal+' skipped where you had real logs':'')+'.');break}
     case 'intakeOpen':{S.drawerOpen=false;S.sheet={t:'intake'};render();break}
+    case 'runScratchOpen':{S.rscr={freq:3,comfort:'2'};S.sheet={t:'runscratch'};render();break}
+    case 'rscrFreq':{(S.rscr=S.rscr||{}).freq=+v;render();break}
+    case 'rscrComfort':{(S.rscr=S.rscr||{}).comfort=v;render();break}
+    case 'runScratchGo':{const f=S.rscr||{freq:3,comfort:'2'};
+      S.rpgen=runPlanScratch(f.freq,f.comfort);S.sheet={t:'runplangen'};render();break}
     case 'runplanGenAsk':{S.rpgen=runPlanGen();S.sheet={t:'runplangen'};render();break}
     case 'runplanGenGo':{const g=S.rpgen;if(!g||g.block)break;
-      lset('training-runplan-v1',{src:'Built from your history',started:today(),note:g.note||null,template:g.template||null,items:g.items});
+      lset('training-runplan-v1',{src:g.scratch?'Built from scratch':'Built from your history',started:today(),note:g.note||null,template:g.template||null,items:g.items,freq:g.freq||3,days:g.days||null,pace:g.pace||null});
       S.runplan=lget('training-runplan-v1',null);S.rpgen=null;S.sheet=null;render();
       flash('Eight weeks on the board — week 1 starts where you already are.');break}
     case 'runplanOffAsk':{S.confirm={t:'Remove the running plan?',
@@ -12124,7 +12224,11 @@ function runAction(a,v,t,e){
         rpe:f.rpe,hr:+f.hr||null,elev:+f.elev||null,note:(f.note||'').trim(),
         z:zt?{z1:+f.z1||0,z2:+f.z2||0,z3:+f.z3||0,z4:+f.z4||0,z5:+f.z5||0}:null});
       S.rform=null;S.sheet=null;S.patCache=null;render();
-      flash((f.id?'Updated — ':'Logged — ')+f.km+' km at '+paceStr(f.mins,f.km)+'.');break}
+      {let extra='';
+       try{const rp=S.runplan;
+        if(rp&&rp.items&&!f.id){const it=rp.items.find(i=>+i.week===Math.min(rpWeek(rp),rp.items.length));
+         if(it&&it.km!=null)extra=' \u00b7 '+rpWeekKm(0)+' of ~'+it.km+' km this plan week'}}catch(e){}
+       flash((f.id?'Updated — ':'Logged — ')+f.km+' km at '+paceStr(f.mins,f.km)+'.'+extra)}break}
     case 'runDelAsk':{const r=runs().find(x=>x.id===v);if(!r)break;
       S.confirm={t:'Delete this run?',
         d:r.km+' km on '+fmtDate(r.date+'T12:00')+'. It comes out of your weekly load and recovery too.',
