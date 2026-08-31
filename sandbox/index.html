@@ -341,7 +341,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return (lget(K_RUN,[])||[]).length>0})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='d9d873';  // stamped by tools/build.py with the content hash
+const BUILD_ID='fb9d87';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -1139,6 +1139,12 @@ A.startRehab=(pid,di)=>{audioInit();
   let sets=buildSets(p,+di,1);
   if(!sets.length)return flash('Nothing programmed for that session.');
   if(S.prevGo&&S.prevGo.pid===p.id&&S.prevGo.di===+di){
+    // swaps first: a renamed exercise must exist in the sets before the
+    // keep-filter runs, or the swap silently vanishes from the session
+    S.prevGo.ex.forEach(e=>{if(!e.origName||e.origName===e.name)return;
+      sets.forEach(st=>{if(st.ex===e.origName){st.ex=e.name;
+        const pvSet=e.sets.find(s2=>s2.setNo===st.setNo);
+        if(pvSet&&pvSet.targetW!==undefined)st.targetW=pvSet.targetW}})});
     const keep=new Set(),cut=new Set();
     S.prevGo.ex.forEach(e=>{if(e.keep)keep.add(e.no);e.sets.forEach(st=>{if(st.cut)cut.add(st.ex+'#'+st.setNo)})});
     sets=sets.filter(st=>keep.has(st.exNo)&&!cut.has(st.ex+'#'+st.setNo));
@@ -1221,6 +1227,12 @@ A.start=di=>{audioInit();const p=activeProg();let sets=sessionSets(p,+di,S.week)
   S.confirmRedo=false;
   if(!sets.length)return flash('Nothing programmed for that day this week.');
   if(S.prevGo&&S.prevGo.pid===p.id&&S.prevGo.di===+di){
+    // swaps first: a renamed exercise must exist in the sets before the
+    // keep-filter runs, or the swap silently vanishes from the session
+    S.prevGo.ex.forEach(e=>{if(!e.origName||e.origName===e.name)return;
+      sets.forEach(st=>{if(st.ex===e.origName){st.ex=e.name;
+        const pvSet=e.sets.find(s2=>s2.setNo===st.setNo);
+        if(pvSet&&pvSet.targetW!==undefined)st.targetW=pvSet.targetW}})});
     // match by name: cutting or moving renumbers the exercises
     const keep=new Set(),cut=new Set();
     S.prevGo.ex.forEach(e=>{if(e.keep)keep.add(e.name);
@@ -13046,6 +13058,7 @@ function runAction(a,v,t,e){
       const sess=S.prev;S.swapFor={name:k.name,i:k.i};S.sheet={t:'keyswap'};render();break}
     case 'keySwapPick':{const n=t.dataset.v,sw=S.swapFor;if(!sw)break;
       const e=S.prev.ex[sw.i];
+      e.origName=e.origName||e.name;
       e.name=n;e.sets.forEach(st=>{st.ex=n;st.targetW=null});
       e.swapped=true;S.swapFor=null;S.sheet={t:'preview'};render();
       flash('Swapped to '+n+' — find a weight that lands on the target effort.');break}
