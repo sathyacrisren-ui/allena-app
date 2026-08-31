@@ -390,7 +390,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return (lget(K_RUN,[])||[]).length>0})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='b1b1e7';  // stamped by tools/build.py with the content hash
+const BUILD_ID='442e82';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -6019,11 +6019,18 @@ function growTree(W,Hh){
   const col=t.tier[2],leafCol=treeSeason().leaf;
   const groundY=Hh-26;
   let out='';
+  /* frame follows growth: track where the tree actually reaches so a
+     deep record is never cropped — the drawing itself is untouched */
+  let mnX=W*0.12,mxX=W*0.88,mnY=groundY,mxY=groundY;
+  const bd=function(x,y,r){r=r||2;
+    if(x-r<mnX)mnX=x-r;if(x+r>mxX)mxX=x+r;
+    if(y-r<mnY)mnY=y-r;if(y+r>mxY)mxY=y+r};
   /* roots — consistency below the surface */
   const rootN=Math.min(7,1+Math.floor(t.weeks/2));
   for(let i=0;i<rootN;i++){
     const dir=(i%2?1:-1),len=14+R()*20+t.days*0.25;
     const x2=W/2+dir*(10+i*7+R()*10),y2=groundY+8+R()*12;
+    bd(x2,Math.min(Hh-2,y2),2);
     out+='<path d="M'+(W/2)+' '+groundY+' Q'+(W/2+dir*8)+' '+(groundY+6)+' '+x2.toFixed(1)+' '+Math.min(Hh-2,y2).toFixed(1)+'" '+
       'stroke="'+col+'" stroke-width="'+(1.6-i*0.15).toFixed(2)+'" fill="none" opacity="'+(0.3-i*0.02).toFixed(2)+'" stroke-linecap="round"/>'}
   out+='<line x1="'+(W*0.12)+'" y1="'+groundY+'" x2="'+(W*0.88)+'" y2="'+groundY+'" stroke="var(--line)" stroke-width="1" opacity=".5"/>';
@@ -6036,6 +6043,7 @@ function growTree(W,Hh){
   function branch(x,y,ang,len,wdt,depth){
     if(depth>maxDepth||len<3||leaves>budget)return;
     const x2=x+Math.cos(ang)*len,y2=y+Math.sin(ang)*len;
+    bd(x2,y2,leafSize+2.6);
     out+='<line x1="'+x.toFixed(1)+'" y1="'+y.toFixed(1)+'" x2="'+x2.toFixed(1)+'" y2="'+y2.toFixed(1)+
       '" stroke="'+col+'" stroke-width="'+Math.max(0.7,wdt).toFixed(2)+'" stroke-linecap="round" opacity="'+
       (0.55+depth*0.06).toFixed(2)+'"/>';
@@ -6070,10 +6078,13 @@ function growTree(W,Hh){
       const dir=(i%2?1:-1);
       const x1=W/2,y1=groundY-6-i*4;
       const x2=W/2+dir*(30+i*14+R()*18),y2=groundY-14-i*10-R()*14;
+      bd(x2,y2,3);bd((x1+x2)/2,y1-16,2);
       out+='<path d="M'+x1+' '+y1+' Q'+((x1+x2)/2)+' '+(y1-16)+' '+x2.toFixed(1)+' '+y2.toFixed(1)+'" '+
         'stroke="#6B9BD1" stroke-width="1.2" fill="none" opacity=".5" stroke-linecap="round"/>'+
         '<circle cx="'+x2.toFixed(1)+'" cy="'+y2.toFixed(1)+'" r="2" fill="#6B9BD1" opacity=".65"/>'}}
-  return'<svg viewBox="0 0 '+W+' '+Hh+'" style="width:100%;aspect-ratio:'+W+'/'+Hh+';display:block" aria-hidden="true">'+out+'</svg>'}
+  const pad=8,vbX=mnX-pad,vbY=mnY-pad,vbW=(mxX-mnX)+pad*2,vbH=(mxY-mnY)+pad*2;
+  return'<svg viewBox="'+vbX.toFixed(1)+' '+vbY.toFixed(1)+' '+vbW.toFixed(1)+' '+vbH.toFixed(1)+
+    '" style="width:100%;aspect-ratio:'+vbW.toFixed(1)+'/'+vbH.toFixed(1)+';display:block" aria-hidden="true">'+out+'</svg>'}
 
 
 
