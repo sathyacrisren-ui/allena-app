@@ -83,6 +83,8 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
 @keyframes bootRing{to{stroke-dashoffset:0}}
 #deepanim{position:fixed;inset:0;z-index:880;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px}
 @keyframes ddraw{to{stroke-dashoffset:0}}
+@keyframes gainx{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+.gainfill{transform-origin:left center;animation:gainx .9s cubic-bezier(.16,1,.3,1) both}
 @keyframes dnode{0%{opacity:0;transform:scale(.4)}70%{opacity:1;transform:scale(1.15)}100%{opacity:1;transform:scale(1)}}
 .dnode{opacity:0;animation:dnode .5s cubic-bezier(.16,1,.3,1) forwards;transform-origin:center}
 .dline{animation:ddraw 1s cubic-bezier(.4,0,.2,1) forwards}
@@ -339,7 +341,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return (lget(K_RUN,[])||[]).length>0})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='d8d136';  // stamped by tools/build.py with the content hash
+const BUILD_ID='464cc3';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -1232,7 +1234,8 @@ A.start=di=>{audioInit();const p=activeProg();let sets=sessionSets(p,+di,S.week)
     if(!sets.length){S.prevGo=null;return flash('Nothing left after trimming.')}
     S.prevGo=null}
   if(p.weeks>1)weekClockSet(p,S.week);
-  S.sess={progId:p.id,dayIdx:+di,dayName:p.days[+di].name,block:p.block,week:S.week,sets,idx:0,phase:'ready',log:[],wu:{},subs:{},startedAt:Date.now()};
+  S.sess={progId:p.id,dayIdx:+di,dayName:p.days[+di].name,block:p.block,week:S.week,sets,idx:0,phase:'ready',log:[],wu:{},subs:{},startedAt:Date.now(),
+    dp0:(function(){try{const d0=dataPoints();return{total:d0.total,lv:dpLevel(d0.total).lv}}catch(e){return null}})()};
   S.note={sleep:'',fatigue:'',knee:''};S.view='session';persistActive();wakeOn();render()};
 A.resume=()=>{S.view='session';wakeOn();render()};
 A.begin=()=>{audioInit();S.holdWait=false;const c=S.sess.sets[S.sess.idx];S.setStart=Date.now();
@@ -9150,6 +9153,40 @@ function viewSession(){
      '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:20px">'+
      [[s.log.length,'sets'],[Math.max(1,Math.round((Date.now()-s.startedAt)/60000)),'minutes'],[vol?Math.round(vol).toLocaleString()+' kg':'—',vol?'volume':'']]
       .map((x,i)=>'<div class="card an-pop" style="padding:12px;animation-delay:'+(0.08+i*0.1).toFixed(2)+'s"><p class="mono" style="font-size:20px;font-weight:600">'+x[0]+'</p><p style="color:var(--faint);font-size:11px">'+x[1]+'</p></div>').join('')+'</div>';
+    {/* the payoff: watch the dashes fill in, the points land, the level move */
+     try{
+      const d1=dataPoints();
+      const gained=s.dp0?Math.max(0,d1.total-s.dp0.total):null;
+      const L1=dpLevel(d1.total);
+      const lvUp=s.dp0&&L1.lv>s.dp0.lv;
+      // per-muscle units this session banked, from what was actually logged
+      const cnt={};s.log.forEach(l=>{if(!(l.w&&l.r)&&!l.secs)return;
+        MUSCLE_RULES.forEach(r=>{if(!r[1].test(l.ex))return;
+          if(r[0]==='Biceps'&&/leg curl|hamstring/i.test(l.ex))return;
+          cnt[r[0]]=(cnt[r[0]]||0)+1})});
+      const wkNow=muscleWeekUnits();
+      const rows=Object.keys(cnt).filter(m=>cnt[m]>=2).sort((a2,b2)=>cnt[b2]-cnt[a2]).slice(0,4)
+        .map(m=>{const add=muscleStimUnits(cnt[m]);
+          const after=Math.min(12,wkNow[m]||add);const before=Math.max(0,after-add);
+          return{m:m,b:Math.round(before/12*100),a:Math.round(after/12*100)}});
+      if(rows.length||gained!=null){
+        h+='<div class="card mt2 an-hero" style="padding:16px;border-radius:18px">';
+        if(lvUp)h+='<div class="an-pop an-glow" style="text-align:center;padding:10px 0 14px">'+
+          '<p class="mono" style="color:var(--amber);font-size:9.5px;letter-spacing:.14em">LEVEL UP</p>'+
+          '<p class="disp grad" style="font-size:34px;font-weight:600;line-height:1.1;margin-top:2px">Level '+L1.lv+'</p></div>';
+        if(gained!=null)h+='<div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px">'+
+          '<p class="eyebrow" style="margin:0">Banked this session</p>'+
+          '<span class="mono an-pop" style="color:var(--blue);font-size:15px;font-weight:600">+'+gained+' points</span></div>';
+        if(rows.length)h+='<div style="margin-top:11px;display:flex;flex-direction:column;gap:7px">'+
+          rows.map((r9,i9)=>'<div style="display:flex;align-items:center;gap:8px">'+
+            '<span class="mono" style="color:var(--faint);font-size:9px;letter-spacing:.05em;width:78px;flex:none;text-transform:uppercase;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">'+esc(r9.m)+'</span>'+
+            '<div style="flex:1;height:5px;border-radius:5px;background:var(--line);overflow:hidden;display:flex">'+
+            '<div style="height:5px;width:'+r9.b+'%;background:var(--blue)"></div>'+
+            '<div class="gainfill" style="height:5px;width:'+Math.max(0,r9.a-r9.b)+'%;background:var(--green);animation-delay:'+(0.35+i9*0.22).toFixed(2)+'s"></div></div>'+
+            '<span class="mono" style="color:var(--green);font-size:9px;width:34px;text-align:right;flex:none">'+r9.a+'%</span></div>').join('')+
+          '<p class="mono" style="color:var(--faint);font-size:8.5px;letter-spacing:.05em;margin-top:2px">WEEK DOSE \u2014 THE DASHES YOU JUST FILLED IN</p></div>';
+        h+='</div>'}
+     }catch(e){}}
     {const rev=S.sessReveal;
      if(rev&&rev.show){const r=rarityOf(rev.show.rar);
       h+='<div class="card mt2 an-hero an-glow an-pop" style="padding:17px;border-radius:20px;border-color:'+r[1]+'">'+
