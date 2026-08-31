@@ -81,6 +81,11 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
 @keyframes bootOut{to{opacity:0;transform:scale(1.04)}}
 @keyframes bootSweep{0%{transform:translateX(-110%)}100%{transform:translateX(210%)}}
 @keyframes bootRing{to{stroke-dashoffset:0}}
+#deepanim{position:fixed;inset:0;z-index:880;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px}
+@keyframes ddraw{to{stroke-dashoffset:0}}
+@keyframes dnode{0%{opacity:0;transform:scale(.4)}70%{opacity:1;transform:scale(1.15)}100%{opacity:1;transform:scale(1)}}
+.dnode{opacity:0;animation:dnode .5s cubic-bezier(.16,1,.3,1) forwards;transform-origin:center}
+.dline{animation:ddraw 1s cubic-bezier(.4,0,.2,1) forwards}
 #boot{position:fixed;inset:0;z-index:900;background:var(--bg);display:flex;flex-direction:column;
   align-items:center;justify-content:center;padding:32px;text-align:center}
 #boot.out{animation:bootOut .42s cubic-bezier(.4,0,1,1) forwards}
@@ -334,7 +339,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return (lget(K_RUN,[])||[]).length>0})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='d27f90';  // stamped by tools/build.py with the content hash
+const BUILD_ID='86e507';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -3724,11 +3729,16 @@ function pointsChip(){
     '<circle cx="15" cy="15" r="13" fill="none" stroke="var(--line)" stroke-width="2.5"/>'+
     '<circle cx="15" cy="15" r="13" fill="none" stroke="'+t[2]+'" stroke-width="2.5" stroke-linecap="round" '+
     'stroke-dasharray="'+C.toFixed(1)+'" stroke-dashoffset="'+(C*(1-pct/100)).toFixed(1)+'"/>'+
-    (function(){/* the blue inner ring: what today could still earn */
-      const room=d.room||0;if(!(room>0))return '';
-      const C2=2*Math.PI*9;const frac=Math.min(1,room/dpDayCap());
-      return '<circle cx="15" cy="15" r="9" fill="none" stroke="var(--blue)" stroke-width="2" stroke-linecap="round" '+
-        'stroke-dasharray="'+(C2*frac).toFixed(1)+' '+C2.toFixed(1)+'" opacity=".85"/>'})()+'</svg>'+
+    (function(){/* the dotted blue continuation: where the arc lands if
+        today's remaining room is fully earned */
+      const room=d.room||0;if(!(room>0)||!nx)return '';
+      const addPct=Math.min(100-pct,room/(nx[0]-t[0])*100);
+      if(addPct<=1)return '';
+      const a0=(pct/100)*2*Math.PI,a1=((pct+addPct)/100)*2*Math.PI;
+      const px=v=>(15+13*Math.cos(v)).toFixed(2),py=v=>(15+13*Math.sin(v)).toFixed(2);
+      const large=(a1-a0)>Math.PI?1:0;
+      return '<path d="M'+px(a0)+' '+py(a0)+' A13 13 0 '+large+' 1 '+px(a1)+' '+py(a1)+'" '+
+        'fill="none" stroke="var(--blue)" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="0.5 4" opacity=".9"/>'})()+'</svg>'+
     '<span style="text-align:left;line-height:1.15"><span class="mono" style="display:block;font-size:14px;font-weight:600;color:'+t[2]+'">'+d.total.toLocaleString()+'</span>'+
     '<span class="mono" style="display:block;color:var(--faint);font-size:8.5px;letter-spacing:.08em">DATA POINTS</span></span></button>'}
 
@@ -8853,22 +8863,71 @@ const DEEP_SYS='You are the analysis engine of a training app. You receive conde
 'Find 2-4 NON-OBVIOUS findings: relationships BETWEEN signals (readiness vs load vs performance vs pain vs timing, and LIFTING vs RUNNING — km near leg work, pace vs tonnage weeks), lags, thresholds, divergences. '+
 'FORBIDDEN: restating any single statistic, anything a simple rule could flag (totals, bests, ratios), motivation talk, advice. '+
 'Every finding MUST cite at least two specific numbers from the data and name the relationship. If the data is too thin for real nuance, return fewer findings — never pad. '+
-'Reply with ONLY a JSON array, no fences: [{"t":"short title","d":"2 sentences citing the numbers","rar":"rare"}] . "rar" may be "epic" only when the pattern repeats 3+ times in the data.';
+'Reply with ONLY a JSON array, no fences: [{"t":"short title IN PLAIN WORDS a non-lifter understands","d":"2 sentences citing the numbers","plain":"2-3 sentences for a layperson: what happened, why it matters to their training, and what they might watch or try - no jargon, no numbers required","refs":[{"kind":"lift","ex":"Chin-up"}],"rar":"rare"}] . "plain" is REQUIRED - it is the translation of "d" for someone who has never read a training log. "refs" (0-3) names the charts that show this finding: kind one of "lift" (with "ex": the exact exercise name from the data), "tonnage", "runs", "bw". "rar" may be "epic" only when the pattern repeats 3+ times in the data.';
 function deepParse(txt){
   try{
     const m=String(txt).match(/\[[\s\S]*\]/);
     if(!m)return [];
     const arr=JSON.parse(m[0]);
     if(!Array.isArray(arr))return [];
+    const KINDS={lift:1,tonnage:1,runs:1,bw:1};
     return arr.filter(x=>x&&x.t&&x.d).slice(0,4).map(x=>({
       t:String(x.t).slice(0,80),d:String(x.d).slice(0,400),
+      plain:x.plain?String(x.plain).slice(0,500):null,
+      refs:Array.isArray(x.refs)?x.refs.filter(r=>r&&KINDS[r.kind]).slice(0,3)
+        .map(r=>({kind:r.kind,ex:r.ex?String(r.ex).slice(0,48):null})):[],
       rar:x.rar==='epic'?'epic':'rare'}))}catch(e){return []}}
+function deepAnimHtml(){
+  const da=S.deepAnim;if(!da)return '';
+  const N=da.nodes;const cx=150,cy=150,R=108;
+  const pos=i=>{const ang=-Math.PI/2+i*(2*Math.PI/N.length);
+    return [cx+R*Math.cos(ang),cy+R*Math.sin(ang)]};
+  let svg='<svg viewBox="0 0 300 300" style="width:min(78vw,300px);height:min(78vw,300px)">';
+  // spokes: centre reaching out to every source
+  N.forEach((n,i)=>{const [x,y]=pos(i);const len=Math.hypot(x-cx,y-cy);
+    svg+='<line x1="'+cx+'" y1="'+cy+'" x2="'+x.toFixed(1)+'" y2="'+y.toFixed(1)+'" stroke="var(--line)" stroke-width="1" class="dline" style="stroke-dasharray:'+len.toFixed(0)+';stroke-dashoffset:'+len.toFixed(0)+';animation-delay:'+(0.4+i*0.5)+'s"/>'});
+  // the pattern pass: links BETWEEN sources, drawn later, in blue
+  N.forEach((n,i)=>{const j=(i+2)%N.length;const [x1,y1]=pos(i),[x2,y2]=pos(j);
+    const len=Math.hypot(x2-x1,y2-y1);
+    svg+='<line x1="'+x1.toFixed(1)+'" y1="'+y1.toFixed(1)+'" x2="'+x2.toFixed(1)+'" y2="'+y2.toFixed(1)+'" stroke="var(--blue)" stroke-width="1" opacity=".55" class="dline" style="stroke-dasharray:'+len.toFixed(0)+';stroke-dashoffset:'+len.toFixed(0)+';animation-delay:'+(3.2+i*0.35)+'s"/>'});
+  // the sources themselves, counted honestly
+  N.forEach((n,i)=>{const [x,y]=pos(i);
+    svg+='<g class="dnode" style="animation-delay:'+(0.3+i*0.5)+'s">'+
+      '<circle cx="'+x.toFixed(1)+'" cy="'+y.toFixed(1)+'" r="17" fill="var(--surface)" stroke="var(--line)"/>'+
+      '<text x="'+x.toFixed(1)+'" y="'+(y+1).toFixed(1)+'" text-anchor="middle" fill="var(--text)" font-size="10" font-weight="600" font-family="JetBrains Mono,monospace">'+n.v+'</text>'+
+      '<text x="'+x.toFixed(1)+'" y="'+(y+30).toFixed(1)+'" text-anchor="middle" fill="var(--faint)" font-size="6.5" letter-spacing="1" font-family="JetBrains Mono,monospace">'+n.k+'</text></g>'});
+  // the centre: the mark inside the working ring
+  svg+='<circle cx="150" cy="150" r="24" fill="var(--bg)" stroke="var(--line)"/>'+
+    '<circle class="an-ring" cx="150" cy="150" r="24" fill="none" stroke="var(--amber)" stroke-width="1.4" stroke-linecap="round" stroke-dasharray="36 115" opacity=".85"/></svg>';
+  return '<div id="deepanim"><div style="position:relative;display:inline-block">'+svg+
+    '<img src="'+MARK+'" alt="" style="position:absolute;width:22px;height:22px;object-fit:contain;top:calc(50% - 11px);left:calc(50% - 11px)"></div>'+
+    '<p class="disp" style="font-size:16px;font-weight:600;margin-top:22px">The deep read</p>'+
+    '<p class="mono" style="color:var(--amber);font-size:11px;margin-top:8px;min-height:16px">'+esc((da.steps[Math.min(da.i,da.steps.length-1)]||[''])[0])+'\u2026</p>'+
+    '<p class="mono" style="color:var(--faint);font-size:9px;margin-top:4px;min-height:12px">'+esc((da.steps[Math.min(da.i,da.steps.length-1)]||['',''])[1]||'')+'</p></div>'}
 async function deepRun(){
   { // the same gate the card shows — no button path spends tokens on old data
     const st0=deepStore();
     if(st0.last===today())return flash('Today\u2019s read is done — a fresh one unlocks tomorrow.');
     if(!deepReadyInfo())return flash(st0.last?'Nothing new since the last read — it reopens when new data lands.':'Not enough logged data for a first read yet.');
     if(!aiSpend('deep'))return}
+  { // the constellation: real sources, real counts, drawn while the model works
+    const H9=(S.history||[]).filter(h=>h.complete&&!h.run);
+    const R9=(typeof runs==='function'?runs():[]);
+    const g9=Object.keys((S.gar&&S.gar.days)||{}).filter(k=>S.gar.days[k].am!=null).length;
+    const c9=((S.acl&&S.acl.checks)||[]).length;
+    const wk9={};H9.forEach(h=>{const k=isoWeek(h.date);wk9[k]=1});
+    S.deepAnim={t0:Date.now(),i:0,
+      nodes:[{k:'SESSIONS',v:H9.length},{k:'RUNS',v:R9.length},{k:'WEEKS',v:Object.keys(wk9).length},
+        {k:'READINESS',v:g9},{k:'CHECK-INS',v:c9},{k:'FINDS',v:Object.keys(discBank()).length}],
+      steps:[['Opening ten weeks of history',H9.length+' sessions in reach'],
+        ['Laying the running beside it',R9.length+' runs, every pace and distance'],
+        ['Lining up readiness and check-ins',g9+' mornings, '+c9+' check-ins'],
+        ['Testing lags','does a big week show up days later?'],
+        ['Drawing the connections','lifting against running against recovery'],
+        ['Keeping only what survives the numbers','interpretation, clearly labelled']]};
+    const tick=()=>{if(!S.deepAnim)return;
+      if(S.deepAnim.i<S.deepAnim.steps.length-1){S.deepAnim.i++;render();setTimeout(tick,1150)}};
+    setTimeout(tick,1150);render()}
   if(!aiReady()){flash('Sign in (or add a key) first — the deep read uses your coach connection.');return}
   const st=deepStore();
   if(st.last===today()){flash('One deep read a day — tomorrow brings new data to read.');return}
@@ -8881,25 +8940,28 @@ async function deepRun(){
     const d=await res.json();
     const txt=d.content?d.content.map(x=>x.text||'').join(''):'';
     const items=deepParse(txt);
-    if(!items.length){S.deepBusy=false;flash(d.error?('Error: '+d.error.message):'The model found nothing it could stand behind today — honest answer, try after more logging.');render();return}
+    if(!items.length){S.deepBusy=false;S.deepAnim=null;flash(d.error?('Error: '+d.error.message):'The model found nothing it could stand behind today — honest answer, try after more logging.');render();return}
     const bank=discBank();
     items.forEach((x,i)=>{const id='insight:'+today()+':'+i;
       if(!bank[id])bank[id]={t:x.t,d:x.d+' — the model’s reading of your numbers.',
         rar:x.rar,tag:'insight',found:today()}});
     bankSave();
     lset(K_DEEP,{last:today(),items:items});
-    S.deepBusy=false;vib([25,45,25]);render();
-  }catch(e){S.deepBusy=false;flash('No connection.');render()}}
+    const doneAt=Date.now(),minRun=6800;
+    const linger=S.deepAnim?Math.max(0,minRun-(doneAt-S.deepAnim.t0)):0;
+    setTimeout(function(){S.deepAnim=null;S.deepBusy=false;vib([25,45,25]);render()},linger);
+  }catch(e){S.deepBusy=false;S.deepAnim=null;flash('No connection.');render()}}
 function deepCard(){
   const st=deepStore();
   let inner;
   if(S.deepBusy)inner='<p class="mono" style="color:var(--amber);font-size:11px;margin-top:9px">Reading ten weeks of numbers…</p>';
   else if(st.last===today()&&st.items.length)
     inner='<div style="margin-top:10px;display:flex;flex-direction:column;gap:8px">'+
-      st.items.map(x=>'<div class="card" style="padding:13px 15px;border-color:'+rarityOf(x.rar)[1]+'">'+
+      st.items.map((x,xi)=>'<button data-a="deepItemOpen" data-v="'+xi+'" class="card" style="width:100%;text-align:left;padding:13px 15px;border-color:'+rarityOf(x.rar)[1]+'">'+
         '<p class="mono" style="color:'+rarityOf(x.rar)[1]+';font-size:9px;letter-spacing:.06em">'+esc(x.rar.toUpperCase())+' · MODEL READ</p>'+
         '<p style="font-size:14px;font-weight:600;margin-top:5px">'+esc(x.t)+'</p>'+
-        '<p style="color:var(--dim);font-size:12.5px;line-height:1.6;margin-top:3px">'+esc(x.d)+'</p></div>').join('')+
+        '<p style="color:var(--dim);font-size:12.5px;line-height:1.6;margin-top:3px">'+esc(x.plain||x.d)+'</p>'+
+        '<p class="mono" style="color:var(--amber);font-size:10px;margin-top:7px">Open — the numbers'+((x.refs||[]).length?' and the charts':'')+' \u203a</p></button>').join('')+
       '</div><p class="mono" style="color:var(--faint);font-size:10px;margin-top:9px">Banked in your collection. A fresh read unlocks in about '+Math.max(1,Math.ceil((new Date(today()+'T24:00').getTime()-Date.now())/36e5))+'h.</p>';
   else if(!aiReady())
     inner='<p style="color:var(--dim);font-size:12.5px;line-height:1.6;margin-top:8px">The rule engines find what was pre-imagined; the model finds the rest — lags, thresholds, relationships between your signals. Sign in (Settings → account) and this unlocks with no key needed.</p>';
@@ -10290,6 +10352,39 @@ function sheetHtml(){
     const nn=Math.max(1,Math.min(6,+f.sets||3));
     inner+='<button data-a="axAdd" class="big disp mt" style="background:'+(f.name.trim()?'var(--green)':'var(--raised)')+';color:'+(f.name.trim()?'#1F1E1D':'var(--faint)')+';font-size:16px">Add '+nn+' set'+(nn===1?'':'s')+'</button>';
     return wrapSheet('Add exercise',inner)}
+  if(S.sheet.t==='deepitem'){
+    const it=(deepStore().items||[])[S.sheet.i];if(!it)return '';
+    const rc=rarityOf(it.rar)[1];
+    const bars=(pairs,unit)=>{if(pairs.length<2)return '';
+      const mx=Math.max.apply(null,pairs.map(p=>p[1]));if(!(mx>0))return '';
+      return '<div style="display:flex;align-items:flex-end;gap:4px;height:56px;margin-top:8px">'+
+        pairs.map(p=>'<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:3px">'+
+          '<div style="width:100%;border-radius:4px 4px 2px 2px;background:var(--blue);height:'+Math.max(3,Math.round(p[1]/mx*44))+'px"></div>'+
+          '<span class="mono" style="color:var(--faint);font-size:7px">'+p[0]+'</span></div>').join('')+'</div>'+
+        '<p class="mono" style="color:var(--faint);font-size:9px;margin-top:4px">'+unit+', last '+pairs.length+' weeks</p>'};
+    const inline=r=>{try{
+      if(r.kind==='lift'&&r.ex){const c9=liftChart(r.ex,null);
+        return c9?'<div class="card" style="padding:12px 14px;margin-top:8px"><p class="mono" style="color:var(--faint);font-size:9px;letter-spacing:.06em">'+esc(r.ex.toUpperCase())+'</p>'+c9+'</div>':''}
+      if(r.kind==='tonnage'){const wk={};S.history.forEach(h=>{if(h.run)return;const k=isoWeek(h.date);
+          wk[k]=(wk[k]||0)+(h.log||[]).reduce((a2,l)=>a2+(l.w||0)*(l.r||0),0)});
+        const ks=Object.keys(wk).sort().slice(-8);
+        return '<div class="card" style="padding:12px 14px;margin-top:8px"><p class="mono" style="color:var(--faint);font-size:9px;letter-spacing:.06em">WEEKLY TONNAGE</p>'+
+          bars(ks.map(k=>[k.slice(6),Math.round(wk[k])]),'kg lifted')+'</div>'}
+      if(r.kind==='runs'){const wks=weeklyKm(8);
+        return '<div class="card" style="padding:12px 14px;margin-top:8px"><p class="mono" style="color:var(--faint);font-size:9px;letter-spacing:.06em">WEEKLY KM</p>'+
+          bars(wks.map(w=>[String(w.end||'').slice(8,10),w.km]),'km run')+'</div>'}
+      if(r.kind==='bw')return '<div style="margin-top:8px">'+(bwCard()||'')+'</div>';
+      return ''}catch(e){return ''}};
+    return wrapSheet('The deep read',
+      '<p class="mono" style="color:'+rc+';font-size:9px;letter-spacing:.06em">'+esc(it.rar.toUpperCase())+' \u00b7 MODEL READ \u00b7 INTERPRETATION, NOT MEASUREMENT</p>'+
+      '<p class="disp" style="font-size:18px;font-weight:600;margin-top:6px;line-height:1.3">'+esc(it.t)+'</p>'+
+      (it.plain?'<p class="eyebrow mt2">In plain words</p>'+
+        '<p style="font-size:13.5px;line-height:1.65;margin-top:6px">'+esc(it.plain)+'</p>':'')+
+      '<p class="eyebrow mt2">The numbers it stands on</p>'+
+      '<p style="color:var(--dim);font-size:12.5px;line-height:1.6;margin-top:6px">'+esc(it.d)+'</p>'+
+      ((it.refs||[]).length?'<p class="eyebrow mt2">See it yourself \u2014 the raw truth it read from</p>'+
+        it.refs.map(inline).join(''):'')+
+      '<p style="color:var(--faint);font-size:11px;line-height:1.5;margin-top:12px">A deep read is the model\u2019s interpretation of your own numbers \u2014 clearly labelled, never dressed up as a measurement. The charts are the raw truth it read from.</p>')}
   if(S.sheet.t==='pvsub'){
     const e=S.prev&&S.prev.ex[S.sheet.i];if(!e)return '';
     const f=subsFor(e.origName||e.name);if(!f)return '';
@@ -11547,7 +11642,7 @@ function render(){
     document.getElementById('app').innerHTML=body;
     let extra=document.getElementById('extra');
     if(!extra){extra=document.createElement('div');extra.id='extra';document.body.appendChild(extra)}
-    extra.innerHTML=extraHtml+(S.boot!=null?bootHtml(S.boot):'');
+    extra.innerHTML=extraHtml+(S.deepAnim?deepAnimHtml():'')+(S.boot!=null?bootHtml(S.boot):'');
     if(big&&!vt){const vEl=document.querySelector('#app .view');if(vEl)vEl.classList.add('anim')}
     if(!big){try{const vEl=document.querySelector('#app .view.stg');if(vEl&&vEl.classList&&vEl.classList.remove)vEl.classList.remove('stg')}catch(e){}}
     if(key){const el=document.querySelector('[data-in="'+key+'"]');
@@ -12715,6 +12810,7 @@ function runAction(a,v,t,e){
       flash(clinical?'Left out and flagged for your physio. Do not work around it today.'
         :(v==='cant'?'Logged — it will be in your physio notes.':'Left out for today.'));break}
     case 'keyCancel':S.keyAsk=null;S.sheet={t:'preview'};render();break;
+    case 'deepItemOpen':S.sheet={t:'deepitem',i:+v};render();break;
     case 'pvSubOpen':S.sheet={t:'pvsub',i:+v};render();break;
     case 'pvSubBack':S.sheet={t:'preview'};render();break;
     case 'pvSubPick':{const sh=S.sheet,e=S.prev&&S.prev.ex[sh.i];if(!e)break;
