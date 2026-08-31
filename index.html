@@ -341,7 +341,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return (lget(K_RUN,[])||[]).length>0})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='5f451f';  // stamped by tools/build.py with the content hash
+const BUILD_ID='897f7e';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -8301,9 +8301,15 @@ function sessionMuscleRows(prog,di,wk){
     const wkU=muscleWeekUnits();
     return Object.keys(per).filter(m=>per[m]>=2)
       .sort((a,b)=>per[b]-per[a]).slice(0,4)
-      .map(m=>({m:m,sets:per[m],fresh:fresh[m]==null?100:fresh[m],
-        weekU:wkU[m]||0,addU:muscleStimUnits(per[m]),
-        stim:Math.round(muscleStimUnits(per[m])*2)}))}catch(e){return []}}
+      .map(m=>{const f=fresh[m]==null?100:fresh[m];
+        /* the fatigue discount: stimulus quality scales with recovery.
+           A fatigued muscle can't reach true failure as well, so the
+           same sets bank less — floored at 60% because fatigued work
+           still works, it just costs quality. */
+        const q=0.6+0.4*Math.max(0,Math.min(100,f))/100;
+        return{m:m,sets:per[m],fresh:f,q:q,
+          weekU:wkU[m]||0,addU:muscleStimUnits(per[m])*q,
+          stim:Math.round(muscleStimUnits(per[m])*2*q)}})}catch(e){return []}}
 function dayReadiness(prog,di,wk){
   const load=dayMuscles(prog,di,wk);
   const fresh={};muscleFresh().forEach(x=>fresh[x.m]=x.fresh);
@@ -9362,8 +9368,11 @@ function viewSession(){
         MUSCLE_RULES.forEach(r=>{if(!r[1].test(l.ex))return;
           if(r[0]==='Biceps'&&/leg curl|hamstring/i.test(l.ex))return;
           cnt[r[0]]=(cnt[r[0]]||0)+1})});
+      const fr9={};muscleFresh().forEach(x=>fr9[x.m]=x.fresh);
       const rows=Object.keys(cnt).filter(m=>cnt[m]>=2).sort((a2,b2)=>cnt[b2]-cnt[a2]).slice(0,4)
-        .map(m=>({m:m,stim:Math.round(muscleStimUnits(cnt[m])*2)}));
+        .map(m=>{const f=fr9[m]==null?100:fr9[m];
+          const q=0.6+0.4*Math.max(0,Math.min(100,f))/100;
+          return{m:m,stim:Math.round(muscleStimUnits(cnt[m])*2*q)}});
       if(rows.length||gained!=null){
         h+='<div class="card mt2 an-hero" style="padding:16px;border-radius:18px">';
         if(lvUp)h+='<div class="an-pop an-glow" style="text-align:center;padding:10px 0 14px">'+
