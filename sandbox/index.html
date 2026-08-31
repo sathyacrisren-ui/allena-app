@@ -390,7 +390,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return (lget(K_RUN,[])||[]).length>0})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='c4c3a1';  // stamped by tools/build.py with the content hash
+const BUILD_ID='efe7ba';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -3864,6 +3864,9 @@ function viewRun(){
     '<button data-a="runImport" class="btn mt">Import my history</button></div></div>';
   // this week at a glance
   h+=runPlanCard();
+  if(!S.runplan&&runs().length>=6)h+='<button data-a="runplanGenAsk" class="card mt" style="width:100%;text-align:left;padding:14px 16px;display:flex;align-items:center;gap:12px;border-style:dashed">'+
+    '<span style="flex:1;min-width:0"><span style="display:block;font-size:14px;font-weight:600;color:var(--dim)">Build a progression from your history</span>'+
+    '<span style="color:var(--faint);font-size:11.5px">Eight weeks from your own average — the 10% rule, down weeks included</span></span></button>';
   h+='<button data-a="runDetail" data-v="load" class="card mt2" style="width:100%;text-align:left;padding:16px;display:block">'+
     '<div style="display:flex;justify-content:space-between;align-items:baseline"><p class="eyebrow">This week</p>'+
     '<span class="mono" style="color:var(--faint);font-size:13px">›</span></div>'+
@@ -4118,6 +4121,33 @@ function runPlanCard(){
       '<p style="font-size:13.5px;line-height:1.55;margin-top:6px">'+esc((cur&&cur.desc)||'')+'</p>'+
       (a!=null&&a>1.3?'<p style="color:var(--dim);font-size:12px;line-height:1.5;margin-top:6px">Load is already '+a+'\u00d7 your four-week average — the 0.8\u20131.3 band outranks the plan this week. Ease it.</p>':'')+
       '<button data-a="runplanOffAsk" class="mono" style="color:var(--faint);font-size:10.5px;margin-top:8px;padding:2px 0">Remove the plan</button></div>'}catch(e){return ''}}
+
+function runPlanGen(){
+  /* a progression built from the runner's own logged reality — the
+     10% guideline, a down week every fourth, ACWR-safe by
+     construction. Refuses honestly when the data or the knee says no. */
+  try{
+    const R=runs();
+    if(S.acl&&S.acl.on&&S.acl.phase<3)
+      return{block:'Running waits for the criteria — phase 3 is where it usually opens, and quad symmetry near 80% matters more than any plan.'};
+    const wks=weeklyKm(5),hist=wks.slice(0,4);
+    const distinct=new Set(R.map(r=>String(r.date).slice(0,7)+questWeekKey(r.date))).size;
+    if(R.length<6||hist.filter(w=>w.km>0).length<3)
+      return{block:'Not enough history to build from yet — a few more weeks of logged runs and this gets real.'};
+    const base=Math.max(5,Math.round(hist.reduce((a,w)=>a+w.km,0)/hist.filter(w=>w.km>0).length));
+    const byWk={};R.slice(-30).forEach(r=>{const k=questWeekKey(r.date);byWk[k]=(byWk[k]||0)+1});
+    const freqs=Object.values(byWk).sort((a,b)=>a-b);
+    const freq=Math.max(2,Math.min(5,freqs[Math.floor(freqs.length/2)]||3));
+    const items=[];let km=base;
+    for(let w=1;w<=8;w++){
+      const down=(w%4===0);
+      const wkKm=down?Math.round(km*0.7):Math.round(km);
+      const lng=Math.round(wkKm*0.38);
+      items.push({week:w,desc:down
+        ?('~'+wkKm+' km over '+Math.max(2,freq-1)+' runs — down week on purpose; the adaptation happens here.')
+        :('~'+wkKm+' km over '+freq+' runs — long run ~'+lng+' km, everything else easy.')});
+      if(!down)km=km*1.08}
+    return{base:base,freq:freq,items:items}}catch(e){return{block:'Could not read the history.'}}}
 function viewPoints(){
   const d=dataPoints(),t=dpTier(d.total),nx=dpNext(d.total),L=dpLabels(),st=weekStreak();
   const keys=Object.keys(d.by).filter(k=>d.by[k]).sort((a,b)=>d.by[b]-d.by[a]);
@@ -9772,6 +9802,18 @@ function sheetHtml(){
          '<button data-a="questPass" class="btn mt" style="color:var(--dim)">Not this week</button>'
         :'')+
       '<p style="color:var(--faint);font-size:11px;line-height:1.55;margin-top:12px">One per week, generated Monday from what you have already done. If it does not happen, nothing is lost and nothing turns red — a fresh one simply arrives Monday.</p>')}
+  if(S.sheet.t==='runplangen'){
+    const g=S.rpgen;if(!g)return '';
+    if(g.block)return wrapSheet('The running plan',
+      '<p style="color:var(--dim);font-size:13.5px;line-height:1.6">'+esc(g.block)+'</p>');
+    return wrapSheet('Eight weeks, built from you',
+      '<p style="color:var(--dim);font-size:13px;line-height:1.6">Base: your own average of about '+g.base+' km a week across '+g.freq+' runs. It grows 8% a week with a down week every fourth — and the 0.8\u20131.3 load band always outranks it.</p>'+
+      '<div class="card mt" style="padding:4px 15px">'+
+      g.items.map((it,i)=>'<div style="display:flex;gap:11px;padding:9px 0'+(i?';border-top:1px solid var(--line)':'')+'">'+
+        '<span class="mono" style="color:var(--faint);font-size:11px;flex:none;width:20px">W'+it.week+'</span>'+
+        '<span style="flex:1;font-size:12.5px;line-height:1.45;color:var(--dim)">'+esc(it.desc)+'</span></div>').join('')+'</div>'+
+      '<button data-a="runplanGenGo" class="big disp mt" style="background:var(--amber);color:#1F1E1D;font-size:15px">Run this plan</button>'+
+      '<p style="color:var(--faint);font-size:11px;line-height:1.55;margin-top:10px">A plan follows your logged reality, not the other way round — miss a week and nothing turns red; the numbers just rebuild from where you actually are.</p>')}
   if(S.sheet.t==='rehabdocs'){
     const iss=rehabIssues(),unseen=iss.filter(x=>!x.seen).length;
     const nx=apptNext();
@@ -11030,6 +11072,11 @@ function runAction(a,v,t,e){
     case 'deepGo':{const _f=S.view;S.drawerOpen=false;S.backTo=_f;S.backDrawer=true;S.view='findings';S.scrollTo='deepcard';render();break}
     case 'chatNew':{S.coachBack=S.view;S.drawerOpen=false;chatNew();render();break}
     case 'chatOpen':{S.coachBack=S.view;S.drawerOpen=false;chatOpen(v);render();break}
+    case 'runplanGenAsk':{S.rpgen=runPlanGen();S.sheet={t:'runplangen'};render();break}
+    case 'runplanGenGo':{const g=S.rpgen;if(!g||g.block)break;
+      lset('training-runplan-v1',{src:'Built from your history',started:today(),items:g.items});
+      S.runplan=lget('training-runplan-v1',null);S.rpgen=null;S.sheet=null;render();
+      flash('Eight weeks on the board — week 1 starts where you already are.');break}
     case 'runplanOffAsk':{S.confirm={t:'Remove the running plan?',
       d:'The week-by-week progression card goes; your logged runs are untouched. Re-import the program to bring it back.',
       go:'runplanOff',v:'',soft:true,ok:'Remove the plan',no:'Keep it'};S.sheet={t:'confirm'};render();break}
