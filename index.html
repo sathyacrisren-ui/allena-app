@@ -390,7 +390,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return (lget(K_RUN,[])||[]).length>0})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='754669';  // stamped by tools/build.py with the content hash
+const BUILD_ID='2fd7c8';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -9802,6 +9802,30 @@ function sheetHtml(){
          '<button data-a="questPass" class="btn mt" style="color:var(--dim)">Not this week</button>'
         :'')+
       '<p style="color:var(--faint);font-size:11px;line-height:1.55;margin-top:12px">One per week, generated Monday from what you have already done. If it does not happen, nothing is lost and nothing turns red — a fresh one simply arrives Monday.</p>')}
+  if(S.sheet.t==='intake'){
+    if(S.hkBusy)return wrapSheet('Import your data',
+      '<p class="mono" style="color:var(--amber);font-size:12px">Reading the export — big files take a minute…</p>');
+    if(S.hkRes){const hr=S.hkRes;
+      return wrapSheet('Import your data',
+        '<p class="eyebrow" style="color:var(--green)">Done</p>'+
+        '<p class="disp" style="font-size:20px;font-weight:600;margin-top:6px">'+hr.added+' workout'+(hr.added===1?'':'s')+' in from Apple Health</p>'+
+        '<p style="color:var(--dim);font-size:13px;line-height:1.6;margin-top:8px">'+
+        (hr.dup?hr.dup+' already here were skipped. ':'')+'Swims, rides and rows count as load; running is coached.</p>'+
+        ((!S.runplan&&runs().length>=6)?'<button data-a="runplanGenAsk" class="btn mt" style="color:var(--amber)">Build a running progression from it</button>':'')+
+        '<button data-a="hkDone" class="btn mt" style="color:var(--dim)">Done</button>')}
+    return wrapSheet('Import your data',
+      '<p style="color:var(--dim);font-size:13.5px;line-height:1.6">One door for everything. Drop a file and Allena works out what it is — a program becomes a block she reviews with you, running history lands in your record, an Apple Health export brings every app that syncs to it.</p>'+
+      '<label class="big disp mt2" style="display:block;text-align:center;cursor:pointer;background:var(--amber);color:#1F1E1D;font-size:15px">Choose a file'+
+      '<input type="file" accept=".xlsx,.csv,.tsv,.txt,.gpx,.tcx,.xml,image/*,text/plain,text/csv,text/xml,application/xml,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" data-intakefile="1" style="display:none"></label>'+
+      '<div class="card mt2" style="padding:4px 15px">'+
+      [['Spreadsheets & CSV','Programs or run history — Allena tells them apart by reading them'],
+       ['Apple Health export.xml','Garmin, Apple Watch, Strava — everything that syncs to Health'],
+       ['GPX / TCX','Single watch activities'],
+       ['A photo of a program','Whiteboard, PDF page, screenshot — she reads it']].map((x,i)=>
+       '<div style="padding:9px 0'+(i?';border-top:1px solid var(--line)':'')+'">'+
+       '<span style="font-size:13px;font-weight:600;display:block">'+x[0]+'</span>'+
+       '<span style="color:var(--faint);font-size:11.5px;line-height:1.45">'+x[1]+'</span></div>').join('')+'</div>'+
+      '<p style="color:var(--faint);font-size:11px;line-height:1.55;margin-top:10px">Backup files restore from Settings → Restore — that one replaces data, so it lives behind its own door. Nothing here uploads anywhere; files are read on this phone.</p>')}
   if(S.sheet.t==='runplangen'){
     const g=S.rpgen;if(!g)return '';
     if(g.block)return wrapSheet('The running plan',
@@ -10557,6 +10581,7 @@ function render(){
       drow('findings','Deep read',I2.spark,'deepGo')+
       drow('collection','The collection',I2.star)+
       drow('history','History',I2.save)+
+      drow('history','Import your data',I2.load,'intakeOpen')+
       drow('data','Data & settings',I2.gear);
     const recents=(S.chats||[]).slice(0,6);
     if(recents.length)rows+='<p style="color:var(--faint);font-size:12.5px;margin:16px 13px 4px">Recents</p>'+
@@ -10689,6 +10714,38 @@ document.addEventListener('input',e=>{const d=e.target.dataset;
       if(!parsed){flash('Could not read that file.');render();return}
       S.hkRes=hkImport(parsed);vib([20,40,20]);render()});
     return}
+  if(e.target.dataset.intakefile){const fl=e.target.files&&e.target.files[0];if(!fl)return;
+    const nm=String(fl.name||'').toLowerCase();
+    const routeText=function(txt,label){
+      // Allena reads it and decides: run history or a program
+      const r=parseRunImport(txt);
+      if(r&&r.runs&&r.runs.length>=3){
+        S.rimp={text:txt.slice(0,120000),res:null,fileName:fl.name};
+        S.sheet={t:'runimp'};render();runAction('rimpRead');
+        flash('Reads like running history — '+r.runs.length+' runs found.');return}
+      if(typeof impNew==='function'){impNew();S.imp.text=txt.slice(0,26000);S.imp.fileName=fl.name;
+        S.sheet=null;S.view='import';render();
+        flash('Reads like a program — Allena converts it, then reviews it with you.')}};
+    if(/\.(png|jpe?g|heic|webp)$/.test(nm)||/^image\//.test(fl.type)){
+      const fr=new FileReader();
+      fr.onload=function(){impNew();S.imp.img=String(fr.result);S.sheet=null;S.view='import';render();
+        flash('Photo attached — Allena reads programs straight off an image.')};
+      fr.readAsDataURL(fl);return}
+    if(/\.xml$/.test(nm)){
+      S.hkBusy=true;S.hkRes=null;render();
+      hkParseFile(fl,function(parsed){
+        S.hkBusy=false;
+        if(!parsed){flash('Could not read that file.');render();return}
+        S.hkRes=hkImport(parsed);vib([20,40,20]);render()});
+      return}
+    if(/\.xlsx$/.test(nm)){
+      xlsxExtract(fl,function(txt){
+        routeText(txt.replace(/^== .*==$/gm,'').replace(/ \| /g,',').replace(/\n{2,}/g,'\n').trim())},
+        function(){flash('Could not read that spreadsheet — export it as CSV and try again.')});
+      return}
+    const fr=new FileReader();
+    fr.onload=function(){routeText(String(fr.result))};
+    fr.readAsText(fl);return}
   if(e.target.dataset.rimpfile){const fl=e.target.files&&e.target.files[0];if(!fl)return;
     S.rimp=S.rimp||{text:'',res:null};
     if(/\.xlsx$/i.test(fl.name)){
@@ -11072,6 +11129,7 @@ function runAction(a,v,t,e){
     case 'deepGo':{const _f=S.view;S.drawerOpen=false;S.backTo=_f;S.backDrawer=true;S.view='findings';S.scrollTo='deepcard';render();break}
     case 'chatNew':{S.coachBack=S.view;S.drawerOpen=false;chatNew();render();break}
     case 'chatOpen':{S.coachBack=S.view;S.drawerOpen=false;chatOpen(v);render();break}
+    case 'intakeOpen':{S.drawerOpen=false;S.sheet={t:'intake'};render();break}
     case 'runplanGenAsk':{S.rpgen=runPlanGen();S.sheet={t:'runplangen'};render();break}
     case 'runplanGenGo':{const g=S.rpgen;if(!g||g.block)break;
       lset('training-runplan-v1',{src:'Built from your history',started:today(),items:g.items});
@@ -11506,7 +11564,8 @@ function runAction(a,v,t,e){
     case 'rimpBack':S.rimp.res=null;render();break;
     case 'rimpGo':{const r=runImportCommit(S.rimp.res.runs);
       S.rimp=null;S.sheet=null;S.patCache=null;S.runOn=true;lset('training-runon-v1',true);render();
-      flash(r.added+' run'+(r.added===1?'':'s')+' imported'+(r.dupe?', '+r.dupe+' already there':'')+'.');break}
+      flash(r.added+' run'+(r.added===1?'':'s')+' imported'+(r.dupe?', '+r.dupe+' already there':'')+
+        ((!S.runplan&&runs().length>=6)?' Build a progression from it on the Running tab.':''));break}
     case 'readyWhy':{const p=activeProgSafe();if(!p)break;
       const di=+v,d=p.days[di];if(!d)break;
       const r=dayReadiness(p,di,S.week);
