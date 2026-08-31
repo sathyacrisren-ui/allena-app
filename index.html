@@ -334,7 +334,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return (lget(K_RUN,[])||[]).length>0})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='9d1926';  // stamped by tools/build.py with the content hash
+const BUILD_ID='3d8ef3';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -8522,6 +8522,10 @@ function deepParse(txt){
       t:String(x.t).slice(0,80),d:String(x.d).slice(0,400),
       rar:x.rar==='epic'?'epic':'rare'}))}catch(e){return []}}
 async function deepRun(){
+  { // the same gate the card shows — no button path spends tokens on old data
+    const st0=deepStore();
+    if(st0.last===today())return flash('Today\u2019s read is done — a fresh one unlocks tomorrow.');
+    if(!deepReadyInfo())return flash(st0.last?'Nothing new since the last read — it reopens when new data lands.':'Not enough logged data for a first read yet.')}
   if(!aiReady()){flash('Sign in (or add a key) first — the deep read uses your coach connection.');return}
   const st=deepStore();
   if(st.last===today()){flash('One deep read a day — tomorrow brings new data to read.');return}
@@ -8556,10 +8560,18 @@ function deepCard(){
       '</div><p class="mono" style="color:var(--faint);font-size:10px;margin-top:9px">Banked in your collection. A fresh read unlocks in about '+Math.max(1,Math.ceil((new Date(today()+'T24:00').getTime()-Date.now())/36e5))+'h.</p>';
   else if(!aiReady())
     inner='<p style="color:var(--dim);font-size:12.5px;line-height:1.6;margin-top:8px">The rule engines find what was pre-imagined; the model finds the rest — lags, thresholds, relationships between your signals. Sign in (Settings → account) and this unlocks with no key needed.</p>';
-  else
-    inner='<p style="color:var(--dim);font-size:12.5px;line-height:1.6;margin-top:8px">Ten weeks of your numbers, handed to the model with one demand: find what the rules cannot, and cite the figures it stands on. Interpretation, clearly labelled — never dressed up as measurement.</p>'+
-      '<button data-a="deepRun" class="big disp mt" style="background:var(--amber);color:#1F1E1D">Run a deep read</button>'+
-      '<p class="mono" style="color:var(--faint);font-size:10px;margin-top:8px;text-align:center">once a day · costs about a cent through your connection</p>';
+  else{
+    const rdy=deepReadyInfo();
+    if(rdy)
+      inner='<p style="color:var(--dim);font-size:12.5px;line-height:1.6;margin-top:8px">Ten weeks of your numbers, handed to the model with one demand: find what the rules cannot, and cite the figures it stands on. Interpretation, clearly labelled — never dressed up as measurement.</p>'+
+        '<p class="mono" style="color:var(--amber);font-size:10.5px;margin-top:8px">'+esc(rdy.line)+'</p>'+
+        '<button data-a="deepRun" class="big disp mt" style="background:var(--amber);color:#1F1E1D">Run a deep read</button>'+
+        '<p class="mono" style="color:var(--faint);font-size:10px;margin-top:8px;text-align:center">once a day · only when there is new data to read · about a cent</p>';
+    else if(!st.last){
+      const have=(S.history||[]).filter(h=>h.complete&&!h.run).length+(typeof runs==='function'?runs():[]).length;
+      inner='<p style="color:var(--dim);font-size:12.5px;line-height:1.6;margin-top:8px">The model reads ten weeks of your numbers and finds what the rules cannot. It needs about 8 logged sessions or runs before there is anything worth reading — '+have+' so far.</p>'}
+    else
+      inner='<p style="color:var(--dim);font-size:12.5px;line-height:1.6;margin-top:8px">Nothing new since the last read'+(st.last?' on '+esc(st.last):'')+'. Re-reading the same numbers would cost tokens to say the same things — it reopens on its own when new sessions or runs land.</p>'}
   return '<div class="card mt2" style="padding:17px;border-radius:20px">'+
     '<div style="display:flex;align-items:center;gap:10px">'+
     '<p class="disp" style="flex:1;font-size:15.5px;font-weight:600">The deep read</p>'+
