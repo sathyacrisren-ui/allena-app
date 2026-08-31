@@ -339,7 +339,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return (lget(K_RUN,[])||[]).length>0})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='86e507';  // stamped by tools/build.py with the content hash
+const BUILD_ID='d8d136';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -3005,6 +3005,15 @@ function dataPoints(){
   return{total:total,by:B,live:Math.min(live,total),
     today:todayEarned,room:Math.max(0,dpDayCap()-todayEarned),
     livePct:total?Math.round(Math.min(live,total)/total*100):0}}
+/* the two clocks of motivation: LEVELS are the small wins — the first
+   costs one honest session, each next ~12% more, capped so a level is
+   never more than a few good days away (goal-gradient: a finish line
+   you can see pulls harder than one you cannot). TIERS stay as the
+   long arc — the named identity you hold for weeks. */
+function dpLevel(n){
+  let lv=1,need=50,at=0;
+  while(n>=at+need&&lv<200){at+=need;lv++;need=Math.min(900,Math.round(need*1.12))}
+  return{lv:lv,into:n-at,need:need,left:Math.max(0,at+need-n),floor:at}}
 function dpTier(n){let t=DP_TIERS[0];DP_TIERS.forEach(x=>{if(n>=x[0])t=x});return t}
 function dpNext(n){const nx=DP_TIERS.find(x=>x[0]>n);return nx||null}
 function dpLabels(){return{sets:'Sets logged',effort:'Efforts recorded',sessions:'Sessions completed',
@@ -3721,7 +3730,8 @@ function drawerBtn(){return '<button data-a="drawerOpen" style="width:42px;heigh
 function headBtns(){return ''}   // chips live in the drawer now — headers stay quiet
 function pointsChip(){
   const d=dataPoints(),t=dpTier(d.total),nx=dpNext(d.total);
-  const pct=nx?Math.min(100,Math.round((d.total-t[0])/(nx[0]-t[0])*100)):100;
+  const L=dpLevel(d.total);
+  const pct=Math.min(100,Math.round(L.into/L.need*100));
   const C=2*Math.PI*13;
   return '<button data-a="drawerNav" data-v="points" style="display:flex;align-items:center;gap:9px;padding:6px 13px 6px 7px;border-radius:999px;'+
     'background:var(--raised);border:1px solid var(--line);flex:none">'+
@@ -3732,7 +3742,7 @@ function pointsChip(){
     (function(){/* the dotted blue continuation: where the arc lands if
         today's remaining room is fully earned */
       const room=d.room||0;if(!(room>0)||!nx)return '';
-      const addPct=Math.min(100-pct,room/(nx[0]-t[0])*100);
+      const addPct=Math.min(100-pct,room/L.need*100);
       if(addPct<=1)return '';
       const a0=(pct/100)*2*Math.PI,a1=((pct+addPct)/100)*2*Math.PI;
       const px=v=>(15+13*Math.cos(v)).toFixed(2),py=v=>(15+13*Math.sin(v)).toFixed(2);
@@ -3740,7 +3750,7 @@ function pointsChip(){
       return '<path d="M'+px(a0)+' '+py(a0)+' A13 13 0 '+large+' 1 '+px(a1)+' '+py(a1)+'" '+
         'fill="none" stroke="var(--blue)" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="0.5 4" opacity=".9"/>'})()+'</svg>'+
     '<span style="text-align:left;line-height:1.15"><span class="mono" style="display:block;font-size:14px;font-weight:600;color:'+t[2]+'">'+d.total.toLocaleString()+'</span>'+
-    '<span class="mono" style="display:block;color:var(--faint);font-size:8.5px;letter-spacing:.08em">DATA POINTS</span></span></button>'}
+    '<span class="mono" style="display:block;color:var(--faint);font-size:8.5px;letter-spacing:.08em">LEVEL '+L.lv+'</span></span></button>'}
 
 /* ══ the climb — rehab as the game it already is ═════════════
    Rehab has levels (phases), boss gates (criteria), a number
@@ -4592,7 +4602,13 @@ function viewPoints(){
        '<span style="color:var(--dim);font-size:11px">'+esc(lt[1])+'</span></div>'+
        (ln?'<p class="mono" style="color:var(--faint);font-size:10px;margin-top:6px">'+(ln[0]-d.live).toLocaleString()+' live to '+esc(ln[1])+' \u00b7 live means this phone ran the clock</p>'
           :'<p class="mono" style="color:var(--faint);font-size:10px;margin-top:6px">the top of the live ladder \u00b7 every point witnessed</p>')})()+
-   '<p class="disp" style="font-size:16px;font-weight:600;margin-top:12px">'+esc(t[1])+'</p>'+
+   (function(){const L=dpLevel(d.total);
+     const pcl=Math.min(100,Math.round(L.into/L.need*100));
+     return '<p class="disp" style="font-size:16px;font-weight:600;margin-top:12px">Level '+L.lv+' \u00b7 '+esc(t[1])+'</p>'+
+     '<div style="height:5px;border-radius:3px;background:var(--line);overflow:hidden;margin-top:10px">'+
+       '<div class="an-bar" style="height:5px;width:'+pcl+'%;background:'+t[2]+'"></div></div>'+
+     '<p class="mono" style="color:var(--faint);font-size:10.5px;margin-top:6px">'+L.left.toLocaleString()+' to level '+(L.lv+1)+
+       (L.left<=(d.room||0)?' \u2014 today could do it':' \u00b7 a good day earns ~60\u2013120')+'</p>'})()+
    (nx?'<div style="height:5px;border-radius:3px;background:var(--line);overflow:hidden;margin-top:14px">'+
      '<div class="an-bar" style="height:5px;width:'+Math.min(100,Math.round((d.total-t[0])/(nx[0]-t[0])*100))+'%;background:'+t[2]+'"></div></div>'+
      '<p class="mono" style="color:var(--faint);font-size:10.5px;margin-top:7px">'+(nx[0]-d.total).toLocaleString()+' more to '+esc(nx[1])+'</p>':
