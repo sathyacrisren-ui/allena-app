@@ -390,7 +390,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return (lget(K_RUN,[])||[]).length>0})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='87d03a';  // stamped by tools/build.py with the content hash
+const BUILD_ID='fa6daf';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -2251,7 +2251,7 @@ function viewCoach(){
 
 
 /* ══ import an existing program ═════════════════════════ */
-const IMPORT_SYS='Convert the training program into JSON only — no prose, no code fences. Shape: {"block":"name","weeks":N,"days":[{"name":"Day name","note":"","exercises":[{"name":"Exercise","bar":true|false,"rest":seconds,"sets":{"default":[{"w":kg|null,"reps":8|"8-12","rpe":8|null}]}}]}]}. One entry per set. If a week differs, use the week number as a key alongside "default". Use kg; convert lb by 0.4536 and round to 0.5. If a weight is not given use null. bar:true only for barbell lifts. rest in seconds, estimate if absent (compound 180, isolation 90). Keep the lifter\'s own exercise names. Never invent exercises that are not there.';
+const IMPORT_SYS='Convert the training program into JSON only — no prose, no code fences. Shape: {"block":"name","weeks":N,"days":[{"name":"Day name","note":"","exercises":[{"name":"Exercise","bar":true|false,"rest":seconds,"sets":{"default":[{"w":kg|null,"reps":8|"8-12","rpe":8|null}]}}]}]}. One entry per set. If a week differs, use the week number as a key alongside "default". Use kg; convert lb by 0.4536 and round to 0.5. If a weight is not given use null. bar:true only for barbell lifts. rest in seconds, estimate if absent (compound 180, isolation 90). Keep the lifter\'s own exercise names. Never invent exercises that are not there. Output COMPACT JSON (no spaces or newlines). Spreadsheets often repeat each day as empty per-week template blocks (loads of 0 or blank) — those are future weeks: use them only to count "weeks", and build each day ONCE from the filled-in block, preferring "default" sets over per-week keys unless the plan genuinely changes week to week. Logged results columns (S1/S2/Best) are history, not targets.';
 function impNew(){S.imp={step:'pick',text:'',img:null,busy:false,draft:null,err:null,assess:null}}
 async function impParse(){
   const f=S.imp;if(!aiReady())return flash('Add your API key or Allena cloud link under Data → Allena first.');
@@ -2261,10 +2261,16 @@ async function impParse(){
     if(m)content.push({type:'image',source:{type:'base64',media_type:m[1],data:m[2]}})}
   content.push({type:'text',text:(f.text||'Convert this program.').slice(0,26000)});
   try{
-    const res=await claudeFetch({model:S.ai.model,max_tokens:3000,system:IMPORT_SYS,messages:[{role:'user',content:content}]});
+    const res=await claudeFetch({model:S.ai.model,max_tokens:8000,system:IMPORT_SYS,messages:[{role:'user',content:content}]});
     const d=await res.json();
+    if(d.error){f.err='Allena could not be reached: '+(d.error.message||'unknown error')+'.';f.busy=false;return render()}
     let t=d.content?d.content.map(x=>x.text||'').join(''):'';
     t=t.replace(/```json|```/g,'').trim();
+    const b0=t.indexOf('{'),b1=t.lastIndexOf('}');
+    if(b0>=0&&b1>b0)t=t.slice(b0,b1+1);
+    if(d.stop_reason==='max_tokens'){
+      f.err='That program is big and the conversion ran out of room. Trim the pasted text above to the sheets that matter (the day tabs) and read it again.';
+      f.busy=false;return render()}
     const o=JSON.parse(t);
     o.id='imp'+Date.now().toString(36);o.kind=o.kind||'strength';o.weeks=o.weeks||4;
     (o.days||[]).forEach(dd=>(dd.exercises||[]).forEach(e=>{e.rest=e.rest||90;
@@ -2274,7 +2280,7 @@ async function impParse(){
     o.own=true;
     S.own={prog:o,review:null};
     S.imp=null;S.view='own';S.busyDone=1;render();return;
-  }catch(e){f.err="Couldn't read that as a program. Try pasting it as text, or a clearer photo."}
+  }catch(e){f.err=f.img?"Couldn't read that as a program — try a clearer photo, or paste the text.":"Couldn't read that as a program. Trimming the pasted text to just the training-day sheets usually fixes it."}
   f.busy=false;render()}
 function assessProgram(p){
   // local, deterministic: weekly sets per muscle from the written program
