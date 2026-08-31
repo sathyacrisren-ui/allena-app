@@ -390,7 +390,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return (lget(K_RUN,[])||[]).length>0})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='31eae5';  // stamped by tools/build.py with the content hash
+const BUILD_ID='3afe1a';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -4138,16 +4138,35 @@ function runPlanGen(){
     const byWk={};R.slice(-30).forEach(r=>{const k=questWeekKey(r.date);byWk[k]=(byWk[k]||0)+1});
     const freqs=Object.values(byWk).sort((a,b)=>a-b);
     const freq=Math.max(2,Math.min(5,freqs[Math.floor(freqs.length/2)]||3));
+    // their own easy pace, from their own logs — never an invented number
+    const paced=R.filter(r=>r.km>1&&r.mins>0).slice(-20);
+    const paces=paced.map(r=>r.mins/r.km).sort((a,b)=>a-b);
+    const easyP=paces.length?paces[Math.floor(paces.length/2)]*1.03:null;
+    const pStr=p2=>{const m2=Math.floor(p2),s2=Math.round((p2-m2)*60);return m2+':'+(s2<10?'0':'')+s2};
+    // the weekdays they actually run
+    const dows=[0,0,0,0,0,0,0];
+    R.slice(-30).forEach(r=>{try{dows[new Date(r.date+'T12:00').getDay()]++}catch(e){}});
+    const DN=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+    const order=[1,2,3,4,5,6,0];
+    const days=order.map(d=>({d:d,n:dows[d]})).sort((a2,b2)=>b2.n-a2.n).slice(0,freq)
+      .sort((a2,b2)=>order.indexOf(a2.d)-order.indexOf(b2.d)).map(x=>DN[x.d]);
+    const half=x=>Math.max(1,Math.round(x*2)/2);
     const items=[];let km=base;
     for(let w=1;w<=8;w++){
       const down=(w%4===0);
       const wkKm=down?Math.round(km*0.7):Math.round(km);
-      const lng=Math.round(wkKm*0.38);
-      items.push({week:w,desc:down
-        ?('~'+wkKm+' km over '+Math.max(2,freq-1)+' runs — down week on purpose; the adaptation happens here.')
-        :('~'+wkKm+' km over '+freq+' runs — long run ~'+lng+' km, everything else easy.')});
+      let parts=[];
+      if(down){
+        const each=half(wkKm/freq);
+        parts=days.map(d2=>d2+' '+each+' km easy');
+        items.push({week:w,desc:parts.join(' · ')+' — down week on purpose (~'+wkKm+' km, no long run); the adaptation happens here.'});
+      }else{
+        const lng=half(wkKm*0.38),each=half((wkKm-lng)/Math.max(1,freq-1));
+        parts=days.map((d2,i2)=>i2===days.length-1?(d2+' '+lng+' km long'):(d2+' '+each+' km easy'));
+        items.push({week:w,desc:parts.join(' · ')+' — ~'+wkKm+' km'+(easyP?', all around '+pStr(easyP)+'/km (your own easy average)':'')+'.'});
+      }
       if(!down)km=km*1.08}
-    return{base:base,freq:freq,items:items}}catch(e){return{block:'Could not read the history.'}}}
+    return{base:base,freq:freq,days:days,pace:easyP?pStr(easyP):null,items:items}}catch(e){return{block:'Could not read the history.'}}}
 function viewPoints(){
   const d=dataPoints(),t=dpTier(d.total),nx=dpNext(d.total),L=dpLabels(),st=weekStreak();
   const keys=Object.keys(d.by).filter(k=>d.by[k]).sort((a,b)=>d.by[b]-d.by[a]);
@@ -9831,7 +9850,7 @@ function sheetHtml(){
     if(g.block)return wrapSheet('The running plan',
       '<p style="color:var(--dim);font-size:13.5px;line-height:1.6">'+esc(g.block)+'</p>');
     return wrapSheet('Eight weeks, built from you',
-      '<p style="color:var(--dim);font-size:13px;line-height:1.6">Base: your own average of about '+g.base+' km a week across '+g.freq+' runs. It grows 8% a week with a down week every fourth — and the 0.8\u20131.3 load band always outranks it.</p>'+
+      '<p style="color:var(--dim);font-size:13px;line-height:1.6">Base: your own average of about '+g.base+' km a week across '+g.freq+' runs'+(g.days?' on your usual days ('+g.days.join(', ')+')':'')+(g.pace?', paced off your own easy average of '+g.pace+'/km':'')+'. It grows 8% a week with a down week every fourth — and the 0.8\u20131.3 load band always outranks it.</p>'+
       '<div class="card mt" style="padding:4px 15px">'+
       g.items.map((it,i)=>'<div style="display:flex;gap:11px;padding:9px 0'+(i?';border-top:1px solid var(--line)':'')+'">'+
         '<span class="mono" style="color:var(--faint);font-size:11px;flex:none;width:20px">W'+it.week+'</span>'+
