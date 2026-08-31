@@ -390,7 +390,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return (lget(K_RUN,[])||[]).length>0})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='c1b678';  // stamped by tools/build.py with the content hash
+const BUILD_ID='029ce4';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -2269,7 +2269,18 @@ function midName(n){
   return n.slice(0,Math.max(8,22-ext.length))+'\u2026'+ext}
 function impNew(){S.imp={step:'pick',text:'',img:null,busy:false,draft:null,err:null,assess:null}}
 async function impParse(){
-  const f=S.imp;if(!aiReady())return flash('Add your API key or Allena cloud link under Data → Allena first.');
+  const f=S.imp;if(!f)return;
+  /* a structured spreadsheet needs no AI: read the grid exactly, on the
+     phone, instantly. Allena is the fallback for layouts this cannot see. */
+  if(f.grid&&f.kindHint!=='plan'&&typeof liftGridParse==='function'){
+    const g=liftGridParse(f.grid);
+    if(g){
+      S.histImp={block:String((f.fileName||'Imported history').replace(/\.[a-z0-9]+$/i,'')).slice(0,60),
+        weeks:g.weeks.slice(0,52)};
+      S.hdate={date:'',mode:'start'};
+      S.imp=null;S.view='today';S.sheet={t:'histdate'};S.busyDone=1;render();
+      flash(g.totalSets+' sets read straight off the sheet — no cloud needed.');return}}
+  if(!aiReady())return flash('Add your API key or Allena cloud link under Data → Allena first.');
   f.busy=true;f.err=null;
   if(typeof thinkStart==='function')thinkStart('impread',[
     ['Reading what you gave her'],
@@ -5366,15 +5377,72 @@ function xlsxExtract(file,done,fail){
         if(!sheets.length){fail('bad');return}
         Promise.all(sheets.map(s2=>z.read(s2.ent)))
         .then(function(xmls){
-          const out=[];
-          sheets.forEach((s2,i)=>{const t=xlsxGridText(s2.name,xmls[i],strings,48);if(t)out.push(t)});
+          const out=[],grid=[];
+          sheets.forEach((s2,i)=>{const t=xlsxGridText(s2.name,xmls[i],strings,48);if(t)out.push(t);
+            grid.push({name:s2.name,rows:xlsxCells(xmls[i],strings)})});
           let txt=out.join('\n\n');
           if(txt.length>26000)txt=txt.slice(0,26000)+'\n… (trimmed — long sheet; the days and targets above are what matter)';
-          if(txt)done(txt);else fail('empty')})
+          if(txt)done(txt,grid);else fail('empty')})
         .catch(function(){fail('bad')})})
       .catch(function(){fail('bad')})
     },fail)};
   fr.readAsArrayBuffer(file)}
+
+/* ── the grid reader ─────────────────────────────────────────
+   A structured tracker needs no AI: Week markers, an Exercise header
+   row mapping the columns, data rows underneath. Read the numbers
+   exactly, on the phone, instantly. AI stays as the fallback for
+   layouts this cannot see. */
+function liftGridParse(grid){
+  const wk={};let total=0;
+  (grid||[]).forEach(sh=>{
+    const day=String(sh.name||'').trim().slice(0,40)||'Session';
+    const rows=sh.rows||{};
+    const keys=Object.keys(rows).map(Number).sort((a,b)=>a-b);
+    let map=null,week=1;
+    const sess=w=>{const k=Math.max(1,Math.round(w)||1);
+      const o=(wk[k]=wk[k]||{week:k,sessions:[]});
+      let x=o.sessions.find(z=>z.name===day);
+      if(!x){x={name:day,exercises:[]};o.sessions.push(x)}
+      return x};
+    keys.forEach(rn=>{
+      const r=rows[rn];
+      const cols=Object.keys(r).map(Number).sort((a,b)=>a-b);
+      if(!cols.length)return;
+      const first=String(r[cols[0]]).trim();
+      const w1=/^week\s*(\d+)/i.exec(first);
+      if(w1&&cols.length<=2){week=+w1[1];return}
+      if(cols.some(c=>/^exercises?$/i.test(String(r[c]).trim()))){
+        map={ex:null,load:null,sets:[],rir:null,rpe:null,reps:null};
+        cols.forEach(c=>{const v=String(r[c]).trim();
+          if(/^exercises?$/i.test(v))map.ex=c;
+          else if(/^(load|weight)\b/i.test(v)||/^kg$/i.test(v))map.load=c;
+          else if(/^s(et)?\s*\d+$/i.test(v))map.sets.push(c);
+          else if(/^rir$/i.test(v))map.rir=c;
+          else if(/^rpe$/i.test(v))map.rpe=c;
+          else if(/^reps?\b/i.test(v))map.reps=c});
+        if(map.ex==null||(!map.sets.length&&map.reps==null))map=null;
+        return}
+      if(!map)return;
+      const name=r[map.ex]!=null?String(r[map.ex]).trim():'';
+      if(!name||name.length>60)return;
+      const num=c=>{if(c==null||r[c]==null)return null;
+        const v=parseFloat(String(r[c]).replace(',','.'));return isFinite(v)?v:null};
+      const load=num(map.load);
+      let rpe=num(map.rpe);
+      const rir=num(map.rir);
+      if(rpe==null&&rir!=null)rpe=Math.max(4,Math.min(10,10-rir));
+      const sets=[];
+      map.sets.forEach(c=>{const reps=num(c);
+        if(reps!=null&&reps>0&&reps<200)sets.push({w:(load&&load>0)?load:null,r:Math.round(reps),rpe:rpe})});
+      if(!sets.length&&map.reps!=null){const reps=num(map.reps);
+        if(reps&&reps>0&&reps<200)sets.push({w:(load&&load>0)?load:null,r:Math.round(reps),rpe:rpe})}
+      if(!sets.length)return; // unfilled template row = a plan, not history
+      sess(week).exercises.push({name:name.slice(0,48),sets:sets});
+      total+=sets.length})});
+  const weeks=Object.keys(wk).map(Number).sort((a,b)=>a-b).map(k=>wk[k]);
+  if(total<8||!weeks.length)return null;
+  return {history:true,weeks:weeks,totalSets:total}}
 
 /* ── history without dates ───────────────────────────────────
    A friend's log often has weeks but no calendar. One anchor date
@@ -9990,7 +10058,7 @@ function sheetHtml(){
     return wrapSheet('One date and it all lands',
       '<p style="color:var(--dim);font-size:13.5px;line-height:1.6">'+esc(hi.block)+' — '+nW+' weeks, '+nS+' sessions of logged lifting, no calendar. Give Allena one anchor and the dates are deduced, marked approximate, and everything starts working on it: trends, patterns, deep reads, the next block.</p>'+
       '<div class="row mt2" style="gap:8px">'+
-      [['start','Week 1 started on\u2026'],['end','The last week ended on\u2026']].map(m2=>
+      [['start','Week 1 started'],['end','Last week ended']].map(m2=>
         '<button data-a="hdateMode" data-v="'+m2[0]+'" class="pill" style="flex:1;font-size:12px'+(f.mode===m2[0]?';background:var(--text);color:#1F1E1D;border-color:var(--text);font-weight:600':'')+'">'+m2[1]+'</button>').join('')+'</div>'+
       '<input type="date" data-in="hdate.date" value="'+esc(f.date||'')+'" style="margin-top:10px">'+
       '<button data-a="histImpGo" class="big disp mt" style="background:'+((f.date||'').trim()?'var(--amber)':'var(--raised)')+';color:'+((f.date||'').trim()?'#1F1E1D':'var(--faint)')+';font-size:15px">Bring it in</button>'+
@@ -10911,19 +10979,19 @@ document.addEventListener('input',e=>{const d=e.target.dataset;
   if(e.target.dataset.runsel){S.runGroup=e.target.value;render();return}
   if(e.target.dataset.intakefile){const fl=e.target.files&&e.target.files[0];if(!fl)return;
     const nm=String(fl.name||'').toLowerCase();
-    const routeText=function(txt,raw){
+    const routeText=function(txt,raw,grid){
       // Allena reads it and decides: runs, lifting, or both
       const r=parseRunImport(txt);
       const nRuns=(r&&r.runs)?r.runs.length:0;
       const liftSignal=(txt.match(/\b\d+\s*[x×]\s*\d+|\bRPE\b|\bRIR\b|\bsets?\b|\bbench|squat|deadlift|press\b/gi)||[]).length;
       if(nRuns>=3&&liftSignal>=6){
-        S.intakeBoth={text:(raw||txt),runs:r.runs,fileName:fl.name};
+        S.intakeBoth={text:(raw||txt),runs:r.runs,fileName:fl.name,grid:grid||null};
         S.sheet={t:'intakeboth'};render();return}
       if(nRuns>=3){
         S.rimp={text:txt.slice(0,120000),res:null,fileName:fl.name};
         S.sheet={t:'runimp'};render();runAction('rimpRead');
         flash('Reads like running history — '+nRuns+' runs found.');return}
-      if(typeof impNew==='function'){impNew();S.imp.text=(raw||txt).slice(0,26000);S.imp.fileName=fl.name;
+      if(typeof impNew==='function'){impNew();S.imp.text=(raw||txt).slice(0,26000);S.imp.fileName=fl.name;S.imp.grid=grid||null;
         S.sheet=null;S.view='import';render();
         flash('Reads like a program — Allena converts it, then reviews it with you.')}};
     if(/\.(png|jpe?g|heic|webp)$/.test(nm)||/^image\//.test(fl.type)){
@@ -10939,9 +11007,9 @@ document.addEventListener('input',e=>{const d=e.target.dataset;
         S.hkRes=hkImport(parsed);vib([20,40,20]);render()});
       return}
     if(/\.xlsx$/.test(nm)){
-      xlsxExtract(fl,function(txt){
+      xlsxExtract(fl,function(txt,grid){
         const flat=txt.replace(/^== .*==$/gm,'').replace(/ \| /g,',').replace(/\n{2,}/g,'\n').trim();
-        routeText(flat,txt.replace(/ \| /g,',')) },
+        routeText(flat,txt.replace(/ \| /g,','),grid) },
         function(){flash('Could not read that spreadsheet — export it as CSV and try again.')});
       return}
     const fr=new FileReader();
@@ -10964,7 +11032,7 @@ document.addEventListener('input',e=>{const d=e.target.dataset;
   if(e.target.dataset.imptext){const fl=e.target.files&&e.target.files[0];if(!fl)return;
     if(/\.xlsx$/i.test(fl.name)){
       S.imp.err=null;S.imp.fileName=fl.name;
-      xlsxExtract(fl,function(txt){S.imp.text=txt;S.imp.err=null;render()},
+      xlsxExtract(fl,function(txt,grid){S.imp.text=txt;S.imp.grid=grid||null;S.imp.err=null;render()},
         function(code){S.imp.fileName=null;
           S.imp.err=code==='nozip'
             ?'This browser cannot unpack Excel files — export the sheet as CSV, or photograph it.'
@@ -11336,17 +11404,17 @@ function runAction(a,v,t,e){
       S.rimp={text:ib.text.slice(0,120000),res:null,fileName:ib.fileName};
       S.sheet={t:'runimp'};render();runAction('rimpRead');break}
     case 'ibLift':{const ib=S.intakeBoth;if(!ib)break;
-      S.intakeBoth=null;impNew();S.imp.text=ib.text.slice(0,26000);S.imp.fileName=ib.fileName;
+      S.intakeBoth=null;impNew();S.imp.text=ib.text.slice(0,26000);S.imp.fileName=ib.fileName;S.imp.grid=ib.grid||null;
       S.sheet=null;S.view='import';render();
-      if(aiReady())impParse();break}
+      impParse();break}
     case 'ibBoth':{const ib=S.intakeBoth;if(!ib)break;
       S.intakeBoth=null;
       const r9=runImportCommit(ib.runs);
       S.runOn=true;lset('training-runon-v1',true);
-      impNew();S.imp.text=ib.text.slice(0,26000);S.imp.fileName=ib.fileName;
+      impNew();S.imp.text=ib.text.slice(0,26000);S.imp.fileName=ib.fileName;S.imp.grid=ib.grid||null;
       S.sheet=null;S.view='import';render();
       flash(r9.added+' runs in'+(r9.dupe?' ('+r9.dupe+' already there, skipped)':'')+' — now the lifting.');
-      if(aiReady())impParse();break}
+      impParse();break}
     case 'hdateMode':{(S.hdate=S.hdate||{}).mode=v;render();break}
     case 'histImpGo':{const f=S.hdate||{};
       if(!(f.date||'').trim()){flash('Pick the date first.');break}
