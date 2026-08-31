@@ -334,7 +334,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return (lget(K_RUN,[])||[]).length>0})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='3f99cd';  // stamped by tools/build.py with the content hash
+const BUILD_ID='ae5496';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -8023,6 +8023,23 @@ function readinessExplain(r,name){
        :'Close enough to normal to leave the score alone.')});
   else parts.push({t:'Body Battery',d:'No reading today, so this is recovery only.'});
   return parts}
+function sessionStimulus(prog,di,wk){
+  /* the growth stimulus a session OFFERS — not growth measured, and
+     labelled that way. Hard sets per prime mover with diminishing
+     returns: the first ~4 sets per muscle carry most of the signal,
+     the next few add less, past ~8 adds little (the literature's
+     shape, stated plainly in the explainer). 100 = a full hypertrophy
+     session's worth of stimulus. */
+  try{
+    const per={};
+    buildSets(prog,di,wk).forEach(st=>{
+      MUSCLE_RULES.forEach(r=>{if(!r[1].test(st.ex))return;
+        if(r[0]==='Biceps'&&/leg curl|hamstring/i.test(st.ex))return;
+        per[r[0]]=(per[r[0]]||0)+1})});
+    let units=0;
+    Object.values(per).forEach(n=>{
+      units+=Math.min(n,4)+Math.max(0,Math.min(n-4,4))*0.6+Math.max(0,Math.min(n-8,4))*0.25});
+    return Math.max(0,Math.min(100,Math.round(units/24*100)))}catch(e){return null}}
 function dayReadiness(prog,di,wk){
   const load=dayMuscles(prog,di,wk);
   const fresh={};muscleFresh().forEach(x=>fresh[x.m]=x.fresh);
@@ -8498,7 +8515,13 @@ function dayCard(p,d,i,done,daily){
           '<div style="flex:1;height:4px;border-radius:4px;background:var(--line);overflow:hidden">'+
           '<div style="height:4px;width:'+sc+'%;border-radius:4px;background:'+col+'"></div></div>'+
           '<span class="mono" style="color:'+col+';font-size:9.5px;letter-spacing:.05em;flex:none">'+sc+'% FRESH'+
-          (r9.worst&&r9.worstV<75?' \u00b7 '+esc(r9.worst.toUpperCase())+' '+r9.worstV+'%':'')+'</span></div>'
+          (r9.worst&&r9.worstV<75?' \u00b7 '+esc(r9.worst.toUpperCase())+' '+r9.worstV+'%':'')+'</span></div>'+
+          (function(){const g9=sessionStimulus(p,i,S.week);
+            if(g9==null||!g9)return '';
+            return '<div style="display:flex;align-items:center;gap:9px;margin-top:6px">'+
+              '<div style="flex:1;height:4px;border-radius:4px;background:var(--line);overflow:hidden">'+
+              '<div style="height:4px;width:'+g9+'%;border-radius:4px;background:var(--blue)"></div></div>'+
+              '<span class="mono" style="color:var(--blue);font-size:9.5px;letter-spacing:.05em;flex:none">'+g9+'% GROWTH STIMULUS</span></div>'})()
       }catch(e){return ''}})()+
     (offloadFor(p,i).length?'<p class="mono" style="color:var(--amber);font-size:10.5px;margin-top:6px">+ '+offloadFor(p,i).length+' moved here: '+offloadFor(p,i).map(x=>esc(String(x.ex||'').replace(/ — .*/,''))).join(', ')+'</p>':'')+
     (function(){const ab=((S.addback||{})[offloadKey(p)]||[]).filter(a=>a.day===i);
