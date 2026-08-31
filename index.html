@@ -390,7 +390,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return (lget(K_RUN,[])||[]).length>0})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='106a10';  // stamped by tools/build.py with the content hash
+const BUILD_ID='7647f3';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -10167,12 +10167,12 @@ function sheetHtml(){
     let inner='<p style="color:var(--dim);font-size:13px;line-height:1.55">'+esc((p.days[pv.di]||{}).name||'')+' as written. Uncheck anything you are not doing today, or trim it to fit the time you have.</p>';
     {const live=pv.ex.filter(e=>!e.cut);
      const untouched=live.every(e=>e.keep&&!e.sets.some(s2=>s2.cut));
-     const shown=untouched?(pv.mode==='full'?'full':pv.mode):null;
+     const shown=pv.preset||(untouched?'full':null);
      inner+='<div class="row mt" style="gap:6px">'+
       [['full','Full'],['short','~2/3'],['min','Key lifts']].map(m=>
         '<button data-a="prevMode" data-v="'+m[0]+'" class="pill" style="flex:1;font-size:12px'+(shown===m[0]?';background:var(--text);color:#1F1E1D;border-color:var(--text);font-weight:600':'')+'">'+m[1]+'</button>').join('')+'</div>';
      const cutN=pv.ex.filter(e=>e.cut).length;
-     if(!untouched)inner+='<p class="mono" style="color:var(--faint);font-size:10.5px;margin-top:6px">Trimmed by hand — tap a preset to start over.</p>';
+     if(!untouched&&!pv.preset)inner+='<p class="mono" style="color:var(--faint);font-size:10.5px;margin-top:6px">Trimmed by hand — tap a preset to start over.</p>';
      else if(cutN)inner+='<p class="mono" style="color:var(--faint);font-size:10.5px;margin-top:6px">'+cutN+' cut from this week — presets apply to what is left.</p>';}
     inner+='<p class="mono" style="color:'+(mins<fullMins?'var(--amber)':'var(--faint)')+';font-size:11px;margin-top:10px">'+
       totalSets+' of '+allSets+' sets · about '+Math.max(mins,5)+' min'+
@@ -11225,13 +11225,13 @@ function runAction(a,v,t,e){
         const p6=S.lib.programs.find(x=>x.id===S.prev.pid)||activeProgSafe(),ck=offloadKey(p6);
         S.cut[ck]=(S.cut[ck]||[]).filter(c=>!(c.day===S.prev.di&&c.ex===e.name));lset(K_CUT,S.cut);
         A.preview(S.prev.di,p6.id);flash(String(e.name).replace(/ — .*/,'')+' is back in today.');break}
-      e.keep=!e.keep;render();break}
+      e.keep=!e.keep;S.prev.preset=null;render();break}
     case 'prevSets':{const [i,d]=t.dataset.v.split(':').map(Number);const e=S.prev.ex[i];
       const live=e.sets.filter(s2=>!s2.cut);
       if(d<0&&live.length>1)e.sets.filter(s2=>!s2.cut).slice(-1)[0].cut=true;
       if(d>0){const c=e.sets.filter(s2=>s2.cut)[0];if(c)delete c.cut}
-      render();break}
-    case 'prevMode':{const pv=S.prev;pv.mode=v;
+      S.prev.preset=null;render();break}
+    case 'prevMode':{const pv=S.prev;pv.mode=v;pv.preset=v;
       const rank=pv.ex.map((e,i)=>({i:i,cut:!!e.cut,s:(e.sets[0].bar?3:0)+((e.sets[0].targetW||0)>=60?1:0)+
         (S.goals.some(g=>{const gb=gBase(g.ex).toLowerCase().trim();return gb&&gBase(e.name).toLowerCase().trim()===gb})?8:0)+(e.sets.length>=3?1:0)}))
         .filter(x=>!x.cut).sort((a,b)=>b.s-a.s);
