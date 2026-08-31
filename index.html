@@ -333,7 +333,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return (lget(K_RUN,[])||[]).length>0})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='e4663a';  // stamped by tools/build.py with the content hash
+const BUILD_ID='b3e4ee';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -1221,6 +1221,7 @@ A.commit=(confirmed)=>{const s=S.sess,c=s.sets[s.idx],timed=!!c.secs;
     if(sn){S.sanity=sn;S.sheet={t:'sanity'};render();return}}
   const pr=isPR(e);if(pr)e.pr=true;
   S.hint=autoReg(e,c);
+  e.t=Date.now(); // wall-clock stamp: a live set is auditable, a typed one is not
   s.log.push(e);
   upsert(record(false));
   if(s.idx>=s.sets.length-1){s.phase='done';S.restEnd=null;audioCancel();
@@ -10179,12 +10180,16 @@ function sheetHtml(){
         (hr.dup?hr.dup+' already here were skipped. ':'')+'Swims, rides and rows count as load; running is coached.</p>'+
         ((!S.runplan&&runs().length>=6)?'<button data-a="runplanGenAsk" class="btn mt" style="color:var(--amber)">Build a running progression from it</button>':'')+
         '<button data-a="hkDone" class="btn mt" style="color:var(--dim)">Done</button>')}
-    return wrapSheet('Import your data',
-      '<p style="color:var(--dim);font-size:13.5px;line-height:1.6">One door for everything. Drop a file and Allena works out what it is — a program becomes a block she reviews with you, running history lands in your record, an Apple Health export brings every app that syncs to it.</p>'+
-      '<label class="big disp mt2" style="display:block;text-align:center;cursor:pointer;background:var(--amber);color:#1F1E1D;font-size:15px">Choose a file'+
-      '<input type="file" accept=".xlsx,.csv,.tsv,.txt,.gpx,.tcx,.xml,image/*,text/plain,text/csv,text/xml,application/xml,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" data-intakefile="1" style="display:none"></label>'+
+    return wrapSheet('Import',
+      '<p style="color:var(--dim);font-size:13.5px;line-height:1.6">Two different jobs, so say which one this is — then drop any file.</p>'+
+      '<label class="big disp mt2" style="display:block;text-align:center;cursor:pointer;background:var(--amber);color:#1F1E1D;font-size:15px">My training history'+
+      '<span style="display:block;font-size:11.5px;font-weight:400;color:#1F1E1D;opacity:.75;margin-top:2px">Runs, logged lifting, Health exports — it lands in your record</span>'+
+      '<input type="file" accept=".xlsx,.csv,.tsv,.txt,.gpx,.tcx,.xml,text/plain,text/csv,text/xml,application/xml,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" data-intakefile="data" style="display:none"></label>'+
+      '<label class="big disp mt" style="display:block;text-align:center;cursor:pointer;background:var(--raised);border:1px solid var(--line);color:var(--text);font-size:15px">A program to follow'+
+      '<span style="display:block;font-size:11.5px;font-weight:400;color:var(--dim);margin-top:2px">A plan or a photo of one — Allena converts and reviews it with you</span>'+
+      '<input type="file" accept=".xlsx,.csv,.tsv,.txt,image/*,text/plain,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" data-intakefile="program" style="display:none"></label>'+
       '<div class="card mt2" style="padding:4px 15px">'+
-      [['Spreadsheets & CSV','Programs or run history — Allena tells them apart by reading them'],
+      [['Spreadsheets & CSV','Strong, Hevy, Garmin, hand-made sheets — read right on the phone'],
        ['Apple Health export.xml','Garmin, Apple Watch, Strava — everything that syncs to Health'],
        ['GPX / TCX','Single watch activities'],
        ['A photo of a program','Whiteboard, PDF page, screenshot — she reads it']].map((x,i)=>
@@ -11084,21 +11089,24 @@ document.addEventListener('input',e=>{const d=e.target.dataset;
   if(e.target.dataset.runsel){S.runGroup=e.target.value;render();return}
   if(e.target.dataset.intakefile){const fl=e.target.files&&e.target.files[0];if(!fl)return;
     const nm=String(fl.name||'').toLowerCase();
+    const kind=e.target.dataset.intakefile; // 'data' | 'program' — the user said which
     const routeText=function(txt,raw,grid){
-      // Allena reads it and decides: runs, lifting, or both
+      if(kind==='program'){
+        impNew();S.imp.text=(raw||txt).slice(0,26000);S.imp.fileName=fl.name;S.imp.grid=grid||null;
+        S.imp.kindHint='plan';S.sheet=null;S.view='import';render();impParse();return}
+      // data intent: runs, lifting history, or both — no guessing about which job
       const r=parseRunImport(txt);
       const nRuns=(r&&r.runs)?r.runs.length:0;
       const liftSignal=(txt.match(/\b\d+\s*[x×]\s*\d+|\bRPE\b|\bRIR\b|\bsets?\b|\bbench|squat|deadlift|press\b/gi)||[]).length;
       if(nRuns>=3&&liftSignal>=6){
         S.intakeBoth={text:(raw||txt),runs:r.runs,fileName:fl.name,grid:grid||null};
-        S.sheet={t:'intakeboth'};render();return}
+        runAction('ibBoth');return}
       if(nRuns>=3){
         S.rimp={text:txt.slice(0,120000),res:null,fileName:fl.name};
         S.sheet={t:'runimp'};render();runAction('rimpRead');
         flash('Reads like running history — '+nRuns+' runs found.');return}
       if(typeof impNew==='function'){impNew();S.imp.text=(raw||txt).slice(0,26000);S.imp.fileName=fl.name;S.imp.grid=grid||null;
-        S.sheet=null;S.view='import';render();
-        flash('Reads like a program — Allena converts it, then reviews it with you.')}};
+        S.imp.kindHint='hist';S.sheet=null;S.view='import';render();impParse()}};
     if(/\.(png|jpe?g|heic|webp)$/.test(nm)||/^image\//.test(fl.type)){
       const fr=new FileReader();
       fr.onload=function(){impNew();S.imp.img=String(fr.result);S.sheet=null;S.view='import';render();
@@ -11510,14 +11518,14 @@ function runAction(a,v,t,e){
       S.sheet={t:'runimp'};render();runAction('rimpRead');break}
     case 'ibLift':{const ib=S.intakeBoth;if(!ib)break;
       S.intakeBoth=null;impNew();S.imp.text=ib.text.slice(0,26000);S.imp.fileName=ib.fileName;S.imp.grid=ib.grid||null;
-      S.sheet=null;S.view='import';render();
+      S.imp.kindHint='hist';S.sheet=null;S.view='import';render();
       impParse();break}
     case 'ibBoth':{const ib=S.intakeBoth;if(!ib)break;
       S.intakeBoth=null;
       const r9=runImportCommit(ib.runs);
       S.runOn=true;lset('training-runon-v1',true);
       impNew();S.imp.text=ib.text.slice(0,26000);S.imp.fileName=ib.fileName;S.imp.grid=ib.grid||null;
-      S.sheet=null;S.view='import';render();
+      S.imp.kindHint='hist';S.sheet=null;S.view='import';render();
       flash(r9.added+' runs in'+(r9.dupe?' ('+r9.dupe+' already there, skipped)':'')+' — now the lifting.');
       impParse();break}
     case 'histDatedGo':{const hd=S.histDated;if(!hd)break;
