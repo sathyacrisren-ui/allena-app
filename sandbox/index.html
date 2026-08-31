@@ -390,7 +390,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return (lget(K_RUN,[])||[]).length>0})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='3afe1a';  // stamped by tools/build.py with the content hash
+const BUILD_ID='1198eb';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -2069,12 +2069,20 @@ function scanCard(){
     chip('weight',d.w,' kg',d.w>0)+chip('muscle',d.smm,' kg',d.smm>0)+chip('fat',d.fm,' kg',d.fm<0)+chip('body fat',d.bf,'%',d.bf<0)+'</div>'+
     '<p style="color:var(--faint);font-size:11px;line-height:1.5;margin-top:8px">Since '+fmtDate(first.date+'T12:00')+'. Muscle up with fat flat or down is the recomp you want. Tap to explain.</p></button>'}
 function recoveryCard(){
+ /* recovery on the same glow mannequin as Your Ground — cooled slate
+    glow = still recovering, dark plate = recovered. One body
+    language across the whole app. */
  if(!S.history.length)return '';
  const F=muscleFresh();
+ const st={};F.forEach(x=>{st[x.m]={s:x.fresh<75?'fade':'open',days:null}});
  const worked=F.filter(x=>x.fresh<100).sort((a,b)=>a.fresh-b.fresh);
- let h='<div class="card mt" style="padding:16px"><p class="eyebrow">Muscle recovery</p>'+bodySvg(F);
- h+='<div style="display:flex;gap:14px;justify-content:center;margin-top:8px">'+
-  [['#7FA86B','fresh'],['#E0A458','working'],['#C1554A','loaded']].map(x=>'<span style="display:flex;align-items:center;gap:5px;color:var(--faint);font-size:10.5px"><span style="width:9px;height:9px;border-radius:3px;background:'+x[0]+'"></span>'+x[1]+'</span>').join('')+'</div>';
+ const panel=back=>'<div style="flex:1;min-width:0">'+
+   groundSvg(st,back,{hit:false,idSuffix:'RC',attr:'style="width:100%;height:auto;display:block"'})+'</div>';
+ let h='<div class="card mt" style="padding:16px"><p class="eyebrow">Muscle recovery</p>'+
+  '<div style="display:flex;gap:10px;max-width:300px;margin:10px auto 0">'+panel(false)+panel(true)+'</div>'+
+  '<div style="display:flex;gap:14px;justify-content:center;margin-top:8px">'+
+  '<span style="display:flex;align-items:center;gap:5px;color:var(--faint);font-size:10.5px"><span style="width:9px;height:9px;border-radius:9px;background:#C9D6E3"></span>still recovering</span>'+
+  '<span style="display:flex;align-items:center;gap:5px;color:var(--faint);font-size:10.5px"><span style="width:9px;height:9px;border-radius:9px;background:#3B3935"></span>recovered</span></div>';
  if(worked.length)h+='<div style="margin-top:12px;display:flex;flex-direction:column;gap:6px">'+
   worked.slice(0,6).map(x=>'<div style="display:flex;align-items:center;gap:8px">'+
    '<span class="mono" style="width:88px;flex:none;font-size:11px;color:var(--dim)">'+x.m+'</span>'+
@@ -2229,13 +2237,15 @@ function viewCoach(){
        :'Ask me about your program — I can see this week, your recovery and what is left.')+'</p>'+
       '<div style="display:flex;flex-direction:column;gap:7px;margin-top:12px">'+
       (CHIPS[topic]||CHIPS.program).map(q=>'<button data-a="askChip" data-v="'+esc(q)+'" class="card" style="width:100%;text-align:left;padding:11px 14px;font-size:13px;color:var(--dim)">'+esc(q)+'</button>').join('')+'</div>';
-    if(recent.length){h+='<div style="display:flex;flex-direction:column;gap:7px;margin-top:14px">'+
-      recent.map(x=>{const vol=x.log.reduce((a,l)=>a+(l.w||0)*(l.r||0),0);
-       return '<button data-a="coachFocus" data-v="'+x.id+'" class="card" style="width:100%;text-align:left;padding:12px 14px">'+
-        '<div style="display:flex;align-items:baseline;gap:8px"><span style="flex:1;min-width:0;font-size:13.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(x.dayTitle||'Session')+'</span>'+
-        '<span class="mono" style="color:var(--faint);font-size:10px;flex:none">'+fmtDate(x.date)+'</span></div>'+
-        '<p class="mono" style="color:var(--faint);font-size:10px;margin-top:3px">'+x.log.length+' sets'+(vol?' · '+Math.round(vol).toLocaleString()+' kg':'')+'</p></button>'}).join('')+'</div>'+
-      '<p style="color:var(--faint);font-size:12px;line-height:1.55;margin-top:14px">Or just ask — I already have your recent sessions, week, goals and recovery.</p>'}
+    if(recent.length){
+      h+='<button data-a="coachSessToggle" class="card" style="width:100%;text-align:left;padding:12px 14px;margin-top:14px;display:flex;align-items:center;gap:10px">'+
+        '<span style="flex:1;font-size:13.5px;font-weight:600">Ask about a session</span>'+
+        '<span class="mono" style="color:var(--faint);font-size:12px">'+(S.coachSessOpen?'\u2304':'\u203a')+'</span></button>';
+      if(S.coachSessOpen)h+='<div style="display:flex;flex-direction:column;gap:6px;margin-top:7px">'+
+        recent.map(x=>'<button data-a="coachFocus" data-v="'+x.id+'" class="card" style="width:100%;text-align:left;padding:10px 14px;display:flex;align-items:baseline;gap:8px">'+
+          '<span style="flex:1;min-width:0;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(x.dayTitle||'Session')+'</span>'+
+          '<span class="mono" style="color:var(--faint);font-size:10px;flex:none">'+fmtDate(x.date)+'</span></button>').join('')+'</div>';
+      h+='<p style="color:var(--faint);font-size:12px;line-height:1.55;margin-top:12px">Or just ask — your week, goals and recovery are already in the room.</p>'}
     else h+='<p style="color:var(--faint);font-size:12.5px;line-height:1.55;margin-top:10px">Nothing logged yet. Ask about programming, technique or setting things up.</p>'}
   else h+=th.map((m,i)=>m.r==='user'
       ?'<div class="msg-u">'+esc(m.t)+'</div>'
@@ -3925,10 +3935,9 @@ function viewRun(){
   h+=collapser('allruns','Every run',
     R.length+' runs · '+Math.round(R.reduce((a,r)=>a+(r.km||0),0))+' km · grouped by '+
       ({month:'month',type:'session type',week:'week',dist:'distance'})[mode],
-    '<div class="scroller" style="margin-top:10px">'+
-    [['month','By month'],['week','By week'],['type','By session type'],['dist','By distance']].map(x=>
-      '<button data-a="runGroup" data-v="'+x[0]+'" class="pill" style="'+
-      (mode===x[0]?'background:var(--text);color:#1F1E1D;border-color:var(--text);font-weight:600':'')+'">'+x[1]+'</button>').join('')+'</div>'+
+    '<select data-runsel="1" style="width:100%;margin-top:10px;padding:13px 14px;font-size:14px;background:var(--raised);border:1px solid var(--line);border-radius:12px;color:var(--text);-webkit-appearance:none;appearance:none">'+
+    [['month','Grouped by month'],['week','Grouped by week'],['type','Grouped by session type'],['dist','Grouped by distance']].map(x=>
+      '<option value="'+x[0]+'"'+(mode===x[0]?' selected':'')+'>'+x[1]+'</option>').join('')+'</select>'+
     groups.map(g=>{
       const open=!!S.openSec['rg:'+mode+':'+g.k];
       return '<div class="card" style="padding:0;overflow:hidden;margin-top:8px'+(open?';border-color:var(--text);border-width:2px':'')+'">'+
@@ -4120,6 +4129,7 @@ function runPlanCard(){
       '<span class="mono" style="color:var(--faint);font-size:10px">WEEK '+wk+' OF '+top+'</span></div>'+
       '<p style="font-size:13.5px;line-height:1.55;margin-top:6px">'+esc((cur&&cur.desc)||'')+'</p>'+
       (a!=null&&a>1.3?'<p style="color:var(--dim);font-size:12px;line-height:1.5;margin-top:6px">Load is already '+a+'\u00d7 your four-week average — the 0.8\u20131.3 band outranks the plan this week. Ease it.</p>':'')+
+      (rp.note?'<p style="color:var(--faint);font-size:11px;line-height:1.5;margin-top:6px">'+esc(rp.note)+'</p>':'')+
       '<button data-a="runplanOffAsk" class="mono" style="color:var(--faint);font-size:10.5px;margin-top:8px;padding:2px 0">Remove the plan</button></div>'}catch(e){return ''}}
 
 function runPlanGen(){
@@ -4166,7 +4176,12 @@ function runPlanGen(){
         items.push({week:w,desc:parts.join(' · ')+' — ~'+wkKm+' km'+(easyP?', all around '+pStr(easyP)+'/km (your own easy average)':'')+'.'});
       }
       if(!down)km=km*1.08}
-    return{base:base,freq:freq,days:days,pace:easyP?pStr(easyP):null,items:items}}catch(e){return{block:'Could not read the history.'}}}
+    let note=null;
+    try{const p9=activeProgSafe();
+      if(p9&&p9.days&&p9.days.some((d9,i9)=>{const m9=dayMuscles(p9,i9,S.week)||{};return m9.Quads||m9.Hamstrings||m9.Glutes}))
+        note='Keep the long run at least a day clear of leg work — heavy legs the day after '+Math.round(km*0.38)+' km is where the lifting and the running both lose.';
+    }catch(e){}
+    return{base:base,freq:freq,days:days,pace:easyP?pStr(easyP):null,note:note,items:items}}catch(e){return{block:'Could not read the history.'}}}
 function viewPoints(){
   const d=dataPoints(),t=dpTier(d.total),nx=dpNext(d.total),L=dpLabels(),st=weekStreak();
   const keys=Object.keys(d.by).filter(k=>d.by[k]).sort((a,b)=>d.by[b]-d.by[a]);
@@ -8040,9 +8055,21 @@ function deepContext(){
   L.push('By time: morning '+hr.m+', midday '+hr.d+', evening '+hr.e);
   if(S.acl&&S.acl.on){const q=aclLatest('quad');
     L.push('ACL phase '+S.acl.phase+'/5'+(q?', quad LSI '+Math.round(q.lsi)+'%':''))}
+  // running: the other half of the interference story
+  {const R=(typeof runs==='function'?runs():[]);
+   if(R.length){
+     const a2=(typeof acwr==='function'?acwr():null);
+     L.push('Running: '+R.length+' runs total'+(a2!=null?', load '+a2+'x four-week average':''));
+     L.push('Recent runs (date km pace type hr): '+R.slice(-10).map(r=>
+       String(r.date).slice(5)+' '+r.km+'km '+paceStr(r.mins,r.km)+' '+(r.type||'')+(r.hr?' hr'+r.hr:'')).join('; '));
+     const easy=R.filter(r=>r.type==='easy'&&r.km>1);
+     if(easy.length>=6){
+       const p0=easy.slice(0,3).map(r=>r.mins/r.km),p1=easy.slice(-3).map(r=>r.mins/r.km);
+       const m0=p0.reduce((x,y)=>x+y,0)/p0.length,m1=p1.reduce((x,y)=>x+y,0)/p1.length;
+       L.push('Easy pace drift: first-3 '+paceStr(m0,1)+'/km vs last-3 '+paceStr(m1,1)+'/km')}}}
   return L.join('\n')}
 const DEEP_SYS='You are the analysis engine of a training app. You receive condensed weekly training data. '+
-'Find 2-4 NON-OBVIOUS findings: relationships BETWEEN signals (readiness vs load vs performance vs pain vs timing), lags, thresholds, divergences. '+
+'Find 2-4 NON-OBVIOUS findings: relationships BETWEEN signals (readiness vs load vs performance vs pain vs timing, and LIFTING vs RUNNING — km near leg work, pace vs tonnage weeks), lags, thresholds, divergences. '+
 'FORBIDDEN: restating any single statistic, anything a simple rule could flag (totals, bests, ratios), motivation talk, advice. '+
 'Every finding MUST cite at least two specific numbers from the data and name the relationship. If the data is too thin for real nuance, return fewer findings — never pad. '+
 'Reply with ONLY a JSON array, no fences: [{"t":"short title","d":"2 sentences citing the numbers","rar":"rare"}] . "rar" may be "epic" only when the pattern repeats 3+ times in the data.';
@@ -9850,7 +9877,7 @@ function sheetHtml(){
     if(g.block)return wrapSheet('The running plan',
       '<p style="color:var(--dim);font-size:13.5px;line-height:1.6">'+esc(g.block)+'</p>');
     return wrapSheet('Eight weeks, built from you',
-      '<p style="color:var(--dim);font-size:13px;line-height:1.6">Base: your own average of about '+g.base+' km a week across '+g.freq+' runs'+(g.days?' on your usual days ('+g.days.join(', ')+')':'')+(g.pace?', paced off your own easy average of '+g.pace+'/km':'')+'. It grows 8% a week with a down week every fourth — and the 0.8\u20131.3 load band always outranks it.</p>'+
+      '<p style="color:var(--dim);font-size:13px;line-height:1.6">Base: your own average of about '+g.base+' km a week across '+g.freq+' runs'+(g.days?' on your usual days ('+g.days.join(', ')+')':'')+(g.pace?', paced off your own easy average of '+g.pace+'/km':'')+'. It grows 8% a week with a down week every fourth — and the 0.8\u20131.3 load band always outranks it.</p>'+(g.note?'<p style="color:var(--dim);font-size:12.5px;line-height:1.55;margin-top:8px">'+esc(g.note)+'</p>':'')+
       '<div class="card mt" style="padding:4px 15px">'+
       g.items.map((it,i)=>'<div style="display:flex;gap:11px;padding:9px 0'+(i?';border-top:1px solid var(--line)':'')+'">'+
         '<span class="mono" style="color:var(--faint);font-size:11px;flex:none;width:20px">W'+it.week+'</span>'+
@@ -10733,6 +10760,8 @@ document.addEventListener('input',e=>{const d=e.target.dataset;
       if(!parsed){flash('Could not read that file.');render();return}
       S.hkRes=hkImport(parsed);vib([20,40,20]);render()});
     return}
+  if(e.target.dataset.runsel){S.runGroup=e.target.value;render();return}
+  if(e.target.dataset.runsel){S.runGroup=e.target.value;render();return}
   if(e.target.dataset.intakefile){const fl=e.target.files&&e.target.files[0];if(!fl)return;
     const nm=String(fl.name||'').toLowerCase();
     const routeText=function(txt,label){
@@ -11148,10 +11177,11 @@ function runAction(a,v,t,e){
     case 'deepGo':{const _f=S.view;S.drawerOpen=false;S.backTo=_f;S.backDrawer=true;S.view='findings';S.scrollTo='deepcard';render();break}
     case 'chatNew':{S.coachBack=S.view;S.drawerOpen=false;chatNew();render();break}
     case 'chatOpen':{S.coachBack=S.view;S.drawerOpen=false;chatOpen(v);render();break}
+    case 'coachSessToggle':{S.coachSessOpen=!S.coachSessOpen;render();break}
     case 'intakeOpen':{S.drawerOpen=false;S.sheet={t:'intake'};render();break}
     case 'runplanGenAsk':{S.rpgen=runPlanGen();S.sheet={t:'runplangen'};render();break}
     case 'runplanGenGo':{const g=S.rpgen;if(!g||g.block)break;
-      lset('training-runplan-v1',{src:'Built from your history',started:today(),items:g.items});
+      lset('training-runplan-v1',{src:'Built from your history',started:today(),note:g.note||null,items:g.items});
       S.runplan=lget('training-runplan-v1',null);S.rpgen=null;S.sheet=null;render();
       flash('Eight weeks on the board — week 1 starts where you already are.');break}
     case 'runplanOffAsk':{S.confirm={t:'Remove the running plan?',
