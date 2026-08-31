@@ -334,7 +334,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return (lget(K_RUN,[])||[]).length>0})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='708b38';  // stamped by tools/build.py with the content hash
+const BUILD_ID='a7fe2d';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -4285,7 +4285,18 @@ function runPlanAdjust(){
   if(why){rp.adjLog=(rp.adjLog||[]).slice(-5);rp.adjLog.push({wk:wk,why:why});}
   lset('training-runplan-v1',rp);S.runplan=rp;
   return why}
-function runPlanGoal(goal,dateStr){
+function parseGoalTime(str,raceKm){
+  /* '3:45' for a marathon reads as hours; '22:30' for a 5K as minutes.
+     Plain numbers are minutes. Returns total minutes or null. */
+  str=String(str||'').trim();if(!str)return null;
+  const m=/^(\d{1,3})(?::(\d{1,2}))?(?::(\d{1,2}))?$/.exec(str);if(!m)return null;
+  const a=+m[1],b=m[2]!=null?+m[2]:null,c=m[3]!=null?+m[3]:null;
+  let mins;
+  if(c!=null)mins=a*60+b+c/60;               // h:mm:ss
+  else if(b!=null)mins=(a<=9&&raceKm>=10)?a*60+b:a+b/60; // h:mm vs mm:ss
+  else mins=a;
+  return (mins>=raceKm*2.9&&mins<=raceKm*15)?mins:null} // 2.9/km floor: faster than any human has run these
+function runPlanGoal(goal,dateStr,timeStr){
   /* goal-driven periodization from the runner's own data. The science,
      stated plainly: ~80% easy, one long run, one quality session once
      the intensity gate opens (weeks 1-2 are always easy+strides —
@@ -4311,6 +4322,15 @@ function runPlanGoal(goal,dateStr){
     const easyP=paces.length?paces[Math.floor(paces.length/2)]*1.03:6.5;
     const pS=p=>{const m=Math.floor(p),s2=Math.round((p-m)*60);return m+':'+(s2<10?'0':'')+s2};
     const tempoP=easyP*0.90,intP=easyP*0.84;
+    // the time goal, and the honesty it demands
+    const goalMins=parseGoalTime(timeStr,G.race);
+    const raceP=goalMins?goalMins/G.race:easyP*0.93;
+    let paceNote=null;
+    if(goalMins){
+      const gap=easyP/raceP; // how much faster than easy the goal is
+      if(raceP>=easyP)paceNote='Your easy pace already beats this goal — it is banked before you start. Worth aiming higher.';
+      else if(gap>1.45)paceNote='Honest note: '+pS(raceP)+'/km is a long way under your current easy '+pS(easyP)+'/km. The plan trains toward it, but a goal this far out usually takes more than one block — hold it loosely.';
+      else if(gap>1.25)paceNote='The goal pace ('+pS(raceP)+'/km) is ambitious against your current training — reachable if the block goes cleanly.'}
     // weeks: from the race date when given, else a sensible default
     let weeks=G.race>=21?12:8;
     let taper=G.race>=21?2:1;
@@ -4337,7 +4357,7 @@ function runPlanGoal(goal,dateStr){
       const eEach=half(Math.max(2,(rest-qKm)/Math.max(1,freq-1-(quality?1:0))));
       parts.push((freq-1-(quality?1:0))+'\u00d7 '+eEach+' km easy @'+pS(easyP)+'/km');
       if(quality)parts.push(phase==='peak'
-        ?(G.race>=21?half(qKm)+' km @ race effort ('+pS(easyP*0.93)+'/km)':'5\u00d73 min @'+pS(intP)+'/km, 2 min jog between')
+        ?(G.race>=21?half(qKm)+' km @ goal pace ('+pS(raceP)+'/km)':'5\u00d73 min @'+pS(Math.min(intP,raceP*0.97))+'/km, 2 min jog between')
         :(w%2?half(qKm)+' km tempo @'+pS(tempoP)+'/km':'6\u00d72 min @'+pS(intP)+'/km, 90s jog between'));
       if(lng)parts.push(lng+' km long, easy \u2014 the week\u2019s anchor');
       if(down)parts=[(freq)+'\u00d7 '+half(wkKm/freq)+' km easy \u2014 down week on purpose, adaptation happens here'];
@@ -4345,9 +4365,10 @@ function runPlanGoal(goal,dateStr){
       items.push({week:w,km:wkKm,down:down,phase:phase,
         desc:parts.join(' \u00b7 ')+' \u2014 ~'+wkKm+' km ('+phase+')'});
       if(!down&&!inTaper)km=km*1.08}
-    return{goal:goal,goalName:G.name,date:dateStr||null,base:base,freq:freq,
+    const tStr=goalMins?(goalMins>=90?Math.floor(goalMins/60)+':'+String(Math.round(goalMins%60)).padStart(2,'0'):Math.floor(goalMins)+':'+String(Math.round((goalMins%1)*60)).padStart(2,'0')):null;
+    return{goal:goal,goalName:G.name,date:dateStr||null,goalTime:tStr,goalPace:goalMins?pS(raceP):null,paceNote:paceNote,base:base,freq:freq,
       days:null,pace:pS(easyP),items:items,
-      note:'Weeks 1\u20132 are easy running plus strides only \u2014 pain-free volume is what earns the speed work (that is the intensity gate). Paces come from your own easy median: tempo \u224810% faster, intervals \u224816%. Tune by feel; the effort is the prescription. '+(S.acl&&S.acl.on?'With the knee in rehab, swap intervals for tempo until your physio clears sharp speed.':'')}}
+      note:(paceNote?paceNote+' ':'')+'Weeks 1\u20132 are easy running plus strides only \u2014 pain-free volume is what earns the speed work (that is the intensity gate). Paces come from your own easy median: tempo \u224810% faster, intervals \u224816%. Tune by feel; the effort is the prescription. '+(S.acl&&S.acl.on?'With the knee in rehab, swap intervals for tempo until your physio clears sharp speed.':'')}}
   catch(e){return{block:'Could not read the history.'}}}
 function runPlanCard(){
   /* the imported running progression, week by week — carried from the
@@ -4365,7 +4386,8 @@ function runPlanCard(){
       '<p class="eyebrow" style="margin:0">'+esc(rp.goalName?('Training for the '+rp.goalName):'The running plan')+'</p>'+
       '<span class="mono" style="color:var(--faint);font-size:10px">WEEK '+wk+' OF '+top+'</span></div>'+
       (rp.raceDate?(function(){const dd=Math.max(0,Math.round((new Date(rp.raceDate+'T12:00').getTime()-Date.now())/864e5));
-        return '<p class="mono" style="color:var(--amber);font-size:10.5px;margin-top:4px">RACE DAY IN '+dd+' DAYS \u00b7 '+esc(rp.raceDate)+'</p>'})():'')+
+        return '<p class="mono" style="color:var(--amber);font-size:10.5px;margin-top:4px">RACE DAY IN '+dd+' DAYS \u00b7 '+esc(rp.raceDate)+(rp.goalTime?' \u00b7 GOAL '+esc(rp.goalTime)+' ('+esc(rp.goalPace||'')+'/km)':'')+'</p>'})():
+       (rp.goalTime?'<p class="mono" style="color:var(--amber);font-size:10.5px;margin-top:4px">GOAL '+esc(rp.goalTime)+' \u00b7 '+esc(rp.goalPace||'')+'/km</p>':''))+
       '<p style="font-size:13.5px;line-height:1.55;margin-top:6px">'+esc((cur&&cur.desc)||'')+'</p>'+
       (a!=null&&a>1.3?'<p style="color:var(--dim);font-size:12px;line-height:1.5;margin-top:6px">Load is already '+a+'\u00d7 your four-week average — the 0.8\u20131.3 band outranks the plan this week. Ease it.</p>':'')+
       ((rp.adjLog&&rp.adjLog.length)?'<p style="color:var(--dim);font-size:11.5px;line-height:1.5;margin-top:6px;border-top:1px solid var(--line);padding-top:6px">'+esc(rp.adjLog[rp.adjLog.length-1].why)+'</p>':'')+
@@ -10522,7 +10544,10 @@ function sheetHtml(){
       pill(f.goal==='base','Just build my base','base')+
       pill(f.goal==='5k','5K','5k')+pill(f.goal==='10k','10K','10k')+
       pill(f.goal==='half','Half marathon','half')+pill(f.goal==='marathon','Marathon','marathon')+'</div>'+
-      (f.goal!=='base'?'<p class="eyebrow mt2">Race date \u2014 if you have one</p>'+
+      (f.goal!=='base'?'<p class="eyebrow mt2">Goal time \u2014 if you have one</p>'+
+        '<input data-in="rgoal.time" value="'+esc(f.time||'')+'" placeholder="'+(f.goal==='marathon'?'e.g. 3:45':f.goal==='half'?'e.g. 1:45':f.goal==='10k'?'e.g. 48:00':'e.g. 22:30')+'" autocomplete="off" style="width:100%;margin-top:8px;background:var(--surface);border:1px solid var(--line);border-radius:10px;color:var(--text);padding:11px;font-size:15px;outline:none;font-family:\'JetBrains Mono\',ui-monospace,monospace;font-weight:600;text-align:center">'+
+        '<p style="color:var(--faint);font-size:11px;line-height:1.5;margin-top:6px">Sets the race-pace work in the peak weeks. Allena will say honestly if the goal is a long way from your current training.</p>'+
+        '<p class="eyebrow mt2">Race date \u2014 if you have one</p>'+
         '<input type="date" data-in="rgoal.date" value="'+esc(f.date||'')+'" style="width:100%;margin-top:8px;background:var(--surface);border:1px solid var(--line);border-radius:10px;color:var(--text);padding:11px;font-size:15px;outline:none;-webkit-appearance:none;font-family:\'JetBrains Mono\',ui-monospace,monospace;font-weight:600;text-align:center">'+
         '<p style="color:var(--faint);font-size:11px;line-height:1.5;margin-top:6px">With a date the plan periodizes backwards from it \u2014 build, peak, then a real taper. Without one you get an open-ended build toward the distance.</p>':'')+
       '<button data-a="runGoalGo" class="big disp mt2" style="background:var(--amber);color:#1F1E1D;font-size:15px">Build my plan</button>'+
@@ -11922,10 +11947,10 @@ function runAction(a,v,t,e){
     case 'runplanGenAsk':{S.rgoal={goal:'base',date:''};S.sheet={t:'rungoal'};render();break}
     case 'rgGoal':{(S.rgoal=S.rgoal||{}).goal=v;render();break}
     case 'runGoalGo':{const f=S.rgoal||{goal:'base'};
-      S.rpgen=f.goal==='base'?runPlanGen():runPlanGoal(f.goal,(f.date||'').trim()||null);
+      S.rpgen=f.goal==='base'?runPlanGen():runPlanGoal(f.goal,(f.date||'').trim()||null,(f.time||'').trim()||null);
       S.sheet={t:'runplangen'};render();break}
     case 'runplanGenGo':{const g=S.rpgen;if(!g||g.block)break;
-      lset('training-runplan-v1',{src:g.goalName?('Training for the '+g.goalName):(g.scratch?'Built from scratch':'Built from your history'),started:today(),note:g.note||null,template:g.template||null,items:g.items,freq:g.freq||3,days:g.days||null,pace:g.pace||null,goal:g.goal||null,goalName:g.goalName||null,raceDate:g.date||null});
+      lset('training-runplan-v1',{src:g.goalName?('Training for the '+g.goalName):(g.scratch?'Built from scratch':'Built from your history'),started:today(),note:g.note||null,template:g.template||null,items:g.items,freq:g.freq||3,days:g.days||null,pace:g.pace||null,goal:g.goal||null,goalName:g.goalName||null,raceDate:g.date||null,goalTime:g.goalTime||null,goalPace:g.goalPace||null});
       S.runplan=lget('training-runplan-v1',null);S.rpgen=null;S.sheet=null;render();
       flash('Eight weeks on the board — week 1 starts where you already are.');break}
     case 'runplanOffAsk':{S.confirm={t:'Remove the running plan?',
