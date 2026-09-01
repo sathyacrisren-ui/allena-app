@@ -341,7 +341,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return (lget(K_RUN,[])||[]).length>0})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='486277';  // stamped by tools/build.py with the content hash
+const BUILD_ID='b85902';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -4862,7 +4862,7 @@ function viewPoints(){
      ['Blossom',tr.rare+' rare find'+(tr.rare===1?'':'s')],
      ['Roots',tr.weeks+' week'+(tr.weeks===1?'':'s')+' of consistency'],
      ['Season',treeSeason().name],
-     tr.runs?['Blue sweeps',tr.km+' km run']:null].filter(Boolean)
+     tr.runs?['The river',tr.km+' km run']:null].filter(Boolean)
      .map((x,i)=>'<div style="display:flex;justify-content:space-between;align-items:baseline;padding:10px 0'+(i?';border-top:1px solid var(--line)':'')+'">'+
        '<span style="font-size:12.5px;color:var(--dim)">'+esc(x[0])+'</span>'+
        '<span class="mono" style="font-size:12px">'+esc(x[1])+'</span></div>').join('')+'</div>'+
@@ -6704,11 +6704,20 @@ function growTree(W,Hh){
       'stroke="'+col+'" stroke-width="'+(1.6-i*0.15).toFixed(2)+'" fill="none" opacity="'+(0.3-i*0.02).toFixed(2)+'" stroke-linecap="round"/>'}
   out+='<line x1="'+(W*0.12)+'" y1="'+groundY+'" x2="'+(W*0.88)+'" y2="'+groundY+'" stroke="var(--line)" stroke-width="1" opacity=".5"/>';
   /* the tree itself */
-  const maxDepth=Math.max(1,Math.min(7,1+Math.floor(Math.log(Math.max(2,t.pts))/Math.log(3.1))));
+  /* growth must be VISIBLE (owner call, Sep 2026): the old cap hit
+     its ceiling at ~900 points, so 652 and 1,942 drew near-identical
+     trees. Same log curve, higher ceiling — a new branching level at
+     roughly ×3 the points, all the way to ~26,000 — plus a leaf
+     budget and a trunk that keep thickening for years. */
+  const maxDepth=Math.max(1,Math.min(10,1+Math.floor(Math.log(Math.max(2,t.pts))/Math.log(3.1))));
   const trunkH=Math.min(Hh*0.34,28+t.sessions*1.6);
-  const leafSize=t.pts>3000?2.6:t.pts>800?2.2:1.9;
+  const leafSize=t.pts>8000?3:t.pts>3000?2.6:t.pts>800?2.2:1.9;
   let leaves=0,blossom=0;
-  const budget=Math.min(220,20+Math.round(t.pts/9));
+  const budget=Math.min(900,20+Math.round(t.pts/7));
+  /* the hidden ceiling was branch length: limbs shrank under 9px and
+     leafed out at ~6 levels whatever the depth cap said. A deeper
+     record earns finer twigs — the canopy genuinely thickens. */
+  const leafLen=t.pts>8000?4.5:t.pts>2500?6:9;
   function branch(x,y,ang,len,wdt,depth){
     if(depth>maxDepth||len<3||leaves>budget)return;
     const x2=x+Math.cos(ang)*len,y2=y+Math.sin(ang)*len;
@@ -6716,7 +6725,7 @@ function growTree(W,Hh){
     out+='<line x1="'+x.toFixed(1)+'" y1="'+y.toFixed(1)+'" x2="'+x2.toFixed(1)+'" y2="'+y2.toFixed(1)+
       '" stroke="'+col+'" stroke-width="'+Math.max(0.7,wdt).toFixed(2)+'" stroke-linecap="round" opacity="'+
       (0.55+depth*0.06).toFixed(2)+'"/>';
-    if(depth>=maxDepth-1||len<9){
+    if(depth>=maxDepth-1||len<leafLen){
       // a leaf for the work, a blossom for a rare find
       if(leaves<budget){
         leaves++;
@@ -6739,18 +6748,21 @@ function growTree(W,Hh){
       '<path d="M'+(W/2)+' '+(groundY-16)+' q6 -9 1 -16" stroke="'+col+'" stroke-width="1.6" fill="none" opacity=".7" stroke-linecap="round"/>'+
       '<ellipse cx="'+(W/2+7)+'" cy="'+(groundY-31)+'" rx="6" ry="3.4" fill="'+col+'" opacity=".6" transform="rotate(-24 '+(W/2+7)+' '+(groundY-31)+')"/>';
     return'<svg viewBox="0 0 '+W+' '+Hh+'" style="width:100%;aspect-ratio:'+W+'/'+Hh+';display:block" aria-hidden="true">'+out+'</svg>'}
-  branch(W/2,groundY,-Math.PI/2,trunkH,Math.max(1.6,2+t.sessions*0.06),0);
-  /* running shows as low sweeping growth rather than more canopy */
-  if(t.runs){
-    const n=Math.min(5,1+Math.floor(t.km/60));
-    for(let i=0;i<n;i++){
-      const dir=(i%2?1:-1);
-      const x1=W/2,y1=groundY-6-i*4;
-      const x2=W/2+dir*(30+i*14+R()*18),y2=groundY-14-i*10-R()*14;
-      bd(x2,y2,3);bd((x1+x2)/2,y1-16,2);
-      out+='<path d="M'+x1+' '+y1+' Q'+((x1+x2)/2)+' '+(y1-16)+' '+x2.toFixed(1)+' '+y2.toFixed(1)+'" '+
-        'stroke="#1E9BFF" stroke-width="1.2" fill="none" opacity=".5" stroke-linecap="round"/>'+
-        '<circle cx="'+x2.toFixed(1)+'" cy="'+y2.toFixed(1)+'" r="2" fill="#1E9BFF" opacity=".65"/>'}}
+  branch(W/2,groundY,-Math.PI/2,trunkH,
+    Math.max(1.6,(2+t.sessions*0.06)*(1+Math.min(1.2,t.pts/8000))),0);
+  /* running is the river (replaced the sweeps, owner call Sep 2026):
+     a quiet blue current beneath the roots — it feeds the tree rather
+     than sprouting from it. Longer and fuller with the km behind it. */
+  if(t.runs&&t.km>0){
+    const rw=Math.min(W*0.46,26+t.km*0.35);
+    const layers=Math.min(3,1+Math.floor(t.km/150));
+    for(let i=0;i<layers;i++){
+      const y0=groundY+18+i*6,amp=(2.2+i*0.8);
+      bd(W/2-rw,y0+amp,3);bd(W/2+rw,y0+amp,3);
+      const seg=rw/3;
+      let d='M'+(W/2-rw).toFixed(1)+' '+y0;
+      for(let k=0;k<6;k++)d+=' q'+(seg/2).toFixed(1)+' '+((k%2?amp:-amp).toFixed(1))+' '+seg.toFixed(1)+' 0';
+      out+='<path d="'+d+'" stroke="#1E9BFF" stroke-width="'+(1.6-i*0.35).toFixed(2)+'" fill="none" opacity="'+(0.42-i*0.09).toFixed(2)+'" stroke-linecap="round"/>'}}
   const pad=8,vbX=mnX-pad,vbY=mnY-pad,vbW=(mxX-mnX)+pad*2,vbH=(mxY-mnY)+pad*2;
   return'<svg viewBox="'+vbX.toFixed(1)+' '+vbY.toFixed(1)+' '+vbW.toFixed(1)+' '+vbH.toFixed(1)+
     '" style="width:100%;aspect-ratio:'+vbW.toFixed(1)+'/'+vbH.toFixed(1)+';display:block" aria-hidden="true">'+out+'</svg>'}
