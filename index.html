@@ -380,7 +380,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='01db8c';  // stamped by tools/build.py with the content hash
+const BUILD_ID='0613e0';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -4516,6 +4516,7 @@ function viewRun(){
     '<div class="row mt" style="gap:8px">'+
     '<button data-a="runLog" class="btn" style="flex:1;border-color:var(--amber);color:var(--amber);font-size:13px">Log a run</button>'+
     '<button data-a="runImport" class="btn" style="flex:1;font-size:13px;color:var(--dim)">Import</button></div>';
+  h+=aeroCard();
   // what it means alongside everything else
   // distance
   const maxKm=Math.max.apply(null,wk.map(x=>x.km).concat([1]));
@@ -5633,6 +5634,36 @@ function runFitness(){
   const half=Math.floor(easy.length/2);
   const avg=l=>l.reduce((a,r)=>a+paceMin(r),0)/l.length;
   return{early:avg(easy.slice(0,half)),late:avg(easy.slice(half)),n:easy.length}}
+function aeroEngine(){
+  /* the engine number: speed per heartbeat, so every HR run moves it.
+     Median of the last five against the five before — pace can lie
+     (hills, heat, tired legs); speed-per-beat lies less. */
+  const l=runs().filter(r=>isRunType(r.type)&&r.hr>0&&r.km>=3&&r.mins>0)
+    .sort((a,b)=>String(a.date).localeCompare(String(b.date)));
+  if(l.length<6)return null;
+  const ei=r=>(r.km*1000/r.mins)/r.hr;
+  const med=a=>{const s9=a.slice().sort((x,y)=>x-y);return s9[Math.floor(s9.length/2)]};
+  const now=med(l.slice(-5).map(ei)),before=med(l.slice(-10,-5).map(ei));
+  if(!(now>0&&before>0))return null;
+  const paceAt150=1000/(now*150);   // min/km at 150 bpm
+  return{p150:paceAt150,pct:Math.round((now/before-1)*1000)/10,n:l.length,
+    latest:l[l.length-1].date}}
+function aeroCard(){
+  const e=aeroEngine();if(!e)return '';
+  const mm=Math.floor(e.p150*(UNITS.d==='mi'?1/MI_KM:1)),ss=Math.round((e.p150*(UNITS.d==='mi'?1/MI_KM:1)-mm)*60);
+  const pace=mm+':'+String(ss).padStart(2,'0');
+  const up=e.pct>=1,down=e.pct<=-1;
+  return '<div class="card mt" style="padding:15px 16px">'+
+    '<p class="mono" style="font-size:9px;color:var(--faint);letter-spacing:.06em">THE ENGINE · PACE AT 150 BPM</p>'+
+    '<div style="display:flex;align-items:baseline;gap:10px;margin-top:6px">'+
+    '<span class="mono disp" style="font-size:28px;font-weight:800;letter-spacing:-.02em">'+pace+'</span>'+
+    '<span class="mono" style="font-size:11px;color:var(--faint)">/'+udUnit()+'</span>'+
+    (up?'<span class="mono" style="font-size:12px;color:var(--green);font-weight:700">▲ '+Math.abs(e.pct)+'%</span>'
+     :down?'<span class="mono" style="font-size:12px;color:var(--faint)">▼ '+Math.abs(e.pct)+'%</span>':'')+'</div>'+
+    '<p style="color:var(--dim);font-size:12px;line-height:1.5;margin-top:6px">'+
+    (up?'Up '+Math.abs(e.pct)+'% on the five runs before — same heartbeats, more road. Every HR run moves this number.'
+     :down?'Down '+Math.abs(e.pct)+'% on the five before — tired weeks read slower. Judge it over a month, not a run.'
+     :'Holding steady across your last ten HR runs. Every run with heart rate moves this number.')+'</p></div>'}
 function runPB(dist){
   const near=runs().filter(r=>r.km&&Math.abs(r.km-dist)<=dist*0.06&&r.mins);
   if(!near.length)return null;
@@ -6971,6 +7002,55 @@ function discoveries(){
       else if(aa-na>0.4)
         add('uncommon','Even easy runs cost your lifting a little',
           'Sessions the day after an easy run average RPE '+(Math.round(aa*10)/10)+' vs your usual '+(Math.round(na*10)/10)+'. Worth keeping runs and hard lifts a day apart when it matters.','obscure')}}}catch(e){}
+
+  /* ── moving baselines (Sep 2026) ──────────────────────────
+     All-time records saturate — a windowed record can be
+     re-broken forever, and each re-break is REAL. The rounded
+     figure lives in the title so a fresh bank only happens when
+     the number meaningfully moves, and momentum keys on the
+     month so it fires at most monthly per lift. */
+  try{
+    const dayTon={};H.forEach(h=>{let t9=0;h.log.forEach(l=>{if(l.w>0&&l.r>0)t9+=l.w*l.r});
+      if(t9>0)dayTon[h.date]=(dayTon[h.date]||0)+t9});
+    const tkeys=Object.keys(dayTon).sort();
+    if(tkeys.length>=10){
+      const roll=(end)=>{const e=new Date(end+'T12:00').getTime();let t9=0;
+        tkeys.forEach(k=>{const d9=new Date(k+'T12:00').getTime();
+          if(d9<=e&&d9>e-30*864e5)t9+=dayTon[k]});return t9};
+      const nowT=roll(today());
+      let prior=0;tkeys.forEach(k=>{
+        if(new Date(k+'T12:00').getTime()<Date.now()-31*864e5)prior=Math.max(prior,roll(k))});
+      if(prior>0&&nowT>prior*1.02){
+        const tn=Math.round(nowT/1000);
+        add('rare','Your biggest 30 days yet — '+uwNum(Math.round(nowT/100)/10)+' tonnes'.replace('tonnes',UNITS.w==='lb'?'k lb':'tonnes'),
+          'The last 30 days moved more load than any 30-day stretch before them — '+uwNum(Math.round(nowT))+' '+uwUnit()+' against a previous best of '+uwNum(Math.round(prior))+' '+uwUnit()+'. A record that can be broken again.','record')}}
+    if(R.length>=8){
+      const rkeys={};R.forEach(r=>{if(r.km>0&&isRunType(r.type))rkeys[r.date]=(rkeys[r.date]||0)+r.km});
+      const rk=Object.keys(rkeys).sort();
+      const rroll=(end)=>{const e=new Date(end+'T12:00').getTime();let t9=0;
+        rk.forEach(k=>{const d9=new Date(k+'T12:00').getTime();
+          if(d9<=e&&d9>e-30*864e5)t9+=rkeys[k]});return t9};
+      const nowK=rroll(today());
+      let priorK=0;rk.forEach(k=>{
+        if(new Date(k+'T12:00').getTime()<Date.now()-31*864e5)priorK=Math.max(priorK,rroll(k))});
+      if(priorK>0&&nowK>priorK*1.02&&nowK>=20)
+        add('rare','Your biggest running 30 days — '+udNum(Math.round(nowK))+' '+udUnit(),
+          'More ground in the last 30 days than any stretch before — '+udNum(Math.round(nowK))+' '+udUnit()+' past the old best of '+udNum(Math.round(priorK))+' '+udUnit()+'.','record')}
+    if(typeof aeroEngine==='function'){const ae=aeroEngine();
+      if(ae&&ae.pct>=2)add('uncommon','The engine is growing · '+monthName(today().slice(0,7)),
+        'Speed per heartbeat is up '+ae.pct+'% across your last ten HR runs — the aerobic base itself, not just a good day.','record')}
+    const ymNow=today().slice(0,7);
+    lifts.forEach(b=>{
+      const l=byLift[b];if(l.length<8)return;
+      const nowW=[],prevW=[];
+      l.forEach(x=>{const age=(Date.now()-new Date(x.h.date+'T12:00').getTime())/864e5;
+        if(age<=21)nowW.push(x.e);else if(age<=63)prevW.push(x.e)});
+      if(nowW.length<3||prevW.length<3)return;
+      const med=a=>{const s9=a.slice().sort((x,y)=>x-y);return s9[Math.floor(s9.length/2)]};
+      const pct=Math.round((med(nowW)/med(prevW)-1)*100);
+      if(pct>=3)add('uncommon','Momentum on '+b+' · '+monthName(ymNow),
+        b+' is moving — the estimated max is up about '+pct+'% on the three weeks before. Whatever this block is doing, it is working.','record')})
+  }catch(e){}
   return D}
 function discoverySeen(){return S.discSeen||(S.discSeen=lget('training-disc-v1',{}))}
 function markDiscoveries(){
@@ -7816,10 +7896,151 @@ function verdictCard(){
   return '<div class="card an-hero" style="padding:18px;border-radius:22px;margin-top:16px;border-color:'+(done?'var(--green)':'var(--line)')+'">'+
     inner+
     briefLines()+
+    (typeof predLine==='function'?predLine():'')+
     questLine()+
     wrapLine()+
     (typeof deepLine==='function'?deepLine():'')+
     '</div>'}
+/* ══ the prediction loop ═════════════════════════════════════
+   Allena says what it expects BEFORE the session, and the new
+   data settles it. A forecast is not a target and never a bounty
+   — beating it teaches the model more than hitting it, and an
+   under is information, never shame. Resolution is lazy: the
+   next render after the data exists settles the call, so no
+   engine hooks are needed. Calls that land bank under 'call'. */
+const K_PRED='training-pred-v1';
+function predStore(){return S.predSt||(S.predSt=lget(K_PRED,{days:{}}))}
+function predSave(){
+  const st=predStore(),ks=Object.keys(st.days).sort();
+  while(ks.length>120)delete st.days[ks.shift()];
+  lset(K_PRED,st)}
+function predLastTop(ex){
+  const b=gBase(ex);let best=null;
+  for(let i=S.history.length-1;i>=0;i--){const h=S.history[i];
+    if(h.run||!h.complete)continue;
+    let top=null;
+    (h.log||[]).forEach(l=>{if(gBase(l.ex)!==b||!(l.w>0&&l.r>0))return;
+      if(!top||e1rm(l.w,l.r)>e1rm(top.w,top.r))top={w:l.w,r:l.r,rpe:l.rpe}});
+    if(top)return Object.assign(top,{date:h.date,n:histCountFor(b)})}
+  return null}
+function histCountFor(base){
+  let n=0;S.history.forEach(h=>{if(h.run||!h.complete)return;
+    if((h.log||[]).some(l=>gBase(l.ex)===base&&l.w>0&&l.r>0))n++});
+  return n}
+function predBuild(){
+  /* the call for today's recommended session — needs a real program
+     day and at least 3 sightings of the lift, or it stays silent */
+  try{
+    const rec=recommendToday();if(!rec||rec.empty)return null;
+    const p=activeProgSafe();if(!p)return null;
+    const sets=buildSets(p,rec.i,S.week).filter(s=>!s.warmup&&s.targetW!=null&&s.targetW>0&&s.targetReps!=null);
+    if(!sets.length)return null;
+    const goalset=new Set((S.goals||[]).map(g=>g.ex));
+    let pick=null;
+    sets.forEach(s=>{const sc=(goalset.has(gBase(s.ex))?10000:0)+s.targetW;
+      if(!pick||sc>pick.sc)pick={sc:sc,s:s}});
+    const s=pick.s,base=gBase(s.ex);
+    if(histCountFor(base)<3)return null;
+    const last=predLastTop(s.ex);if(!last)return null;
+    const reps=parseInt(s.targetReps)||last.r;
+    const rpeHi2=(typeof rpeHigh==='function'&&s.targetRpe)?rpeHigh(s.targetRpe):8;
+    /* the call: the plan's top set, nudged up a rep when last time
+       came in under the effort ceiling at this weight or more */
+    let predW=s.targetW,predR=reps,why;
+    if(last.w>=s.targetW&&last.rpe&&last.rpe<=rpeHi2-1&&last.r>=reps){
+      predR=reps+1;
+      why='Last time: '+last.w+'×'+last.r+' @'+last.rpe+' — under the ceiling with room, so one more rep is the call.'}
+    else if(last.w<s.targetW){
+      why='The plan steps up to '+uwStr(predW)+' — from '+last.w+'×'+last.r+(last.rpe?' @'+last.rpe:'')+' last time, '+predR+' reps is the call.'}
+    else why='Last time: '+last.w+'×'+last.r+(last.rpe?' @'+last.rpe:'')+' — a straight repeat of the plan is the call.';
+    return{ex:s.ex,day:rec.name,predW:predW,predR:predR,predE:Math.round(e1rm(predW,predR)*10)/10,why:why,
+      base:{w:last.w,r:last.r,rpe:last.rpe||null}}
+  }catch(e){return null}}
+function predReadyBuild(){
+  try{
+    if(!(S.gar&&S.gar.on))return null;
+    const base=bbBaseline();if(base==null)return null;
+    let adj=0,whyR='your usual mornings';
+    const fresh=muscleFresh(),legs=fresh.filter(x=>/quad|ham|glute/i.test(x.m)&&x.fresh<60);
+    const yk=dayKey(new Date(Date.now()-864e5));
+    const ranHard=(runs()||[]).some(r=>r.date===yk&&r.km>=8);
+    if(legs.length||ranHard){adj=-10;whyR=ranHard?'yesterday’s run is still in the ledger':'legs are still paying for the last session'}
+    return{lo:Math.max(10,base+adj-8),hi:Math.min(95,base+adj+8),whyR:whyR}
+  }catch(e){return null}}
+function predToday(){
+  const st=predStore(),tk=today();
+  predResolvePending();
+  if(st.days[tk])return st.days[tk];
+  const call=predBuild();if(!call)return null;
+  const rd=predReadyBuild();
+  st.days[tk]=Object.assign({made:tk},call,rd?{readyLo:rd.lo,readyHi:rd.hi,readyWhy:rd.whyR}:{});
+  predSave();
+  return st.days[tk]}
+function predResolvePending(){
+  /* new data settles old calls — checked on every read, no hooks */
+  const st=predStore();let dirty=false;
+  Object.keys(st.days).forEach(dk=>{
+    const d=st.days[dk];
+    if(d.outcome==null&&d.ex){
+      const b=gBase(d.ex);
+      const h=(S.history||[]).find(x=>x.date===dk&&!x.run&&x.complete&&(x.log||[]).some(l=>gBase(l.ex)===b&&l.w>0&&l.r>0));
+      if(h){let top=null;
+        (h.log||[]).forEach(l=>{if(gBase(l.ex)!==b||!(l.w>0&&l.r>0))return;
+          if(!top||e1rm(l.w,l.r)>e1rm(top.w,top.r))top=l});
+        const actE=Math.round(e1rm(top.w,top.r)*10)/10,gap=(actE-d.predE)/d.predE;
+        d.actW=top.w;d.actR=top.r;d.actE=actE;
+        d.outcome=gap>0.025?'beat':gap<-0.025?'under':'called';
+        dirty=true;
+        try{predBank(dk,d)}catch(e){}}}
+    if(d.readyLo!=null&&d.readyAct==null&&S.gar&&S.gar.days&&S.gar.days[dk]){
+      const v=S.gar.days[dk].am??S.gar.days[dk].pre;
+      if(v!=null){d.readyAct=v;d.readyHit=v>=d.readyLo&&v<=d.readyHi;dirty=true}}});
+  if(dirty)predSave()}
+function predBank(dk,d){
+  /* only landed calls bank — an under is information, not a failure */
+  if(d.outcome==='under')return;
+  const id='pred:'+dk,bank=discBank();
+  if(bank[id])return;
+  const exN=String(d.ex).replace(/ — .*/,'');
+  bank[id]=d.outcome==='called'
+    ?{t:'Called it',d:'Allena forecast '+exN+' '+uwStr(d.predW)+'×'+d.predR+' — you did '+uwStr(d.actW)+'×'+d.actR+'.',rar:'uncommon',tag:'call',found:today()}
+    :{t:'Beat the call',d:'Allena forecast '+exN+' '+uwStr(d.predW)+'×'+d.predR+' — you did '+uwStr(d.actW)+'×'+d.actR+'. The model recalibrates upward.',rar:(d.actE-d.predE)/d.predE>0.05?'rare':'uncommon',tag:'call',found:today()};
+  bankSave()}
+function predStats(){
+  const st=predStore();let n=0,called=0,beat=0;
+  Object.keys(st.days).forEach(k=>{const d=st.days[k];
+    if(d.outcome){n++;if(d.outcome==='called')called++;if(d.outcome==='beat')beat++}});
+  return{n:n,called:called,beat:beat}}
+function predLine(){
+  try{
+    const d=predToday();if(!d||!d.ex)return '';
+    const exN=esc(String(d.ex).replace(/ — .*/,''));
+    if(d.outcome){
+      const msg=d.outcome==='called'?'Called it — '+exN+' '+uwStr(d.actW)+'×'+d.actR
+        :d.outcome==='beat'?'You beat the call — '+exN+' '+uwStr(d.actW)+'×'+d.actR
+        :'Under the call — recalibrating';
+      return '<button data-a="predOpen" style="display:flex;align-items:center;gap:9px;width:100%;text-align:left;margin-top:11px;padding-top:11px;border-top:1px solid var(--line)">'+
+        '<span class="mono" style="font-size:9px;color:'+(d.outcome==='under'?'var(--faint)':'var(--green)')+';letter-spacing:.06em;flex:none">FORECAST</span>'+
+        '<span style="flex:1;min-width:0;color:var(--dim);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+msg+'</span>'+
+        '<span class="mono" style="color:var(--faint);font-size:11px;flex:none">›</span></button>'}
+    return '<button data-a="predOpen" style="display:flex;align-items:center;gap:9px;width:100%;text-align:left;margin-top:11px;padding-top:11px;border-top:1px solid var(--line)">'+
+      '<span class="mono" style="font-size:9px;color:var(--amber);letter-spacing:.06em;flex:none">FORECAST</span>'+
+      '<span style="flex:1;min-width:0;color:var(--dim);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+exN+' '+uwStr(d.predW)+'×'+d.predR+' is the call</span>'+
+      '<span class="mono" style="color:var(--faint);font-size:11px;flex:none">›</span></button>'
+  }catch(e){return ''}}
+function predSessionVerdict(){
+  /* one line for the completion screen, the moment the call settles */
+  try{
+    const d=predStore().days[today()];
+    if(!d||!d.outcome)return '';
+    const exN=esc(String(d.ex).replace(/ — .*/,''));
+    const line=d.outcome==='called'?'Allena called '+uwStr(d.predW)+'×'+d.predR+' — and that is what you did.'
+      :d.outcome==='beat'?'Allena called '+uwStr(d.predW)+'×'+d.predR+'; you did '+uwStr(d.actW)+'×'+d.actR+'. The model learns from being beaten.'
+      :'Allena called '+uwStr(d.predW)+'×'+d.predR+'; today gave '+uwStr(d.actW)+'×'+d.actR+'. Recovery, or the call was hot — either way it recalibrates.';
+    return '<div class="card mt" style="padding:12px 15px'+(d.outcome!=='under'?';border-color:var(--green)':'')+'">'+
+      '<p class="mono" style="font-size:9px;color:'+(d.outcome!=='under'?'var(--green)':'var(--faint)')+';letter-spacing:.06em">THE FORECAST · '+exN.toUpperCase()+'</p>'+
+      '<p style="color:var(--dim);font-size:12.5px;line-height:1.55;margin-top:5px">'+line+'</p></div>'
+  }catch(e){return ''}}
 function sessionCard(){
   /* the session, as its own pill under the hero. An empty program has
      no week to complete — zero planned sessions is not "all logged"
@@ -7879,6 +8100,28 @@ function watchList(){
   const add=(t,have,need,d,got)=>{
     if(have>=need){W.met=(W.met||0)+1;return}        // unlocked: it has answered or is about to
     W.push({t:t,have:have,need:need,d:d,pct:Math.round(Math.min(1,have/need)*100)})};
+  /* the cold-start ladder (Sep 2026): short thresholds FIRST, so a
+     week-one account watches bars move every single day. The list is
+     the roadmap of what is coming — anticipation is the honest half
+     of the slot machine. */
+  {const lifts={};H.forEach(h=>h.log.forEach(l=>{if(l.w&&l.r)lifts[gBase(l.ex)]=(lifts[gBase(l.ex)]||0)+1}));
+   const most=Object.keys(lifts).sort((a,b)=>lifts[b]-lifts[a])[0];
+   const seen=most?Math.min(3,H.filter(h=>h.log.some(l=>gBase(l.ex)===most&&l.w>0)).length):0;
+   add('Your first forecast',seen,3,
+     'Three sessions with the same lift and Allena starts calling your top set before you train it.',seen>=3)}
+  add('Your first patterns',Math.min(5,H.length),5,
+    'Five sessions is where the pattern engines wake up — timing, balance, what costs you the most.',H.length>=5);
+  {const st9=(typeof predStats==='function')?predStats():{n:0};
+   if(st9.n>0||H.length>=3)add('The call ledger',Math.min(5,st9.n),5,
+     'Five settled forecasts and the ledger opens — how often Allena is right about you, in the open.',st9.n>=5)}
+  if(S.runOn){const hrRuns=R.filter(r=>r.hr>0&&r.km>=3).length;
+   add('The engine number',Math.min(6,hrRuns),6,
+     'Six runs with heart rate and Allena can measure your aerobic engine itself — speed per heartbeat, not just pace.',hrRuns>=6)}
+  /* the refill: a deep read ages, and new training re-arms the next one */
+  try{const ins=bankList().filter(d=>d.tag==='insight').map(d=>d.found).sort().pop();
+   if(ins){const since=H.filter(h=>h.date>ins).length;
+     add('What changed since your last deep read',Math.min(8,since),8,
+       'Eight sessions of new evidence since the last read — enough for the next one to say something new.',since>=8)}}catch(e){}
   /* which day of the week suits you */
   {const byDow={};H.forEach(h=>{const r=h.log.filter(l=>l.rpe!=null);
       if(r.length)byDow[new Date(h.date).getDay()]=(byDow[new Date(h.date).getDay()]||0)+1});
@@ -7977,6 +8220,7 @@ const DISC_CATALOG=[
  ['streak','Consistency','Runs of days and weeks without missing one.','Log something most days.'],
  ['quest','Quests','Weekly challenges taken on and finished.','Accept a weekly quest and see it through.'],
  ['insight','Deep reads','What the model found between your numbers.','Run a deep read from Findings.'],
+ ['call','Called shots','Allena\'s forecasts, settled by what you did.','Train on a day Allena has made a call.'],
  ['timing','Timing','When in the day and week your training goes best.','Log effort across different days and times.'],
  ['block','Blocks','How one block compares with the last.','Finish a block and start another.'],
  ['session','Sessions','The outliers — longest, hardest, biggest.','Train.'],
@@ -10270,6 +10514,7 @@ function viewSession(){
           '<p class="mono" style="color:var(--faint);font-size:8.5px;letter-spacing:.05em;margin-top:2px">THIS SESSION\u2019S DOSE, BANKED \u2014 THE DASHES, FILLED</p></div>';
         h+='</div>'}
      }catch(e){}}
+    try{predResolvePending();h+=predSessionVerdict()}catch(e){}
     {const rev=S.sessReveal;
      if(rev&&rev.show){const r=rarityOf(rev.show.rar);
       h+='<div class="card mt2 an-hero an-glow an-pop" style="padding:17px;border-radius:20px;border-color:'+r[1]+'">'+
@@ -11974,6 +12219,23 @@ function sheetHtml(){
       '</div>'+
       '<button data-a="histImpGo" class="big disp mt" style="background:'+((f.date||'').trim()?'var(--amber)':'var(--raised)')+';color:'+((f.date||'').trim()?'#1F1E1D':'var(--faint)')+';font-size:15px">Bring it in</button>'+
       '<p style="color:var(--faint);font-size:11px;line-height:1.55;margin-top:10px">Sessions are spread across each week and marked as imported with approximate dates — honest labels, real data.</p>')}
+  if(S.sheet.t==='pred'){
+    const d=predToday(),ps=predStats();
+    if(!d||!d.ex)return wrapSheet('The forecast','<p style="color:var(--dim);font-size:13px;line-height:1.6">No call today — Allena forecasts when a program day is on and it has seen the lift at least three times.</p>');
+    const exN=esc(String(d.ex).replace(/ — .*/,''));
+    return wrapSheet('The forecast',
+      '<p class="mono" style="font-size:10px;color:var(--amber);letter-spacing:.06em">'+esc(String(d.day||'').toUpperCase())+'</p>'+
+      '<p class="disp gradhead" style="font-size:26px;line-height:1.2;margin-top:8px">'+exN+' '+uwStr(d.predW)+'×'+d.predR+'</p>'+
+      '<p style="color:var(--dim);font-size:13px;line-height:1.6;margin-top:8px">'+esc(d.why||'')+'</p>'+
+      (d.readyLo!=null?'<div class="card mt" style="padding:12px 15px"><p class="mono" style="font-size:9px;color:var(--faint);letter-spacing:.06em">MORNING READINESS</p>'+
+        '<p style="color:var(--dim);font-size:12.5px;line-height:1.55;margin-top:4px">Expected between <b style="color:var(--text)">'+d.readyLo+'</b> and <b style="color:var(--text)">'+d.readyHi+'</b> — '+esc(d.readyWhy||'')+'.'+
+        (d.readyAct!=null?' It came in at <b style="color:'+(d.readyHit?'var(--green)':'var(--amber)')+'">'+d.readyAct+'</b>.':'')+'</p></div>':'')+
+      (d.outcome?'<div class="card mt" style="padding:12px 15px'+(d.outcome!=='under'?';border-color:var(--green)':'')+'">'+
+        '<p class="mono" style="font-size:9px;color:'+(d.outcome!=='under'?'var(--green)':'var(--faint)')+';letter-spacing:.06em">SETTLED</p>'+
+        '<p style="color:var(--dim);font-size:12.5px;line-height:1.55;margin-top:4px">You did '+uwStr(d.actW)+'×'+d.actR+' — '+
+        (d.outcome==='called'?'the call landed.':d.outcome==='beat'?'you beat the call, and the model learns more from that than from being right.':'under the call. Recovery, or the call was hot — it recalibrates either way.')+'</p></div>':'')+
+      (ps.n>=3?'<p class="mono" style="color:var(--faint);font-size:11px;margin-top:14px">THE LEDGER · '+ps.called+' of '+ps.n+' calls landed'+(ps.beat?' · beaten '+ps.beat+' time'+(ps.beat===1?'':'s'):'')+'</p>':'')+
+      '<p style="color:var(--faint);font-size:11.5px;line-height:1.55;margin-top:12px">A forecast, not a target. It is what the model expects from the evidence — going past it teaches Allena more than hitting it.</p>')}
   if(S.sheet.t==='impguide'){
     /* one step per page, on purpose: the user is switching between
        Safari and Allena with one hand — a single instruction and a big
@@ -14168,6 +14430,7 @@ function runAction(a,v,t,e){
     case 'svGo':svConnect();break;
     case 'suGateGo':if(S.setup)S.setup.gate=false;render();break;
     case 'suGateBack':if(S.setup)S.setup.gate=true;render();break;
+    case 'predOpen':S.sheet={t:'pred'};render();break;
     case 'impGuideOpen':S.impgBack=v||'';S.impg=S.impg||'garmin';S.impgStep=0;S.sheet={t:'impguide'};render();break;
     case 'impgSrc':S.impg=v;S.impgStep=0;render();break;
     case 'impgStep':S.impgStep=Math.max(0,(S.impgStep||0)+(+v));render();break;
