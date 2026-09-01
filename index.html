@@ -361,7 +361,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='0d15e8';  // stamped by tools/build.py with the content hash
+const BUILD_ID='c56109';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -10098,8 +10098,9 @@ function viewSession(){
 
   const doneCount=s.sets.filter(st=>s.log.some(l=>l.ex===st.ex&&l.setNo===st.setNo)||(s.skipped&&s.skipped.indexOf(st.exNo)>=0)).length;
   const pct=s.sets.length?Math.round(doneCount/s.sets.length*100):0;
-  let h='<div class="stickyhead"><div style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 20px 10px">'+
-   '<div style="min-width:0"><p class="eyebrow" style="color:'+acc+'">'+esc(s.block)+' · '+(prog.weeks>1?'Week '+s.week:'Day '+(s.dayIdx+1))+'</p>'+
+  let h='<div class="stickyhead" data-sessbar="1"><div style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 20px 10px">'+
+   '<button data-a="sessMin" style="width:40px;height:40px;border-radius:13px;background:var(--raised);border:1px solid var(--line);color:var(--dim);display:flex;align-items:center;justify-content:center;flex:none;font-size:16px">\u2304</button>'+
+   '<div style="min-width:0;flex:1"><p class="eyebrow" style="color:'+acc+'">'+esc(s.block)+' · '+(prog.weeks>1?'Week '+s.week:'Day '+(s.dayIdx+1))+'</p>'+
    '<p class="disp" style="font-size:16px;font-weight:600;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(s.dayName)+'</p></div>'+
    '<div style="display:flex;gap:8px;flex:none;align-items:center">'+
    (S.lastAdj?'<button data-a="undoAdj" style="padding:9px 10px;border-radius:11px;background:var(--raised);border:1px solid var(--amber);color:var(--amber);font-size:12px;white-space:nowrap">Undo '+(S.lastAdj.delta>0?'+':'')+S.lastAdj.delta+'</button>':'')+
@@ -12665,7 +12666,20 @@ function render(){
         esc(((S.prof&&S.prof.name)||'Y').slice(0,1).toUpperCase())+'</button>'+
       '<button data-a="chatNew" class="pill on" style="flex:1;padding:12px 16px;font-size:14.5px;text-align:center">+ New chat with Allena</button>'+
       '</div></div></div>'};
-  const extraHtml=drawerHtml()+sheetHtml()+(S.toast?'<div class="toast"><div class="'+(S.toastGold?'gold':'')+'">'+esc(S.toast)+'</div></div>':'');
+  const sessPillHtml=()=>{
+    /* the session, minimized (owner call, Sep 2026): browse anywhere,
+       the clock keeps ticking, one tap returns. Ticks via #spTime
+       without re-rendering. */
+    if(!S.sess||S.view==='session'||S.sess.phase==='done')return '';
+    const s2=S.sess,cur=s2.sets[Math.min(s2.idx,s2.sets.length-1)];
+    const resting=s2.phase==='resting'&&S.restEnd;
+    const left=resting?Math.max(0,Math.ceil((S.restEnd-Date.now())/1000)):0;
+    return '<button data-a="resume" id="sessPill" style="position:fixed;left:12px;right:12px;bottom:calc(14px + env(safe-area-inset-bottom));z-index:80;display:flex;align-items:center;gap:11px;padding:12px 15px;border-radius:16px;background:var(--raised);border:1px solid rgba(240,238,230,.4);box-shadow:0 10px 34px rgba(0,0,0,.55);text-align:left">'+
+      '<span class="mono" id="spTime" data-end="'+(resting?S.restEnd:'')+'" style="font-size:16px;font-weight:700;color:'+(resting?'#1E9BFF':'var(--green)')+';flex:none;min-width:46px">'+(resting?mmss(left):'LIVE')+'</span>'+
+      '<span style="flex:1;min-width:0"><span style="display:block;font-size:12.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(String(cur.ex||'').replace(/ \u2014 .*/,''))+'</span>'+
+      '<span class="mono" style="color:var(--faint);font-size:9.5px;letter-spacing:.04em">'+(resting?'REST \u00b7 THEN SET '+cur.setNo+' OF '+cur.of:'SET '+cur.setNo+' OF '+cur.of+' \u00b7 '+s2.log.length+'/'+s2.sets.length+' LOGGED')+'</span></span>'+
+      '<span class="mono" style="color:var(--amber);font-size:12px;flex:none">Return \u203a</span></button>'};
+  const extraHtml=sessPillHtml()+drawerHtml()+sheetHtml()+(S.toast?'<div class="toast"><div class="'+(S.toastGold?'gold':'')+'">'+esc(S.toast)+'</div></div>':'');
   const keyA=S.view+'|'+(S.sess&&S.view==='session'?S.sess.phase+':'+S.sess.idx:'');
   const sheetKey=S.sheet?S.sheet.t:'';
   const big=(keyA!==lastAnimKey)||(sheetKey!==lastSheetKey);
@@ -12690,6 +12704,14 @@ function render(){
 function getPath(p){const k=p.split('.');let o=S;for(let i=0;i<k.length-1;i++){if(!o)return '';o=o[k[i]]}return o?o[k[k.length-1]]:''}
 function setPath(p,v){const k=p.split('.');let o=S;for(let i=0;i<k.length-1;i++){if(!o)return;o=o[k[i]]}if(o)o[k[k.length-1]]=v}
 
+
+/* the minimized-session clock: ticks the pill without a render */
+setInterval(function(){try{
+  const el=document.getElementById('spTime');if(!el)return;
+  const end=+el.dataset.end;if(!end)return;
+  const left=Math.ceil((end-Date.now())/1000);
+  if(left>0)el.textContent=mmss(left);
+  else{el.textContent='GO';el.style.color='var(--green)'}}catch(e){}},500);
 /* ══ chart scrubbing ════════════════════════════════════════
    Touch a chart, read the value. Horizontal drags scrub; a
    vertical drag scrolls the page as usual. Direct DOM — no
@@ -12738,6 +12760,15 @@ function setPath(p,v){const k=p.split('.');let o=S;for(let i=0;i<k.length-1;i++)
   document.addEventListener('mouseup',()=>{active=false;setTimeout(clear,1400)});
 })();
 
+/* swipe down on the session top bar minimizes it — the pill takes over */
+(function(){let y0=null;
+  document.addEventListener('touchstart',e=>{const b=e.target.closest&&e.target.closest('[data-sessbar]');
+    y0=b?e.touches[0].clientY:null},{passive:true});
+  document.addEventListener('touchmove',e=>{
+    if(y0==null)return;
+    if(e.touches[0].clientY-y0>70){y0=null;vib(10);runAction('sessMin')}},{passive:true});
+  document.addEventListener('touchend',()=>{y0=null},{passive:true});
+})();
 let lpT=null;
 document.addEventListener('touchstart',e=>{const g=e.target.closest&&e.target.closest('[data-a="planGrab"]');
   if(!g)return;clearTimeout(lpT);lpT=setTimeout(()=>{S.reorder=+g.dataset.v;vib(16);render()},320)},{passive:true});
@@ -13020,6 +13051,7 @@ function runAction(a,v,t,e){
     case 'week':A.week(v);break;
     case 'start':A.start(v);break;
     case 'resume':A.resume();break;
+    case 'sessMin':S.view='today';wakeOff();render();break;
     case 'begin':A.begin();break;
     case 'finish':A.finish();break;
     case 'commit':A.commit();break;
