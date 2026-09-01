@@ -270,7 +270,10 @@ const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;'
    uwIn/udIn helpers convert back at the keyboard. */
 const K_UNITS='training-units-v1';
 const LB_KG=2.2046226218,MI_KM=0.621371;
-let UNITS=lget(K_UNITS,{w:'kg',d:'km'});
+let UNITS=lget(K_UNITS,null);
+if(!UNITS){/* US (and LR/MM) phones start imperial — one toggle back */
+  let us=false;try{us=/-(US|LR|MM)\b/i.test(String((navigator.languages&&navigator.languages[0])||navigator.language||''))}catch(e){}
+  UNITS=us?{w:'lb',d:'mi'}:{w:'kg',d:'km'}}
 function unitsSet(k,v){UNITS[k]=v;lset(K_UNITS,UNITS)}
 const uwNum=kg=>(kg==null||kg==='')?kg:(UNITS.w==='lb'?Math.round(kg*LB_KG*2)/2:kg);
 const uwIn=v=>UNITS.w==='lb'?Math.round(v/LB_KG*4)/4:v;      // typed lb → stored kg (quarter-kg grain)
@@ -358,7 +361,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='f5e8e8';  // stamped by tools/build.py with the content hash
+const BUILD_ID='abb2c6';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -470,17 +473,17 @@ function autoReg(e,c){
       return{level:'ok',msg:'Short of the target at RPE '+e.rpe+' — that is stopping early, not a heavy weight. Keep the load and take the next set to RPE '+tR+'; you had '+Math.round(10-rpe)+' reps left in you.'};
     if(!isNaN(rpe)&&!isNaN(tLo)&&rpe<tLo-0.5)
       return{level:'ok',msg:'Missed the reps but only RPE '+e.rpe+'. Hold this weight and push nearer the target effort before touching the load.'};
-    if(isTop&&short>=2)return{level:'warn',msg:'Top set missed by '+short+' at RPE '+(isNaN(rpe)?'max':e.rpe)+'. Take '+drop+' kg off the back-offs today and repeat this week rather than advancing.'};
-    return{level:'warn',msg:'Missed the target at RPE '+(isNaN(rpe)?'high effort':e.rpe)+' — the load is genuinely ahead of you. Take '+drop+' kg off the remaining sets and keep the reps.'}}
+    if(isTop&&short>=2)return{level:'warn',msg:'Top set missed by '+short+' at RPE '+(isNaN(rpe)?'max':e.rpe)+'. Take '+uwNum(drop)+' '+uwUnit()+' off the back-offs today and repeat this week rather than advancing.'};
+    return{level:'warn',msg:'Missed the target at RPE '+(isNaN(rpe)?'high effort':e.rpe)+' — the load is genuinely ahead of you. Take '+uwNum(drop)+' '+uwUnit()+' off the remaining sets and keep the reps.'}}
   if(!isNaN(rpe)&&!isNaN(tHi)&&rpe>=tHi+1){
     const drop=Math.max(step,Math.round(e.w*0.05/2.5)*2.5);
     return{level:'warn',msg:(rpe>=10?'That set went to failure against a target of RPE '+tTxt+'. ':'RPE '+e.rpe+' against a target of '+tTxt+'. ')+
-      'Take '+drop+' kg off the remaining sets — you want to finish this exercise, not survive it.'}}
+      'Take '+uwNum(drop)+' '+uwUnit()+' off the remaining sets — you want to finish this exercise, not survive it.'}}
   if(!isNaN(rpe)&&!isNaN(tHi)&&rpe>=tHi+0.5)return{level:'ok',msg:'Slightly hot at RPE '+e.rpe+' against a target of '+tTxt+'. Hold this weight for the rest of the exercise.'};
   if(!isNaN(rpe)&&!isNaN(tLo)&&!isNaN(tHi)&&tHi>tLo&&rpe>=tLo&&rpe<=tHi&&e.r>=low)
     return{level:'good',msg:'RPE '+e.rpe+' against a target of '+tTxt+' — right where it should be. Same weight for the rest.'};
   if(!isNaN(rpe)&&!isNaN(tLo)&&rpe<=tLo-2&&e.r<high)return{level:'ok',msg:'In range but only RPE '+e.rpe+' — roughly '+Math.round(10-rpe)+' reps left. Same weight, push the next set nearer '+tR+' and the reps will come.'};
-  if(e.r>=high&&!isNaN(rpe)&&!isNaN(tLo)&&rpe<=tLo-1&&!isTop)return{level:'good',msg:'Top of the range with room to spare. If the next sets match, this goes up '+step+' kg.'};
+  if(e.r>=high&&!isNaN(rpe)&&!isNaN(tLo)&&rpe<=tLo-1&&!isTop)return{level:'good',msg:'Top of the range with room to spare. If the next sets match, this goes up '+uwNum(step)+' '+uwUnit()+'.'};
   if(isTop)return{level:'good',msg:'Top set done to plan. Back-offs as written.'};
   return{level:'ok',msg:'On target — same again.'}}
 const MR=(v,q)=>Math.round(v/q)*q;
@@ -514,7 +517,7 @@ function warmupHtml(wu,cur,sess){
         (done?'color:var(--faint);text-decoration:line-through':'color:var(--text)')+'">'+
         '<span style="width:18px;height:18px;border-radius:18px;flex:none;display:inline-flex;align-items:center;justify-content:center;font-size:11px;'+
         (done?'background:var(--green);color:#1F1E1D':'border:1.5px solid var(--line)')+'">'+(done?'✓':'')+'</span>'+
-        (r[0]===BAR?'Bar · '+BAR+' kg':r[0]+' kg')+' × '+r[1]+'</button>'}).join('')+'</div>'+
+        (r[0]===BAR?'Bar · '+uwNum(BAR)+' '+uwUnit():uwNum(r[0])+' '+uwUnit())+' × '+r[1]+'</button>'}).join('')+'</div>'+
     '<p style="color:var(--faint);font-size:11px;margin-top:6px">30–60 s between warm-up sets. Not logged, not counted.</p></div>'}
 const SUBS={
  'bench':[{n:'Dumbbell bench press',f:.40,u:'per DB',note:'Two DBs. Slightly higher reps if the top set is a double or triple.'},
@@ -607,7 +610,7 @@ function applyAdj(exName,delta,why,silent){
     S.sess.sets.forEach(st=>{if(st.ex===exName&&st.targetW!=null){st.targetW=Math.max(0,Math.round((st.targetW+delta)*4)/4);st.adj=(st.adj||0)+delta}});
     persistActive()}
   S.lastAdj={ex:exName,delta:delta};
-  if(!silent){vib(14);flash((delta>0?'+':'')+delta+' kg on '+exName.replace(/ — .*/,'')+(why?' — '+why:'')+'. Tap Undo in the header.')}
+  if(!silent){vib(14);flash((delta>0?'+':'')+uwNum(delta)+' '+uwUnit()+' on '+exName.replace(/ — .*/,'')+(why?' — '+why:'')+'. Tap Undo in the header.')}
   return true}
 function undoAdj(){if(!S.lastAdj)return;const a=S.lastAdj;S.lastAdj=null;applyAdj(a.ex,-a.delta,'reverted',true);flash('Reverted.');render()}
 
@@ -678,14 +681,14 @@ function regulate(rows,c,opts){
     out.msg='Reps came up short on '+belowLow+' sets, but average RPE was '+(Math.round(avg*10)/10)+' against a target of '+tTxt+'. That is stopping early rather than a weight problem — same load next time, taken closer to '+tR+'.';
     out.why='under-effort miss, load unchanged'}
   else if(belowLow>=2){out.level='warn';out.delta=pctCut(0.05);out.outcome='overshot';
-    out.msg='Missed the bottom of the range on '+belowLow+' sets'+(avg!=null?' at RPE '+(Math.round(avg*10)/10):'')+'. Dropping '+Math.abs(out.delta)+' kg — the load is ahead of you today.';
+    out.msg='Missed the bottom of the range on '+belowLow+' sets'+(avg!=null?' at RPE '+(Math.round(avg*10)/10):'')+'. Dropping '+uwNum(Math.abs(out.delta))+' '+uwUnit()+' — the load is ahead of you today.';
     out.why='reps under target on '+belowLow+' sets'}
   // 2. effort past target — the case that used to slip through
   else if(d!=null&&d>=0.75){
     const sev=(mx>=10&&d>=1)?0.07:0.05;
     out.level='warn';out.delta=pctCut(sev);out.outcome='overshot';
     out.msg=(mx>=10?'Sets taken to failure against a target of RPE '+tTxt+'. ':'Effort ran '+(Math.round(d*10)/10)+' above target. ')+
-      'Taking '+Math.abs(out.delta)+' kg off. Hitting the reps at maximum effort is not the same as hitting the prescription — it buys fatigue you did not need.';
+      'Taking '+uwNum(Math.abs(out.delta))+' '+uwUnit()+' off. Hitting the reps at maximum effort is not the same as hitting the prescription — it buys fatigue you did not need.';
     out.why='avg RPE '+(Math.round(avg*10)/10)+' vs target '+tTxt}
   // 3. slightly hot — hold, do not add
   else if(d!=null&&d>=0.4){out.level='ok';out.outcome='held';
@@ -693,10 +696,10 @@ function regulate(rows,c,opts){
     out.why='mild overshoot'}
   // 4. clean progression
   else if(allTop&&d!=null&&d<=-0.75){out.level='good';out.delta=step*2;out.outcome='easy';
-    out.msg='Top of the range and '+Math.abs(Math.round(d*10)/10)+' under target effort. That is a double step: +'+out.delta+' kg.';
+    out.msg='Top of the range and '+Math.abs(Math.round(d*10)/10)+' under target effort. That is a double step: +'+uwNum(out.delta)+' '+uwUnit()+'.';
     out.why='top of range, well inside target effort'}
   else if(allTop&&(d==null||d<=0.25)){out.level='good';out.delta=step;out.outcome='held';
-    out.msg='Every set at the top of the range on target effort. +'+step+' kg next session.';
+    out.msg='Every set at the top of the range on target effort. +'+uwNum(step)+' '+uwUnit()+' next session.';
     out.why='double progression met'}
   // 5. in range, on effort — the genuine "same again"
   else if(d!=null&&d<=-1.5&&!allTop){out.level='ok';out.outcome='held';
@@ -2134,7 +2137,7 @@ function bwCard(){
  const X=t=>P+(t-t0)/span*(W-P*2),Y=v=>H-P-(v-lo)/(hi-lo)*(H-P*2);
  const d=pts[pts.length-1].v-pts[0].v;
  return '<div class="card mt" style="padding:16px"><div style="display:flex;justify-content:space-between;align-items:baseline"><p class="eyebrow">Bodyweight</p>'+
-  '<span class="mono" style="font-size:12px;color:var(--dim)">'+pts[pts.length-1].v+' kg · '+(d>=0?'+':'')+Math.round(d*10)/10+' kg</span></div>'+
+  '<span class="mono" style="font-size:12px;color:var(--dim)">'+uwNum(pts[pts.length-1].v)+' '+uwUnit()+' · '+(d>=0?'+':'')+uwNum(Math.round(d*10)/10)+' '+uwUnit()+'</span></div>'+
   '<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;margin-top:8px">'+
   '<path d="'+pts.map((p,i)=>(i?'L':'M')+X(p.t).toFixed(1)+','+Y(p.v).toFixed(1)).join(' ')+'" style="fill:none;stroke:#5FA8A0;stroke-width:2.2" stroke-linejoin="round"/>'+
   pts.map(p=>'<circle cx="'+X(p.t).toFixed(1)+'" cy="'+Y(p.v).toFixed(1)+'" r="2.4" style="fill:#5FA8A0"/>').join('')+'</svg></div>'}
@@ -2195,7 +2198,7 @@ function scanCard(){
     '<span class="mono" style="font-size:10px;color:#30D158">— muscle</span>'+
     '<span class="mono" style="font-size:10px;color:#E8E5DC">— body fat</span></div>'+
     '<div style="display:flex;flex-wrap:wrap;gap:12px;margin-top:10px;border-top:1px solid var(--line);padding-top:10px">'+
-    chip('weight',d.w,' kg',d.w>0)+chip('muscle',d.smm,' kg',d.smm>0)+chip('fat',d.fm,' kg',d.fm<0)+chip('body fat',d.bf,'%',d.bf<0)+'</div>'+
+    chip('weight',uwNum(d.w),' '+uwUnit(),d.w>0)+chip('muscle',uwNum(d.smm),' '+uwUnit(),d.smm>0)+chip('fat',uwNum(d.fm),' '+uwUnit(),d.fm<0)+chip('body fat',d.bf,'%',d.bf<0)+'</div>'+
     '<p style="color:var(--faint);font-size:11px;line-height:1.5;margin-top:8px">Since '+fmtDate(first.date+'T12:00')+'. Muscle up with fat flat or down is the recomp you want. Tap to explain.</p></button>'}
 function recoveryCard(){
  /* recovery on the same glow mannequin as Your Ground — cooled slate
@@ -2229,7 +2232,7 @@ function dailyCard(){
   '<p class="mono" style="text-align:center;color:var(--faint);font-size:9px;margin-top:3px">'+unit+'</p></div>';
  let h='<div class="card" style="margin-top:10px;padding:14px 16px"><p class="eyebrow">Daily check-in</p>'+
   '<div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px;margin-top:10px">'+
-  cell('bw','Bodyweight','—','kg')+cell('pr','Protein','—','grams')+'</div>'+
+  cell('bw','Bodyweight','—',uwUnit())+cell('pr','Protein','—','grams')+'</div>'+
   '<p class="eyebrow" style="font-size:9.5px;margin-top:12px">Water</p>'+
   '<div style="display:flex;gap:6px;margin-top:6px">'+
   Array.from({length:8},(_,i)=>'<button data-a="dWater" data-v="'+(i+1)+'" style="flex:1;height:26px;border-radius:7px;'+(i<d.wa?'background:#5FA8A0':'background:var(--line)')+'"></button>').join('')+'</div></div>';
@@ -2311,7 +2314,7 @@ function viewQuick(){
     h+='<div style="display:grid;grid-template-columns:26px minmax(0,1fr) minmax(0,1fr) 62px;gap:7px;align-items:center;margin-top:6px;opacity:'+(r.skip?'.32':'1')+'">'+
       '<button data-a="qDel" data-i="'+i+'" class="mono" style="color:var(--faint);font-size:11px;text-align:left;padding:6px 0" title="remove set">'+r.setNo+' <span style="color:var(--red);font-size:12px">×</span></button>'+
       (timed?'<div style="grid-column:span 2">'+qCell(i,'s','sec')+'</div>'
-            :qCell(i,'w','kg')+qCell(i,'r','reps'))+
+            :qCell(i,'w',uwUnit())+qCell(i,'r','reps'))+
       '<select data-qrpe="'+i+'" class="mono" style="'+inp+';padding:11px 0;font-size:13px;text-align:center;text-align-last:center;-moz-text-align-last:center;color:'+(r.rpe==null?'var(--faint)':'var(--text)')+'">'+
       '<option value="">–</option>'+[6,7,7.5,8,8.5,9,9.5,10].map(v=>'<option value="'+v+'"'+(r.rpe===v?' selected':'')+'>'+v+'</option>').join('')+'</select></div>'+
       '<p class="mono" style="color:var(--faint);font-size:10px;margin-top:3px;margin-left:33px">'+
@@ -2334,8 +2337,8 @@ function actChip(m,i){
   if(!m.act)return '';
   const done=m.act.applied;
   return '<div style="margin-top:8px">'+
-    (done?'<span class="mono" style="color:var(--green);font-size:11.5px">✓ '+(m.act.kg>0?'+':'')+m.act.kg+' kg applied to '+esc(m.act.ex)+'</span>'
-         :'<button data-a="coachApply" data-v="'+i+'" class="pill" style="border-color:var(--amber);color:var(--amber);font-size:12px">Apply '+(m.act.kg>0?'+':'')+m.act.kg+' kg to '+esc(m.act.ex.replace(/ — .*/,''))+'</button>')+'</div>'}
+    (done?'<span class="mono" style="color:var(--green);font-size:11.5px">✓ '+(m.act.kg>0?'+':'')+uwNum(m.act.kg)+' '+uwUnit()+' applied to '+esc(m.act.ex)+'</span>'
+         :'<button data-a="coachApply" data-v="'+i+'" class="pill" style="border-color:var(--amber);color:var(--amber);font-size:12px">Apply '+(m.act.kg>0?'+':'')+uwNum(m.act.kg)+' '+uwUnit()+' to '+esc(m.act.ex.replace(/ — .*/,''))+'</button>')+'</div>'}
 function viewCoach(){
   const th=S.coach.thread,foc=S.coach.focus?S.history.find(h=>h.id===S.coach.focus):null;
   let h='<div class="chatwrap">';
@@ -2777,7 +2780,7 @@ function viewScans(){
     list.map(x=>'<div class="card" style="padding:12px 15px;display:flex;align-items:center;gap:12px">'+
       (x.thumb?'<img src="'+x.thumb+'" style="width:38px;height:38px;border-radius:8px;object-fit:cover;flex:none">':'')+
       '<div style="flex:1;min-width:0"><p class="mono" style="font-size:12.5px">'+fmtDate(x.date+'T12:00')+'</p>'+
-      '<p class="mono" style="color:var(--faint);font-size:11px;margin-top:2px">'+[x.w!=null?x.w+' kg':'',x.bf!=null?x.bf+'%':'',x.smm!=null?x.smm+' kg SMM':''].filter(Boolean).join(' · ')+'</p></div>'+
+      '<p class="mono" style="color:var(--faint);font-size:11px;margin-top:2px">'+[x.w!=null?uwNum(x.w)+' '+uwUnit():'',x.bf!=null?x.bf+'%':'',x.smm!=null?uwNum(x.smm)+' '+uwUnit()+' SMM':''].filter(Boolean).join(' · ')+'</p></div>'+
       '<button data-a="scanDel" data-v="'+x.id+'" style="color:var(--red);font-size:11.5px;flex:none">Remove</button></div>').join('')+'</div>'}
   else h+='<p style="color:var(--faint);font-size:12.5px;margin-top:16px">No scans yet.</p>';
   return h+'</div>'}
@@ -2791,7 +2794,7 @@ function scanSheet(){
   inner+='<p class="eyebrow" style="margin-top:18px">Date</p>'+
     '<input type="date" data-sdate="1" value="'+esc(f.date)+'" style="width:100%;margin-top:6px;background:var(--surface);border:1px solid var(--line);border-radius:10px;color:var(--text);padding:11px;font-size:16px;outline:none">';
   inner+='<div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px;margin-top:14px">'+
-    SCAN_FIELDS.map(x=>stepper('sform.'+x[0],x[1],f[x[0]],x[3],x[2])).join('')+'</div>';
+    SCAN_FIELDS.map(x=>stepper('sform.'+x[0],x[1],f[x[0]],x[3],x[2]==='kg'?uwUnit():x[2])).join('')+'</div>';
   inner+='<button data-a="scanSave" class="big disp mt" style="background:var(--amber);color:#1F1E1D;font-size:16px">Save scan</button>'+
     '<p style="color:var(--faint);font-size:11px;line-height:1.5;margin-top:10px">Only a small thumbnail of the image is kept, so backups stay light.</p>';
   return wrapSheet('Add a scan',inner)}
@@ -2944,7 +2947,7 @@ function noticedPool(){
       if(l.length<6)return;
       const first=l[0].e,last=l[l.length-1].e;
       if(last>first*1.04)add(b+' is up '+Math.round((last/first-1)*100)+'%',
-        'From about '+Math.round(first)+' kg to '+Math.round(last)+' kg estimated max since you started logging it. That is the whole point of the exercise.')})}catch(e){}
+        'From about '+uwNum(Math.round(first))+' to '+uwNum(Math.round(last))+' '+uwUnit()+' estimated max since you started logging it. That is the whole point of the exercise.')})}catch(e){}
   // the day of the week that goes best
   try{const byDow={};
     H.forEach(h=>{const dow=new Date(h.date).getDay();
@@ -2961,14 +2964,14 @@ function noticedPool(){
   // total moved
   try{const ton=H.reduce((a,h)=>a+h.log.reduce((x,l)=>x+(l.w||0)*(l.r||0),0),0);
     if(ton>20000)add(tonStr(ton)+' lifted in total',
-      'Across '+H.length+' sessions. That is roughly '+Math.round(ton/1000)+' tonnes through your hands.')}catch(e){}
+      'Across '+H.length+' sessions. That is roughly '+(UNITS.w==='lb'?Math.round(ton*LB_KG/2000)+' US tons':Math.round(ton/1000)+' tonnes')+' through your hands.')}catch(e){}
   // consistency
   try{const st=weekStreak();
     if(st.weeks>=3)add(st.weeks+' weeks without missing one',
       'Consistency beats every programming decision you will ever make. This is the number that actually predicts where you end up.')}catch(e){}
   // running
   try{if((S.runs||[]).length>=5){const km=(S.runs||[]).reduce((a,r)=>a+(r.km||0),0);
-    add(Math.round(km)+' km logged',
+    add(udNum(Math.round(km))+' '+udUnit()+' logged',
       'Over '+S.runs.length+' runs. Every one of them is in the same recovery picture as your lifting, which is not true in any other app you could be using.')}}catch(e){}
   // rehab
   try{const q=((S.acl&&S.acl.tests)||[]).filter(t=>t.kind==='quad');
@@ -3000,7 +3003,7 @@ function noticedPool(){
       const dp=a3-b3;
       const pf=v=>Math.floor(v)+':'+String(Math.round((v%1)*60)).padStart(2,'0');
       if(dp>0.08)add('Your easy pace has dropped '+Math.round(dp*60)+' seconds',
-        'From about '+pf(a3)+'/km to '+pf(b3)+'/km across your easy runs. Same effort, more speed \u2014 that is aerobic base being built, and it is the quietest kind of progress.')}}catch(e){}
+        'From about '+pf(a3)+'/'+udUnit()+' to '+pf(b3)+'/'+udUnit()+' across your easy runs. Same effort, more speed \u2014 that is aerobic base being built, and it is the quietest kind of progress.')}}catch(e){}
   // heaviest week vs this block's average
   try{const byW={};H.forEach(h=>{if(h.run)return;const k=isoWeek(h.date);
       byW[k]=(byW[k]||0)+h.log.reduce((x,l)=>x+(l.w||0)*(l.r||0),0)});
@@ -4287,7 +4290,7 @@ function viewRun(){
     '<div style="display:flex;justify-content:space-between;align-items:baseline"><p class="eyebrow">This week</p>'+
     '<span class="mono" style="color:var(--faint);font-size:13px">›</span></div>'+
     '<div class="row mt" style="gap:10px">'+
-      statBox(wk[wk.length-1].km+' km','distance')+
+      statBox(udNum(wk[wk.length-1].km)+' '+udUnit(),'distance')+
       statBox(wk[wk.length-1].n||0,'runs')+
       statBox(a==null?'—':a+'×','load')+'</div>'+
     (a!=null?'<p style="color:'+(a>1.5?'var(--red)':a>1.3?'var(--amber)':'var(--faint)')+';font-size:11.5px;line-height:1.5;margin-top:10px">'+
@@ -4308,7 +4311,7 @@ function viewRun(){
     wk.map(x=>'<div style="flex:1;display:flex;flex-direction:column;justify-content:flex-end;height:100%">'+
       '<div style="height:'+Math.max(2,Math.round(x.km/maxKm*80))+'px;background:'+(x.km?'#1E9BFF':'var(--line)')+';border-radius:5px"></div></div>').join('')+'</div>'+
     '<div style="display:flex;justify-content:space-between;align-items:baseline;margin-top:6px">'+
-    '<span class="mono" style="color:var(--faint);font-size:10px">'+wk[0].km+' km → '+wk[wk.length-1].km+' km over eight weeks</span>'+
+    '<span class="mono" style="color:var(--faint);font-size:10px">'+udNum(wk[0].km)+' → '+udNum(wk[wk.length-1].km)+' '+udUnit()+' over eight weeks</span>'+
     '<span class="mono" style="color:var(--faint);font-size:13px">›</span></div></button>';
   if(sp)h+='<p class="eyebrow mt2">Where the time goes · 28 days</p>'+
     '<button data-a="runDetail" data-v="zones" class="card mt" style="width:100%;text-align:left;padding:16px;display:block">'+
@@ -4328,7 +4331,7 @@ function viewRun(){
     '<span class="mono" style="color:var(--faint);font-size:13px">›</span></div>'+
     '<p style="color:var(--dim);font-size:12.5px;line-height:1.55;margin-top:4px">'+
     paceStr(f.early*10,10)+' → '+paceStr(f.late*10,10)+' across '+f.n+' easy and long runs. Same effort, different speed, is what aerobic progress looks like.</p></button>';
-  const pbs=[[5,'5 km'],[10,'10 km'],[21.1,'Half'],[42.2,'Marathon']].map(x=>{const b=runPB(x[0]);return b?{n:x[1],b:b}:null}).filter(Boolean);
+  const pbs=[[5,'5K'],[10,'10K'],[21.1,'Half'],[42.2,'Marathon']].map(x=>{const b=runPB(x[0]);return b?{n:x[1],b:b}:null}).filter(Boolean);
   if(pbs.length)h+='<p class="eyebrow mt2">Best efforts</p><button data-a="runDetail" data-v="pb" class="card mt" style="width:100%;text-align:left;padding:4px 16px;display:block">'+
     pbs.map((p,i)=>'<div style="display:flex;justify-content:space-between;align-items:baseline;padding:12px 0'+(i?';border-top:1px solid var(--line)':'')+'">'+
       '<span style="font-size:13px;color:var(--dim)">'+p.n+'</span>'+
@@ -4339,7 +4342,7 @@ function viewRun(){
   const mode=S.runGroup||'month';
   const groups=runGroups(R,mode);
   h+=collapser('allruns','Every run',
-    R.length+' runs · '+Math.round(R.reduce((a,r)=>a+(r.km||0),0))+' km · grouped by '+
+    R.length+' runs · '+udNum(Math.round(R.reduce((a,r)=>a+(r.km||0),0)))+' '+udUnit()+' · grouped by '+
       ({month:'month',type:'session type',week:'week',dist:'distance'})[mode],
     '<select data-runsel="1" style="width:100%;margin-top:10px;padding:13px 14px;font-size:14px;background:var(--raised);border:1px solid var(--line);border-radius:12px;color:var(--text);-webkit-appearance:none;appearance:none">'+
     [['month','Grouped by month'],['week','Grouped by week'],['type','Grouped by session type'],['dist','Grouped by distance']].map(x=>
@@ -4377,7 +4380,7 @@ function runDetail(kind){
       '<p class="eyebrow mt2">Week by week</p><div class="card mt" style="padding:4px 16px">'+
       wk.slice().reverse().map((x,i)=>'<div style="display:flex;justify-content:space-between;align-items:baseline;padding:11px 0'+(i?';border-top:1px solid var(--line)':'')+'">'+
         '<span class="mono" style="font-size:12px;color:var(--dim)">'+esc(fmtDate(x.end+'T12:00'))+'</span>'+
-        '<span class="mono" style="font-size:12.5px;font-weight:600">'+x.km+' km <span style="color:var(--faint);font-weight:400;font-size:10.5px">'+x.n+' runs · load '+x.load+'</span></span></div>').join('')+'</div>'+
+        '<span class="mono" style="font-size:12.5px;font-weight:600">'+udNum(x.km)+' '+udUnit()+' <span style="color:var(--faint);font-weight:400;font-size:10.5px">'+x.n+' runs · load '+x.load+'</span></span></div>').join('')+'</div>'+
       '<div class="card mt2" style="padding:15px 16px"><p class="eyebrow">Why this number</p>'+
       '<p style="color:var(--dim);font-size:12.5px;line-height:1.65;margin-top:6px">Injuries cluster where load rises faster than the body has adapted to carry. Comparing the last seven days to the last twenty-eight is the simplest way to see that happening while you can still do something about it. It is a rate of change, not a verdict — a high number after three easy weeks means less than the same number after three hard ones.</p></div>'}
   else if(kind==='zones'){
@@ -4429,7 +4432,7 @@ function runDetail(kind){
   else if(kind==='pb'){
     h+='<h1 class="disp" style="font-size:24px;font-weight:600">Best efforts</h1>'+
       '<p style="color:var(--dim);font-size:13.5px;line-height:1.65;margin-top:10px">Your quickest run at each distance, and what that predicts elsewhere. Predictions assume you have trained for the distance — they are a ceiling, not a promise.</p>';
-    const dists=[[5,'5 km'],[10,'10 km'],[21.1,'Half marathon'],[42.2,'Marathon']];
+    const dists=[[5,'5K'],[10,'10K'],[21.1,'Half marathon'],[42.2,'Marathon']];
     const base=dists.map(x=>({d:x[0],n:x[1],b:runPB(x[0])})).filter(x=>x.b);
     if(!base.length)h+='<div class="card mt2" style="padding:16px"><p style="color:var(--dim);font-size:13px">Log a run near one of the standard distances and this fills in.</p></div>';
     else{
@@ -4464,23 +4467,23 @@ function runGroups(R,mode){
       const best=l.filter(r=>r.km&&r.mins).sort((a,b)=>(a.mins/a.km)-(b.mins/b.km))[0];
       out.push({k:t[0],label:t[1],colour:({easy:'var(--green)',recovery:'var(--green)',long:'#1E9BFF',
         tempo:'var(--amber)',interval:'var(--red)',hills:'var(--amber)',race:'var(--red)'})[t[0]],
-        sub:l.length+(l.length===1?' run · ':' runs · ')+s2.km+' km · avg '+s2.pace+(best?' · best '+paceStr(best.mins,best.km):''),runs:l})})}
+        sub:l.length+(l.length===1?' run · ':' runs · ')+udNum(s2.km)+' '+udUnit()+' · avg '+s2.pace+(best?' · best '+paceStr(best.mins,best.km):''),runs:l})})}
   else if(mode==='dist'){
-    const bands=[[0,5,'Under 5 km','var(--green)'],[5,10,'5 to 10 km','var(--green)'],
-      [10,16,'10 to 16 km','#1E9BFF'],[16,25,'16 to 25 km','var(--amber)'],[25,999,'Over 25 km','var(--red)']];
+    const bands=[[0,5,'Under '+udNum(5)+' '+udUnit(),'var(--green)'],[5,10,udNum(5)+' to '+udNum(10)+' '+udUnit(),'var(--green)'],
+      [10,16,udNum(10)+' to '+udNum(16)+' '+udUnit(),'#1E9BFF'],[16,25,udNum(16)+' to '+udNum(25)+' '+udUnit(),'var(--amber)'],[25,999,'Over '+udNum(25)+' '+udUnit(),'var(--red)']];
     bands.forEach(b=>{
       const l=list.filter(r=>r.km>=b[0]&&r.km<b[1]);if(!l.length)return;
       const s2=sum(l);
       const best=l.filter(r=>r.km&&r.mins).sort((a,b2)=>(a.mins/a.km)-(b2.mins/b2.km))[0];
       out.push({k:String(b[0]),label:b[2],colour:b[3],
-        sub:l.length+(l.length===1?' run · avg ':' runs · avg ')+s2.pace+(best?' · best '+paceStr(best.mins,best.km)+' over '+best.km+' km':''),runs:l})})}
+        sub:l.length+(l.length===1?' run · avg ':' runs · avg ')+s2.pace+(best?' · best '+paceStr(best.mins,best.km)+' over '+udNum(best.km)+' '+udUnit():''),runs:l})})}
   else if(mode==='week'){
     const by={};
     list.forEach(r=>{const w=weekRange(r.date+'T12:00');(by[w.key]=by[w.key]||{label:w.label,l:[]}).l.push(r)});
     Object.keys(by).sort().reverse().forEach(k=>{
       const s2=sum(by[k].l);
       out.push({k:k,label:by[k].label,colour:null,
-        sub:by[k].l.length+(by[k].l.length===1?' run · ':' runs · ')+s2.km+' km · '+Math.round(s2.mins)+' min'+(s2.pace?' · avg '+s2.pace:''),runs:by[k].l})})}
+        sub:by[k].l.length+(by[k].l.length===1?' run · ':' runs · ')+udNum(s2.km)+' '+udUnit()+' · '+Math.round(s2.mins)+' min'+(s2.pace?' · avg '+s2.pace:''),runs:by[k].l})})}
   else{
     const by={};
     list.forEach(r=>{const k=r.date.slice(0,7);
@@ -4490,7 +4493,7 @@ function runGroups(R,mode){
       const s2=sum(by[k].l);
       const longest=by[k].l.reduce((a,r)=>r.km>a.km?r:a,by[k].l[0]);
       out.push({k:k,label:by[k].label,colour:null,
-        sub:s2.km+' km · '+by[k].l.length+(by[k].l.length===1?' run':' runs')+(s2.pace?' · avg '+s2.pace:'')+' · longest '+longest.km+' km',runs:by[k].l})})}
+        sub:udNum(s2.km)+' '+udUnit()+' · '+by[k].l.length+(by[k].l.length===1?' run':' runs')+(s2.pace?' · avg '+s2.pace:'')+' · longest '+udNum(longest.km)+' '+udUnit(),runs:by[k].l})})}
   return out}
 function runRow(r){
   const open=!!S.openSec['run:'+r.id];
@@ -4522,10 +4525,10 @@ function runRow(r){
 function rpDescBuild(km,freq,days,pace,down){
   const half=x=>Math.max(1,Math.round(x*2)/2);
   if(down){const each=half(km/freq);
-    return days.map(d=>d+' '+each+' km easy').join(' \u00b7 ')+' \u2014 down week on purpose (~'+km+' km, no long run); the adaptation happens here.'}
+    return days.map(d=>d+' '+udNum(each)+' '+udUnit()+' easy').join(' \u00b7 ')+' \u2014 down week on purpose (~'+udNum(km)+' '+udUnit()+', no long run); the adaptation happens here.'}
   const lng=half(km*0.38),each=half((km-lng)/Math.max(1,freq-1));
-  return days.map((d,i)=>i===days.length-1?(d+' '+lng+' km long'):(d+' '+each+' km easy')).join(' \u00b7 ')+
-    ' \u2014 ~'+km+' km'+(pace?', all around '+pace+'/km':'')+'.'}
+  return days.map((d,i)=>i===days.length-1?(d+' '+udNum(lng)+' '+udUnit()+' long'):(d+' '+udNum(each)+' '+udUnit()+' easy')).join(' \u00b7 ')+
+    ' \u2014 ~'+udNum(km)+' '+udUnit()+(pace?', all around '+pace+'/'+udUnit():'')+'.'}
 function runPlanScratch(freq,comfort){
   /* no history to read: build from the honest floor instead. comfort is
      'walkrun' or the km they can run comfortably today. */
@@ -4582,11 +4585,11 @@ function runPlanAdjust(){
     // the week did not happen: the plan waits instead of piling on
     const d2=new Date(rp.started+'T12:00');d2.setDate(d2.getDate()+7);
     rp.started=dayKey(d2);
-    why='Week '+(wk-1)+' saw '+actual+' of ~'+planned+' km \u2014 the plan waits and runs that week again. No punishment, just sequence.';
+    why='Week '+(wk-1)+' saw '+udNum(actual)+' of ~'+udNum(planned)+' '+udUnit()+' \u2014 the plan waits and runs that week again. No punishment, just sequence.';
   }else if((a!=null&&a>1.3)||actual>planned*1.5){
     rp.items.forEach(i=>{if(+i.week>=wk&&i.km!=null){i.km=Math.max(3,Math.round(i.km*0.9));
       i.desc=rpDescBuild(i.km,rp.freq||3,rp.days||['Mon','Wed','Sat'],rp.pace||null,!!i.down)}});
-    why='Load ran ahead of the plan ('+actual+' km vs ~'+planned+') \u2014 the remaining weeks eased 10% to keep the 0.8\u20131.3 band.';
+    why='Load ran ahead of the plan ('+udNum(actual)+' '+udUnit()+' vs ~'+udNum(planned)+') \u2014 the remaining weeks eased 10% to keep the 0.8\u20131.3 band.';
   }
   rp.adjWk=wk;
   if(why){rp.adjLog=(rp.adjLog||[]).slice(-5);rp.adjLog.push({wk:wk,why:why});}
@@ -4626,10 +4629,10 @@ function runPlanNudge(){
     s.km=Math.max(0,v)});
   const newTotal=remaining.reduce((a,s)=>a+s.km,0);
   const shortfall=Math.round((need-newTotal)*10)/10;
-  const daysTxt=remaining.map(s=>s.d+' '+s.km+' km '+(s.kind==='long'?'long':s.kind)).join(' · ');
+  const daysTxt=remaining.map(s=>s.d+' '+udNum(s.km)+' '+udUnit()+' '+(s.kind==='long'?'long':s.kind)).join(' · ');
   rp.weekAdj={wk:wk,at:today(),
     note:'Rebalanced after your last run: '+daysTxt+'.'+
-      (shortfall>1.5?' Still ~'+shortfall+' km short of the week — that is fine; the plan holds rather than cramming, and next week picks up from reality.':'')+
+      (shortfall>1.5?' Still ~'+udNum(shortfall)+' '+udUnit()+' short of the week — that is fine; the plan holds rather than cramming, and next week picks up from reality.':'')+
       (shortfall<-1.5?' You are ahead of the week — the remaining days eased so the load band holds.':'')};
   lset('training-runplan-v1',rp);S.runplan=rp;
   return rp.weekAdj.note}catch(e){return null}}
@@ -4956,11 +4959,11 @@ function viewPoints(){
     '<div class="card mt" style="padding:6px 16px">'+
     [['Trunk',tr.sessions+' sessions'],
      ['Branches',tr.liftCount+' different lifts'],
-     ['Leaves',Math.min(220,20+Math.round(tr.pts/9))+' from '+tr.pts.toLocaleString()+' data points'],
+     ['Leaves',Math.min(900,20+Math.round(tr.pts/7))+' from '+tr.pts.toLocaleString()+' data points'],
      ['Blossom',tr.rare+' rare find'+(tr.rare===1?'':'s')],
      ['Roots',tr.weeks+' week'+(tr.weeks===1?'':'s')+' of consistency'],
      ['Season',treeSeason().name],
-     tr.runs?['The river',tr.km+' km run']:null].filter(Boolean)
+     tr.runs?['The river',udStr(tr.km)+' run']:null].filter(Boolean)
      .map((x,i)=>'<div style="display:flex;justify-content:space-between;align-items:baseline;padding:10px 0'+(i?';border-top:1px solid var(--line)':'')+'">'+
        '<span style="font-size:12.5px;color:var(--dim)">'+esc(x[0])+'</span>'+
        '<span class="mono" style="font-size:12px">'+esc(x[1])+'</span></div>').join('')+'</div>'+
@@ -5324,8 +5327,8 @@ function nextBlock(){
       if(st.w!=null){
         st.w=Math.max(0,Math.round((st.w+a)/1.25)*1.25); // bake in what you actually lift now
         if(!stalled&&st.rpe!=null&&!ex.warmup)st.w=Math.round((st.w+2.5)/1.25)*1.25*10/10}}));
-    if(a)changes.push(ex.name.replace(/ — .*/,'')+': carried your '+(a>0?'+':'')+a+' kg adjustment into the base');
-    if(stalled)changes.push(ex.name.replace(/ — .*/,'')+': stalled ('+vel+' kg/wk) — held at current load to consolidate');
+    if(a)changes.push(ex.name.replace(/ — .*/,'')+': carried your '+(a>0?'+':'')+uwNum(a)+' '+uwUnit()+' adjustment into the base');
+    if(stalled)changes.push(ex.name.replace(/ — .*/,'')+': stalled ('+uwNum(vel)+' '+uwUnit()+'/wk) — held at current load to consolidate');
   }));
   // balance: one extra set for clearly low muscles that appear in the program, trim one for high
   const tag=(ex)=>MUSCLE_RULES.filter(r=>r[1].test(ex.name)).map(r=>r[0]);
@@ -6320,12 +6323,12 @@ function discoveries(){
     const recent=l[l.length-1];
     if(best===recent&&l.length>=5)
       add('rare','New best on '+b,'Your last set of '+b+' was the strongest you have logged — '+
-        Math.round(best.e)+' kg estimated max, past a previous best of '+
-        Math.round(l.slice(0,-1).reduce((a,c)=>Math.max(a,c.e),0))+' kg.','record');
+        uwNum(Math.round(best.e))+' '+uwUnit()+' estimated max, past a previous best of '+
+        uwNum(Math.round(l.slice(0,-1).reduce((a,c)=>Math.max(a,c.e),0)))+' '+uwUnit()+'.','record');
     // heaviest weight regardless of reps
     const hw=l.reduce((a,c)=>c.l.w>a.l.w?c:a,l[0]);
     if(hw.l.w>=100&&hw.l.w%20===0)
-      add('uncommon',b+' at '+hw.l.w+' kg','A round number worth noting. '+hw.l.r+' reps at '+hw.l.w+' kg on '+fmtDate(hw.h.date)+'.','round');
+      add('uncommon',b+' at '+uwNum(hw.l.w)+' '+uwUnit(),'A round number worth noting. '+hw.l.r+' reps at '+uwNum(hw.l.w)+' '+uwUnit()+' on '+fmtDate(hw.h.date)+'.','round');
     // most reps at a given weight
     const byW={};l.forEach(x=>{(byW[x.l.w]=byW[x.l.w]||[]).push(x.l.r)});
     {let bestGain=null;
@@ -6334,14 +6337,14 @@ function discoveries(){
        if(rs[rs.length-1]!==Math.max.apply(null,rs)||rs[rs.length-1]<=rs[0])return;
        const gain=rs[rs.length-1]-rs[0];
        if(!bestGain||gain>bestGain.gain)bestGain={w:w,from:rs[0],to:rs[rs.length-1],gain:gain}});
-     if(bestGain)add('uncommon','More reps at '+Math.round(bestGain.w)+' kg on '+b,
+     if(bestGain)add('uncommon','More reps at '+uwNum(Math.round(bestGain.w))+' '+uwUnit()+' on '+b,
        'You got '+bestGain.to+' where you used to get '+bestGain.from+
        '. Same weight, more work — that is progress that does not show up on the bar.','reps')}
     // bodyweight ratio
     if(bw&&best.l.w>=bw&&/^(back |front |high-bar |low-bar )?squat|^bench|^deadlift|romanian|overhead press|barbell row/i.test(b)&&!/leg press|machine|hack|smith/i.test(b)){
       const r=Math.round(best.l.w/bw*100)/100;
       if(r>=1)add(r>=1.5?'epic':'rare',b+' at '+r+'× bodyweight',
-        Math.round(best.l.w)+' kg against '+bw+' kg. Ratios travel better than absolute numbers — this one holds up wherever you take it.','ratio')}
+        uwNum(Math.round(best.l.w))+' '+uwUnit()+' against '+uwNum(bw)+' '+uwUnit()+'. Ratios travel better than absolute numbers — this one holds up wherever you take it.','ratio')}
   });
 
   /* ── session records ── */
@@ -6438,8 +6441,8 @@ function discoveries(){
   try{const sc=scansSorted();
     if(sc.length>=2){const d=scanDelta(sc[0],sc[sc.length-1]);
       if(d.smm>0.5&&d.fm<-0.5)add('epic','Muscle up, fat down',
-        'Skeletal muscle '+(d.smm>0?'+':'')+d.smm+' kg while fat mass '+d.fm+' kg. Doing both at once is the hardest outcome to get.','body');
-      else if(d.smm>1)add('rare','+'+d.smm+' kg of muscle','Since your first scan. That is the number that actually matters.','body')}}catch(e){}
+        'Skeletal muscle '+(d.smm>0?'+':'')+uwNum(d.smm)+' '+uwUnit()+' while fat mass '+uwNum(d.fm)+' '+uwUnit()+'. Doing both at once is the hardest outcome to get.','body');
+      else if(d.smm>1)add('rare','+'+uwNum(d.smm)+' '+uwUnit()+' of muscle','Since your first scan. That is the number that actually matters.','body')}}catch(e){}
 
   /* ── rehab ── */
   try{const q=((S.acl&&S.acl.tests)||[]).filter(t=>t.kind==='quad');
@@ -6482,7 +6485,7 @@ function discoveries(){
       if(new Set(l.map(x=>x.h.id)).size<2)continue;
       const startW=l[0].l.w,endW=l[l.length-1].l.w;
       if(endW>startW){add('uncommon','First weight increase',
-        esc(b)+' has gone from '+startW+' kg to '+endW+' kg. That is the whole game, repeated.','first-up');break}}
+        esc(b)+' has gone from '+uwNum(startW)+' to '+uwNum(endW)+' '+uwUnit()+'. That is the whole game, repeated.','first-up');break}}
     // first full week
     if(dates.length>=3){
       const wk={};H.forEach(h=>{wk[isoWeek(h.date)]=(wk[isoWeek(h.date)]||0)+1});
@@ -6521,7 +6524,7 @@ function discoveries(){
     const best=ks.sort((x,y)=>avg(y)-avg(x))[0],worst=ks[ks.length-1];
     if(avg(best)-avg(worst)>1.5)
       add('rare',b+' likes '+best+' days of rest',
-        'When you come back to '+b+' after '+best+' days it moves up by '+(Math.round(avg(best)*10)/10)+' kg est-max on average; after '+worst+' days it averages '+(Math.round(avg(worst)*10)/10)+' kg. Your recovery has a shape \u2014 this is it.','obscure')})}catch(e){}
+        'When you come back to '+b+' after '+best+' days it moves up by '+uwNum(Math.round(avg(best)*10)/10)+' '+uwUnit()+' est-max on average; after '+worst+' days it averages '+uwNum(Math.round(avg(worst)*10)/10)+' '+uwUnit()+'. Your recovery has a shape \u2014 this is it.','obscure')})}catch(e){}
   // set-order fade: where in an exercise your reps actually die
   try{const bySet={};
     H.forEach(h=>h.log.forEach(l=>{if(!(l.r>0)||l.secs)return;
@@ -6906,7 +6909,7 @@ function restPool(){
     let top=null;
     H.forEach(h=>h.log.forEach(l=>{if(!l.w||!l.r)return;const e=e1rm(l.w,l.r);
       if(!top||e>top.e)top={e:e,ex:gBase(l.ex),w:l.w,r:l.r,d:h.date.slice(0,10)}}));
-    if(top)add('Your best set ever is still '+top.w+' kg × '+top.r+' on '+top.ex+', from '+fmtDate(top.d+'T12:00')+'. It is waiting.','nav','progress')}catch(e){}
+    if(top)add('Your best set ever is still '+uwNum(top.w)+' '+uwUnit()+' × '+top.r+' on '+top.ex+', from '+fmtDate(top.d+'T12:00')+'. It is waiting.','nav','progress')}catch(e){}
   try{ // readiness week vs baseline
     if(S.gar&&S.gar.on){const days=S.gar.days||{},ks=Object.keys(days).filter(k=>days[k].am!=null).sort();
       if(ks.length>=10){const last7=ks.slice(-7).map(k=>days[k].am),rest=ks.slice(0,-7).map(k=>days[k].am);
@@ -6919,18 +6922,18 @@ function restPool(){
       const rec=ks.filter(k=>k>=cut).map(k=>dd[k].bw),old=ks.filter(k=>k<cut).map(k=>dd[k].bw);
       if(rec.length>=3&&old.length>=3){
         const a=rec.reduce((x,y)=>x+y,0)/rec.length,b=old.reduce((x,y)=>x+y,0)/old.length,df=a-b;
-        add('Bodyweight is '+(Math.abs(df)<0.4?'holding steady at '+(Math.round(a*10)/10)+' kg over the fortnight.':(df>0?'up ':'down ')+(Math.round(Math.abs(df)*10)/10)+' kg over the fortnight — '+(Math.round(a*10)/10)+' kg now.'),'nav','progress')}}}catch(e){}
+        add('Bodyweight is '+(Math.abs(df)<0.4?'holding steady at '+uwNum(Math.round(a*10)/10)+' '+uwUnit()+' over the fortnight.':(df>0?'up ':'down ')+uwNum(Math.round(Math.abs(df)*10)/10)+' '+uwUnit()+' over the fortnight — '+uwNum(Math.round(a*10)/10)+' '+uwUnit()+' now.'),'nav','progress')}}}catch(e){}
   try{ // running pace
     if(S.runOn&&(S.runs||[]).length>=6){const rs=S.runs.filter(r=>paceMin(r)).sort((a,b)=>a.date.localeCompare(b.date));
       if(rs.length>=6){const last=paceMin(rs[rs.length-1]),avg=rs.slice(0,-1).reduce((a,r)=>a+paceMin(r),0)/(rs.length-1);
         const f=p=>Math.floor(p)+':'+String(Math.round((p%1)*60)).padStart(2,'0');
-        add('Your last run went at '+f(last)+'/km against a '+f(avg)+' average. '+(last<avg?'Fitness moving the right way.':'Slower is fine — most runs should be.'),'nav','run')}}}catch(e){}
+        add('Your last run went at '+f(last)+'/'+udUnit()+' against a '+f(avg)+' average. '+(last<avg?'Fitness moving the right way.':'Slower is fine — most runs should be.'),'nav','run')}}}catch(e){}
   try{ // month km
     if(S.runOn){const ym=today().slice(0,7);
       const pm=(function(){const d=new Date();d.setMonth(d.getMonth()-1);return dayKey(d).slice(0,7)})();
       const sum=m=>Math.round((S.runs||[]).filter(r=>(r.date||'').slice(0,7)===m).reduce((a,r)=>a+(r.km||0),0));
       const cur=sum(ym),prev=sum(pm);
-      if(cur&&prev)add(cur+' km so far this month; '+prev+' km in the whole of last month.','nav','run')}}catch(e){}
+      if(cur&&prev)add(udNum(cur)+' '+udUnit()+' so far this month; '+udNum(prev)+' '+udUnit()+' in the whole of last month.','nav','run')}}catch(e){}
   try{ // a find worth re-reading
     const l=bankList().filter(x=>x.rar==='rare'||x.rar==='epic');
     if(l.length)add('From your collection: "'+l[0].t+'" — '+l[0].d,'collOpen','','Open the collection')}catch(e){}
@@ -7141,7 +7144,7 @@ function questGen(wk){
      return ga-gb||best[b].w-best[a].w});
    if(names.length){const n=names[0],b=best[n];
      C.push({k:'reps',t:'One more rep on '+n,
-       d:'Your best set lately is '+b.w+' kg for '+b.r+'. One set of '+(b.r+1)+' at the same weight takes it. Any session this week counts.',
+       d:'Your best set lately is '+uwNum(b.w)+' '+uwUnit()+' for '+b.r+'. One set of '+(b.r+1)+' at the same weight takes it. Any session this week counts.',
        ex:n,w:b.w,r:b.r+1,target:1,
        basis:{what:'best recent set on '+n+' ('+b.w+'×'+b.r+')',proven:e1rm(b.w,b.r),target:e1rm(b.w,b.r+1)}})}}
   // 2. as many sessions as your best week — capped at what the plan asks for
@@ -7162,8 +7165,8 @@ function questGen(wk){
    if(vals.length>=2){const bestKm=Math.max.apply(null,vals);
      if(bestKm>=8){
        const target=Math.max(Math.floor(bestKm),Math.min(Math.round(bestKm*1.04),Math.floor(bestKm*1.05)));
-       C.push({k:'runkm',t:'Run '+target+' km this week',
-         d:'Your biggest week so far is '+(Math.round(bestKm*10)/10)+' km. This matches it, or nudges just past. Spread it however you like.',
+       C.push({k:'runkm',t:'Run '+udNum(target)+' '+udUnit()+' this week',
+         d:'Your biggest week so far is '+udNum(Math.round(bestKm*10)/10)+' '+udUnit()+'. This matches it, or nudges just past. Spread it however you like.',
          target:target,basis:{what:'biggest running week',proven:bestKm,target:target}})}}}
   // 4. log mornings — only as many as you have already managed in a week
   if(S.gar&&S.gar.on){const byWk={};
@@ -7295,7 +7298,7 @@ function dailyBrief(){
           if(left>0.5&&isLongDay){
             const lng=Math.max(2,Math.round(it.km*0.38*2)/2);
             out.push({tag:'RUN',a:'nav',v:'run',
-              line:'The long one: ~'+Math.min(lng,Math.max(2,left))+' km easy \u2014 the week\u2019s anchor, legs at '+Math.round(leg)+'%'})}
+              line:'The long one: ~'+udNum(Math.min(lng,Math.max(2,left)))+' '+udUnit()+' easy \u2014 the week\u2019s anchor, legs at '+Math.round(leg)+'%'})}
           else if(left>0.5&&isRunDay){
             const chunk=Math.max(2,Math.round(Math.min(left,it.km/(rp.freq||3))*2)/2);
             out.push({tag:'RUN',a:'nav',v:'run',
@@ -8328,8 +8331,8 @@ function viewReview(){
     good.forEach(x=>{h+='<div class="card" style="padding:13px 15px;border-color:var(--green)">'+
       '<div style="display:flex;justify-content:space-between;gap:10px;align-items:baseline">'+
       '<span style="font-size:14px;font-weight:600">'+esc(x.ex)+'</span>'+
-      '<span class="mono" style="color:var(--green);font-size:12px">+'+Math.round(x.d)+' kg e1RM</span></div>'+
-      '<p class="mono" style="color:var(--faint);font-size:10.5px;margin-top:3px">'+Math.round(x.from)+' → '+Math.round(x.to)+' kg · '+x.n+' sets · '+x.pct.toFixed(1)+'%</p></div>'});
+      '<span class="mono" style="color:var(--green);font-size:12px">+'+uwNum(Math.round(x.d))+' '+uwUnit()+' e1RM</span></div>'+
+      '<p class="mono" style="color:var(--faint);font-size:10.5px;margin-top:3px">'+uwNum(Math.round(x.from))+' → '+uwNum(Math.round(x.to))+' '+uwUnit()+' · '+x.n+' sets · '+x.pct.toFixed(1)+'%</p></div>'});
     h+='</div>'}
   const strug=st.worst;
   if(strug.length||st.cut.length){
@@ -8341,7 +8344,7 @@ function viewReview(){
       h+='<div class="card" style="padding:13px 15px;border-color:var(--amber)">'+
         '<div style="display:flex;justify-content:space-between;gap:10px;align-items:baseline">'+
         '<span style="font-size:14px;font-weight:600">'+esc(x.ex)+'</span>'+
-        '<span class="mono" style="color:'+(x.d<0?'var(--red)':'var(--faint)')+';font-size:12px">'+(x.d>=0?'+':'')+Math.round(x.d)+' kg</span></div>'+
+        '<span class="mono" style="color:'+(x.d<0?'var(--red)':'var(--faint)')+';font-size:12px">'+(x.d>=0?'+':'')+uwNum(Math.round(x.d))+' '+uwUnit()+'</span></div>'+
         '<p style="color:var(--dim);font-size:12px;line-height:1.5;margin-top:4px">'+esc(why)+'</p></div>'});
     if(st.cut.length)h+='<div class="card" style="padding:13px 15px"><p style="color:var(--dim);font-size:12.5px;line-height:1.55">'+
       st.cut.length+' exercise'+(st.cut.length===1?'':'s')+' had load taken off mid-block ('+st.cut.slice(0,3).map(x=>x.replace(/ — .*/,'')).join(', ')+'). That is the system working — but if it keeps happening, the starting loads were too ambitious.</p></div>';
@@ -8479,7 +8482,7 @@ function demoClear(){
 /* ══ view pieces ════════════════════════════════════════ */
 function plateHtml(w){const{ok,list}=platesFor(w);
   if(!S.lay.plates)return '';
-  if(!list.length)return '<p class="eyebrow" style="text-align:center;margin-top:10px">'+(ok?'Empty bar · '+BAR+' kg':"Can't load exactly")+'</p>';
+  if(!list.length)return '<p class="eyebrow" style="text-align:center;margin-top:10px">'+(ok?'Empty bar · '+uwNum(BAR)+' '+uwUnit():"Can't load exactly")+'</p>';
   const tall=Math.max.apply(null,list.map(p=>p.h));
   return '<div style="display:flex;align-items:center;justify-content:center;gap:3px;height:'+(tall+14)+'px">'+
       '<div style="width:40px;height:7px;background:linear-gradient(180deg,#A29B90,#6E6860);border-radius:2px;flex:none"></div>'+
@@ -8489,7 +8492,7 @@ function plateHtml(w){const{ok,list}=platesFor(w);
     '<div style="display:flex;flex-wrap:wrap;justify-content:center;gap:5px;margin-top:10px">'+
       list.map(p=>'<span class="mono" style="display:inline-flex;align-items:center;gap:5px;font-size:10.5px;color:var(--dim);border:1px solid var(--line);border-radius:20px;padding:2px 8px">'+
         '<span style="width:7px;height:7px;border-radius:2px;background:'+p.c+'"></span>'+p.kg+'</span>').join('')+'</div>'+
-    '<p class="eyebrow" style="text-align:center;margin-top:8px">'+(ok?'Per side · '+BAR+' kg bar':"Can't load exactly")+'</p>'}
+    '<p class="eyebrow" style="text-align:center;margin-top:8px">'+(ok?'Per side · '+uwNum(BAR)+' '+uwUnit()+' bar':"Can't load exactly")+'</p>'}
 function stepper(key,label,val,step,suffix){
   return '<div style="min-width:0">'+(label?'<p style="color:var(--dim);font-size:11px;letter-spacing:.1em;text-transform:uppercase;margin-bottom:8px">'+label+'</p>':'')+
    '<div class="step"><button data-a="bump" data-k="'+key+'" data-d="-'+step+'">−</button>'+
@@ -9485,7 +9488,7 @@ function deepContext(){
      if(easy.length>=6){
        const p0=easy.slice(0,3).map(r=>r.mins/r.km),p1=easy.slice(-3).map(r=>r.mins/r.km);
        const m0=p0.reduce((x,y)=>x+y,0)/p0.length,m1=p1.reduce((x,y)=>x+y,0)/p1.length;
-       L.push('Easy pace drift: first-3 '+paceStr(m0,1)+'/km vs last-3 '+paceStr(m1,1)+'/km')}}}
+       L.push('Easy pace drift: first-3 '+paceStr(m0,1)+' vs last-3 '+paceStr(m1,1)+')')}}}
   return L.join('\n')}
 const DEEP_SYS='You are the analysis engine of a training app. You receive condensed weekly training data. '+
 'Find 2-4 NON-OBVIOUS findings: relationships BETWEEN signals (readiness vs load vs performance vs pain vs timing, and LIFTING vs RUNNING — km near leg work, pace vs tonnage weeks), lags, thresholds, divergences. '+
@@ -9856,7 +9859,7 @@ function viewSession(){
     if(nx)h+='<div style="text-align:center;margin-top:28px"><p class="eyebrow">Up next</p>'+
       '<p class="disp" style="font-size:17px;font-weight:600;margin-top:4px">'+esc(nx.ex)+'</p>'+
       '<p class="mono" style="color:var(--dim);font-size:14px;margin-top:4px;padding:0 8px">Set '+nx.setNo+' · '+
-      (nx.secs?nx.secs+'s hold'+(nx.perSide?' / side':''):(nx.targetW!=null?nx.targetW+' kg ':'')+'× '+nx.targetReps+(nx.targetRpe!=null?' @ RPE '+nx.targetRpe:''))+'</p>'+
+      (nx.secs?nx.secs+'s hold'+(nx.perSide?' / side':''):(nx.targetW!=null?uwNum(nx.targetW)+' '+uwUnit()+' ':'')+'× '+nx.targetReps+(nx.targetRpe!=null?' @ RPE '+nx.targetRpe:''))+'</p>'+
       muscleChips(nx.ex)+'</div>';
     {const plan=A.exPlan(),curNo=s.sets[Math.min(s.idx,s.sets.length-1)].exNo;
      const remain=plan.filter(e=>e.done<e.sets.length);
@@ -9914,7 +9917,7 @@ function viewSession(){
       (last?'<p class="mono" style="font-size:12px;color:var(--faint);margin-top:4px">'+((last.week&&last.week!==s.week)?'WEEK '+last.week:'LAST')+' '+esc(entryStr(last))+'</p>':'');
   }else{
     body+='<p class="eyebrow">Target</p>'+
-    '<div style="display:flex;align-items:baseline;gap:8px;row-gap:2px;margin-top:6px;flex-wrap:wrap">'+targetStr(cur)+'</div>'+(cur.adj?'<p class="mono" style="color:var(--amber);font-size:10.5px;margin-top:3px">'+(cur.adj>0?'+':'')+cur.adj+' kg — adjusted from your logs</p>':'')+
+    '<div style="display:flex;align-items:baseline;gap:8px;row-gap:2px;margin-top:6px;flex-wrap:wrap">'+targetStr(cur)+'</div>'+(cur.adj?'<p class="mono" style="color:var(--amber);font-size:10.5px;margin-top:3px">'+(cur.adj>0?'+':'')+uwNum(cur.adj)+' '+uwUnit()+' — adjusted from your logs</p>':'')+
     (cur.targetRpe!=null?'<p class="mono" style="color:'+acc+';font-size:12.5px;font-weight:600;margin-top:6px">RPE '+cur.targetRpe+
       (rir(cur.targetRpe)!==null?'<span style="color:var(--faint);font-weight:400"> · '+(rir(cur.targetRpe)===0?'nothing left':rir(cur.targetRpe)+' reps in reserve')+'</span>':'')+'</p>':'');
     if(last){const dw=(last.week&&last.week!==s.week)?'WEEK '+last.week:'LAST TIME';
@@ -10067,7 +10070,7 @@ function liftChart(ex,goal){
       const x=rightBusy?P:(W-P),anchor=rightBusy?'start':'end';
       const above=Y(target)>26;
       const y=above?(Y(target)-6):(Y(target)+13);
-      return '<text x="'+x+'" y="'+y.toFixed(1)+'" text-anchor="'+anchor+'" class="mono" style="fill:var(--amber);font-size:10px">'+Math.round(target)+' kg goal</text>'})();
+      return '<text x="'+x+'" y="'+y.toFixed(1)+'" text-anchor="'+anchor+'" class="mono" style="fill:var(--amber);font-size:10px">'+uwNum(Math.round(target))+' '+uwUnit()+' goal</text>'})();
   g+='<path d="'+pts.map((p,i)=>(i?'L':'M')+X(p.t).toFixed(1)+','+Y(p.v).toFixed(1)).join(' ')+'" stroke-linejoin="round" style="fill:none;stroke:#1E9BFF;stroke-width:2.4"/>';
   pts.forEach(p=>{g+='<circle cx="'+X(p.t).toFixed(1)+'" cy="'+Y(p.v).toFixed(1)+'" r="3" style="fill:#1E9BFF"/>'});
   if(projT){g+='<line x1="'+X(last.t).toFixed(1)+'" y1="'+Y(last.v).toFixed(1)+'" x2="'+X(projT).toFixed(1)+'" y2="'+Y(target).toFixed(1)+'" stroke-linecap="round" style="stroke:var(--dim);stroke-width:2;stroke-dasharray:2 6"/>'+
@@ -10087,8 +10090,8 @@ function liftChart(ex,goal){
       const xa=i===0?P:last?(W-P):x;
       return '<line x1="'+xa.toFixed(1)+'" x2="'+xa.toFixed(1)+'" y1="'+(H-P+2)+'" y2="'+(H-P+6)+'" stroke="var(--line)" stroke-width="1"/>'+
         '<text x="'+xa.toFixed(1)+'" y="'+(H-2)+'" text-anchor="'+anchor+'" class="mono" style="fill:var(--faint);font-size:9px">'+fmtShort(t)+'</text>'}).join('')}
-  const scrub=pts.map(p=>({x:+X(p.t).toFixed(1),v:Math.round(p.v*10)/10,d:dayKey(new Date(p.t))}));
-  return '<div data-scrub=\''+JSON.stringify(scrub)+'\' data-vb="'+W+'" data-suffix=" kg" style="position:relative">'+g+'</svg></div>'}
+  const scrub=pts.map(p=>({x:+X(p.t).toFixed(1),v:uwNum(Math.round(p.v*10)/10),d:dayKey(new Date(p.t))}));
+  return '<div data-scrub=\''+JSON.stringify(scrub)+'\' data-vb="'+W+'" data-suffix=" '+uwUnit()+'" style="position:relative">'+g+'</svg></div>'}
 function lineChart(pts,opts){
   if(!pts||pts.length<2)return '';
   opts=opts||{};
@@ -10200,16 +10203,16 @@ function chartFindings(kind,ex){
     const first=pts[0],last=pts[pts.length-1];
     const wks=Math.max(1,Math.round((last.t-first.t)/6048e5));
     const d=last.v-first.v,perWk=d/wks;
-    add(d>=0?'Up '+Math.round(d)+' kg in '+wks+' weeks':'Down '+Math.round(Math.abs(d))+' kg in '+wks+' weeks',
-      Math.round(first.v)+' → '+Math.round(last.v)+' kg estimated 1RM, about '+(perWk>=0?'+':'')+(Math.round(perWk*10)/10)+' kg a week.',
+    add(d>=0?'Up '+uwNum(Math.round(d))+' '+uwUnit()+' in '+wks+' weeks':'Down '+uwNum(Math.round(Math.abs(d)))+' '+uwUnit()+' in '+wks+' weeks',
+      uwNum(Math.round(first.v))+' → '+uwNum(Math.round(last.v))+' '+uwUnit()+' estimated 1RM, about '+(perWk>=0?'+':'')+uwNum(Math.round(perWk*10)/10)+' '+uwUnit()+' a week.',
       d>0?'good':d<0?'warn':'ok');
     const best=pts.reduce((a,p)=>p.v>a.v?p:a,pts[0]);
-    if(best!==last)add('Peak was '+fmtD(best.t),'Your best estimated 1RM was '+Math.round(best.v)+' kg — you are '+Math.round(best.v-last.v)+' kg under it now.','warn');
+    if(best!==last)add('Peak was '+fmtD(best.t),'Your best estimated 1RM was '+uwNum(Math.round(best.v))+' '+uwUnit()+' — you are '+uwNum(Math.round(best.v-last.v))+' '+uwUnit()+' under it now.','warn');
     // plateau detection
     const recent=pts.filter(p=>Date.now()-p.t<28*864e5);
     if(recent.length>=3){
       const rd=recent[recent.length-1].v-recent[0].v;
-      if(Math.abs(rd)<2.5)add('Flat for four weeks','Estimated 1RM has moved '+(rd>=0?'+':'')+Math.round(rd)+' kg across '+recent.length+' sessions. That is a plateau, not noise.','warn')}
+      if(Math.abs(rd)<2.5)add('Flat for four weeks','Estimated 1RM has moved '+(rd>=0?'+':'')+uwNum(Math.round(rd))+' '+uwUnit()+' across '+recent.length+' sessions. That is a plateau, not noise.','warn')}
     // effort context
     const rows=[];S.history.forEach(h=>h.log.forEach(l=>{if(!l.w||!l.r)return;
       if(gBase(l.ex).toLowerCase()!==String(ex).toLowerCase()&&l.ex!==ex)return;
@@ -10239,23 +10242,23 @@ function chartFindings(kind,ex){
     const first=S.daily.days[days[0]].bw,last=S.daily.days[days[days.length-1]].bw;
     const wks=Math.max(1,Math.round((new Date(days[days.length-1])-new Date(days[0]))/6048e5));
     const rate=(last-first)/wks;
-    add((last>first?'Up ':'Down ')+Math.abs(Math.round((last-first)*10)/10)+' kg over '+wks+' weeks',
-      (Math.round(rate*100)/100)+' kg a week. Around 0.25–0.5% of bodyweight a week is the usual range for gaining or losing without dragging performance down.',
+    add((last>first?'Up ':'Down ')+uwNum(Math.abs(Math.round((last-first)*10)/10))+' '+uwUnit()+' over '+wks+' weeks',
+      uwNum(Math.round(rate*100)/100)+' '+uwUnit()+' a week. Around 0.25–0.5% of bodyweight a week is the usual range for gaining or losing without dragging performance down.',
       Math.abs(rate)>0.9?'warn':'good');
     const recent=days.slice(-7).map(k=>S.daily.days[k].bw);
     if(recent.length>=5){const rMin=Math.min.apply(null,recent),rMax=Math.max.apply(null,recent);
-      add('Day-to-day swing '+(Math.round((rMax-rMin)*10)/10)+' kg','That is water, food and salt, not tissue. Judge the direction over weeks.','ok')}
+      add('Day-to-day swing '+uwNum(Math.round((rMax-rMin)*10)/10)+' '+uwUnit(),'That is water, food and salt, not tissue. Judge the direction over weeks.','ok')}
   }
   if(kind==='scan'){
     const l=scansSorted();if(l.length<2)return F;
     const d=scanDelta(l[0],l[l.length-1]);
     const good=(d.smm>0&&d.fm<=0);
     add(good?'Recomposition':'Direction of travel',
-      'Muscle '+(d.smm>0?'+':'')+d.smm+' kg, fat '+(d.fm>0?'+':'')+d.fm+' kg, weight '+(d.w>0?'+':'')+d.w+' kg since '+fmtD(l[0].date+'T12:00')+'.'+
+      'Muscle '+(d.smm>0?'+':'')+uwNum(d.smm)+' '+uwUnit()+', fat '+(d.fm>0?'+':'')+uwNum(d.fm)+' '+uwUnit()+', weight '+(d.w>0?'+':'')+uwNum(d.w)+' '+uwUnit()+' since '+fmtD(l[0].date+'T12:00')+'.'+
       (good?' Muscle up with fat down is the outcome most people want and rarely get.':d.smm<0?' Losing muscle — worth checking protein and whether training volume dropped.':''),
       good?'good':d.smm<0?'warn':'ok');
     const last2=l.length>=3?scanDelta(l[l.length-2],l[l.length-1]):null;
-    if(last2)add('Most recent scan','Since the previous one: muscle '+(last2.smm>0?'+':'')+last2.smm+' kg, fat '+(last2.fm>0?'+':'')+last2.fm+' kg. One scan of movement is inside the error of the device — two in the same direction is a trend.','ok');
+    if(last2)add('Most recent scan','Since the previous one: muscle '+(last2.smm>0?'+':'')+uwNum(last2.smm)+' '+uwUnit()+', fat '+(last2.fm>0?'+':'')+uwNum(last2.fm)+' '+uwUnit()+'. One scan of movement is inside the error of the device — two in the same direction is a trend.','ok');
   }
   if(kind==='bb'){
     const ks=Object.keys(S.gar.days||{}).sort();
@@ -10341,9 +10344,9 @@ function crossPatterns(){
     const wks=Math.max(1,Math.round((new Date(days[days.length-1])-new Date(days[0]))/6048e5));
     const rate=(l-f)/wks;
     if(rate<-0.3&&stalled.length)out.push({src:['bw','trends'],t:'Losing weight, lifts flat',
-      d:'Down '+Math.abs(Math.round(rate*100)/100)+' kg a week while '+stalled.slice(0,2).join(' and ')+' '+(stalled.length>1?'sit':'sits')+' flat. Holding strength in a deficit is a good outcome — do not read it as a stalled program.',tone:'ok'});
+      d:'Down '+uwNum(Math.abs(Math.round(rate*100)/100))+' '+uwUnit()+' a week while '+stalled.slice(0,2).join(' and ')+' '+(stalled.length>1?'sit':'sits')+' flat. Holding strength in a deficit is a good outcome — do not read it as a stalled program.',tone:'ok'});
     if(rate>0.4&&stalled.length)out.push({src:['bw','trends'],t:'Gaining weight without strength',
-      d:'Up '+Math.round(rate*100)/100+' kg a week with '+stalled.slice(0,2).join(' and ')+' flat. If the scale is moving and the bar is not, the surplus is outpacing the stimulus.',tone:'warn'})}
+      d:'Up '+uwNum(Math.round(rate*100)/100)+' '+uwUnit()+' a week with '+stalled.slice(0,2).join(' and ')+' flat. If the scale is moving and the bar is not, the surplus is outpacing the stimulus.',tone:'warn'})}
   // drain vs stalling
   const dr=S.history.filter(h=>h.bb&&h.bb.drain!=null);
   if(dr.length>=3&&stalled.length){
@@ -10352,7 +10355,7 @@ function crossPatterns(){
   // scan vs strength
   const sl=scansSorted();
   if(sl.length>=2&&moving.length){const d=scanDelta(sl[0],sl[sl.length-1]);
-    if(d.smm>0.5)out.push({src:['scan','trends'],t:'Muscle and strength both up',d:'Skeletal muscle +'+d.smm+' kg alongside '+moving.slice(0,2).join(' and ')+' progressing. That is the combination worth protecting — change as little as possible.',tone:'good'})}
+    if(d.smm>0.5)out.push({src:['scan','trends'],t:'Muscle and strength both up',d:'Skeletal muscle +'+uwNum(d.smm)+' '+uwUnit()+' alongside '+moving.slice(0,2).join(' and ')+' progressing. That is the combination worth protecting — change as little as possible.',tone:'good'})}
   // recovery map vs upcoming work
   const fresh=muscleFresh().filter(x=>x.fresh<60);
   if(fresh.length>=3)out.push({src:['recovery','balance'],t:'Several muscles under 60% recovered',d:fresh.slice(0,3).map(x=>x.m.toLowerCase()+' '+x.fresh+'%').join(', ')+'. If that is normal for you rather than a one-off, weekly volume is running ahead of recovery.',tone:'warn'});
@@ -10395,13 +10398,13 @@ function chartPoints(kind,ex){
     S.history.forEach(h=>h.log.forEach((l,li)=>{
       if(!l.w||!l.r)return;
       if(gBase(l.ex).toLowerCase()!==String(ex).toLowerCase()&&l.ex!==ex)return;
-      out.push({id:h.id+':'+li,date:h.date,label:'Set '+(l.setNo||'')+' · '+l.w+' kg × '+l.r+(l.rpe?' @'+l.rpe:''),
-        sub:Math.round(e1rm(l.w,l.r))+' kg est 1RM'+(l.pr?' · PR':''),hid:h.id,li:li,editable:true})}));
+      out.push({id:h.id+':'+li,date:h.date,label:'Set '+(l.setNo||'')+' · '+uwNum(l.w)+' '+uwUnit()+' × '+l.r+(l.rpe?' @'+l.rpe:''),
+        sub:uwNum(Math.round(e1rm(l.w,l.r)))+' '+uwUnit()+' est 1RM'+(l.pr?' · PR':''),hid:h.id,li:li,editable:true})}));
   }
   if(kind==='bw'){Object.keys(S.daily.days||{}).forEach(k=>{const d=S.daily.days[k];
-    if(d&&d.bw)out.push({id:'bw:'+k,date:k+'T12:00',label:d.bw+' kg',sub:'daily check-in',dayK:k,editable:true})})}
+    if(d&&d.bw)out.push({id:'bw:'+k,date:k+'T12:00',label:uwNum(d.bw)+' '+uwUnit(),sub:'daily check-in',dayK:k,editable:true})})}
   if(kind==='scan'){scansSorted().forEach(x=>out.push({id:'scan:'+x.id,date:x.date+'T12:00',
-    label:x.w+' kg · '+(x.bf!=null?x.bf+'%':'—'),sub:(x.smm!=null?x.smm+' kg muscle':''),scanId:x.id,editable:true}))}
+    label:uwNum(x.w)+' '+uwUnit()+' · '+(x.bf!=null?x.bf+'%':'—'),sub:(x.smm!=null?uwNum(x.smm)+' '+uwUnit()+' muscle':''),scanId:x.id,editable:true}))}
   if(kind==='bb'){Object.keys(S.gar.days||{}).forEach(k=>{const d=S.gar.days[k];
     const bits=[];if(d.am!=null)bits.push('am '+d.am);if(d.day!=null)bits.push('later '+d.day);
     if(d.pre!=null)bits.push('pre '+d.pre);if(d.post!=null)bits.push('post '+d.post);
@@ -10477,7 +10480,7 @@ function viewChart(){
         summary=wPts.length+' set'+(wPts.length===1?'':'s')+' · best '+best.p.sub;
       }else if(c.kind==='bw'){
         const vals=wPts.map(p=>parseFloat(p.label)).filter(x=>!isNaN(x));
-        if(vals.length)summary=(Math.round(vals.reduce((a,b)=>a+b,0)/vals.length*10)/10)+' kg average';
+        if(vals.length)summary=uwNum(Math.round(vals.reduce((a,b)=>a+b,0)/vals.length*10)/10)+' '+uwUnit()+' average';
       }else summary=wPts.length+' entr'+(wPts.length===1?'y':'ies');
       return '<div>'+
         '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px;padding:0 2px 6px">'+
@@ -10524,7 +10527,7 @@ function sectionSub(k){
     if(k==='scan'){const l=scansSorted();
       if(l.length<2)return l.length+' scan';
       const d=scanDelta(l[0],l[l.length-1]);
-      return l.length+' scans · muscle '+(d.smm>0?'+':'')+d.smm+' kg, fat '+(d.fm>0?'+':'')+d.fm+' kg'}
+      return l.length+' scans · muscle '+(d.smm>0?'+':'')+uwNum(d.smm)+' '+uwUnit()+', fat '+(d.fm>0?'+':'')+uwNum(d.fm)+' '+uwUnit()}
     if(k==='balance'){const ws=weeklySets(28);const n=Object.keys(ws).filter(m=>ws[m]>0).length;
       const low=Object.keys(ws).filter(m=>ws[m]>0&&ws[m]<6).length;
       return n+' muscles trained'+(low?' · '+low+' under 6 sets':'')}
@@ -10534,7 +10537,7 @@ function sectionSub(k){
       if(!days.length)return 'no weigh-ins';
       const last=S.daily.days[days[days.length-1]].bw;
       const first=S.daily.days[days[0]].bw;
-      return last+' kg · '+(last>first?'+':'')+(Math.round((last-first)*10)/10)+' kg since '+fmtDate(days[0]+'T12:00')}
+      return uwNum(last)+' '+uwUnit()+' · '+(last>first?'+':'')+uwNum(Math.round((last-first)*10)/10)+' '+uwUnit()+' since '+fmtDate(days[0]+'T12:00')}
   }catch(e){}
   return 'tap to open'}
 const COLLAPSER_ICONS={goals:'target',trends:'trend',tonnage:'bar',lifetime:'save',bb:'heart',scan:'body2',recovery:'moon',bw:'scale2',bests:'star',balance:'body2',allruns:'run'};
@@ -10579,7 +10582,7 @@ function viewProgress(){
         '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px">'+
         '<span class="disp" style="font-size:17px;font-weight:600">'+esc(g.ex)+'</span>'+
         '<span class="mono" style="color:var(--amber);font-size:11px;white-space:nowrap">GOAL '+g.w+' × '+g.r+'</span></div>'+
-        '<p class="mono" style="color:var(--dim);font-size:12px;margin-top:2px">'+(st.cur?Math.round(st.cur):0)+' / '+Math.round(st.target)+' kg est 1RM</p>'+
+        '<p class="mono" style="color:var(--dim);font-size:12px;margin-top:2px">'+(st.cur?uwNum(Math.round(st.cur)):0)+' / '+uwNum(Math.round(st.target))+' '+uwUnit()+' est 1RM</p>'+
         (chart?chart:'<p style="color:var(--faint);font-size:12px;margin-top:10px;line-height:1.5">'+
           (liftPts(g.ex).length===1?'One session logged. One more and the trend line and projection appear here.':'No '+esc(g.ex)+' sessions logged yet.')+'</p>')+
         '<p class="mono" style="font-size:11px;color:var(--faint);margin-top:4px">'+sub+'</p></button>'});
@@ -10591,7 +10594,7 @@ function viewProgress(){
       return '<button data-a="chartOpen" data-v="lift:'+esc(b)+'" class="card mt" style="width:100%;text-align:left;padding:14px 16px;display:block">'+
         '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px">'+
         '<span style="font-size:14px;font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(b)+'</span>'+
-        '<span class="mono" style="font-size:11.5px;color:'+(d>=0?'var(--green)':'var(--red)')+';white-space:nowrap">'+(d>=0?'+':'')+Math.round(d)+' kg · '+wks+' wks</span></div>'+
+        '<span class="mono" style="font-size:11.5px;color:'+(d>=0?'var(--green)':'var(--red)')+';white-space:nowrap">'+(d>=0?'+':'')+uwNum(Math.round(d))+' '+uwUnit()+' · '+wks+' wks</span></div>'+
         liftChart(b,null)+'</button>'}).join('');
     if(waiting.length)inner+='<div class="card mt" style="padding:13px 16px"><p style="color:var(--dim);font-size:12.5px;line-height:1.5">A trend needs the same lift in two sessions. One more and these start charting: '+
       waiting.slice(0,10).map(esc).join(', ')+'</p></div>';
@@ -10798,8 +10801,15 @@ function viewData(){
     setRow(I.check,'Daily check-in',(S.daily&&S.daily.on)?'On':'Off','Daily creatine tracker'),
     setRow(I.pill,'Creatine',(S.supp&&S.supp.on)?'On':'Off','Daily creatine tracker'),
     setRow(I.check,'Profile & goals','','Profile')]);
+  h+='<p class="eyebrow mt2">Units</p>'+
+   '<div class="card mt" style="padding:13px 15px">'+
+   '<div style="display:flex;align-items:center;gap:10px"><span style="flex:1;font-size:13.5px;font-weight:600">Weight</span>'+
+   ['kg','lb'].map(u=>'<button data-a="unitW" data-v="'+u+'" class="pill" style="width:64px;padding:9px 0'+(UNITS.w===u?';background:var(--text);color:#1F1E1D;border-color:var(--text);font-weight:600':'')+'">'+u+'</button>').join('')+'</div>'+
+   '<div style="display:flex;align-items:center;gap:10px;margin-top:10px;border-top:1px solid var(--line);padding-top:10px"><span style="flex:1;font-size:13.5px;font-weight:600">Distance</span>'+
+   ['km','mi'].map(u=>'<button data-a="unitD" data-v="'+u+'" class="pill" style="width:64px;padding:9px 0'+(UNITS.d===u?';background:var(--text);color:#1F1E1D;border-color:var(--text);font-weight:600':'')+'">'+u+'</button>').join('')+'</div>'+
+   '<p style="color:var(--faint);font-size:11px;line-height:1.5;margin-top:10px">Display and typing only — everything is stored metric underneath, so backups and history never change.</p></div>';
   h+=setGroup('Equipment',[
-    setRow(I.bar,'Bar & plates',BAR+' kg bar','Barbell weight')]);
+    setRow(I.bar,'Bar & plates',uwNum(BAR)+' '+uwUnit()+' bar','Barbell weight')]);
   h+=setGroup('Allena',[
     setRow(I.check,'Report something broken','','__beta'),
     setRow(I.ai,'AI coach',
@@ -10896,13 +10906,6 @@ function dataRaw(){
      if(onCount)h2+='<button data-a="rehabAllOff" class="btn mt" style="color:var(--dim);font-size:12.5px">Turn them all off</button>';
      return h2})()+
    '</div>'+
-   '<div class="mt2"><p class="eyebrow">Units</p>'+
-   '<div class="card mt" style="padding:13px 15px">'+
-   '<div style="display:flex;align-items:center;gap:10px"><span style="flex:1;font-size:13.5px;font-weight:600">Weight</span>'+
-   ['kg','lb'].map(u=>'<button data-a="unitW" data-v="'+u+'" class="pill" style="width:64px;padding:9px 0'+(UNITS.w===u?';background:var(--text);color:#1F1E1D;border-color:var(--text);font-weight:600':'')+'">'+u+'</button>').join('')+'</div>'+
-   '<div style="display:flex;align-items:center;gap:10px;margin-top:10px;border-top:1px solid var(--line);padding-top:10px"><span style="flex:1;font-size:13.5px;font-weight:600">Distance</span>'+
-   ['km','mi'].map(u=>'<button data-a="unitD" data-v="'+u+'" class="pill" style="width:64px;padding:9px 0'+(UNITS.d===u?';background:var(--text);color:#1F1E1D;border-color:var(--text);font-weight:600':'')+'">'+u+'</button>').join('')+'</div>'+
-   '<p style="color:var(--faint);font-size:11px;line-height:1.5;margin-top:10px">Display and typing only — everything is stored metric underneath, so backups and history never change.</p></div></div>'+
    '<div class="mt2"><p class="eyebrow">Running</p>'+
    '<p style="color:var(--faint);font-size:12px;line-height:1.55;margin-top:8px">A separate tab for runs, with running load folded into the same recovery picture as your lifting.</p>'+
    '<button data-a="runToggle" class="card mt" style="width:100%;text-align:left;padding:13px 15px;display:flex;align-items:center;gap:11px'+((S.runOn||runs().length)?';border-color:var(--amber)':'')+'">'+
@@ -11097,7 +11100,7 @@ function sheetHtml(){
         return '<button data-a="pvSubPick" data-v="'+j+'" class="card" style="width:100%;text-align:left;padding:14px 16px">'+
           '<div style="display:flex;justify-content:space-between;gap:10px;align-items:baseline">'+
           '<span style="font-size:14.5px;font-weight:600">'+esc(sb.n)+'</span>'+
-          '<span class="mono" style="color:var(--amber);font-size:13.5px;white-space:nowrap">'+(w?w+' kg':'\u2014')+'</span></div>'+
+          '<span class="mono" style="color:var(--amber);font-size:13.5px;white-space:nowrap">'+(w?uwNum(w)+' '+uwUnit():'\u2014')+'</span></div>'+
           '<p style="color:var(--faint);font-size:11.5px;margin-top:4px">'+esc(sb.u)+' \u00b7 '+esc(sb.note)+'</p></button>'}).join('')+'</div>';
     if(e.origName)inner+='<button data-a="pvSubRevert" class="btn mt">Revert to '+esc(e.origName)+'</button>';
     inner+='<button data-a="pvSubBack" class="btn mt" style="color:var(--dim)">Back to the session</button>';
@@ -11112,8 +11115,8 @@ function sheetHtml(){
         return '<button data-a="qSubPick" data-v="'+j+'" class="card" style="width:100%;text-align:left;padding:14px 16px">'+
           '<div style="display:flex;justify-content:space-between;gap:10px;align-items:baseline">'+
           '<span style="font-size:14.5px;font-weight:600">'+esc(sb.n)+'</span>'+
-          '<span class="mono" style="color:var(--amber);font-size:13.5px;white-space:nowrap">'+(w?w+' kg':'—')+'</span></div>'+
-          '<p style="color:var(--faint);font-size:11.5px;margin-top:4px">'+esc(sb.u)+' · '+esc(sb.note)+'</p></button>'}).join('')+'</div>';
+          '<span class="mono" style="color:var(--amber);font-size:13.5px;white-space:nowrap">'+(w?uwNum(w)+' '+uwUnit():'—')+'</span></div>'+
+          '<p style="color:var(--faint);font-size:11.5px;margin-top:4px">'+esc(String(sb.u).replace('kg',uwUnit()))+' · '+esc(sb.note)+'</p></button>'}).join('')+'</div>';
     if(r.origEx)inner+='<button data-a="qSubRevert" class="btn mt">Revert to '+esc(r.origEx)+'</button>';
     return wrapSheet('Swap exercise',inner)}
   if(S.sheet.t==='quickDay'){
@@ -11158,8 +11161,8 @@ function sheetHtml(){
         return '<button data-a="subPick" data-v="'+i+'" class="card" style="width:100%;text-align:left;padding:14px 16px">'+
           '<div style="display:flex;justify-content:space-between;gap:10px;align-items:baseline">'+
           '<span style="font-size:14.5px;font-weight:600">'+esc(sb.n)+'</span>'+
-          '<span class="mono" style="color:var(--amber);font-size:13.5px;white-space:nowrap">'+(w?w+' kg':'—')+'</span></div>'+
-          '<p style="color:var(--faint);font-size:11.5px;margin-top:4px">'+esc(sb.u)+' · '+esc(sb.note)+'</p></button>'}).join('')+'</div>';
+          '<span class="mono" style="color:var(--amber);font-size:13.5px;white-space:nowrap">'+(w?uwNum(w)+' '+uwUnit():'—')+'</span></div>'+
+          '<p style="color:var(--faint);font-size:11.5px;margin-top:4px">'+esc(String(sb.u).replace('kg',uwUnit()))+' · '+esc(sb.note)+'</p></button>'}).join('')+'</div>';
     if(cur.origEx)inner+='<button data-a="subRevert" class="btn mt">Revert to '+esc(cur.origEx)+'</button>';
     inner+='<p style="color:var(--faint);font-size:11.5px;line-height:1.5;margin-top:12px">Converted weights are a starting point. First set at the suggested load, then adjust to hit the target RPE — the app logs what you actually do.</p>';
     return wrapSheet('Swap exercise',inner)}
@@ -11327,7 +11330,7 @@ function sheetHtml(){
       '<p class="mono" style="font-size:26px;font-weight:600">'+e.w+' <span style="font-size:14px;color:var(--dim)">kg</span> × '+e.r+
         (e.rpe!=null?' <span style="font-size:14px;color:var(--dim)">@'+e.rpe+'</span>':'')+'</p>'+
       '<p class="mono" style="color:var(--faint);font-size:11px;margin-top:5px">'+esc(e.ex)+' · set '+e.setNo+
-        (c.targetW!=null?' · target '+c.targetW+' kg × '+c.targetReps:'')+'</p></div>'+
+        (c.targetW!=null?' · target '+uwNum(c.targetW)+' '+uwUnit()+' × '+c.targetReps:'')+'</p></div>'+
       '<div class="card mt" style="padding:13px 15px;border-color:var(--amber)">'+
       q.flags.map(f=>'<p style="color:var(--dim);font-size:12.5px;line-height:1.55">· '+esc(f)+'</p>').join('')+'</div>'+
       '<button data-a="sanityFix" class="big disp mt" style="background:var(--amber);color:#1F1E1D;font-size:15px">Let me fix it</button>'+
@@ -11395,7 +11398,7 @@ function sheetHtml(){
     const last=days.length?S.daily.days[days[days.length-1]].bw:null;
     return wrapSheet('Bodyweight today',
       '<p style="color:var(--dim);font-size:13px;line-height:1.6">Same time of day each time is what makes the trend readable — first thing, before food, is the usual choice.</p>'+
-      (last?'<p class="mono" style="color:var(--faint);font-size:11.5px;margin-top:8px">Last logged '+last+' kg</p>':'')+
+      (last?'<p class="mono" style="color:var(--faint);font-size:11.5px;margin-top:8px">Last logged '+uwNum(last)+' '+uwUnit()+'</p>':'')+
       '<input data-in="gform.bw" value="'+esc(f.bw||'')+'" inputmode="decimal" placeholder="'+(last||'kg')+'" style="margin-top:12px;text-align:center;font-size:22px" class="mono">'+
       '<button data-a="bwSave" class="big disp mt2" style="background:'+((f.bw||'').trim()?'var(--amber)':'var(--raised)')+';color:'+((f.bw||'').trim()?'#1F1E1D':'var(--faint)')+';font-size:15px">Save</button>')}
   if(S.sheet.t==='signal'){
@@ -11583,7 +11586,7 @@ function sheetHtml(){
     if(g.block)return wrapSheet('The running plan',
       '<p style="color:var(--dim);font-size:13.5px;line-height:1.6">'+esc(g.block)+'</p>');
     return wrapSheet('Eight weeks, built from you',
-      '<p style="color:var(--dim);font-size:13px;line-height:1.6">Base: your own average of about '+g.base+' km a week across '+g.freq+' runs'+(g.days?' on your usual days ('+g.days.join(', ')+')':'')+(g.pace?', paced off your own easy average of '+g.pace+'/km':'')+'. It grows 8% a week with a down week every fourth — and the 0.8\u20131.3 load band always outranks it.</p>'+(g.note?'<p style="color:var(--dim);font-size:12.5px;line-height:1.55;margin-top:8px">'+esc(g.note)+'</p>':'')+(g.template?'<p class="eyebrow mt2">One week, both sides</p>'+'<div class="card mt" style="padding:4px 15px">'+g.template.map((l2,i2)=>'<p style="padding:8px 0;font-size:12.5px;color:var(--dim)'+(i2?';border-top:1px solid var(--line)':'')+'">'+esc(l2)+'</p>').join('')+'</div>'+'<p style="color:var(--faint);font-size:11px;line-height:1.5;margin-top:6px">Lift days are your program\u2019s own \u2014 slide the week around your life, keep the spacing.</p>':'')+
+      '<p style="color:var(--dim);font-size:13px;line-height:1.6">Base: your own average of about '+udNum(g.base)+' '+udUnit()+' a week across '+g.freq+' runs'+(g.days?' on your usual days ('+g.days.join(', ')+')':'')+(g.pace?', paced off your own easy average of '+g.pace+'/km':'')+'. It grows 8% a week with a down week every fourth — and the 0.8\u20131.3 load band always outranks it.</p>'+(g.note?'<p style="color:var(--dim);font-size:12.5px;line-height:1.55;margin-top:8px">'+esc(g.note)+'</p>':'')+(g.template?'<p class="eyebrow mt2">One week, both sides</p>'+'<div class="card mt" style="padding:4px 15px">'+g.template.map((l2,i2)=>'<p style="padding:8px 0;font-size:12.5px;color:var(--dim)'+(i2?';border-top:1px solid var(--line)':'')+'">'+esc(l2)+'</p>').join('')+'</div>'+'<p style="color:var(--faint);font-size:11px;line-height:1.5;margin-top:6px">Lift days are your program\u2019s own \u2014 slide the week around your life, keep the spacing.</p>':'')+
       '<div class="card mt" style="padding:4px 15px">'+
       g.items.map((it,i)=>'<div style="display:flex;gap:11px;padding:9px 0'+(i?';border-top:1px solid var(--line)':'')+'">'+
         '<span class="mono" style="color:var(--faint);font-size:11px;flex:none;width:20px">W'+it.week+'</span>'+
@@ -11792,7 +11795,7 @@ function sheetHtml(){
       const first=l.length?l.map(r=>r.date).sort()[0]:null,last=l.length?l.map(r=>r.date).sort().reverse()[0]:null;
       return wrapSheet('Found '+l.length+' run'+(l.length===1?'':'s'),
         (l.length?'<div class="row" style="gap:10px;margin-top:4px">'+
-          statBox(l.length,'runs')+statBox(km+' km','total')+
+          statBox(l.length,'runs')+statBox(udNum(km)+' '+udUnit(),'total')+
           statBox(first?fmtDate(first+'T12:00').replace(/,.*/,''):'—','from')+'</div>'+
           '<p style="color:var(--dim);font-size:12.5px;line-height:1.55;margin-top:12px">'+
           esc(first?fmtDate(first+'T12:00')+' to '+fmtDate(last+'T12:00'):'')+
@@ -11800,7 +11803,7 @@ function sheetHtml(){
           '<p class="eyebrow mt2">A sample, so you can check it read them right</p>'+
           '<div style="margin-top:8px;display:flex;flex-direction:column;gap:7px">'+
           l.slice(0,6).map(r=>'<div class="card" style="padding:11px 14px">'+
-            '<span class="mono" style="font-size:12.5px;display:block">'+r.km+' km · '+paceStr(r.mins,r.km)+'</span>'+
+            '<span class="mono" style="font-size:12.5px;display:block">'+udNum(r.km)+' '+udUnit()+' · '+paceStr(r.mins,r.km)+'</span>'+
             '<span class="mono" style="color:var(--faint);font-size:10.5px">'+esc(fmtDate(r.date+'T12:00'))+' · '+
             esc((RUN_TYPES.find(t2=>t2[0]===r.type)||['','run'])[1].toLowerCase())+(r.hr?' · '+Math.round(r.hr)+' bpm':'')+'</span></div>').join('')+
           (l.length>6?'<p class="mono" style="color:var(--faint);font-size:10.5px">and '+(l.length-6)+' more.</p>':'')+'</div>'+
@@ -12057,7 +12060,7 @@ function sheetHtml(){
             (e.moved?';color:var(--amber)':'')+'">'+esc(e.name)+
             (keyLift(e,pv)?'<span class="mono" style="color:var(--faint);font-size:9px;font-weight:400"> KEY</span>':'')+'</span>'+
           '<span class="mono" style="color:'+(e.moved?'var(--amber)':e.cut?'var(--faint)':'var(--faint)')+';font-size:10.5px">'+(e.cut?'cut from this week · ':'')+(e.keep?live:0)+' of '+e.sets.length+' sets'+(e.addedBack?' · +'+e.addedBack+' added back':'')+((hMap&&hMap[e.name]!=null)?' · RPE '+hMap[e.name]+' today':'')+
-            (st.targetW!=null?' · '+st.targetW+' kg':'')+(st.targetReps!=null?' × '+st.targetReps:'')+(isGoal(e.name)?' · goal lift':'')+'</span></span>'+
+            (st.targetW!=null?' · '+uwNum(st.targetW)+' '+uwUnit():'')+(st.targetReps!=null?' × '+st.targetReps:'')+(isGoal(e.name)?' · goal lift':'')+'</span></span>'+
           (function(){if(!e.moved)return '';
             const p4=S.lib.programs.find(x=>x.id===pv.pid)||activeProgSafe();
             const m4=offloadAll(p4).find(x=>x.ex===e.name&&x.day===pv.di);
@@ -12205,9 +12208,9 @@ function sheetHtml(){
     let inner='<p style="color:var(--dim);font-size:13px;line-height:1.55">Change the load for <b style="color:var(--text)">'+esc(cur.ex)+'</b>. This updates the remaining sets today and the programmed weight from now on.</p>'+
       '<div class="card mt" style="padding:16px;text-align:center">'+
       '<p class="mono" style="font-size:30px;font-weight:600">'+cur.targetW+' <span style="font-size:15px;color:var(--dim)">kg</span></p>'+
-      (cur_adj?'<p class="mono" style="color:var(--amber);font-size:11px;margin-top:4px">'+(cur_adj>0?'+':'')+cur_adj+' kg vs the written program</p>':'')+'</div>'+
+      (cur_adj?'<p class="mono" style="color:var(--amber);font-size:11px;margin-top:4px">'+(cur_adj>0?'+':'')+uwNum(cur_adj)+' '+uwUnit()+' vs the written program</p>':'')+'</div>'+
       '<div class="row mt">'+[-5,-2.5,2.5,5].map(d=>'<button data-a="tuneBy" data-v="'+d+'" class="pill" style="flex:1;font-size:15px;padding:14px 0">'+(d>0?'+':'')+d+'</button>').join('')+'</div>';
-    if(cur_adj)inner+='<button data-a="tuneReset" class="btn mt">Reset to the written program ('+(cur.targetW-cur_adj)+' kg)</button>';
+    if(cur_adj)inner+='<button data-a="tuneReset" class="btn mt">Reset to the written program ('+uwNum(cur.targetW-cur_adj)+' '+uwUnit()+')</button>';
     inner+='<p style="color:var(--faint);font-size:11.5px;line-height:1.5;margin-top:12px">Allena adjusts this automatically too: all sets at the top of the range at RPE 8 or less adds 2.5 kg; missing the target on two or more sets takes weight off.</p>';
     return wrapSheet('Tune load',inner)}
   if(S.sheet.t==='plan'){
@@ -12232,7 +12235,7 @@ function sheetHtml(){
           (isCur?'<span class="mono" style="color:var(--amber);font-size:10px;flex:none">NOW</span>':'')+
           '<span class="mono" style="color:var(--faint);font-size:11px;flex:none">'+done+'/'+total+'</span></div>'+
           '<p class="mono" style="color:var(--faint);font-size:10.5px;margin-top:4px;margin-left:18px">'+
-          esc(target.secs?target.secs+'s'+(target.perSide?' per side':''):((target.targetW!=null?target.targetW+' kg × ':'')+(target.targetReps!=null?target.targetReps:'')))+'</p></button>'+
+          esc(target.secs?target.secs+'s'+(target.perSide?' per side':''):((target.targetW!=null?uwNum(target.targetW)+' '+uwUnit()+' × ':'')+(target.targetReps!=null?target.targetReps:'')))+'</p></button>'+
           (lifted
             ?'<div style="display:flex;flex-direction:column;justify-content:center;gap:2px;padding:0 10px;border-left:1px solid var(--line)">'+
              '<button data-a="planUp" data-v="'+e.exNo+'" style="padding:6px 8px;color:var(--amber);font-size:15px">▲</button>'+
@@ -12819,10 +12822,11 @@ function runAction(a,v,t,e){
       if(dd2.am!=null||dd2.pre!=null||dd2.day!=null){flash('Already logged for today.');break}
       S.gform={am:''};S.sheet={t:'gam'};render();break}
     case 'bwSave':{const v2=parseFloat((S.gform&&S.gform.bw)||'');
-      if(!(v2>20&&v2<400)){flash('That does not look like a bodyweight.');break}
+      {const kg9=uwIn(v2);
+      if(!(kg9>20&&kg9<400)){flash('That does not look like a bodyweight.');break}
       S.daily.days[today()]=S.daily.days[today()]||{};
-      S.daily.days[today()].bw=Math.round(v2*10)/10;lset(K_DAILY,S.daily);
-      S.gform=null;S.sheet=null;render();flash('Logged '+Math.round(v2*10)/10+' kg.');break}
+      S.daily.days[today()].bw=Math.round(kg9*10)/10;lset(K_DAILY,S.daily);
+      S.gform=null;S.sheet=null;render();flash('Logged '+v2+' '+uwUnit()+'.')}break}
     case 'adhOpen':S.sheet={t:'adh'};render();break;
     case 'patOpen':{S.patView=v;S.patFrom=S.view;S.view='pattern';markPatternsSeen();render();break}
     case 'patBack':{S.view=S.patFrom||'progress';S.patView=null;render();break}
@@ -12847,7 +12851,7 @@ function runAction(a,v,t,e){
       chartOpen(kind,ex,TT[kind]||ex,'');break}
     case 'editptSave':{const e=S.sheet,val=+e.val;
       if(!(val>0)){flash('Enter a number.');break}
-      if(e.kind==='bw'){const k=e.id.slice(3);S.daily.days[k]=S.daily.days[k]||{};S.daily.days[k].bw=val;lset(K_DAILY,S.daily)}
+      if(e.kind==='bw'){const k=e.id.slice(3);S.daily.days[k]=S.daily.days[k]||{};S.daily.days[k].bw=Math.round(uwIn(val)*10)/10;lset(K_DAILY,S.daily)}
       if(e.kind==='bb'){const k=e.id.slice(3);S.gar.days[k]=S.gar.days[k]||{};
         if(S.gar.days[k].am!=null)S.gar.days[k].am=val;else S.gar.days[k].day=val;garSave()}
       S.sheet=null;flash('Updated.');render();break}
@@ -12858,7 +12862,7 @@ function runAction(a,v,t,e){
     case 'chartEdit':{const id=String(v);
       if(id.indexOf('bw:')===0){S.sheet={t:'editpt',id:id,kind:'bw',val:(S.daily.days[id.slice(3)]||{}).bw||''};render();break}
       if(id.indexOf('bb:')===0){const d=S.gar.days[id.slice(3)]||{};S.sheet={t:'editpt',id:id,kind:'bb',val:d.am!=null?d.am:(d.day!=null?d.day:'')};render();break}
-      if(id.indexOf('scan:')===0){const sc=S.scans.find(x=>x.id===id.slice(5));if(sc){S.sform=Object.assign({img:null,busy:false},sc);S.sheet={t:'scan'};render()}break}
+      if(id.indexOf('scan:')===0){const sc=S.scans.find(x=>x.id===id.slice(5));if(sc){S.sform=Object.assign({img:null,busy:false},sc,{w:sc.w!=null?uwNum(sc.w):'',smm:sc.smm!=null?uwNum(sc.smm):''});S.sheet={t:'scan'};render()}break}
       if(id.indexOf('t:')===0){flash('Retest from the Rehab tab — test results are not edited by hand.');break}
       const [hid,li]=id.split(':');const rec=S.history.find(h=>h.id===hid);
       if(rec){S.open=hid;S.chart=null;S.view='history';S.histTab='sessions';render();flash('Opened that session — tap the set to correct it.')}
@@ -13188,7 +13192,7 @@ function runAction(a,v,t,e){
     case 'scanRead':readScanWithAllena();break;
     case 'scanSave':{const f=S.sform;if(!(+f.w>0)){flash('Weight is needed at minimum.');break}
       const rec3=scanDerive({id:'s'+Date.now().toString(36),date:f.date||today(),thumb:f.thumb||null});
-      ['w','bf','smm','vf','bmr','tee'].forEach(k=>{if(+f[k]>0)rec3[k]=+f[k]});
+      ['w','bf','smm','vf','bmr','tee'].forEach(k=>{if(+f[k]>0)rec3[k]=(k==='w'||k==='smm')?Math.round(uwIn(+f[k])*10)/10:+f[k]});
       const d2=scanDerive(rec3);S.scans.push(d2);scanSave();
       S.sform=null;S.sheet=null;S.view='scans';render();flash('Scan saved.');break}
     case 'scanDel':S.scans=S.scans.filter(x=>x.id!==v);scanSave();render();break;
