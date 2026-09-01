@@ -380,7 +380,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='88dd78';  // stamped by tools/build.py with the content hash
+const BUILD_ID='32b64d';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -9034,7 +9034,7 @@ function muscleRowsHtml(p,i){
           '<div style="height:5px;width:'+donePct+'%;background:var(--blue)"></div>'+
           '<div style="height:5px;width:'+addPct+'%;background:repeating-linear-gradient(90deg,var(--blue) 0 3px,transparent 3px 6px);opacity:.85"></div></div>'+
           '<span class="mono" style="color:var(--blue);font-size:9.5px;font-weight:600;width:28px;text-align:right;flex:none">+'+r9.stim+'</span></div>'}).join('')+
-      '<p class="mono" style="color:var(--faint);font-size:8.5px;letter-spacing:.05em;margin-top:2px">FRESH \u00b7 LAST 7 DAYS\u2019 DOSE (DASHED = THIS SESSION) \u00b7 +STIMULUS</p></div>'
+      '<p class="mono" style="color:var(--faint);font-size:8.5px;letter-spacing:.03em;margin-top:3px;line-height:1.5">GREEN = RECOVERED \u00b7 BLUE = THIS WEEK\u2019S WORK (DASHES = THIS SESSION ADDS) \u00b7 +N = GROWTH</p></div>'
   }catch(e){return ''}}
 function dayReadiness(prog,di,wk){
   const load=dayMuscles(prog,di,wk);
@@ -12801,7 +12801,14 @@ function render(){
     document.getElementById('app').innerHTML=body;
     let extra=document.getElementById('extra');
     if(!extra){extra=document.createElement('div');extra.id='extra';document.body.appendChild(extra)}
-    extra.innerHTML=extraHtml+(S.deepAnim?deepAnimHtml():'')+(S.boot!=null?bootHtml(S.boot):'');
+    extra.innerHTML=extraHtml+(S.boot!=null?bootHtml(S.boot):'');
+    /* the deep-read constellation lives OUTSIDE the render cycle — a
+       mid-animation render used to rebuild it and restart the whole
+       sequence (beta-reported). It mounts once and is only removed. */
+    {let host=document.getElementById('deepAnimHost');
+     if(S.deepAnim){if(!host){host=document.createElement('div');host.id='deepAnimHost';
+       host.innerHTML=deepAnimHtml();document.body.appendChild(host)}}
+     else if(host)host.remove()}
     if(big&&!vt){const vEl=document.querySelector('#app .view');if(vEl)vEl.classList.add('anim')}
     if(!big){try{const vEl=document.querySelector('#app .view.stg');if(vEl&&vEl.classList&&vEl.classList.remove)vEl.classList.remove('stg')}catch(e){}}
     if(key){const el=document.querySelector('[data-in="'+key+'"]');
