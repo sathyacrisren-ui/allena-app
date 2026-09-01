@@ -380,7 +380,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='e4105e';  // stamped by tools/build.py with the content hash
+const BUILD_ID='70713a';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -7235,7 +7235,7 @@ function treeShareRun(){
     x.fillStyle='#8A8578';x.font='500 36px -apple-system,system-ui,sans-serif';
     x.fillText('data points · '+t.found+' found'+(t.km?' · '+t.km+' km run':''),540,1712);
     x.fillText('grown from real training',540,1830);
-    S.shareImg=c.toDataURL('image/png');
+    S.shareImg=c.toDataURL('image/png');S.shareTitle=null;
     const openSheet=function(){S.sheet={t:'treeshare'};render()};
     if(navigator.share&&navigator.canShare&&c.toBlob){
       c.toBlob(function(b){try{
@@ -7536,6 +7536,52 @@ function wrapText(r){
   if(r.disc)L.push('Best find: '+r.disc.t+' ('+r.disc.rar+')');
   L.push('Worth fixing: '+r.fix);
   return L.join('\n')}
+
+function wrapShareRun(ym){
+  /* the month as a share card — same halo voice as the tree card,
+     counts and finds only, no personal fields */
+  try{
+    const r=wraps()[ym]||wrapBuild(ym);
+    if(!r){flash('Nothing to share for that month.');return}
+    const c=document.createElement('canvas');c.width=1080;c.height=1920;
+    const x=c.getContext('2d');
+    x.fillStyle='#151310';x.fillRect(0,0,1080,1920);
+    const halo=x.createRadialGradient(540,860,100,540,860,900);
+    halo.addColorStop(0,'rgba(240,238,230,0.10)');halo.addColorStop(1,'rgba(240,238,230,0)');
+    x.fillStyle=halo;x.fillRect(0,0,1080,1920);
+    x.textAlign='center';
+    const grad=x.createLinearGradient(140,0,940,0);
+    grad.addColorStop(0,'#F0EEE6');grad.addColorStop(1,'#30D158');
+    x.fillStyle='#8A8578';x.font='600 30px -apple-system,system-ui,sans-serif';
+    x.fillText('A  L  L  E  N  A',540,120);
+    const mName=String(r.name||ym).split(' ')[0].toUpperCase();
+    x.fillStyle=grad;x.font='800 130px -apple-system,system-ui,sans-serif';
+    x.fillText(mName+'.',540,300);
+    let y=520;
+    const stat=(big,small)=>{
+      x.fillStyle=grad;x.font='800 96px -apple-system,system-ui,sans-serif';
+      x.fillText(big,540,y);
+      x.fillStyle='#8A8578';x.font='500 36px -apple-system,system-ui,sans-serif';
+      x.fillText(small,540,y+58);y+=210};
+    if(r.sessions)stat(String(r.sessions),'sessions');
+    if(r.ton)stat((Math.round(r.ton/100)/10).toLocaleString()+' t','moved'+
+      (r.tonPrev?' · '+(r.ton>=r.tonPrev?'+':'')+Math.round((r.ton/r.tonPrev-1)*100)+'% on the month before':''));
+    if(r.km)stat(udNum(r.km)+' '+udUnit(),'on the road');
+    if(r.move)stat(r.move.ex.length>14?'+'+r.move.pct+'%':r.move.ex+' +'+r.move.pct+'%',
+      r.move.ex.length>14?r.move.ex+' — the biggest move':'the biggest move');
+    if(r.disc){x.fillStyle='#E8E5DC';x.font='600 40px -apple-system,system-ui,sans-serif';
+      x.fillText('Best find: '+String(r.disc.t).slice(0,34),540,Math.min(y,1680));y+=90}
+    x.fillStyle='#8A8578';x.font='500 36px -apple-system,system-ui,sans-serif';
+    x.fillText('a month of real training',540,1830);
+    S.shareImg=c.toDataURL('image/png');S.shareTitle='Your month';
+    const openSheet=function(){S.sheet={t:'treeshare'};render()};
+    if(navigator.share&&navigator.canShare&&c.toBlob){
+      c.toBlob(function(b){try{
+        const f=new File([b],'allena-'+ym+'.png',{type:'image/png'});
+        if(navigator.canShare({files:[f]}))navigator.share({files:[f]}).catch(function(){});
+        else openSheet()}catch(e){openSheet()}},'image/png')}
+    else openSheet()
+  }catch(e){flash('Could not draw the card.')}}
 function wrapLine(){
   const pm=wrapDue();
   if(!pm)return '';
@@ -7641,7 +7687,10 @@ function questWeekKey(d){const x=d?new Date(d):new Date();
   x.setDate(x.getDate()-((x.getDay()+6)%7));return dayKey(x)}
 function questSave(){lset(K_QUEST,S.quest)}
 function questSeed(s){let h=0;for(let i=0;i<s.length;i++)h=(h*31+s.charCodeAt(i))>>>0;return h}
-function questGen(wk){
+const CHAIN_NAMES={sess:'Three weeks of showing up',reps:'Three weeks of one more rep',
+  runkm:'Three growing weeks on the road',ready:'Three weeks of honest mornings',
+  rehab:'Three weeks of the work',rehabsess:'Three weeks of the work'};
+function questGen(wk,preferK){
   // every candidate carries basis:{what,proven,target} with target ≤ proven×1.05
   const C=[];
   const H=(S.history||[]).filter(h=>h.complete&&!h.run);
@@ -7714,13 +7763,22 @@ function questGen(wk){
   // never offer a challenge this week has already met — that is a medal, not a quest
   const open=C.filter(q=>questHave(q,wk)<(q.target||1));
   if(!open.length)return null;
+  /* an active chain keeps its shape — the same kind of quest, its
+     target regrown from what last week actually was */
+  if(preferK){const same=open.find(q=>q.k===preferK);if(same)return same}
   return open[questSeed(wk)%open.length]}
 function questCurrent(){
   const wk=questWeekKey();
   if(!S.quest)S.quest=lget(K_QUEST,{});
   if(S.quest.wk!==wk){                 // Monday: the old one is simply replaced
-    const g=questGen(wk);
-    S.quest={wk:wk,q:g,state:g?'offered':'none'};questSave()}
+    /* the chain survives the Monday roll; two quiet weeks and it lets
+       go silently — re-planned, never failed */
+    let ch=S.quest.chain||null;
+    if(ch&&ch.lastWk){const gap=(new Date(wk+'T12:00')-new Date(ch.lastWk+'T12:00'))/(7*864e5);
+      if(gap>2)ch=null}
+    const g=questGen(wk,ch?ch.k:null);
+    if(ch&&(!g||g.k!==ch.k))ch=null;   // the shape ran out of road — no dead arcs
+    S.quest={wk:wk,q:g,state:g?'offered':'none',chain:ch};questSave()}
   return S.quest}
 function questHave(q,wk){
   const end=(function(){const d=new Date(wk+'T12:00');d.setDate(d.getDate()+7);return dayKey(d)})();
@@ -7748,19 +7806,42 @@ function questCheck(){
       d:'Taken on and finished inside the week. '+Q.q.basis.what+' was the bar.',
       rar:'epic',tag:'quest',found:today()};
     bankSave()}
+  /* the chain: a finished quest becomes the next link. Three links
+     bank the arc with its own name, then the chain retires. */
+  try{
+    let ch=Q.chain;
+    if(ch&&ch.k!==Q.q.k)ch=null;
+    if(!ch)ch={k:Q.q.k,links:[],lastWk:null};
+    if(ch.lastWk!==Q.wk){
+      ch.links.push({wk:Q.wk,t:Q.q.t});ch.lastWk=Q.wk;
+      if(ch.links.length>=3){
+        const id2='chain:'+Q.wk;
+        if(!bank[id2]){
+          bank[id2]={t:CHAIN_NAMES[ch.k]||'Three weeks, one arc',
+            d:'Three linked quests, three weeks running: '+ch.links.map(l=>l.t).join(' · ')+'. Every target grown from the week before\'s real number.',
+            rar:'epic',tag:'quest',found:today()};
+          bankSave()}
+        ch=null}}
+    Q.chain=ch;questSave()
+  }catch(e){}
   return true}
+function questChainTag(Q){
+  const ch=Q&&Q.chain;
+  if(ch&&ch.links&&ch.links.length&&ch.links.length<3&&ch.lastWk!==Q.wk)
+    return 'QUEST · WEEK '+(ch.links.length+1)+' OF 3';
+  return 'QUEST'}
 function questLine(){
   const Q=questCurrent();
   if(!Q||!Q.q||Q.state==='passed'||Q.state==='none')return '';
   questCheck();
   const q=Q.q,done=Q.state==='done';
   if(Q.state==='offered')return '<div style="display:flex;align-items:center;gap:9px;margin-top:12px;padding-top:12px;border-top:1px solid var(--line)">'+
-    '<span class="mono" style="color:var(--faint);font-size:9px;letter-spacing:.06em;flex:none">QUEST</span>'+
+    '<span class="mono" style="color:var(--faint);font-size:9px;letter-spacing:.06em;flex:none">'+questChainTag(Q)+'</span>'+
     '<span style="flex:1;min-width:0;font-size:12px;color:var(--dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(q.t)+'</span>'+
     '<button data-a="questOpen" class="mono" style="color:var(--amber);font-size:11px;flex:none">Look</button></div>';
   const pr=questProgress();
   return '<button data-a="questOpen" style="display:flex;align-items:center;gap:9px;margin-top:12px;padding-top:12px;border-top:1px solid var(--line);width:100%;text-align:left">'+
-    '<span class="mono" style="color:'+(done?'var(--amber)':'var(--faint)')+';font-size:9px;letter-spacing:.06em;flex:none">QUEST</span>'+
+    '<span class="mono" style="color:'+(done?'var(--amber)':'var(--faint)')+';font-size:9px;letter-spacing:.06em;flex:none">'+questChainTag(Q)+'</span>'+
     '<span style="flex:1;min-width:0;font-size:12px;color:'+(done?'var(--text)':'var(--dim)')+';overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+
       esc(done?'Done — banked as an epic find':q.t)+'</span>'+
     '<span class="mono" style="color:'+(done?'var(--amber)':'var(--faint)')+';font-size:11px;flex:none">'+
@@ -8251,6 +8332,20 @@ function bankStats(){
   const rar={};l.forEach(d=>{rar[d.rar]=(rar[d.rar]||0)+1});
   return{total:l.length,by:by,rar:rar,
     cats:DISC_CATALOG.filter(c=>by[c[0]]).length,catTotal:DISC_CATALOG.length}}
+function tomorrowHook(){
+  /* the next open, planted at the peak of this one: the completion
+     screen names the nearest thing tomorrow's data unlocks */
+  try{
+    const W=watchList();if(!W.length)return '';
+    const c=W.slice().sort((a,b)=>(a.need-a.have)-(b.need-b.have))[0];
+    const left=c?c.need-c.have:0;
+    if(!c||left<=0)return '';
+    return '<div class="card mt" style="padding:12px 15px">'+
+      '<p class="mono" style="font-size:9px;color:var(--amber);letter-spacing:.06em">TOMORROW</p>'+
+      '<p style="color:var(--dim);font-size:12.5px;line-height:1.55;margin-top:5px">'+
+      '<b style="color:var(--text)">'+esc(c.t)+'</b> is '+left+' away'+
+      (left===1?' — tomorrow can finish it.':'.')+'</p></div>'
+  }catch(e){return ''}}
 /* what a finished session reveals */
 function sessionReveal(){
   const fresh=bankDiscoveries();
@@ -10518,6 +10613,7 @@ function viewSession(){
         h+='</div>'}
      }catch(e){}}
     try{predResolvePending();h+=predSessionVerdict()}catch(e){}
+    try{h+=tomorrowHook()}catch(e){}
     {const rev=S.sessReveal;
      if(rev&&rev.show){const r=rarityOf(rev.show.rar);
       h+='<div class="card mt2 an-hero an-glow an-pop" style="padding:17px;border-radius:20px;border-color:'+r[1]+'">'+
@@ -12497,7 +12593,9 @@ function sheetHtml(){
         '<p style="font-size:13.5px;font-weight:600;margin-top:4px">'+esc(r.disc.t)+'</p></div>':'')+
       '<div class="card mt" style="padding:13px 15px;border-color:rgba(240,238,230,.42)"><p class="mono" style="font-size:9px;color:var(--amber);letter-spacing:.06em">WORTH FIXING</p>'+
         '<p style="color:var(--dim);font-size:12.5px;line-height:1.55;margin-top:4px">'+esc(r.fix)+'</p></div>'+
-      '<button data-a="wrapCopy" data-v="'+r.ym+'" class="btn mt2" style="color:var(--amber)">Copy as text</button>')}
+      '<div class="row mt2" style="gap:10px">'+
+      '<button data-a="wrapShare" data-v="'+r.ym+'" class="btn" style="flex:1;border-color:var(--amber);color:var(--amber)">Share the card</button>'+
+      '<button data-a="wrapCopy" data-v="'+r.ym+'" class="btn" style="flex:1;color:var(--dim)">Copy as text</button></div>')}
   if(S.sheet.t==='treeshare'){
     return wrapSheet(S.shareTitle||'Your tree',
       (S.shareImg?'<img src="'+S.shareImg+'" alt="Tree share card" style="width:100%;border-radius:14px;border:1px solid var(--line)">':'')+
@@ -14433,6 +14531,7 @@ function runAction(a,v,t,e){
     case 'svGo':svConnect();break;
     case 'suGateGo':if(S.setup)S.setup.gate=false;render();break;
     case 'suGateBack':if(S.setup)S.setup.gate=true;render();break;
+    case 'wrapShare':wrapShareRun(v);break;
     case 'predOpen':S.sheet={t:'pred'};render();break;
     case 'impGuideOpen':S.impgBack=v||'';S.impg=S.impg||'garmin';S.impgStep=0;S.sheet={t:'impguide'};render();break;
     case 'impgSrc':S.impg=v;S.impgStep=0;render();break;
