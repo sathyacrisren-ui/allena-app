@@ -361,7 +361,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='c82f70';  // stamped by tools/build.py with the content hash
+const BUILD_ID='528ade';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -4067,16 +4067,19 @@ function pointsChip(){
     '<circle cx="15" cy="15" r="13" fill="none" stroke="var(--line)" stroke-width="2.5"/>'+
     '<circle cx="15" cy="15" r="13" fill="none" stroke="var(--green)" stroke-width="2.5" stroke-linecap="round" '+
     'stroke-dasharray="'+C.toFixed(1)+'" stroke-dashoffset="'+(C*(1-pct/100)).toFixed(1)+'"/>'+
-    (function(){/* the dotted blue continuation: where the arc lands if
-        today's remaining room is fully earned */
-      const room=d.room||0;if(!(room>0)||!nx)return '';
-      const addPct=Math.min(100-pct,room/thr*100);
-      if(addPct<=1)return '';
-      const a0=(pct/100)*2*Math.PI,a1=((pct+addPct)/100)*2*Math.PI;
+    (function(){/* the SOLID blue continuation (owner call, Sep 2026):
+        where the arc lands if today's remaining room is fully earned.
+        Near a level line the true sliver can be under 1% — it still
+        shows, floored to visible, because the promise is presence */
+      const room=d.room||0;if(!(room>0))return '';
+      let addPct=Math.min(100-pct,room/thr*100);
+      if(addPct<=0)return '';
+      addPct=Math.max(addPct,2);
+      const a0=(pct/100)*2*Math.PI,a1=(Math.min(100,pct+addPct)/100)*2*Math.PI;
       const px=v=>(15+13*Math.cos(v)).toFixed(2),py=v=>(15+13*Math.sin(v)).toFixed(2);
       const large=(a1-a0)>Math.PI?1:0;
       return '<path d="M'+px(a0)+' '+py(a0)+' A13 13 0 '+large+' 1 '+px(a1)+' '+py(a1)+'" '+
-        'fill="none" stroke="var(--blue)" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="0.5 4" opacity=".9"/>'})()+'</svg></span>'+
+        'fill="none" stroke="var(--blue)" stroke-width="2.5" stroke-linecap="round" opacity=".95"/>'})()+'</svg></span>'+
     '<span style="text-align:left;line-height:1.15"><span class="mono" style="display:block;font-size:14px;font-weight:600;color:var(--green)">'+d.total.toLocaleString()+'</span>'+
     '<span class="mono" style="display:block;color:var(--faint);font-size:8.5px;letter-spacing:.08em">LEVEL '+L.lv+'</span></span></button>'}
 
