@@ -65,6 +65,9 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
 @keyframes anTick{0%{stroke-dashoffset:28}100%{stroke-dashoffset:0}}
 @keyframes anBreathe{0%,100%{opacity:.55}50%{opacity:1}}
 .an-breathe{animation:anBreathe 2.6s ease-in-out infinite}
+@keyframes ceremony{0%{box-shadow:0 0 0 0 rgba(232,229,220,.35)}70%{box-shadow:0 0 34px 10px rgba(232,229,220,.12)}100%{box-shadow:0 0 22px 4px rgba(232,229,220,.10)}}
+.an-ceremony{animation:ceremony 1.4s ease-out forwards}
+@media (prefers-reduced-motion:reduce){.an-ceremony{animation:none}}
 .an-pop{animation:anPop .42s cubic-bezier(.34,1.4,.5,1) both}
 .an-glow{animation:anGlow 2.4s ease-in-out infinite}
 .an-shimmer{background:linear-gradient(90deg,var(--dim) 20%,var(--amber) 50%,var(--dim) 80%);background-size:220% 100%;
@@ -180,6 +183,9 @@ body.sesslive #app{padding-top:calc(env(safe-area-inset-top) + 10px)} /* the vie
    messages that arrive, a composer that wakes when touched */
 button{transition:transform .16s cubic-bezier(.34,1.56,.64,1),opacity .16s,background-color .18s,border-color .18s}
 button:active{transform:scale(.96)}
+@keyframes wflow{from{opacity:0}to{opacity:1}}
+.wflow{opacity:0;animation:wflow .3s ease forwards}
+@media (prefers-reduced-motion:reduce){.wflow{opacity:1;animation:none}}
 .msg-in{animation:msgIn .34s cubic-bezier(.22,1,.36,1) both}
 @keyframes msgIn{from{opacity:0;transform:translateY(10px) scale(.985)}to{opacity:1;transform:none}}
 .tdots{display:inline-flex;gap:4px;padding:12px 2px 4px}
@@ -380,7 +386,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='d7c185';  // stamped by tools/build.py with the content hash
+const BUILD_ID='f13aeb';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -2426,6 +2432,19 @@ function actChip(m,i){
   return '<div style="margin-top:8px">'+
     (done?'<span class="mono" style="color:var(--green);font-size:11.5px">✓ '+(m.act.kg>0?'+':'')+uwNum(m.act.kg)+' '+uwUnit()+' applied to '+esc(m.act.ex)+'</span>'
          :'<button data-a="coachApply" data-v="'+i+'" class="pill" style="border-color:var(--amber);color:var(--amber);font-size:12px">Apply '+(m.act.kg>0?'+':'')+uwNum(m.act.kg)+' '+uwUnit()+' to '+esc(m.act.ex.replace(/ — .*/,''))+'</button>')+'</div>'}
+function wordFlow(html){
+  /* wrap the text nodes of rendered markdown in staggered spans so the
+     reply reads out word by word; tags stay intact. Delay is capped so
+     a long answer still lands inside ~4s. */
+  try{
+    let n=0;
+    return String(html).replace(/>([^<]+)</g,(mm,txt)=>{
+      const words=txt.split(/(\s+)/).map(w=>{
+        if(!w.trim())return w;
+        const d=Math.min(n++,120)*33;
+        return '<span class="wflow" style="animation-delay:'+d+'ms">'+w+'</span>'});
+      return '>'+words.join('')+'<'})
+  }catch(e){return html}}
 function viewCoach(){
   const th=S.coach.thread,foc=S.coach.focus?S.history.find(h=>h.id===S.coach.focus):null;
   let h='<div class="chatwrap">';
@@ -2467,9 +2486,13 @@ function viewCoach(){
       h+='<p style="color:var(--faint);font-size:12px;line-height:1.55;margin-top:12px">Or just ask — your week, goals and recovery are already in the room.</p>'}
     else h+='<p style="color:var(--faint);font-size:12.5px;line-height:1.55;margin-top:10px">Nothing logged yet. Ask about programming, technique or setting things up.</p>'}
   else h+=th.map((m,i)=>{const inn=i===th.length-1?' msg-in':'';
+      /* the newest reply arrives word by word, ONCE — a re-render must
+         not make her repeat herself (the replay disease) */
+      const speak=m.r!=='user'&&i===th.length-1&&!S.coach.busy&&render.__spokeId!==(S.coach.id||'c')+':'+i;
+      if(speak)render.__spokeId=(S.coach.id||'c')+':'+i;
       return m.r==='user'
       ?'<div class="msg-u'+inn+'">'+esc(m.t)+'</div>'
-      :'<div class="msg-a'+inn+'">'+md(m.t)+actChip(m,i)+'</div>'}).join('')+
+      :'<div class="msg-a'+inn+'">'+(speak?wordFlow(md(m.t)):md(m.t))+actChip(m,i)+'</div>'}).join('')+
      (S.coach.busy?'<div class="tdots msg-in"><span></span><span></span><span></span></div>':'');
   h+='</div>';
   h+='<div class="chatbar"><div class="composer">'+
@@ -5630,7 +5653,7 @@ function paceStr(min,km){if(!min||!km)return '';const p=UNITS.d==='mi'?min/(km*M
 function paceMin(r){return (r.km&&r.mins)?r.mins/r.km:null}
 function runLoad(r){
   // session load: minutes × intensity, the standard sRPE approach
-  const rpe=r.rpe!=null?r.rpe:({easy:4,recovery:3,long:5,tempo:7,interval:8,hills:7,race:9})[r.type]||5;
+  const rpe=r.rpe!=null?r.rpe:({easy:4,recovery:3,long:5,tempo:7,interval:8,hills:7,race:9,walk:2})[r.type]||5;
   return Math.round((r.mins||0)*rpe)}
 function runsIn(days){const cut=Date.now()-days*864e5;
   return runs().filter(r=>new Date(r.date+'T12:00').getTime()>=cut)}
@@ -6115,12 +6138,16 @@ function adhWord(pct){
    in as LOAD for the recovery model: ingested, never coached.
    Running stays the only coached cardio.
    ══════════════════════════════════════════════════════════ */
-const CARDIO_TYPES=[['swim','Swim'],['ride','Ride'],['row','Row']];
+/* 'walk' is first-class on purpose (owner call, Sep 2026): the ACL
+   wedge cannot run yet — their walks ARE the training. Walks land as
+   load in the recovery picture and never touch a running analytic
+   (isRunType guards ACWR, pace, weeklyKm). */
+const CARDIO_TYPES=[['swim','Swim'],['ride','Ride'],['row','Row'],['walk','Walk']];
 function cardioLabel(t){
   const hit=RUN_TYPES.find(x=>x[0]===t)||CARDIO_TYPES.find(x=>x[0]===t);
   return hit?hit[1]:'Cardio'}
 function isRunType(t){return !!RUN_TYPES.find(x=>x[0]===t)}
-const HK_MAP={Running:'easy',Cycling:'ride',Swimming:'swim',Rowing:'row'};
+const HK_MAP={Running:'easy',Cycling:'ride',Swimming:'swim',Rowing:'row',Walking:'walk',Hiking:'walk'};
 function hkDist(v,unit){
   v=parseFloat(v);if(isNaN(v)||v<=0)return 0;
   if(unit==='mi')return v*1.60934;
@@ -6228,7 +6255,7 @@ function hkNative(list){
       if(!/^\d{4}-\d{2}-\d{2}$/.test(date))return;
       out.push({date:date,time:time,type:t,
         km:Math.round((+w.km||0)*100)/100,mins:mins,
-        rpe:t==='easy'?4:5,hr:Math.round(+w.hr||0),elev:0,note:'via Apple Health',
+        rpe:t==='easy'?4:t==='walk'?2:5,hr:Math.round(+w.hr||0),elev:0,note:'via Apple Health',
         id:'hk'+date.replace(/-/g,'')+'t'+time.replace(':','')})});
     if(!out.length)return;
     const res=hkImport({workouts:out,skipped:{}});
@@ -6696,7 +6723,7 @@ try{window.hkNutrition=hkNutrition}catch(e){}
    so Strava, Health sync and file imports can never duplicate. */
 const K_SV='training-strava-v1';
 const SV_MAP={Run:'easy',TrailRun:'easy',VirtualRun:'easy',Ride:'ride',VirtualRide:'ride',
-  Swim:'swim',Rowing:'row'};
+  Swim:'swim',Rowing:'row',Walk:'walk',Hike:'walk'};
 function svState(){return lget(K_SV,null)}
 function svBase(){
   const px=((S.ai&&S.ai.proxy)||'').trim();
@@ -6710,7 +6737,7 @@ function svRows(list){
     const date=d.slice(0,10),time=/T(\d{2}:\d{2})/.test(d)?d.match(/T(\d{2}:\d{2})/)[1]:'08:00';
     if(!/^\d{4}-\d{2}-\d{2}$/.test(date))return;
     out.push({date:date,time:time,type:t,km:Math.round((+a.km||0)*100)/100,mins:mins,
-      rpe:t==='easy'?4:5,hr:Math.round(+a.hr||0),elev:Math.round(+a.elev||0),
+      rpe:t==='easy'?4:t==='walk'?2:5,hr:Math.round(+a.hr||0),elev:Math.round(+a.elev||0),
       note:'via Strava',id:'sv'+a.id})});
   return out}
 function svApi(body){
@@ -8690,8 +8717,22 @@ function holdCard(){
       '<div style="display:flex;justify-content:space-between;align-items:baseline">'+
       '<p class="eyebrow" style="margin:0">Your ground</p>'+
       '<span class="mono" style="color:'+(c.held===c.total?'var(--green)':'var(--faint)')+';font-size:10px">'+c.held+' OF '+c.total+' HELD'+(c.fade?' · '+c.fade+' FADING':'')+'</span></div>'+
+      defendLine(st)+
       '<div style="margin-top:10px">'+bodyMapSvg(st,240)+'</div>'+
       legsLine(st)+'</button>'}catch(e){return ''}}
+function defendLine(st){
+  /* the territory framing: which held muscle falls next, and when —
+     the decay is real physiology, never a punishment timer */
+  try{
+    st=st||holdStates();
+    let next=null;
+    HOLD_MUSCLES.forEach(m=>{const x=st[m];
+      if(x.s==='held'&&x.days!=null&&(!next||x.days>next.days))next={m:m,days:x.days}});
+    if(!next)return '';
+    const left=Math.max(1,8-next.days);
+    const when=left<=1?'tomorrow':new Date(Date.now()+left*864e5).toLocaleDateString(undefined,{weekday:'long'});
+    return '<p style="color:var(--faint);font-size:11.5px;line-height:1.5;margin-top:8px">'+
+      esc(next.m)+' fades '+esc(when)+' — one hard set holds it.</p>'}catch(e){return ''}}
 
 
 
@@ -8848,6 +8889,12 @@ function cbState(){
       cb={state:'offered',gapDays:gap,gapKey:cbLastActivity(),started:null,progress:0};
       lset(K_CB,cb)}else return cb&&cb.state==='on'?cb:null}
   return cb&&cb.state!=='skip'?cb:null}
+function cbEase(why){
+  /* the easing matches the reason — a flare is not jet lag */
+  return why==='ill'?'Off the back of illness the engine dips more than strength — keep the first one very easy and let breathing, not the bar, set the pace.'
+    :why==='travel'?'Travel legs are mostly sleep debt — about 10% off and it will feel normal by session two.'
+    :why==='flare'?'A flare means the joint sets the pace — take 15% off, skip anything that provoked it, and check in daily this week.'
+    :'Take about 10% off the loads and stop a rep earlier than usual; the fitness is still there, the tissue tolerance needs a minute.'}
 function comebackCard(){
   try{
     const cb=cbState();
@@ -8855,7 +8902,12 @@ function comebackCard(){
     if(cb.state==='offered')return '<div class="card mt" style="padding:16px;border-radius:20px;border-color:rgba(240,238,230,.45)">'+
       '<p class="eyebrow" style="color:var(--amber)">The comeback</p>'+
       '<p class="disp gradhead" style="font-size:20px;margin-top:6px">'+cb.gapDays+' days away. Welcome back.</p>'+
-      '<p style="color:var(--dim);font-size:13px;line-height:1.6;margin-top:6px">No streak died — that is not how this app works. The way back in: three sessions, eased on purpose. Take about 10% off the loads and stop a rep earlier than usual; the fitness is still there, the tissue tolerance needs a minute. Finishing all three banks a rare find.</p>'+
+      '<p style="color:var(--dim);font-size:13px;line-height:1.6;margin-top:6px">No streak died — that is not how this app works. The way back in: three sessions, eased on purpose. Finishing all three banks a rare find.</p>'+
+      '<p class="eyebrow" style="margin-top:12px">What kept you away? (it changes the easing)</p>'+
+      '<div style="display:flex;flex-wrap:wrap;gap:7px;margin-top:8px">'+
+      [['life','Life'],['ill','Illness'],['travel','Travel'],['flare','A flare-up']].map(w=>
+        '<button data-a="cbWhy" data-v="'+w[0]+'" class="pill" style="font-size:12px'+((cb.why||'life')===w[0]?';background:var(--text);color:#1F1E1D;border-color:var(--text);font-weight:600':'')+'">'+w[1]+'</button>').join('')+'</div>'+
+      '<p style="color:var(--faint);font-size:12px;line-height:1.55;margin-top:9px">'+esc(cbEase(cb.why))+'</p>'+
       '<div class="row mt" style="gap:10px">'+
       '<button data-a="cbGo" class="btn" style="flex:1;color:var(--amber)">I’m back</button>'+
       '<button data-a="cbSkip" class="btn" style="flex:1;color:var(--dim)">Just resume</button></div></div>';
@@ -8865,7 +8917,7 @@ function comebackCard(){
       '<span class="mono" style="color:var(--amber);font-size:11px">'+(cb.progress||0)+' OF 3</span></div>'+
       '<div style="display:flex;gap:6px;margin-top:10px">'+
       [0,1,2].map(i=>'<div style="flex:1;height:6px;border-radius:3px;background:'+((cb.progress||0)>i?'var(--green)':'var(--line)')+'"></div>').join('')+'</div>'+
-      '<p style="color:var(--faint);font-size:11.5px;line-height:1.5;margin-top:8px">Eased sessions — about 10% off, one rep in hand. The third one banks it.</p></div>';
+      '<p style="color:var(--faint);font-size:11.5px;line-height:1.5;margin-top:8px">'+esc(cbEase(cb.why))+' The third one banks it.</p></div>';
     if(cb.state==='done')return '<div class="card mt an-glow" style="padding:15px 16px;border-radius:20px;border-color:var(--green)">'+
       '<p class="eyebrow" style="color:var(--green);margin:0">Comeback complete</p>'+
       '<p style="color:var(--dim);font-size:12.5px;line-height:1.55;margin-top:5px">Three sessions after '+cb.gapDays+' days away. Banked as a rare find — the kind of thing most apps punish and this one keeps.</p></div>';
@@ -10467,6 +10519,57 @@ function ghostBank(g){
       d:g.now+' sessions against the '+g.best+' your best week ever held. The ghost is now you.',
       rar:'rare',tag:'streak',found:today()};
     bankSave()}catch(e){}}
+
+/* ══ the friend ghost (Sep 2026) ════════════════════════════
+   Social a year before the social backend: two people swap tiny
+   ghost codes — best week's sessions and km, a first name, and
+   NOTHING else — and each races the other's best week. Compete
+   on showing up, never on output (the standing law). The code is
+   data the user chooses to share, so it lives in a normal backed-
+   up key, not a credential one. */
+const K_FG='training-fghost-v1';
+function fghost(){return S.fghost===undefined?(S.fghost=lget(K_FG,null)):S.fghost}
+function fghostCode(){
+  const g=ghostData();if(!g||g.best<2)return null;
+  const name=String((S.prof&&S.prof.name)||'A friend').replace(/[^\x20-\x7E]/g,'').slice(0,12)||'A friend';
+  try{return 'AG1.'+btoa(JSON.stringify({v:1,n:name,s:g.best,k:g.bestKm||0}))}catch(e){return null}}
+function fghostParse(str){
+  try{
+    const m=/AG1\.([A-Za-z0-9+/=]+)/.exec(String(str||''));
+    if(!m)return null;
+    const o=JSON.parse(atob(m[1]));
+    if(o.v!==1)return null;
+    const sN=Math.round(+o.s),kN=Math.round((+o.k||0)*10)/10;
+    if(!(sN>=1&&sN<=14))return null;
+    if(!(kN>=0&&kN<=400))return null;
+    return{n:String(o.n||'A friend').replace(/[^\x20-\x7E]/g,'').slice(0,12)||'A friend',s:sN,k:kN}
+  }catch(e){return null}}
+function fghostBank(g,f){
+  try{
+    if(!f||g.now<=f.s)return;
+    const bank=discBank(),id='fghost:'+questWeekKey();
+    if(bank[id])return;
+    bank[id]={t:'Outlasted '+f.n+'’s best week',
+      d:g.now+' sessions against the '+f.s+' in '+f.n+'’s best week ever. Showing up is the whole competition.',
+      rar:'uncommon',tag:'streak',found:today()};
+    bankSave()}catch(e){}}
+function fghostRows(g){
+  const f=fghost();if(!f)return '';
+  fghostBank(g,f);
+  const beat=g.now>f.s,pct=Math.min(100,Math.round(g.now/Math.max(1,f.s)*100));
+  let h='<div style="display:flex;justify-content:space-between;align-items:baseline;margin-top:13px;padding-top:11px;border-top:1px solid var(--line)">'+
+    '<span style="font-size:12.5px;font-weight:600">'+esc(f.n)+'’s best</span>'+
+    '<span class="mono" style="font-size:11px;color:'+(beat?'var(--green)':'var(--text)')+'">'+g.now+
+    '<span style="color:var(--faint)"> vs '+f.s+'</span></span></div>'+
+    '<div style="position:relative;height:5px;border-radius:3px;background:var(--line);margin-top:6px">'+
+    '<div class="an-bar" style="height:5px;border-radius:3px;width:'+pct+'%;background:'+(beat?'var(--green)':'#1E9BFF')+'"></div>'+
+    '<div style="position:absolute;top:-2.5px;left:calc(100% - 1px);width:2px;height:10px;border-radius:1px;background:#1E9BFF"></div></div>';
+  if(S.runOn&&f.k>=5){
+    const kb=g.km>f.k,kp=Math.min(100,Math.round(g.km/f.k*100));
+    h+='<div style="display:flex;justify-content:space-between;align-items:baseline;margin-top:9px">'+
+      '<span style="font-size:12px;color:var(--dim)">'+udStr(g.km)+' vs '+esc(f.n)+'’s '+udStr(f.k)+'</span>'+
+      '<span class="mono" style="font-size:10px;color:'+(kb?'var(--green)':'var(--faint)')+'">'+kp+'%</span></div>'}
+  return h}
 function ghostCard(){
   try{
     const g=ghostData();
@@ -10495,9 +10598,12 @@ function ghostCard(){
         '<div style="position:relative;height:5px;border-radius:3px;background:var(--line);margin-top:6px">'+
         '<div class="an-bar" style="height:5px;border-radius:3px;width:'+kp+'%;background:'+(kb?'var(--green)':'var(--dim)')+'"></div>'+
         '<div style="position:absolute;top:-2.5px;left:calc(100% - 1px);width:2px;height:10px;border-radius:1px;background:var(--amber)"></div></div>'}
+    h+=fghostRows(g);
     h+='<p style="color:var(--faint);font-size:10.5px;line-height:1.5;margin-top:9px">'+
       (beat?'A new best week. Next week, this one is the ghost.'
         :'Your best week ever, racing quietly beside this one. Catching it is optional; knowing where it stands is not.')+'</p>';
+    h+='<button data-a="fghostOpen" class="mono" style="display:block;width:100%;text-align:left;color:'+(fghost()?'var(--faint)':'var(--amber)')+';font-size:10.5px;margin-top:7px">'+
+      (fghost()?'Ghost codes ›':'Race a friend — swap ghost codes ›')+'</button>';
     return h+'</div>'}catch(e){return ''}}
 
 function viewToday(){
@@ -10637,7 +10743,9 @@ function viewSession(){
     try{h+=tomorrowHook()}catch(e){}
     {const rev=S.sessReveal;
      if(rev&&rev.show){const r=rarityOf(rev.show.rar);
-      h+='<div class="card mt2 an-hero an-glow an-pop" style="padding:17px;border-radius:20px;border-color:'+r[1]+'">'+
+      const big9=rev.show.rar==='epic'||rev.show.rar==='rare';
+      if(big9)try{vib([15,60,25])}catch(e){}
+      h+='<div class="card mt2 an-hero an-glow an-pop'+(big9?' an-ceremony':'')+'" style="padding:17px;border-radius:20px;border-color:'+r[1]+'">'+
         '<div style="display:flex;align-items:center;gap:9px">'+
         '<img src="'+MARK+'" alt="" class="an-mark" style="width:19px;height:19px;object-fit:contain">'+
         '<p class="mono" style="font-size:9.5px;color:'+r[1]+';letter-spacing:.06em">'+esc(r[2].toUpperCase())+' \u00b7 UNLOCKED</p></div>'+
@@ -12339,6 +12447,20 @@ function sheetHtml(){
       '</div>'+
       '<button data-a="histImpGo" class="big disp mt" style="background:'+((f.date||'').trim()?'var(--amber)':'var(--raised)')+';color:'+((f.date||'').trim()?'#1F1E1D':'var(--faint)')+';font-size:15px">Bring it in</button>'+
       '<p style="color:var(--faint);font-size:11px;line-height:1.55;margin-top:10px">Sessions are spread across each week and marked as imported with approximate dates — honest labels, real data.</p>')}
+  if(S.sheet.t==='fghost'){
+    const code=fghostCode(),f=fghost();
+    return wrapSheet('Race a friend',
+      '<p style="color:var(--dim);font-size:13px;line-height:1.6">Swap ghost codes and each of you races the other’s best week. A code carries a first name, a session count and a distance — nothing else leaves your phone.</p>'+
+      (code?'<button data-a="fghostCopy" class="card mt" style="width:100%;text-align:left;padding:12px 15px;display:flex;align-items:center;gap:10px">'+
+        '<span class="mono" style="font-size:11px;color:var(--amber);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(code)+'</span>'+
+        '<span class="mono" style="font-size:10px;color:var(--faint);flex:none">COPY YOURS</span></button>'
+        :'<p style="color:var(--faint);font-size:12px;margin-top:10px">Your own code appears once you have a best week of at least 2 sessions.</p>')+
+      '<p class="eyebrow mt2">Paste theirs</p>'+
+      '<textarea data-in="fgIn" rows="2" placeholder="AG1.…" style="margin-top:8px;font-size:13px">'+esc(S.fgIn||'')+'</textarea>'+
+      '<button data-a="fghostGo" class="big disp mt" style="background:var(--amber);color:#1F1E1D;font-size:15px">Add the ghost</button>'+
+      (f?'<div class="card mt" style="padding:12px 15px;display:flex;align-items:center;gap:10px">'+
+        '<span style="flex:1;font-size:13px">Racing <b>'+esc(f.n)+'</b> — best week '+f.s+' sessions'+(f.k?', '+udStr(f.k):'')+'</span>'+
+        '<button data-a="fghostOff" class="mono" style="color:var(--red);font-size:11px;flex:none">Remove</button></div>':''))}
   if(S.sheet.t==='pred'){
     const d=predToday(),ps=predStats();
     if(!d||!d.ex)return wrapSheet('The forecast','<p style="color:var(--dim);font-size:13px;line-height:1.6">No call today — Allena forecasts when a program day is on and it has seen the lift at least three times.</p>');
@@ -14355,7 +14477,11 @@ function runAction(a,v,t,e){
     case 'gamPick':S.gform.am=+t.dataset.v;render();break;
     case 'gamSave':{const v2=+((S.gform||{}).am);if(!(v2>0)){flash('Pick a number first.');break}
       const hr2=new Date().getHours(),d3=garDay();
-      if(hr2<12){d3.am=v2;garSave();S.sheet=null;flash('Logged — '+v2+'/100 this morning.')}
+      if(hr2<12){d3.am=v2;garSave();S.sheet=null;
+        let fl='Logged — '+v2+'/100 this morning.';
+        try{const pd=predToday();
+          if(pd&&pd.ex&&!pd.outcome)fl='Logged. Today\u2019s call: '+String(pd.ex).replace(/ \u2014 .*/,'')+' '+uwStr(pd.predW)+'\u00d7'+pd.predR+'.'}catch(e){}
+        flash(fl)}
       else{d3.day=v2;d3.dayHr=hr2;garSave();S.sheet=null;
         flash('Logged — '+v2+'/100. Read as a '+(hr2<17?'afternoon':'evening')+' number, not a fresh baseline.')}
       break}
@@ -14552,6 +14678,14 @@ function runAction(a,v,t,e){
     case 'svGo':svConnect();break;
     case 'suGateGo':if(S.setup)S.setup.gate=false;render();break;
     case 'suGateBack':if(S.setup)S.setup.gate=true;render();break;
+    case 'fghostOpen':S.sheet={t:'fghost'};render();break;
+    case 'fghostCopy':{try{navigator.clipboard.writeText(fghostCode()+' — my Allena ghost code. Paste it in Today → The ghost → Race a friend.');flash('Copied — send it to them.')}catch(e){flash('Could not copy.')}break}
+    case 'fghostGo':{const f=fghostParse(S.fgIn);
+      if(!f){flash('That does not read as a ghost code — it starts with AG1.');break}
+      S.fghost=f;lset('training-fghost-v1',f);S.fgIn='';S.sheet=null;render();
+      flash('Racing '+f.n+'’s best week from now on.');break}
+    case 'fghostOff':S.fghost=null;ldel('training-fghost-v1');render();flash('Ghost removed.');break;
+    case 'cbWhy':{const cb=cbStore();if(cb){cb.why=v;lset(K_CB,cb)}render();break}
     case 'wrapShare':wrapShareRun(v);break;
     case 'predOpen':S.sheet={t:'pred'};render();break;
     case 'impGuideOpen':S.impgBack=v||'';S.impg=S.impg||'garmin';S.impgStep=0;S.sheet={t:'impguide'};render();break;
