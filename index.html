@@ -380,7 +380,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='e7449e';  // stamped by tools/build.py with the content hash
+const BUILD_ID='53d348';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -885,8 +885,22 @@ function aiReady(){return !!(((S.ai&&S.ai.proxy)||'').trim()||(S.ai&&S.ai.key)||
   (typeof acctReady==='function'&&acctReady()&&acct()&&acct().refresh))}
 async function claudeFetch(body){
   const px=((S.ai&&S.ai.proxy)||'').trim();
-  if(px)return fetch(px,{method:'POST',headers:{'content-type':'application/json'},
-    body:JSON.stringify(body)});
+  if(px){
+    /* the cloud streams (Netlify's 10s wall killed long conversions);
+       reassemble the SSE here so every caller still gets plain JSON */
+    const res=await fetch(px,{method:'POST',headers:{'content-type':'application/json'},
+      body:JSON.stringify(body)});
+    const ct=res.headers.get('content-type')||'';
+    if(ct.indexOf('event-stream')<0)return res;   // errors and caps arrive as JSON
+    const txt=await res.text();
+    const out={content:[{type:'text',text:''}],stop_reason:null};
+    txt.split('\n').forEach(l=>{
+      if(l.slice(0,5)!=='data:')return;
+      let d;try{d=JSON.parse(l.slice(5))}catch(e){return}
+      if(d.type==='content_block_delta'&&d.delta&&d.delta.text)out.content[0].text+=d.delta.text;
+      if(d.type==='message_delta'&&d.delta&&d.delta.stop_reason)out.stop_reason=d.delta.stop_reason;
+      if(d.type==='error'||d.error)out.error=(d.error&&d.error.error)||d.error||d});
+    return new Response(JSON.stringify(out),{status:200,headers:{'content-type':'application/json'}})}
   if(acctReady()&&acct()&&acct().refresh&&!(S.ai&&S.ai.key)){
     const tok=await acctToken();
     if(tok)return fetch(CLOUD.url+'/functions/v1/coach',{method:'POST',
@@ -2784,7 +2798,8 @@ function viewImport(){
       '<p style="color:var(--faint);font-size:11.5px;line-height:1.5;margin-top:8px">Excel files are read right on the phone — every sheet, nothing uploaded. The text lands above so you can trim it before Allena reads it.</p>';
     if(f.img)h+='<img src="'+f.img+'" style="width:100%;max-height:180px;object-fit:contain;border-radius:12px;margin-top:10px;background:var(--surface)">';
     if(f.err)h+='<p style="color:var(--red);font-size:12.5px;line-height:1.5;margin-top:12px">'+esc(f.err)+'</p>';
-    h+='<button data-a="impParse" class="big disp mt2" style="background:'+((f.text.trim()||f.img)&&!f.busy?'var(--amber)':'var(--raised)')+';color:'+((f.text.trim()||f.img)&&!f.busy?'#1F1E1D':'var(--faint)')+';font-size:15px">'+(f.busy?'Reading…':'Read it with Allena')+'</button>'+
+    h+=(!aiReady()?aiLockHtml('Reading this file')
+      :'<button data-a="impParse" class="big disp mt2" style="background:'+((f.text.trim()||f.img)&&!f.busy?'var(--amber)':'var(--raised)')+';color:'+((f.text.trim()||f.img)&&!f.busy?'#1F1E1D':'var(--faint)')+';font-size:15px">'+(f.busy?'Reading…':'Read it with Allena')+'</button>')+
       '<p style="color:var(--faint);font-size:11.5px;line-height:1.55;margin-top:8px">It lands in the block editor so you can fix anything Allena misread, then she reviews the whole thing before you run it.</p>';
     if(!S.ai.key)h+='<p style="color:var(--faint);font-size:11.5px;margin-top:8px">Needs your API key — Data → Allena.</p>';
   }
@@ -2841,7 +2856,9 @@ function scanSheet(){
   inner+='<label class="btn mt" style="display:block;text-align:center;cursor:pointer">'+(f.img?'Choose a different photo':'Choose a photo')+
     '<input type="file" accept="image/*" data-scanfile="1" style="display:none"></label>';
   if(f.img)inner+='<img src="'+f.img+'" style="width:100%;max-height:190px;object-fit:contain;border-radius:12px;margin-top:10px;background:var(--surface)">';
-  if(f.img&&S.ai.key)inner+='<button data-a="scanRead" class="btn mt" style="border-color:var(--amber);color:var(--amber)'+(f.busy?';opacity:.5':'')+'">'+(f.busy?'Reading…':'Read the numbers with Allena')+'</button>';
+  if(f.img)inner+=(aiReady()
+    ?'<button data-a="scanRead" class="btn mt" style="border-color:var(--amber);color:var(--amber)'+(f.busy?';opacity:.5':'')+'">'+(f.busy?'Reading…':'Read the numbers with Allena')+'</button>'
+    :aiLockHtml('Reading the scan photo'));
   inner+='<p class="eyebrow" style="margin-top:18px">Date</p>'+
     '<input type="date" data-sdate="1" value="'+esc(f.date)+'" style="width:100%;margin-top:6px;background:var(--surface);border:1px solid var(--line);border-radius:10px;color:var(--text);padding:11px;font-size:16px;outline:none">';
   inner+='<div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px;margin-top:14px">'+
@@ -9600,6 +9617,12 @@ function muscleChips(ex){
       '</div>'}catch(e){return ''}}
 
 function unseenFindings(){try{return unseenPatterns()+unseenDiscoveries()}catch(e){return 0}}
+function aiLockHtml(what){
+  /* the honest gate: greyed, locked, and one tap from the fix */
+  return '<button data-a="drawerAi" style="width:100%;display:flex;align-items:center;gap:10px;margin-top:10px;padding:12px 14px;border-radius:12px;background:var(--surface);border:1px dashed var(--line);text-align:left">'+
+    '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--faint)" stroke-width="2" stroke-linecap="round" style="flex:none"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>'+
+    '<span style="flex:1;font-size:12.5px;color:var(--dim)">'+esc(what)+' needs an API key or the Allena cloud link</span>'+
+    '<span class="mono" style="color:var(--amber);font-size:11px;flex:none">Set up \u203a</span></button>'}
 function findingsBtn(){
   /* the brain, worn on the header (owner call, Sep 2026): same
      neural glyph as the deep read, fully lit, on a heavier chip —
@@ -9885,7 +9908,8 @@ function deepCard(){
         return '<p class="mono" style="color:var(--blue);font-size:9.5px;letter-spacing:.04em;margin-top:9px">WATCHING: '+w.map(x=>esc(x.t)).join(' \u00b7 ')+' \u2014 the next read reports on '+(w.length===1?'it':'each')+'</p>'})()+
       '<p class="mono" style="color:var(--faint);font-size:10px;margin-top:9px">Banked in your collection. The next read opens when it has something new to see — train, run or check in, and tomorrow it reads again.</p>';
   else if(!aiReady())
-    inner='<p style="color:var(--dim);font-size:12.5px;line-height:1.6;margin-top:8px">The rule engines find what was pre-imagined; the model finds the rest — lags, thresholds, relationships between your signals. Sign in (Settings → account) and this unlocks with no key needed.</p>';
+    inner='<p style="color:var(--dim);font-size:12.5px;line-height:1.6;margin-top:8px;opacity:.7">The rule engines find what was pre-imagined; the model finds the rest — lags, thresholds, relationships between your signals.</p>'+
+      aiLockHtml('The deep read');
   else{
     const rdy=deepReadyInfo();
     if(rdy)
@@ -12686,7 +12710,8 @@ function render(){
       drow('findings','Patterns in your data',I2.spark)+
       drow('collection','The collection',I2.star)+
       drow('history','History',I2.save)+
-      drow('history','Import your data',I2.load,'intakeOpen');
+      drow('history','Import your data',I2.load,'intakeOpen')+
+      drow('data','Allena \u2014 AI coach',I2.ai,'drawerAi','');
     const recents=(S.chats||[]).slice(0,6);
     if(recents.length)rows+='<p style="color:var(--faint);font-size:12.5px;margin:16px 13px 4px">Recents</p>'+
       recents.map(c=>'<div style="display:flex;align-items:center">'+
@@ -14093,6 +14118,7 @@ function runAction(a,v,t,e){
     case 'unitW':unitsSet('w',v);render();flash(v==='lb'?'Weights now read in pounds — stored metric underneath.':'Weights back to kilograms.');break;
     case 'unitD':unitsSet('d',v);render();flash(v==='mi'?'Distances now read in miles — stored metric underneath.':'Distances back to kilometres.');break;
     case 'progNoteOpen':S.sheet={t:'prognote'};render();break;
+    case 'drawerAi':S.drawerOpen=false;runAction('dsetOpen','Allena \u2014 AI coach');break;
     case 'progDataGo':{const o9=S.impDataOffer;if(!o9)break;
       S.impDataOffer=null;S.sheet=null;
       impNew();S.imp.grid=o9.grid;S.imp.fileName=o9.fileName;S.imp.kindHint='hist';
