@@ -373,7 +373,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='503286';  // stamped by tools/build.py with the content hash
+const BUILD_ID='f61e06';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -1177,7 +1177,9 @@ A.nav=v=>{if(v!=='session'&&S.sess&&S.sess.phase==='resting'){/* the timer keeps
   S.sheet=null;S.view=v;if(v!=='session')wakeOff();render()};
 A.pickProg=id=>{S.lib.activeId=id;saveLib();setWeek(weekFor(id),id);render()};
 A.week=w=>{const p=activeProgSafe();setWeek(Math.min(+w,p?p.weeks:+w));render()};
-A.startRehab=(pid,di)=>{audioInit();
+A.startRehab=(pid,di)=>{
+  if(S.sess){flash('A session is already live — finish it or discard it first.');A.resume();return}
+  audioInit();
   const p=S.lib.programs.find(x=>x.id===pid);if(!p)return;
   let sets=buildSets(p,+di,1);
   if(!sets.length)return flash('Nothing programmed for that session.');
@@ -1255,7 +1257,12 @@ A.preview=(di,pid)=>{const p=pid?S.lib.programs.find(x=>x.id===pid):activeProgSa
     ex.push({no:no,name:c.ex,sets:src.length?src:Array.from({length:c.sets||1},()=>({ex:c.ex,rest:60})),
       keep:false,cut:true})});
   S.prev={pid:p.id,di:+di,wk:wk,ex:ex,mode:(cutHere.length?null:'full')};S.sheet={t:'preview'};render()};
-A.start=di=>{audioInit();const p=activeProg();let sets=sessionSets(p,+di,S.week);
+A.start=di=>{
+  /* one live session at a time (owner call, Sep 2026): starting another
+     while one is minimized would silently clobber it — return to the
+     live one instead */
+  if(S.sess){flash('A session is already live — finish it or discard it first.');A.resume();return}
+  audioInit();const p=activeProg();let sets=sessionSets(p,+di,S.week);
   if(!S.swapSkip){
     const prior=S.history.filter(h=>h.progId===p.id&&h.dayIdx===+di&&h.swaps&&h.swaps.length)
       .sort((a,b)=>b.date.localeCompare(a.date))[0];
