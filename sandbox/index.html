@@ -380,7 +380,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='c340c2';  // stamped by tools/build.py with the content hash
+const BUILD_ID='08c1e5';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -1868,12 +1868,31 @@ function startSetup(pre){
   if(!pre){const d=profDeduce();
     if(d){Object.assign(S.setup,{days:d.days,style:d.style,exp:d.exp,years:d.years,goals:d.goals,goal:Object.keys(d.goals)[0]||null,_deduced:d,
       runs:d.run?(d.run.wkKm>=15?'regular':'some'):S.setup.runs})}}
+  S.setup.gate=!pre&&!S.setup._deduced;   // the front door: one choice, then questions
   S.sheet=null;S.view='setup';render()}
 function suPills(k,opts,multi){return '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:10px">'+opts.map(o=>{
   const on=multi?!!S.setup.restr[o[0]]:String(S.setup[k])===String(o[0]);
   return '<button data-a="'+(multi?'suRestr':'suPick')+'" data-k="'+k+'" data-v="'+o[0]+'" class="pill" style="'+(on?'background:var(--text);color:#1F1E1D;border-color:var(--text);font-weight:600':'')+'">'+o[1]+'</button>'}).join('')+'</div>'}
 function viewSetup(){
   const st=S.setup||(S.setup={step:0,name:'',sex:null,age:30,exp:null,years:1,days:3,mins:60,eq:'full',eqx:{},goal:null,focus:{},style:'mixed',weeks:6,restr:{},notes:''});
+  if(st.gate){
+    const door=(a,label,sub,primary)=>'<button data-a="'+a+'" class="card" style="width:100%;text-align:left;padding:15px 16px;margin-top:10px'+(primary?';border-color:var(--amber)':'')+'">'+
+      '<span style="display:flex;align-items:center;gap:11px"><span style="flex:1;min-width:0">'+
+      '<span style="display:block;font-size:15px;font-weight:600'+(primary?';color:var(--amber)':'')+'">'+label+'</span>'+
+      (sub?'<span style="color:var(--dim);font-size:12px;line-height:1.5;display:block;margin-top:3px">'+sub+'</span>':'')+
+      '</span><span class="mono" style="color:'+(primary?'var(--amber)':'var(--faint)')+';font-size:14px;flex:none">\u203a</span></span></button>';
+    return '<div class="view pad stg" style="padding-top:56px">'+
+      '<h1 class="disp brand" style="font-size:30px;font-weight:600">Allena</h1>'+
+      '<p style="color:var(--dim);font-size:14px;line-height:1.6;margin-top:8px">How do you want to start?</p>'+
+      '<div style="margin-top:14px">'+
+      door('suGateGo','Let Allena build it with you','Eight quick questions, a block shaped around you',true)+
+      door('setupImport','I already have training history','Hevy, Strong, Garmin, a spreadsheet \u2014 Allena reads the evidence')+
+      door('suOwn','I\u2019ll write my own block','Type it in \u2014 Allena reviews it and runs it')+
+      door('suRestore','I have an Allena backup','Restore everything from the file')+
+      door('suSkip','Just let me look around','Straight to Today \u2014 set up whenever')+
+      '</div>'+
+      '<p style="color:var(--faint);font-size:11.5px;margin-top:18px;text-align:center">Everything stays on this phone.</p>'+
+      '</div>'}
   const T=['About you','Experience','Schedule','Equipment','Your goal','Emphasis','Health','Review'];
   const ded=st._deduced?'<div class="card" style="padding:11px 14px;margin-top:12px;border-color:var(--green)">'+
     '<p class="mono" style="color:var(--green);font-size:9px;letter-spacing:.06em">READ FROM YOUR DATA \u00b7 '+st._deduced.n+' SESSIONS</p>'+
@@ -1888,16 +1907,7 @@ function viewSetup(){
       '<span style="flex:1"><span style="display:block;font-size:13.5px;font-weight:600">'+label+'</span>'+
       (sub?'<span style="color:var(--faint);font-size:11.5px">'+sub+'</span>':'')+'</span></button>'};
   let b='';
-  if(st.step===0)b=(st._deduced?ded:'<button data-a="setupImport" class="card" style="width:100%;text-align:left;padding:13px 15px;margin-top:12px;display:flex;align-items:center;gap:11px;border-style:dashed">'+
-    '<span style="flex:1;min-width:0"><span style="display:block;font-size:13px;font-weight:600">Already have training history?</span>'+
-    '<span style="color:var(--faint);font-size:11px;line-height:1.4">Bring it in first \u2014 Hevy, Strong, Garmin, a spreadsheet \u2014 and Allena fills these questions out from the evidence.</span></span>'+
-    '<span class="mono" style="color:var(--amber);font-size:13px;flex:none">\u203a</span></button>')+
-    '<button data-a="suSkip" style="display:flex;align-items:center;width:100%;text-align:left;padding:11px 4px;gap:10px;border-bottom:1px solid var(--line)">'+
-      '<span style="flex:1;color:var(--dim);font-size:13px">Skip all this \u2014 <b style="color:var(--text)">go to Today</b> and set up later</span>'+
-      '<span class="mono" style="color:var(--faint);font-size:13px">\u203a</span></button>'+
-    '<button data-a="suRestore" style="display:flex;align-items:center;width:100%;text-align:left;padding:11px 4px;gap:10px">'+
-      '<span style="flex:1;color:var(--dim);font-size:13px">Have a backup? <b style="color:var(--text)">Restore it</b></span>'+
-      '<span class="mono" style="color:var(--faint);font-size:13px">\u203a</span></button>'+'<p style="color:var(--dim);font-size:13px;line-height:1.55;margin-top:8px">Eight quick screens and Allena builds the block around you. Everything stays on this phone.</p>'+
+  if(st.step===0)b=(st._deduced?ded:'<p style="color:var(--dim);font-size:13px;line-height:1.55;margin-top:8px">A name makes it yours; the rest shapes starting effort and rest.</p>')+
     '<p class="eyebrow" style="margin-top:20px">Name</p><input data-in="setup.name" value="'+esc(st.name)+'" placeholder="Optional" style="width:100%;margin-top:8px;background:var(--surface);border:1px solid var(--line);border-radius:10px;color:var(--text);padding:12px;font-size:16px;outline:none">'+
     '<p class="eyebrow" style="margin-top:18px">Sex</p>'+suPills('sex',[['female','Female'],['male','Male'],['na','Prefer not to say']])+
     '<div style="margin-top:18px;max-width:210px">'+stepper('setup.age','Age',st.age,1,'yrs')+'</div>'+
@@ -2044,9 +2054,10 @@ function viewSetup(){
     '<p class="mono" style="color:var(--faint);font-size:10px;letter-spacing:.08em;text-transform:uppercase;margin-top:12px">Step '+(st.step+1)+' of '+T.length+'</p>'+
     '<h1 class="disp" style="font-size:24px;font-weight:600;margin-top:2px">'+T[st.step]+'</h1>'+b+
     '<div class="row mt2">'+
-    (st.step>0?'<button data-a="suStep" data-v="-1" class="btn" style="flex:1">Back</button>':'')+
+    (st.step>0?'<button data-a="suStep" data-v="-1" class="btn" style="flex:1">Back</button>'
+      :st._deduced?'':'<button data-a="suGateBack" class="btn" style="flex:1">Back</button>')+
     (st.step<T.length-1?'<button data-a="suStep" data-v="1" class="btn" style="flex:2;border-color:var(--amber);color:var(--amber)">Next</button>':'')+'</div>'+
-    (st.step===0?'<button data-a="suOwn" style="width:100%;padding:14px;color:var(--faint);font-size:12px;margin-top:6px">Skip — I will write my own block</button>':'')+
+
     '</div>'}
 
 function gBase(n){return String(n).split('—')[0].trim()}
@@ -14165,6 +14176,8 @@ function runAction(a,v,t,e){
       break}
     case 'rimpBack':S.rimp.res=null;render();break;
     case 'svGo':svConnect();break;
+    case 'suGateGo':if(S.setup)S.setup.gate=false;render();break;
+    case 'suGateBack':if(S.setup)S.setup.gate=true;render();break;
     case 'impGuideOpen':S.impgBack=v||'';S.impg=S.impg||'garmin';S.sheet={t:'impguide'};render();break;
     case 'impgSrc':S.impg=v;render();break;
     case 'impgCopy':{try{navigator.clipboard.writeText(v).then(function(){flash('Copied — paste it into Safari\'s address bar.')})}catch(e){flash('Could not copy — type it into Safari: '+v)}break}
