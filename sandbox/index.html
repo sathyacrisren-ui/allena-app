@@ -380,7 +380,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='b9de68';  // stamped by tools/build.py with the content hash
+const BUILD_ID='22a124';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -9513,7 +9513,7 @@ function secSessions(p,ws){
   let h='<p class="eyebrow" style="margin-top:26px">'+(daily?'Today':'Week '+S.week+' sessions')+'</p>'+
     '<div style="margin-top:10px;display:flex;flex-direction:column;gap:12px">';
   p.days.forEach((d,i)=>{if(isDropped(p,i,S.week)){const sets=buildSets(p,i,S.week);if(!sets.length)return;
-      h+='<div class="card" style="padding:13px 16px;opacity:.55"><p class="eyebrow">Day '+(i+1)+' · dropped this week</p>'+
+      h+='<div class="card" style="padding:13px 16px;opacity:.55"><p class="eyebrow">Day '+(i+1)+' · skipped this week</p>'+
         '<p class="disp" style="font-size:15px;font-weight:600;margin-top:3px;color:var(--dim)">'+esc(d.name)+'</p>'+
         '<button data-a="weekUndrop" data-v="'+i+'" class="mono" style="color:var(--amber);font-size:11px;margin-top:6px">Put it back</button></div>';return}
     h+=dayCard(p,d,i,doneSet.has(d.name),daily)});
@@ -13203,8 +13203,21 @@ function runAction(a,v,t,e){
     case 'weekUndrop':{const p=activeProgSafe(),k=p.id+':'+S.week;
       S.dropped[k]=(S.dropped[k]||[]).filter(x=>x!==+v);lset(K_DROP,S.dropped);render();break}
     case 'weekClose':{const p=activeProgSafe();
-      if(S.week<p.weeks){setWeek(S.week+1);weekClockSet(p,S.week);flash('Week '+S.week+' started — a clean seven days.')}
-      else flash('That was the last week of the block — build the next one from the Program card.');
+      /* nothing silently disappears: whatever the closed week did not
+         get to is marked skipped IN that week, visible on its pills
+         and session list (owner call, Sep 2026) */
+      try{const wk0=S.week,ws0=weekState(p,wk0);
+        const k0=p.id+':'+wk0;S.dropped=S.dropped||{};
+        const skipped=[];
+        p.days.forEach((d,i)=>{
+          if(!buildSets(p,i,wk0).length)return;
+          if(ws0.done.has(d.name))return;
+          if((S.dropped[k0]||[]).indexOf(i)>=0)return;
+          skipped.push(i)});
+        if(skipped.length){S.dropped[k0]=(S.dropped[k0]||[]).concat(skipped);lset(K_DROP,S.dropped)}
+        if(S.week<p.weeks){setWeek(S.week+1);weekClockSet(p,S.week);
+          flash('Week '+wk0+' closed'+(skipped.length?' — '+skipped.length+' session'+(skipped.length===1?'':'s')+' marked skipped':'')+'. Week '+S.week+' starts clean.')}
+        else flash('That was the last week of the block — build the next one from the Program card.')}catch(e){}
       render();break}
     case 'weekDrop':{const p=activeProgSafe();
       S.dropped=S.dropped||{};const k=p.id+':'+S.week;
