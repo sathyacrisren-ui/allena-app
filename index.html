@@ -386,7 +386,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='cbaf35';  // stamped by tools/build.py with the content hash
+const BUILD_ID='e458f4';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -1896,8 +1896,12 @@ function viewSetup(){
       '<span style="display:block;font-size:15px;font-weight:600'+(primary?';color:var(--amber)':'')+'">'+label+'</span>'+
       (sub?'<span style="color:var(--dim);font-size:12px;line-height:1.5;display:block;margin-top:3px">'+sub+'</span>':'')+
       '</span><span class="mono" style="color:'+(primary?'var(--amber)':'var(--faint)')+';font-size:14px;flex:none">\u203a</span></span></button>';
+    const fg9=(typeof fghost==='function')?fghost():null;
     return '<div class="view pad stg" style="padding-top:56px">'+
       '<h1 class="disp brand" style="font-size:30px;font-weight:600">Allena</h1>'+
+      (fg9?'<div class="card" style="padding:12px 15px;margin-top:14px;border-color:var(--green)">'+
+        '<p class="mono" style="font-size:9px;color:var(--green);letter-spacing:.06em">RACE LINKED</p>'+
+        '<p style="color:var(--dim);font-size:12.5px;line-height:1.5;margin-top:4px">'+esc(fg9.n)+'’s best week ('+fg9.s+' sessions) is waiting to race yours — pick a door and it starts.</p></div>':'')+
       '<p style="color:var(--dim);font-size:14px;line-height:1.6;margin-top:8px">How do you want to start?</p>'+
       '<div style="margin-top:14px">'+
       door('suGateGo','Let Allena build it with you','Eight quick questions, a block shaped around you',true)+
@@ -6868,6 +6872,18 @@ function svAutoSync(){
   if(!st)return;
   if(Date.now()-(st.last||0)<20*3600*1000)return;
   svPull(true)}
+function fgCapture(){
+  /* a mate taps the shared link → the race links itself. Works for
+     Safari/PWA storage; wrapper users get the paste button instead. */
+  try{
+    const q=new URLSearchParams(location.search);
+    const raw=q.get('ghost');if(!raw)return false;
+    try{history.replaceState(null,'',location.pathname)}catch(e){}
+    const f=fghostParse(raw);if(!f)return false;
+    S.fghost=f;lset('training-fghost-v1',f);
+    flash('Linked — '+f.n+'’s best week races yours from now on.');
+    return true}catch(e){return false}}
+try{fgCapture()}catch(e){}
 try{if(!svCapture())setTimeout(svAutoSync,4000)}catch(e){}
 
 /* ── local notifications (Sep 2026) ──────────────────────────
@@ -7815,6 +7831,16 @@ function wrapLine(){
     '<span class="mono" style="color:var(--faint);font-size:9px;letter-spacing:.06em;flex:none">WRAP</span>'+
     '<span style="flex:1;min-width:0;font-size:12px;color:var(--dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(ymName(pm))+' is ready to read</span>'+
     '<span class="mono" style="color:var(--amber);font-size:11px;flex:none">Open</span></button>'}
+function wrapCard(){
+  /* unread month = a real card, in your face (owner call, Sep 2026) —
+     once opened it retires to the Progress list */
+  const pm=wrapDue();
+  if(!pm)return '';
+  return '<button data-a="wrapGo" data-v="'+pm+'" class="card an-hero" style="width:100%;text-align:left;padding:17px;border-radius:20px;margin-top:12px;border-color:var(--amber)">'+
+    '<p class="mono" style="font-size:9.5px;color:var(--amber);letter-spacing:.08em">THE WRAP</p>'+
+    '<p class="disp gradhead" style="font-size:30px;line-height:1.1;margin-top:7px">'+esc(String(ymName(pm)).split(' ')[0]).toUpperCase()+'.</p>'+
+    '<p style="color:var(--dim);font-size:13px;line-height:1.55;margin-top:6px">Your month, wrapped — the tonnage, the biggest move, the best find, and the one thing worth fixing.</p>'+
+    '<p class="mono" style="color:var(--amber);font-size:11px;margin-top:10px">Open it ›</p></button>'}
 function wrapsCard(){
   const w=wraps(),keys=Object.keys(w).sort().reverse();
   if(!keys.length)return '';
@@ -8174,7 +8200,26 @@ function verdictCard(){
     (st>1?'<p class="mono" style="color:var(--faint);font-size:9.5px">'+st+' DAY'+(st===1?'':'S')+' RUNNING</p>':'')+'</div>';
   const dots='<span style="display:flex;gap:5px">'+
     pr.tasks.map(x=>'<span style="width:9px;height:9px;border-radius:9px;background:'+(x.done?'var(--green)':'var(--line)')+'"></span>').join('')+'</span>';
-  if(done&&n&&t.revealed){
+  /* the hero must be the thing that is ALIVE today (owner call, Sep
+     2026): once the noticed has been seen it goes stale — the live
+     forecast takes the stage and the noticed drops to a quiet line. */
+  const pd=(typeof predToday==='function')?(function(){try{return predToday()}catch(e){return null}})():null;
+  const callLive=pd&&pd.ex&&!pd.outcome;
+  const noticedQuiet=n?'<button data-a="noticedShow" style="display:flex;align-items:center;gap:9px;width:100%;text-align:left;margin-top:11px;padding-top:11px;border-top:1px solid var(--line)">'+
+    '<span class="mono" style="font-size:9px;color:var(--faint);letter-spacing:.06em;flex:none">NOTICED</span>'+
+    '<span style="flex:1;min-width:0;color:var(--dim);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(n.t)+'</span>'+
+    '<span class="mono" style="color:var(--faint);font-size:11px;flex:none">›</span></button>':'';
+  if(done&&n&&t.revealed&&callLive&&!S.noticedBig){
+    const exN=esc(String(pd.ex).replace(/ — .*/,''));
+    inner+='<div class="an-rise" style="margin-top:11px">'+
+      '<p class="mono" style="font-size:10px;color:var(--amber);letter-spacing:.08em">✦ THE CALL · '+esc(String(pd.day||'today').toUpperCase())+'</p>'+
+      '<p class="disp gradhead" style="font-size:26px;line-height:1.15;margin-top:7px">'+exN+' '+uwStr(pd.predW)+'×'+pd.predR+'</p>'+
+      '<p style="color:var(--dim);font-size:13.5px;line-height:1.6;margin-top:6px">That is what the model expects from your evidence. Match it and it learns you — beat it and it learns more.</p>'+
+      '<button data-a="predOpen" class="mono" style="color:var(--amber);font-size:11px;margin-top:8px;text-align:left">Why this call ›</button></div>'+
+      noticedQuiet+
+      '<div style="display:flex;align-items:center;gap:9px;margin-top:11px;padding-top:11px;border-top:1px solid var(--line)">'+dots+
+      '<span class="mono" style="color:var(--faint);font-size:10.5px">all done today</span></div>'}
+  else if(done&&n&&t.revealed){
     inner+='<div class="an-rise" style="margin-top:11px">'+
       '<p class="mono" style="font-size:10px;color:var(--amber);letter-spacing:.08em">✦ ALLENA NOTICED</p>'+
       '<p class="disp gradhead" style="font-size:24px;line-height:1.18;margin-top:7px">'+esc(n.t)+'</p>'+
@@ -8211,9 +8256,8 @@ function verdictCard(){
   return '<div class="card an-hero" style="padding:18px;border-radius:22px;margin-top:16px;border-color:'+(done?'var(--green)':'var(--line)')+'">'+
     inner+
     briefLines()+
-    (typeof predLine==='function'?predLine():'')+
+    ((typeof predLine==='function'&&!(typeof callLive!=='undefined'&&callLive&&done&&n&&t.revealed&&!S.noticedBig))?predLine():'')+
     questLine()+
-    wrapLine()+
     (typeof deepLine==='function'?deepLine():'')+
     '</div>'}
 /* ══ the prediction loop ═════════════════════════════════════
@@ -10741,59 +10785,64 @@ function fghostBank(g,f){
       d:g.now+' sessions against the '+f.s+' in '+f.n+'’s best week ever. Showing up is the whole competition.',
       rar:'uncommon',tag:'streak',found:today()};
     bankSave()}catch(e){}}
-function fghostRows(g){
-  const f=fghost();if(!f)return '';
-  fghostBank(g,f);
-  const beat=g.now>f.s,pct=Math.min(100,Math.round(g.now/Math.max(1,f.s)*100));
-  let h='<div style="display:flex;justify-content:space-between;align-items:baseline;margin-top:13px;padding-top:11px;border-top:1px solid var(--line)">'+
-    '<span style="font-size:12.5px;font-weight:600">'+esc(f.n)+'’s best</span>'+
-    '<span class="mono" style="font-size:11px;color:'+(beat?'var(--green)':'var(--text)')+'">'+g.now+
-    '<span style="color:var(--faint)"> vs '+f.s+'</span></span></div>'+
-    '<div style="position:relative;height:5px;border-radius:3px;background:var(--line);margin-top:6px">'+
-    '<div class="an-bar" style="height:5px;border-radius:3px;width:'+pct+'%;background:'+(beat?'var(--green)':'#1E9BFF')+'"></div>'+
-    '<div style="position:absolute;top:-2.5px;left:calc(100% - 1px);width:2px;height:10px;border-radius:1px;background:#1E9BFF"></div></div>';
-  if(S.runOn&&f.k>=5){
-    const kb=g.km>f.k,kp=Math.min(100,Math.round(g.km/f.k*100));
-    h+='<div style="display:flex;justify-content:space-between;align-items:baseline;margin-top:9px">'+
-      '<span style="font-size:12px;color:var(--dim)">'+udStr(g.km)+' vs '+esc(f.n)+'’s '+udStr(f.k)+'</span>'+
-      '<span class="mono" style="font-size:10px;color:'+(kb?'var(--green)':'var(--faint)')+'">'+kp+'%</span></div>'}
-  return h}
+function raceTrack(now,best,friend,unit){
+  /* one track, three runners: green fill = you this week, the amber
+     flag = your best week, the blue flag = the friend's. */
+  const mx=Math.max(now,best,friend||0,1)*1.08;
+  const pos=v=>Math.min(97,Math.round(v/mx*100));
+  const flag=(v,col,lbl)=>v>0?'<div style="position:absolute;left:'+pos(v)+'%;top:-4px;bottom:-4px;width:2.5px;border-radius:2px;background:'+col+'"></div>'+
+    '<span class="mono" style="position:absolute;left:'+pos(v)+'%;top:-17px;transform:translateX(-50%);font-size:8px;color:'+col+';letter-spacing:.04em;white-space:nowrap">'+lbl+'</span>':'';
+  return '<div style="position:relative;height:10px;border-radius:6px;background:var(--line);margin-top:24px">'+
+    '<div class="an-bar" style="height:10px;border-radius:6px;width:'+pos(now)+'%;background:'+(now>best&&(!friend||now>friend)?'var(--green)':'#3fae6a')+'"></div>'+
+    flag(best,'var(--amber)','BEST '+best+(unit||''))+
+    (friend?flag(friend,'#1E9BFF','THEM '+friend+(unit||'')):'')+
+    '</div>'}
 function ghostCard(){
   try{
     const g=ghostData();
     if(!g||g.best<2)return '';
     ghostBank(g);
-    const beat=g.now>g.best;
-    const pct=Math.min(100,Math.round(g.now/g.best*100));
-    let h='<div class="card mt" style="padding:15px 16px">'+
-      '<div style="display:flex;justify-content:space-between;align-items:baseline">'+
-      '<p class="eyebrow" style="margin:0">The ghost</p>'+
+    const f=fghost();if(f)fghostBank(g,f);
+    const beat=g.now>g.best,beatF=f&&g.now>f.s;
+    const name=(S.prof&&S.prof.name?String(S.prof.name):'You').slice(0,10);
+    let h='<div class="card mt'+(beat||beatF?' an-glow':'')+'" style="padding:16px;border-radius:20px'+(beat?';border-color:var(--green)':f?';border-color:#1E9BFF':'')+'">'+
+      '<div style="display:flex;align-items:center;gap:8px">'+
+      '<p class="eyebrow" style="margin:0;flex:1">'+(f?'The race':'The ghost')+'</p>'+
       '<span class="mono" style="color:var(--faint);font-size:10px">'+
-      (beat?'BEATEN THIS WEEK':g.daysLeft>0?g.daysLeft+' DAY'+(g.daysLeft===1?'':'S')+' LEFT':'LAST DAY')+'</span></div>'+
-      '<div style="display:flex;justify-content:space-between;align-items:baseline;margin-top:11px">'+
+      (beat?'GHOST BEATEN':g.daysLeft>0?g.daysLeft+' DAY'+(g.daysLeft===1?'':'S')+' LEFT':'LAST DAY')+'</span></div>';
+    if(f)h+='<div style="display:flex;align-items:center;gap:10px;margin-top:12px">'+
+      '<span style="display:flex;align-items:center;gap:7px;flex:1">'+
+      '<span style="width:30px;height:30px;border-radius:30px;background:var(--green);color:#12210f;font-weight:800;font-size:13px;display:inline-flex;align-items:center;justify-content:center">'+esc(name.charAt(0).toUpperCase())+'</span>'+
+      '<span style="font-size:13px;font-weight:600">'+esc(name)+'</span></span>'+
+      '<span class="disp" style="font-weight:800;font-size:15px;color:var(--faint);flex:none">VS</span>'+
+      '<span style="display:flex;align-items:center;gap:7px;flex:1;justify-content:flex-end">'+
+      '<span style="font-size:13px;font-weight:600">'+esc(f.n)+'</span>'+
+      '<span style="width:30px;height:30px;border-radius:30px;background:#1E9BFF;color:#0a1c2e;font-weight:800;font-size:13px;display:inline-flex;align-items:center;justify-content:center">'+esc(f.n.charAt(0).toUpperCase())+'</span></span></div>';
+    h+='<div style="display:flex;justify-content:space-between;align-items:baseline;margin-top:'+(f?'8':'12')+'px">'+
       '<span style="font-size:12.5px;font-weight:600">Sessions</span>'+
       '<span class="mono" style="font-size:11px;color:'+(beat?'var(--green)':'var(--text)')+'">'+g.now+
-      '<span style="color:var(--faint)"> vs your best '+g.best+'</span></span></div>'+
-      '<div style="position:relative;height:5px;border-radius:3px;background:var(--line);margin-top:6px">'+
-      '<div class="an-bar" style="height:5px;border-radius:3px;width:'+pct+'%;background:'+(beat?'var(--green)':'var(--dim)')+'"></div>'+
-      '<div style="position:absolute;top:-2.5px;left:calc(100% - 1px);width:2px;height:10px;border-radius:1px;background:var(--amber)"></div></div>';
-    if(S.runOn&&g.bestKm>=5){
-      const kb=g.km>g.bestKm,kp=Math.min(100,Math.round(g.km/g.bestKm*100));
-      h+='<div style="display:flex;justify-content:space-between;align-items:baseline;margin-top:11px">'+
-        '<span style="font-size:12.5px;font-weight:600">Kilometres</span>'+
-        '<span class="mono" style="font-size:11px;color:'+(kb?'var(--green)':'var(--text)')+'">'+g.km+
-        '<span style="color:var(--faint)"> vs your best '+g.bestKm+'</span></span></div>'+
-        '<div style="position:relative;height:5px;border-radius:3px;background:var(--line);margin-top:6px">'+
-        '<div class="an-bar" style="height:5px;border-radius:3px;width:'+kp+'%;background:'+(kb?'var(--green)':'var(--dim)')+'"></div>'+
-        '<div style="position:absolute;top:-2.5px;left:calc(100% - 1px);width:2px;height:10px;border-radius:1px;background:var(--amber)"></div></div>'}
-    h+=fghostRows(g);
-    h+='<p style="color:var(--faint);font-size:10.5px;line-height:1.5;margin-top:9px">'+
-      (beat?'A new best week. Next week, this one is the ghost.'
-        :'Your best week ever, racing quietly beside this one. Catching it is optional; knowing where it stands is not.')+'</p>';
-    h+='<button data-a="fghostOpen" class="mono" style="display:block;width:100%;text-align:left;color:'+(fghost()?'var(--faint)':'var(--amber)')+';font-size:10.5px;margin-top:7px">'+
-      (fghost()?'Ghost codes ›':'Race a friend — swap ghost codes ›')+'</button>';
+      '<span style="color:var(--faint)"> vs your best '+g.best+(f?' · '+esc(f.n)+'’s '+f.s:'')+'</span></span></div>'+
+      raceTrack(g.now,g.best,f?f.s:0,'');
+    if(S.runOn&&(g.bestKm>=5||(f&&f.k>=5))){
+      h+='<div style="display:flex;justify-content:space-between;align-items:baseline;margin-top:16px">'+
+        '<span style="font-size:12.5px;font-weight:600">Distance</span>'+
+        '<span class="mono" style="font-size:11px;color:'+(g.km>g.bestKm?'var(--green)':'var(--text)')+'">'+udNum(g.km)+
+        '<span style="color:var(--faint)"> vs '+udNum(g.bestKm)+(f&&f.k?' · '+udNum(f.k):'')+' '+udUnit()+'</span></span></div>'+
+        raceTrack(g.km,g.bestKm,f?f.k:0,'')}
+    h+='<p style="color:var(--faint);font-size:10.5px;line-height:1.5;margin-top:12px">'+
+      (beatF?'Past '+esc(f.n)+'’s best week — banked. Showing up is the whole competition.'
+       :beat?'A new best week. Next week, this one is the ghost.'
+       :f?'Two best weeks on one track, all week long. Catching either is optional; the race is the point.'
+       :'Your best week ever, racing quietly beside this one. Catching it is optional; knowing where it stands is not.')+'</p>';
+    if(!f)h+='<button data-a="fghostOpen" class="card" style="width:100%;text-align:left;padding:11px 14px;margin-top:11px;border-style:dashed;display:flex;align-items:center;gap:10px">'+
+      '<span style="display:inline-flex;flex:none">'+
+      '<span style="width:24px;height:24px;border-radius:24px;background:var(--green);opacity:.9"></span>'+
+      '<span style="width:24px;height:24px;border-radius:24px;background:#1E9BFF;margin-left:-8px;display:inline-flex;align-items:center;justify-content:center;color:#0a1c2e;font-weight:800;font-size:12px">?</span></span>'+
+      '<span style="flex:1;min-width:0"><span style="font-size:13px;font-weight:600;display:block">Race a mate</span>'+
+      '<span style="color:var(--faint);font-size:11px">Swap ghost codes — their best week runs beside yours</span></span>'+
+      '<span class="mono" style="color:var(--amber);font-size:13px;flex:none">›</span></button>';
+    else h+='<button data-a="fghostOpen" class="mono" style="display:block;width:100%;text-align:left;color:var(--faint);font-size:10.5px;margin-top:7px">Ghost codes ›</button>';
     return h+'</div>'}catch(e){return ''}}
-
 function viewToday(){
   const dateLine=new Date().toLocaleDateString(undefined,{weekday:'long',day:'numeric',month:'long'});
   let h='<div class="view pad stg" style="padding-top:22px">';
@@ -10809,10 +10858,13 @@ function viewToday(){
     '<span style="flex:1;font-size:12px;color:var(--dim)">Sample data is loaded so you can see the trends — tap to remove it and start clean.</span></button>';
   h+=garCard();
   h+=verdictCard();
-  h+=comebackCard();
+  h+=(typeof wrapCard==='function'?wrapCard():'');
   h+=apptCard();
-  h+=newFindsCard();
+  h+=comebackCard();
   h+=sessionCard();
+  h+=ghostCard();
+  h+=unlockCard();
+  h+=newFindsCard();
   h+='<div class="row mt" style="gap:10px">'+dashTiles()+'</div>';
   if(S.sess)h+='<button data-a="resume" class="card" style="width:100%;text-align:left;padding:16px;border-color:var(--amber);background:var(--raised);margin-top:18px">'+
     '<p class="eyebrow" style="color:var(--amber)">Session in progress</p>'+
@@ -10825,8 +10877,6 @@ function viewToday(){
       '<p class="mono" style="color:var(--dim);font-size:12px;margin-top:4px">'+unf.log.length+' sets saved · tap to pick it back up</p></button>'}
   h+=calCard();
   h+=holdCard();
-  h+=ghostCard();
-  h+=unlockCard();
   h+=collectTeaser();
   if(backupDue())h+='<button data-a="nav" data-v="data" class="card" style="width:100%;text-align:left;padding:12px 16px;margin-top:14px;display:flex;align-items:center;gap:10px;border-color:var(--amber)">'+
     '<span style="width:8px;height:8px;border-radius:8px;background:var(--amber);flex:none"></span>'+
@@ -12651,15 +12701,17 @@ function sheetHtml(){
       '<p style="color:var(--faint);font-size:11px;line-height:1.55;margin-top:10px">Sessions are spread across each week and marked as imported with approximate dates — honest labels, real data.</p>')}
   if(S.sheet.t==='fghost'){
     const code=fghostCode(),f=fghost();
-    return wrapSheet('Race a friend',
-      '<p style="color:var(--dim);font-size:13px;line-height:1.6">Swap ghost codes and each of you races the other’s best week. A code carries a first name, a session count and a distance — nothing else leaves your phone.</p>'+
-      (code?'<button data-a="fghostCopy" class="card mt" style="width:100%;text-align:left;padding:12px 15px;display:flex;align-items:center;gap:10px">'+
-        '<span class="mono" style="font-size:11px;color:var(--amber);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(code)+'</span>'+
-        '<span class="mono" style="font-size:10px;color:var(--faint);flex:none">COPY YOURS</span></button>'
+    return wrapSheet('Race a mate',
+      '<p class="disp gradhead" style="font-size:22px;line-height:1.2">Two codes. One week.</p>'+
+      '<p style="color:var(--dim);font-size:13px;line-height:1.6;margin-top:8px">Swap ghost codes and each of you races the other’s best week, all week long. A code carries a first name, a session count and a distance — nothing else leaves your phone.</p>'+
+      (code?'<button data-a="fghostShare" class="card mt2" style="width:100%;text-align:center;padding:16px;border-color:var(--amber)">'+
+        '<span class="mono" style="font-size:13px;color:var(--amber);display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(code)+'</span>'+
+        '<span class="mono" style="font-size:10px;color:var(--faint);display:block;margin-top:6px;letter-spacing:.06em">SEND YOURS ›</span></button>'
         :'<p style="color:var(--faint);font-size:12px;margin-top:10px">Your own code appears once you have a best week of at least 2 sessions.</p>')+
-      '<p class="eyebrow mt2">Paste theirs</p>'+
-      '<textarea data-in="fgIn" rows="2" placeholder="AG1.…" style="margin-top:8px;font-size:13px">'+esc(S.fgIn||'')+'</textarea>'+
-      '<button data-a="fghostGo" class="big disp mt" style="background:var(--amber);color:#1F1E1D;font-size:15px">Add the ghost</button>'+
+      '<p class="eyebrow mt2">Got theirs?</p>'+
+      '<button data-a="fghostPaste" class="big disp mt" style="background:var(--raised);border:1px solid var(--line);color:var(--text);font-size:14.5px">Paste their code or link</button>'+
+      '<textarea data-in="fgIn" rows="2" placeholder="…or type it here: AG1.…" style="margin-top:10px;font-size:13px">'+esc(S.fgIn||'')+'</textarea>'+
+      ((S.fgIn||'').trim()?'<button data-a="fghostGo" class="big disp mt" style="background:var(--amber);color:#1F1E1D;font-size:15px">Add the ghost</button>':'')+
       (f?'<div class="card mt" style="padding:12px 15px;display:flex;align-items:center;gap:10px">'+
         '<span style="flex:1;font-size:13px">Racing <b>'+esc(f.n)+'</b> — best week '+f.s+' sessions'+(f.k?', '+udStr(f.k):'')+'</span>'+
         '<button data-a="fghostOff" class="mono" style="color:var(--red);font-size:11px;flex:none">Remove</button></div>':''))}
@@ -14198,6 +14250,7 @@ function runAction(a,v,t,e){
     case 'anReset':S.anState='idle';S.anStep=0;S.discShow=null;render();break;
     case 'findingsOpen':{if(S.view!=='findings'){S.backTo=S.view;S.backDrawer=false}S.sheet=null;S.view='findings';render();break}
     case 'findingsGo':{if(S.view!=='findings'){S.backTo=S.view;S.backDrawer=false}S.sheet=null;S.view='findings';runAction('anRun');break}
+    case 'noticedShow':S.noticedBig=!S.noticedBig;render();break;
     case 'noticedOpen':{const t2=todayState();t2.revealed=true;todaySave(t2);vib(12);render();break}
     case 'todayOpen':S.sheet={t:'today'};render();break;
     case 'questOpen':S.sheet={t:'quest'};render();break;
@@ -14891,7 +14944,18 @@ function runAction(a,v,t,e){
       if(P.on)flash('iOS will ask permission once — allow it and Allena can speak up.');break}
     case 'notifKind':{const P=notifPrefs();P[v]=!P[v];notifSave();notifSync();render();break}
     case 'fghostOpen':S.sheet={t:'fghost'};render();break;
-    case 'fghostCopy':{try{navigator.clipboard.writeText(fghostCode()+' — my Allena ghost code. Paste it in Today → The ghost → Race a friend.');flash('Copied — send it to them.')}catch(e){flash('Could not copy.')}break}
+    case 'fghostShare':{const code9=fghostCode();
+      const msg='Race me on Allena — tap and my best week races yours: https://sathyacrisren-ui.github.io/allena-app/?ghost='+encodeURIComponent(code9);
+      if(navigator.share){navigator.share({text:msg}).catch(function(){})}
+      else{try{navigator.clipboard.writeText(msg);flash('Copied — send it to them.')}catch(e){flash('Could not copy.')}}
+      break}
+    case 'fghostCopy':{try{navigator.clipboard.writeText('Race me on Allena — tap and my best week races yours: https://sathyacrisren-ui.github.io/allena-app/?ghost='+encodeURIComponent(fghostCode()));flash('Copied — send it to them.')}catch(e){flash('Could not copy.')}break}
+    case 'fghostPaste':{(navigator.clipboard&&navigator.clipboard.readText?navigator.clipboard.readText():Promise.reject()).then(function(tx){
+        const f=fghostParse(tx);
+        if(!f){flash('Nothing that reads as a ghost code on the clipboard.');return}
+        S.fghost=f;lset('training-fghost-v1',f);S.fgIn='';S.sheet=null;render();
+        flash('Linked — racing '+f.n+'’s best week from now on.')
+      }).catch(function(){flash('Could not read the clipboard — paste it into the box instead.')});break}
     case 'fghostGo':{const f=fghostParse(S.fgIn);
       if(!f){flash('That does not read as a ghost code — it starts with AG1.');break}
       S.fghost=f;lset('training-fghost-v1',f);S.fgIn='';S.sheet=null;render();
