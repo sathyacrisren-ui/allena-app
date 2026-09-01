@@ -361,7 +361,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='4b7f26';  // stamped by tools/build.py with the content hash
+const BUILD_ID='0fe4c3';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -1388,7 +1388,11 @@ A.exportXlsx=()=>{
   download(makeXlsx([{name:'Sessions',rows:sh},{name:'Sets',rows:st}]),
     'training-log-'+today()+'.xlsx');
   flash('Excel file saved.')};
-A.backup=(auto)=>{download(new Blob([JSON.stringify(backupObj(),null,2)],{type:'application/json'}),
+A.backup=(auto)=>{
+  /* auto-backups raise a real iOS save prompt — once a day is care,
+     every save is nagging (owner-reported, Sep 2026) */
+  if(auto&&Date.now()-(lget(K_BK,0)||0)<20*36e5)return;
+  download(new Blob([JSON.stringify(backupObj(),null,2)],{type:'application/json'}),
   'training-backup-'+today()+'.json');
   lset(K_BK,Date.now());
   flash(auto?'Auto-backup ready — tap Save to Files › iCloud Drive.':'Backup saved. Keep it in iCloud Drive.');render()};
@@ -2096,7 +2100,10 @@ function muscleFresh(){
    const rule=MUSCLE_RULES.find(x=>x[0]===m);if(!rule)return;
    L[m]=(L[m]||0)+eff*RUN_M[m]*Math.exp(-Math.max(0,hrs)/rule[2])})});
  return MUSCLE_RULES.map(r=>({m:r[0],fresh:Math.max(0,Math.min(100,Math.round(100-(L[r[0]]||0)*16)))}))}
-function freshCol(f){return f>=80?'#30D158':f>=50?'#E0A458':'#FF453A'}
+/* one scale with the glow figure: green = recovered, gold = part way,
+   BRIGHT warm-white = most fatigued (attention is brighter, not louder
+   — and red stays a stop signal, which 17% recovered is not) */
+function freshCol(f){return f>=80?'#30D158':f>=50?'#E0A458':'#E8E5DC'}
 function bodySvg(F){
  const g=m=>{const x=F.find(v=>v.m===m);return x?freshCol(x.fresh):'#33302A'};
  const N='#2C2A24',ln='stroke="#1F1E1D" stroke-width="1.5"';
@@ -2213,7 +2220,7 @@ function recoveryCard(){
  let h='<div class="card mt" style="padding:16px"><p class="eyebrow">Muscle recovery</p>'+
   '<div style="display:flex;gap:10px;max-width:300px;margin:10px auto 0">'+panel(false)+panel(true)+'</div>'+
   '<div style="display:flex;gap:14px;justify-content:center;margin-top:8px">'+
-  '<span style="display:flex;align-items:center;gap:5px;color:var(--faint);font-size:10.5px"><span style="width:9px;height:9px;border-radius:9px;background:#C9D6E3"></span>still recovering</span>'+
+  '<span style="display:flex;align-items:center;gap:5px;color:var(--faint);font-size:10.5px"><span style="width:9px;height:9px;border-radius:9px;background:#DBD8D0"></span>still recovering</span>'+
   '<span style="display:flex;align-items:center;gap:5px;color:var(--faint);font-size:10.5px"><span style="width:9px;height:9px;border-radius:9px;background:#3B3935"></span>recovered</span></div>';
  if(worked.length)h+='<div style="margin-top:12px;display:flex;flex-direction:column;gap:6px">'+
   worked.slice(0,6).map(x=>'<div style="display:flex;align-items:center;gap:8px">'+
@@ -6311,6 +6318,9 @@ function histCommit(recs){
   kept.forEach(r=>S.history.push(r));
   S.history.sort((a,b)=>String(a.date).localeCompare(String(b.date)));
   saveHistory();
+  // exact-name variants self-heal after every import (db row / DB Rows /
+  // db one arm row); ambiguous merges stay behind Settings → Tidy names
+  try{const r9=historyAliasScan();historyAliasApplyMap({},r9.canon)}catch(e){}
   return{added:kept.length,replaced:replaced,skippedReal:skipped}}
 
 /* ══ exercise aliasing at import (owner call, Sep 2026) ══════
@@ -6386,6 +6396,28 @@ function histAliasStart(next){
       return next()}
     S.halias={r:r,map:map,picks:{},next:next};
     S.sheet={t:'histalias'};render()}catch(e){next()}}
+
+/* the same resolver, pointed at history that is ALREADY in the record
+   (imported before aliasing existed, or through the dated path).
+   Exact-key merges are safe and silent; subset merges follow the same
+   loads-agree rule; ambiguity asks. */
+function historyAliasScan(){
+  const wrap=[{sessions:(S.history||[]).filter(h=>!h.run).map(h=>({
+    exercises:(function(){const by={};
+      (h.log||[]).forEach(l=>{(by[l.ex]=by[l.ex]||{name:l.ex,sets:[]}).sets.push(l)});
+      return Object.keys(by).map(k=>by[k])})()}))}];
+  return histAliasBuild(wrap)}
+function historyAliasApplyMap(map,canon){
+  let n=0;
+  (S.history||[]).forEach(h=>{if(h.run)return;
+    (h.log||[]).forEach(l=>{
+      const nm=exAliasNorm(l.ex);
+      const fin=map[nm.key]||nm.key;
+      const disp=canon[fin]||l.ex;
+      if(nm.side)l.perSide=true;
+      if(l.ex!==disp){l.ex=disp;n++}})});
+  if(n){saveHistory();S.patCache=null}
+  return n}
 const RARITY=[['common','#8A8782','Noticed'],['uncommon','#30D158','Worth knowing'],
   ['rare','#D9D6CD','Rare find'],['epic','#FFFFFF','Big one']];
 function rarityOf(k){return RARITY.find(x=>x[0]===k)||RARITY[0]}
@@ -10928,6 +10960,7 @@ function viewData(){
       ((S.ai&&(S.ai.proxy||'').trim())?'Cloud link':(S.ai&&S.ai.key)?'Own key':signed?'Signed in':'Claude app'),
       'Allena — AI coach')]);
   h+=setGroup('Your data',[
+    navRow(I.own,'Tidy exercise names','','aliasSweep',''),
     setRow(I.save,'Export a backup',backupDue()?'due':'','Export'),
     setRow(I.back,'Restore','','Restore'),
     setRow(I.demo,'Demo data',demoPresent()?'loaded':'','Demo data'),
@@ -13851,13 +13884,24 @@ function runAction(a,v,t,e){
       impNew();S.imp.grid=o9.grid;S.imp.fileName=o9.fileName;S.imp.kindHint='hist';
       S.view='import';render();impParse();break}
     case 'progDataSkip':S.impDataOffer=null;S.sheet=null;render();break;
+    case 'aliasSweep':{const r=historyAliasScan();
+      const map={};r.autos.forEach(a=>{map[a.from]=a.to});
+      if(r.asks.length){
+        S.halias={r:r,map:map,picks:{},
+          apply:function(m,c){const n=historyAliasApplyMap(m,c);
+            flash(n?n+' logged sets renamed — duplicates merged.':'Names already consistent.')},
+          next:function(){S.sheet=null;render()}};
+        S.sheet={t:'histalias'};render();break}
+      const n=historyAliasApplyMap(map,r.canon);
+      flash(n?n+' logged sets renamed — duplicates merged.':'Nothing to merge — names already consistent.');render();break}
     case 'haPick':{const ha=S.halias;if(!ha)break;
       const ix=String(v).indexOf(':');
       ha.picks[+String(v).slice(0,ix)]=String(v).slice(ix+1);render();break}
     case 'haGo':{const ha=S.halias;if(!ha)break;
       ha.r.asks.forEach((q,i)=>{const pk=ha.picks[i];
         if(pk&&pk!=='__own')ha.map[q.from]=pk});
-      histAliasApply(S.histImp&&S.histImp.weeks,ha.map,ha.r.canon);
+      if(ha.apply)ha.apply(ha.map,ha.r.canon);
+      else histAliasApply(S.histImp&&S.histImp.weeks,ha.map,ha.r.canon);
       const nx=ha.next;S.halias=null;
       if(typeof nx==='function')nx();else{S.sheet=null;render()}break}
     case 'weekClockOpen':S.sheet={t:'wkclock'};render();break;
@@ -14084,7 +14128,7 @@ function runAction(a,v,t,e){
       const rec=record(true);rec.minutes=Math.max(1,Math.round(log.length*3));rec.manual=true;
       S.sess=saveSess;S.note=saveNote;
       upsert(rec);
-      S.quick=null;S.view='history';render();
+      S.quick=null;S.view='home';render();
       flash('Logged '+log.length+' sets for '+fmtDate(rec.date)+'.');
       if(S.autoBk.on)setTimeout(function(){A.backup(true)},400);try{acctSyncSoon()}catch(e){}break}
     case 'quickDupGo':{if(S.quick)S.quick.dupOk=true;S.sheet=null;runAction('quickSave');break}
