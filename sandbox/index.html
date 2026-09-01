@@ -386,7 +386,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='99176e';  // stamped by tools/build.py with the content hash
+const BUILD_ID='1a921c';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -467,6 +467,11 @@ function entrySanity(e,c){
 /* target efforts are often written as a range — "5-6" means anything
    from 5 to 6 is on plan. Reading only the first number turned the top
    of the range into a miss. */
+
+/* the body's memory horizon (owner call, Sep 2026): records are
+   forever, but TARGETS decay — anything that sets today's bar only
+   trusts the last ~6 months. The 2024 you is history, not evidence. */
+function recentCutKey(){return dayKey(new Date(Date.now()-182*864e5))}
 function rpeLow(v){const m=String(v==null?'':v).match(/(\d+(?:\.\d+)?)/);return m?parseFloat(m[1]):NaN}
 function rpeHigh(v){const m=String(v==null?'':v).match(/(\d+(?:\.\d+)?)\s*[-–—to]+\s*(\d+(?:\.\d+)?)/);
   return m?parseFloat(m[2]):rpeLow(v)}
@@ -5723,7 +5728,8 @@ function acwr(){
   return Math.round(acute/chronic*100)/100}
 function runFitness(){
   // pace at a comfortable effort, the honest proxy for aerobic progress
-  const easy=runs().filter(r=>(r.type==='easy'||r.type==='long')&&r.km>=3&&paceMin(r));
+  const cut=recentCutKey();
+  const easy=runs().filter(r=>r.date>=cut&&(r.type==='easy'||r.type==='long')&&r.km>=3&&paceMin(r));
   if(easy.length<3)return null;
   const half=Math.floor(easy.length/2);
   const avg=l=>l.reduce((a,r)=>a+paceMin(r),0)/l.length;
@@ -5732,7 +5738,8 @@ function aeroEngine(){
   /* the engine number: speed per heartbeat, so every HR run moves it.
      Median of the last five against the five before — pace can lie
      (hills, heat, tired legs); speed-per-beat lies less. */
-  const l=runs().filter(r=>isRunType(r.type)&&r.hr>0&&r.km>=3&&r.mins>0)
+  const cut9=recentCutKey();
+  const l=runs().filter(r=>r.date>=cut9&&isRunType(r.type)&&r.hr>0&&r.km>=3&&r.mins>0)
     .sort((a,b)=>String(a.date).localeCompare(String(b.date)));
   if(l.length<6)return null;
   const ei=r=>(r.km*1000/r.mins)/r.hr;
@@ -7851,7 +7858,8 @@ function questGen(wk,preferK){
   // 2. as many sessions as your best week — capped at what the plan asks for
   {const p=activeProgSafe();
    if(p&&!p.acl&&!p.rehabProto&&p.days&&p.days.length>=2){
-     const cnt={};H.forEach(h=>{const k=questWeekKey(h.date);cnt[k]=(cnt[k]||0)+1});
+     const cut=recentCutKey();
+   const cnt={};H.forEach(h=>{if(h.date.slice(0,10)<cut)return;const k=questWeekKey(h.date);cnt[k]=(cnt[k]||0)+1});
      delete cnt[wk];
      const bestN=Object.keys(cnt).reduce((a,k)=>Math.max(a,cnt[k]),0);
      const target=Math.min(p.days.length,bestN);
@@ -7860,7 +7868,7 @@ function questGen(wk,preferK){
        d:'You have done '+bestN+' in a week before, so this is proven ground. Which days is up to you.',
        target:target,basis:{what:'most sessions in one week',proven:bestN,target:target}})}}
   // 3. nudge past your biggest running week
-  if(S.runOn){const byWk={};(S.runs||[]).forEach(r=>{const k=questWeekKey(r.date);
+  if(S.runOn){const cut=recentCutKey();const byWk={};(S.runs||[]).forEach(r=>{if(r.date<cut)return;const k=questWeekKey(r.date);
      byWk[k]=(byWk[k]||0)+(r.km||0)});delete byWk[wk];
    const vals=Object.keys(byWk).map(k=>byWk[k]);
    if(vals.length>=2){const bestKm=Math.max.apply(null,vals);
@@ -7870,8 +7878,8 @@ function questGen(wk,preferK){
          d:'Your biggest week so far is '+udNum(Math.round(bestKm*10)/10)+' '+udUnit()+'. This matches it, or nudges just past. Spread it however you like.',
          target:target,basis:{what:'biggest running week',proven:bestKm,target:target}})}}}
   // 4. log mornings — only as many as you have already managed in a week
-  if(S.gar&&S.gar.on){const byWk={};
-   Object.keys((S.gar.days)||{}).forEach(k=>{if(S.gar.days[k].am==null)return;
+  if(S.gar&&S.gar.on){const cut=recentCutKey();const byWk={};
+   Object.keys((S.gar.days)||{}).forEach(k=>{if(k<cut||S.gar.days[k].am==null)return;
      const w=questWeekKey(k);byWk[w]=(byWk[w]||0)+1});delete byWk[wk];
    const best=Object.keys(byWk).reduce((a,k)=>Math.max(a,byWk[k]),0);
    const target=Math.min(7,best);
@@ -7882,7 +7890,7 @@ function questGen(wk,preferK){
   // 5b. rehab sessions matching your best week
   if((S.acl&&S.acl.on)||activeProtocols().length){
     const rp=S.lib.programs.filter(p=>p.acl||p.rehabProto).map(p=>p.id);
-    const byWk={};(S.history||[]).forEach(h=>{if(!h.complete||rp.indexOf(h.progId)<0)return;
+    const cut=recentCutKey();const byWk={};(S.history||[]).forEach(h=>{if(!h.complete||rp.indexOf(h.progId)<0||h.date.slice(0,10)<cut)return;
       const k=questWeekKey(h.date);byWk[k]=(byWk[k]||0)+1});delete byWk[wk];
     const best=Object.keys(byWk).reduce((a,k)=>Math.max(a,byWk[k]),0);
     const target=Math.min(best,rehabWeekTarget());
@@ -7892,7 +7900,7 @@ function questGen(wk,preferK){
       target:target,basis:{what:'most rehab sessions in one week',proven:best,target:target}})}
   // 5. rehab check-ins, same rule
   if(S.acl&&S.acl.on){const byWk={};
-   ((S.acl.checks)||[]).forEach(c=>{const w=questWeekKey(c.date);byWk[w]=(byWk[w]||0)+1});
+   const cut2=recentCutKey();((S.acl.checks)||[]).forEach(c=>{if(c.date<cut2)return;const w=questWeekKey(c.date);byWk[w]=(byWk[w]||0)+1});
    delete byWk[wk];
    const best=Object.keys(byWk).reduce((a,k)=>Math.max(a,byWk[k]),0);
    const target=Math.min(7,best);
@@ -10588,11 +10596,15 @@ function deepCard(){
    ══════════════════════════════════════════════════════════ */
 function ghostData(){
   const wk=questWeekKey();
-  const byWk={},kmWk={};
+  const byWk={},kmWk={},cut=recentCutKey();
+  /* the ghost only races the RECENT you — a best week from years ago
+     (or the pre-injury you) is a record, not a target */
   (S.history||[]).forEach(h=>{if(!h.complete||h.run)return;
-    const k=questWeekKey(h.date);byWk[k]=(byWk[k]||0)+1});
-  (S.runs||[]).forEach(r=>{const k=questWeekKey(r.date);
-    kmWk[k]=(kmWk[k]||0)+(r.km||0)});
+    const dk9=h.date.slice(0,10);
+    const k=questWeekKey(h.date);byWk[k]=(byWk[k]||0)+1;
+    if(dk9<cut)delete byWk[k]});
+  (S.runs||[]).forEach(r=>{if(r.date<cut&&questWeekKey(r.date)!==wk)return;
+    const k=questWeekKey(r.date);kmWk[k]=(kmWk[k]||0)+(r.km||0)});
   const past=Object.keys(byWk).filter(k=>k<wk);
   if(!past.length)return null;
   const bestSess=past.reduce((a,k)=>Math.max(a,byWk[k]),0);
