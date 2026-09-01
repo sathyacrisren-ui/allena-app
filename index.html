@@ -386,7 +386,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='5ae56c';  // stamped by tools/build.py with the content hash
+const BUILD_ID='e3ab75';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -4270,6 +4270,55 @@ function rehabBankMoments(){
     if(st2.n>=30)put('rehabstreak:30','epic','Thirty days of check-ins',
       'A month of showing up for a knee. Very few people manage this.');
     if(dirty)bankSave()}catch(e){}}
+
+/* ── the hero (Sep 2026 rebuild) ─────────────────────────────
+   The hub was assembled as add-ons and read like a settings
+   page; the leaders (Hinge's 'energetic momentum', Curovate's
+   staged celebrations) put the progress and the one daily
+   action front and centre. Same data as climbCard, worn like
+   the Today hero. climbCard itself remains (and is pinned by
+   tests) — this is the hub's face for it. */
+function rehabHero(){
+  try{
+    const a=S.acl||{},acl=!!a.on;
+    const protos=activeProtocols();
+    if(!acl&&!protos.length)return '';
+    if(acl)rehabBankMoments();
+    const c=checkToday(),st=rehabStreakInfo();
+    const q=acl?aclLatest('quad'):null;
+    const lsi=q?Math.round(q.lsi):null;
+    const nextT=lsi==null?80:(lsi<80?80:(lsi<90?90:null));
+    const sess=rehabWeekSessions(),targ=rehabWeekTarget();
+    const found=Object.keys(discBank()).filter(k=>/^(aclgate:|aclphase:|lsi:)/.test(k)).length;
+    const head=lsi!=null?lsi+'% symmetry':acl?'Phase '+a.phase+' of 5':(protos[0]?protos[0].n:'The work');
+    const sub=lsi!=null&&nextT?(nextT===80?'Eighty is where running usually opens — the retest is how it moves.':'Ninety is return-to-sport territory.')
+      :lsi!=null?'Past every threshold. The job now is holding it.'
+      :acl?'Criteria-gated. Green means met — never passed through.'
+      :'Loading the tissue well and watching how it answers.';
+    let h='<div class="card an-hero" style="padding:18px;border-radius:22px;margin-top:14px;border-color:'+(c?'var(--green)':'var(--line)')+'">';
+    h+='<div style="display:flex;align-items:center;gap:9px">'+
+      '<img src="'+MARK+'" alt="" style="width:17px;height:17px;object-fit:contain">'+
+      '<p class="eyebrow" style="flex:1;margin:0;color:'+(c?'var(--green)':'var(--amber)')+'">The climb</p>'+
+      (st.n>1?'<p class="mono" style="color:var(--faint);font-size:9.5px">'+st.n+' DAYS RUNNING</p>':'')+'</div>';
+    h+='<p class="disp gradhead" style="font-size:24px;line-height:1.18;margin-top:10px">'+esc(head)+'</p>'+
+      '<p style="color:var(--dim);font-size:13px;line-height:1.55;margin-top:5px">'+esc(sub)+'</p>';
+    if(acl)h+='<div style="display:flex;gap:6px;margin-top:13px">'+
+      [1,2,3,4,5].map(n=>{const met=phaseMet(n),cur=n===a.phase;
+        return '<div style="flex:1;text-align:center">'+
+          '<div style="height:6px;border-radius:3px;background:'+(met?'var(--green)':cur?'var(--amber)':'var(--line)')+'"></div>'+
+          '<span class="mono" style="font-size:9px;color:'+(met?'var(--green)':cur?'var(--amber)':'var(--faint)')+'">'+n+'</span></div>'}).join('')+'</div>';
+    if(lsi!=null&&nextT)h+='<div style="position:relative;height:5px;border-radius:3px;background:var(--line);overflow:hidden;margin-top:12px">'+
+      '<div class="an-bar" style="height:5px;width:'+Math.min(100,Math.round(lsi/nextT*100))+'%;background:var(--amber)"></div></div>'+
+      '<p class="mono" style="color:var(--faint);font-size:9.5px;margin-top:5px;text-align:right">'+lsi+'% → '+nextT+'%</p>';
+    h+=c?'<button data-a="checkOpen" style="display:flex;align-items:center;gap:9px;width:100%;text-align:left;margin-top:12px;padding-top:12px;border-top:1px solid var(--line)">'+
+        '<span class="mono" style="font-size:9px;color:var(--green);letter-spacing:.06em;flex:none">CHECKED IN</span>'+
+        '<span style="flex:1;min-width:0;color:var(--dim);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Pain '+c.pain+'/10'+(c.swell?' · swollen':'')+' · tap to change</span></button>'
+      :'<button data-a="checkOpen" class="big disp mt" style="background:var(--amber);color:#1F1E1D;font-size:15px">Thirty-second check-in</button>';
+    h+='<div style="display:flex;align-items:center;gap:9px;margin-top:11px;padding-top:11px;border-top:1px solid var(--line)">'+
+      '<span class="mono" style="font-size:9px;color:'+(sess>=targ?'var(--green)':'var(--faint)')+';letter-spacing:.06em;flex:none">THE WORK</span>'+
+      '<span style="flex:1;color:var(--dim);font-size:12px">'+sess+' of '+targ+' rehab sessions this week</span>'+
+      (found?'<button data-a="collOpen" class="mono" style="color:var(--amber);font-size:10px;flex:none">'+found+' GATES ›</button>':'')+'</div>';
+    return h+'</div>'}catch(e){return ''}}
 function climbCard(){
   try{
     if(!(S.acl&&S.acl.on))return '';
@@ -4328,18 +4377,7 @@ function viewRehabHub(){
    '<div style="display:flex;justify-content:space-between;align-items:center;gap:12px">'+
    drawerBtn()+'<h1 class="disp" style="font-size:25px;font-weight:600;flex:1;min-width:0">Rehab</h1>'+rehabDocsBtn()+headBtns()+'</div>';
   h+=apptBanner();
-  {const c=checkToday();
-   const pain7=checkAvg('pain',7);
-   h+='<button data-a="checkOpen" class="card mt" style="width:100%;text-align:left;padding:15px 16px;display:block'+(c?'':';border-color:var(--amber)')+'">'+
-     '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px">'+
-     '<p class="eyebrow" style="color:'+(c?'var(--green)':'var(--amber)')+'">'+(c?'Checked in today':'Today\'s check-in')+'</p>'+
-     (pain7!=null?'<span class="mono" style="color:var(--faint);font-size:10px">7-day pain '+pain7+'/10</span>':'')+'</div>'+
-     (c?'<p style="color:var(--dim);font-size:12.5px;line-height:1.5;margin-top:4px">Pain '+c.pain+'/10'+
-        (c.swell?' · swollen':'')+(c.stiff!=null?' · stiffness '+c.stiff+'/10':'')+(c.conf!=null?' · confidence '+c.conf+'/10':'')+
-        '. Tap to change.</p>'
-       :'<p style="color:var(--dim);font-size:12.5px;line-height:1.5;margin-top:4px">Thirty seconds. Pain, swelling, stiffness and how much you trust it — this is the record your physio actually wants.</p>')+
-     '</button>';
-   h+=climbCard()}
+  h+=rehabHero();
   const cards=[];
   if(S.acl&&S.acl.on)cards.push({k:'acl',n:'ACL pathway',sub:'Phase '+S.acl.phase+' of 5 · criteria-gated',mode:'staged',ev:'strong'});
   protos.forEach(p=>{const st=rehabState(p.k);
@@ -4347,13 +4385,22 @@ function viewRehabHub(){
       sub:p.ev==='physio'?(p.by?'Written with '+p.by:'Your physio\u2019s plan')
          :p.mode==='staged'?('Stage '+st.stage+' of '+p.stages.length):'Ongoing management'})});
   {const I=SET_ICONS;
-   const rows=cards.map(c=>navRow(c.ev==='physio'?I.own:I.rehab,c.n,
-     c.k==='acl'?('Phase '+S.acl.phase+'/5'):(c.mode==='staged'?('Stage '+rehabState(c.k).stage):''),
-     c.k==='acl'?'aclOpen':'protoOpen',c.k,{sub:c.sub}));
-   rows.push(navRow(I.own,'A plan from your physio',null,'pplanOpen',null,
-     {sub:'Hand them the phone at your appointment, or type it in'}));
+   /* the work wears session-card clothes now (Sep 2026 rebuild) —
+      these are the primary actions of the page, not settings rows */
    if(!cards.length)h+='<p style="color:var(--dim);font-size:13.5px;line-height:1.6;margin-top:14px">Nothing to rehab yet. Add an injury under Data → Profile — or bring the plan your physio wrote.</p>';
-   h+=setGroup('The work',rows);
+   else h+='<p class="eyebrow mt2">The work</p>';
+   h+=cards.map(c=>{
+     const chip=c.k==='acl'?('PHASE '+S.acl.phase+'/5'):(c.mode==='staged'?('STAGE '+rehabState(c.k).stage):'ONGOING');
+     return '<button data-a="'+(c.k==='acl'?'aclOpen':'protoOpen')+'"'+(c.k==='acl'?'':' data-v="'+c.k+'"')+' class="card mt" style="width:100%;text-align:left;padding:16px;display:block">'+
+       '<div style="display:flex;align-items:center;gap:10px">'+
+       '<span style="flex:1;min-width:0"><span class="disp" style="font-size:16.5px;font-weight:600;display:block">'+esc(c.n)+'</span>'+
+       '<span style="color:var(--dim);font-size:12px;line-height:1.5;display:block;margin-top:3px">'+esc(c.sub)+'</span></span>'+
+       '<span class="mono" style="font-size:9px;color:var(--amber);letter-spacing:.06em;flex:none;border:1px solid var(--line);border-radius:99px;padding:4px 8px">'+chip+'</span>'+
+       '<span class="mono" style="color:var(--amber);font-size:14px;flex:none">›</span></div></button>'}).join('');
+   h+='<button data-a="pplanOpen" class="card mt" style="width:100%;text-align:left;padding:13px 16px;display:flex;align-items:center;gap:10px;border-style:dashed">'+
+     '<span style="flex:1;min-width:0"><span style="font-size:13.5px;font-weight:600;display:block">A plan from your physio</span>'+
+     '<span style="color:var(--faint);font-size:11.5px">Hand them the phone at your appointment, or type it in</span></span>'+
+     '<span class="mono" style="color:var(--amber);font-size:13px;flex:none">›</span></button>';
    const nx=apptNext();
    h+=setGroup('Your physio',[
      navRow(I.cal,'Appointments',null,'apptsOpen',null,
@@ -13576,7 +13623,14 @@ function render(){
         if(render.__drawerWasOpen)dr.classList.add('open');
         else requestAnimationFrame(()=>{requestAnimationFrame(()=>dr.classList.add('open'))})}
       render.__drawerWasOpen=!!dr}catch(e){}};
-  if(vt){try{document.startViewTransition(apply)}catch(e){apply()}}else apply();
+  /* a hidden document aborts view transitions and can swallow the
+     update callback — with the body cache that left a blank page
+     (found in the preview pane; would bite a backgrounded phone too).
+     Hidden → no transition; and if the callback is dropped, run it. */
+  if(vt&&document.visibilityState==='hidden')vt=false;
+  if(vt){try{const tr=document.startViewTransition(apply);
+    if(tr&&tr.updateCallbackDone)tr.updateCallbackDone.catch(()=>{try{apply()}catch(e){}});
+  }catch(e){apply()}}else apply();
 }
 
 /* ══ input plumbing ═════════════════════════════════════ */
