@@ -172,10 +172,10 @@ pre{background:var(--surface);border:1px solid var(--line);border-radius:10px;pa
 /* the live-session banner: flush at the very top, into the status
    band like an iPhone call bar; the app body reserves its height so
    nothing is ever covered */
-#sessBanner{position:fixed;top:calc(env(safe-area-inset-top) + 4px);left:10px;right:10px;z-index:96;
-  display:flex;align-items:center;gap:11px;padding:9px 15px;background:var(--raised);
-  border:1px solid rgba(240,238,230,.35);border-radius:999px;box-shadow:0 8px 26px rgba(0,0,0,.5);text-align:left}
-body.sesslive #app{padding-top:calc(env(safe-area-inset-top) + 52px)}
+#sessBanner{position:fixed;top:calc(env(safe-area-inset-top) + 2px);left:50%;transform:translateX(-50%);
+  max-width:90vw;z-index:96;display:flex;align-items:center;gap:7px;padding:5px 13px;background:var(--raised);
+  border-radius:999px;box-shadow:0 5px 18px rgba(0,0,0,.45);white-space:nowrap}
+body.sesslive #app{padding-top:calc(env(safe-area-inset-top) + 34px)}
 /* tactile motion (Sep 2026): every tap answers back — a springy press,
    messages that arrive, a composer that wakes when touched */
 button{transition:transform .16s cubic-bezier(.34,1.56,.64,1),opacity .16s,background-color .18s,border-color .18s}
@@ -380,7 +380,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='41f791';  // stamped by tools/build.py with the content hash
+const BUILD_ID='6ce4b2';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -12711,14 +12711,14 @@ function render(){
     const s2=S.sess,cur=s2.sets[Math.min(s2.idx,s2.sets.length-1)];
     const resting=s2.phase==='resting'&&S.restEnd;
     const left=resting?Math.max(0,Math.ceil((S.restEnd-Date.now())/1000)):0;
-    /* the full pill, flush at the very top (owner call, Sep 2026) —
-       time · exercise · set position · Return, like an iPhone call
-       banner; #app reserves the height so nothing is covered */
-    return '<button data-a="resume" id="sessBanner">'+
-      '<span class="mono" id="spTime" data-end="'+(resting?S.restEnd:'')+'" style="font-size:15px;font-weight:700;color:'+(resting?'#1E9BFF':'var(--green)')+';flex:none;min-width:44px">'+(resting?mmss(left):'LIVE')+'</span>'+
-      '<span style="flex:1;min-width:0"><span style="display:block;font-size:12.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(String(cur.ex||'').replace(/ \u2014 .*/,''))+'</span>'+
-      '<span class="mono" style="color:var(--faint);font-size:9px;letter-spacing:.04em">'+(resting?'REST \u00b7 THEN SET '+cur.setNo+' OF '+cur.of:'SET '+cur.setNo+' OF '+cur.of+' \u00b7 '+s2.log.length+'/'+s2.sets.length+' LOGGED')+'</span></span>'+
-      '<span class="mono" style="color:var(--amber);font-size:12px;flex:none">Return \u203a</span></button>'};
+    /* the slim one-line capsule at the very top (owner call, Sep 2026):
+       time · exercise · set — coloured ring, nothing underneath covered
+       because #app reserves the height */
+    return '<button data-a="resume" id="sessBanner" style="border:1.5px solid '+(resting?'#1E9BFF':'var(--green)')+'">'+
+      '<span class="mono" id="spTime" data-end="'+(resting?S.restEnd:'')+'" style="font-size:12.5px;font-weight:700;color:'+(resting?'#1E9BFF':'var(--green)')+';flex:none">'+(resting?mmss(left):'LIVE')+'</span>'+
+      '<span style="min-width:0;overflow:hidden;text-overflow:ellipsis;font-size:12px;color:var(--text)">'+esc(String(cur.ex||'').replace(/ \u2014 .*/,''))+'</span>'+
+      '<span class="mono" style="font-size:10.5px;color:var(--faint);flex:none">\u00b7 set '+cur.setNo+'/'+cur.of+'</span>'+
+      '<span class="mono" style="color:var(--amber);font-size:12px;flex:none">\u203a</span></button>'};
   const extraHtml=sessPillHtml()+drawerHtml()+sheetHtml()+(S.toast?'<div class="toast"><div class="'+(S.toastGold?'gold':'')+'">'+esc(S.toast)+'</div></div>':'');
   const keyA=S.view+'|'+(S.sess&&S.view==='session'?S.sess.phase+':'+S.sess.idx:'');
   const sheetKey=S.sheet?S.sheet.t:'';
