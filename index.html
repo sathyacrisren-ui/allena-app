@@ -386,7 +386,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='e458f4';  // stamped by tools/build.py with the content hash
+const BUILD_ID='8c9df5';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -406,7 +406,12 @@ function sanityWeeks(){
     setTimeout(function(){flash('Fixed a block length that had run away — check your block is the length you want.')},400)}
   return fixed}
 function saveLib(){lset(K_LIB,S.lib)}
-function flash(m,gold){S.toast=m;S.toastGold=!!gold;render();clearTimeout(flash.t);flash.t=setTimeout(()=>{S.toast=null;S.toastGold=false;render()},gold?3200:2400)}
+function flash(m,gold){S.toast=m;S.toastGold=!!gold;
+  /* the timer arms FIRST — a flash fired before render() exists (link
+     capture at load) used to throw mid-function and leave the toast
+     stuck on screen forever (owner-hit) */
+  clearTimeout(flash.t);flash.t=setTimeout(()=>{S.toast=null;S.toastGold=false;try{render()}catch(e){}},gold?3200:2400);
+  try{render()}catch(e){}}
 function saveHistory(){return lset(K_H,S.history)}
 function record(complete){const s=S.sess;return{id:String(s.startedAt),date:new Date(s.startedAt).toISOString(),
   block:s.block,progId:s.progId,dayIdx:s.dayIdx,dayTitle:s.dayName,week:s.week,
@@ -10734,8 +10739,7 @@ function ghostData(){
     if(r.date<cut&&questWeekKey(r.date)!==wk)return;
     const k=questWeekKey(r.date);kmWk[k]=(kmWk[k]||0)+(r.km||0)});
   const past=Object.keys(byWk).filter(k=>k<wk);
-  if(!past.length)return null;
-  const bestSess=past.reduce((a,k)=>Math.max(a,byWk[k]),0);
+  const bestSess=past.length?past.reduce((a,k)=>Math.max(a,byWk[k]),0):0;
   const pastKm=Object.keys(kmWk).filter(k=>k<wk);
   const bestKm=pastKm.length?pastKm.reduce((a,k)=>Math.max(a,kmWk[k]),0):0;
   const dow=(new Date().getDay()+6)%7;                 // Mon=0
@@ -10799,10 +10803,11 @@ function raceTrack(now,best,friend,unit){
     '</div>'}
 function ghostCard(){
   try{
-    const g=ghostData();
-    if(!g||g.best<2)return '';
-    ghostBank(g);
-    const f=fghost();if(f)fghostBank(g,f);
+    const g=ghostData();if(!g)return '';
+    const f=fghost();
+    if(g.best<2&&!f)return '';        // no own ghost AND no mate: quiet
+    if(g.best>=2)ghostBank(g);
+    if(f)fghostBank(g,f);
     const beat=g.now>g.best,beatF=f&&g.now>f.s;
     const name=(S.prof&&S.prof.name?String(S.prof.name):'You').slice(0,10);
     let h='<div class="card mt'+(beat||beatF?' an-glow':'')+'" style="padding:16px;border-radius:20px'+(beat?';border-color:var(--green)':f?';border-color:#1E9BFF':'')+'">'+
@@ -10821,8 +10826,8 @@ function ghostCard(){
     h+='<div style="display:flex;justify-content:space-between;align-items:baseline;margin-top:'+(f?'8':'12')+'px">'+
       '<span style="font-size:12.5px;font-weight:600">Sessions</span>'+
       '<span class="mono" style="font-size:11px;color:'+(beat?'var(--green)':'var(--text)')+'">'+g.now+
-      '<span style="color:var(--faint)"> vs your best '+g.best+(f?' · '+esc(f.n)+'’s '+f.s:'')+'</span></span></div>'+
-      raceTrack(g.now,g.best,f?f.s:0,'');
+      '<span style="color:var(--faint)">'+(g.best>=2?' vs your best '+g.best:'')+(f?' · '+esc(f.n)+'’s '+f.s:'')+'</span></span></div>'+
+      raceTrack(g.now,g.best>=2?g.best:0,f?f.s:0,'');
     if(S.runOn&&(g.bestKm>=5||(f&&f.k>=5))){
       h+='<div style="display:flex;justify-content:space-between;align-items:baseline;margin-top:16px">'+
         '<span style="font-size:12.5px;font-weight:600">Distance</span>'+
