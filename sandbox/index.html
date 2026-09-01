@@ -361,7 +361,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='39ee6b';  // stamped by tools/build.py with the content hash
+const BUILD_ID='32403d';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -3042,6 +3042,116 @@ function noticedPool(){
   try{const lr=(S.runs||[]).filter(r=>r.km>=(S.runs||[]).reduce((a,r2)=>Math.max(a,r2.km||0),0)*0.75&&r.km>=10);
     if(lr.length>=4)add(lr.length+' long runs banked',
       'Your longest is '+Math.round(Math.max.apply(null,lr.map(r=>r.km))*10)/10+' km. The long run is the one session that changes what every other run costs.')}catch(e){}
+  /* ── the obscure tier (owner call, Sep 2026): relationships a
+     casual reader would never compute — so there is always
+     something genuinely interesting to say ─────────────────── */
+  // rest-day bounce: how much a full day off is worth
+  try{const days={};H.filter(h=>!h.run).forEach(h=>{days[h.date.slice(0,10)]=1});
+    const byGap={};
+    H.filter(h=>!h.run).forEach(h=>{
+      const d0=new Date(h.date.slice(0,10)+'T12:00');
+      let gap=0;for(let g=1;g<=3;g++){const k=dayKey(new Date(d0-g*864e5));if(days[k])break;gap=g}
+      let best=0;h.log.forEach(l=>{if(l.w&&l.r)best=Math.max(best,e1rm(l.w,l.r))});
+      if(best)(byGap[gap?'rest':'b2b']=byGap[gap?'rest':'b2b']||[]).push(best)});
+    const avg=a=>a.reduce((x,y)=>x+y,0)/a.length;
+    if(byGap.rest&&byGap.b2b&&byGap.rest.length>=4&&byGap.b2b.length>=4){
+      const d=avg(byGap.rest)/avg(byGap.b2b);
+      if(d>1.04)add('A day off is worth '+Math.round((d-1)*100)+'% to your top sets',
+        'Sessions after a full rest day average '+Math.round((d-1)*100)+'% higher best-set strength than back-to-back days ('+byGap.rest.length+' vs '+byGap.b2b.length+' sessions). Recovery is training too.');
+      else if(d<0.98&&byGap.b2b.length>=6)add('Back-to-back days do not cost you',
+        'Your top sets on consecutive training days match the rested ones across '+byGap.b2b.length+' sessions. Your recovery keeps up with your schedule — useful to know when life compresses the week.')}}catch(e){}
+  // set fade: what happens between the first set and the last
+  try{const fades=[];
+    H.filter(h=>!h.run).forEach(h=>{const by={};
+      h.log.forEach(l=>{if(!l.w||!l.r)return;(by[l.ex]=by[l.ex]||[]).push(l)});
+      Object.keys(by).forEach(k=>{const ss=by[k].filter(l=>l.w===by[k][0].w);
+        if(ss.length>=3)fades.push(ss[0].r-ss[ss.length-1].r)})});
+    if(fades.length>=10){const f=fades.reduce((a,b)=>a+b,0)/fades.length;
+      if(f<=0.5)add('Your last sets hold their reps',
+        'Across '+fades.length+' straight-weight exercises, the final set keeps within half a rep of the first. That is either well-chosen loads or real work capacity — both worth keeping.');
+      else if(f>=1.5)add('Sets fade '+(Math.round(f*10)/10)+' reps by the end',
+        'From first set to last at the same weight, across '+fades.length+' exercises. Not a flaw — it means the first set is honest. If the fade grows, the rests are too short.')}}catch(e){}
+  // spacing sweet spot for the big lifts
+  try{const goals=(S.goals||[]).map(g=>gBase(g.ex));if(goals.length){
+    const pts=[];const lastByEx={};
+    H.filter(h=>!h.run).slice().sort((a,b)=>a.date.localeCompare(b.date)).forEach(h=>{
+      h.log.forEach(l=>{if(!l.w||!l.r)return;const b=gBase(l.ex);if(goals.indexOf(b)<0)return;
+        const t=new Date(h.date).getTime();
+        if(lastByEx[b]){const gap=Math.round((t-lastByEx[b])/864e5);
+          if(gap>=1&&gap<=10)pts.push({gap:gap<=2?'short':gap<=4?'mid':'long',e:e1rm(l.w,l.r)})}
+        lastByEx[b]=t})});
+    const g2={};pts.forEach(p2=>{(g2[p2.gap]=g2[p2.gap]||[]).push(p2.e)});
+    const avg=a=>a.reduce((x,y)=>x+y,0)/a.length;
+    const ks=Object.keys(g2).filter(k=>g2[k].length>=5);
+    if(ks.length>=2){ks.sort((a,b)=>avg(g2[b])-avg(g2[a]));
+      const lbl={short:'1–2 days',mid:'3–4 days',long:'5 or more days'};
+      if(avg(g2[ks[0]])>avg(g2[ks[ks.length-1]])*1.03)
+        add('Your goal lifts like '+lbl[ks[0]]+' between visits',
+          'Estimated max runs highest when you come back to a goal lift after '+lbl[ks[0]]+' ('+g2[ks[0]].length+' data points), and lowest after '+lbl[ks[ks.length-1]]+'. Your frequency has a shape — this is it.')}}}catch(e){}
+  // the same sets are getting cheaper
+  try{const seen={};const pairs=[];
+    H.filter(h=>!h.run).slice().sort((a,b)=>String(a.date).localeCompare(String(b.date))).forEach(h=>h.log.forEach(l=>{
+      if(!l.w||!l.r||l.rpe==null)return;const k=l.ex+'|'+l.w+'|'+l.r;
+      if(seen[k]){const dd=(new Date(h.date)-new Date(seen[k].d))/864e5;
+        if(dd>=21)pairs.push(l.rpe-seen[k].rpe)}
+      else seen[k]={d:h.date,rpe:l.rpe}}));
+    if(pairs.length>=6){const d=pairs.reduce((a,b)=>a+b,0)/pairs.length;
+      if(d<=-0.7)add('The same weights cost less than they used to',
+        'Across '+pairs.length+' repeated set-for-set comparisons at least three weeks apart, the identical weight and reps now run about '+(Math.round(-d*10)/10)+' RPE easier. That is fitness arriving quietly, before the numbers move.')}}catch(e){}
+  // when you run matters
+  try{const R=(S.runs||[]).filter(r=>r.type==='easy'&&r.km>2&&r.mins&&r.time);
+    const am=R.filter(r=>+String(r.time).slice(0,2)<12),pm=R.filter(r=>+String(r.time).slice(0,2)>=15);
+    if(am.length>=4&&pm.length>=4){
+      const pc=a=>a.reduce((x,r)=>x+r.mins/r.km,0)/a.length;
+      const d=(pc(am)-pc(pm))*60;
+      if(Math.abs(d)>=10)add((d>0?'Evening':'Morning')+' runs come out '+Math.round(Math.abs(d))+'s faster',
+        'Per '+udUnit()+', at the same easy effort ('+am.length+' morning vs '+pm.length+' late runs). Worth knowing when a session matters.')}}catch(e){}
+  // rehab: the boring sessions show up in the pain numbers
+  try{if(S.acl&&S.acl.on){
+    const rp=S.lib.programs.filter(p2=>p2.acl||p2.rehabProto).map(p2=>p2.id);
+    const rehabDays={};H.forEach(h=>{if(rp.indexOf(h.progId)>=0)rehabDays[h.date.slice(0,10)]=1});
+    const after=[],other=[];
+    ((S.acl.checks)||[]).forEach(c=>{if(c.pain==null)return;
+      const prev=dayKey(new Date(new Date(c.date+'T12:00')-864e5));
+      (rehabDays[prev]?after:other).push(c.pain)});
+    const avg=a=>a.reduce((x,y)=>x+y,0)/a.length;
+    if(after.length>=6&&other.length>=6&&avg(after)<avg(other)-0.5)
+      add('Pain runs lower the day after rehab work',
+        'Average '+(Math.round(avg(after)*10)/10)+' vs '+(Math.round(avg(other)*10)/10)+' on other days, across '+(after.length+other.length)+' check-ins. The boring exercises are doing exactly what your physio said they would.')}}catch(e){}
+  // the quiet climber: up without a single headline set
+  try{const cut=dayKey(new Date(Date.now()-30*864e5));const by={};
+    H.filter(h=>!h.run).forEach(h=>h.log.forEach(l=>{if(!l.w||!l.r)return;
+      const b=gBase(l.ex);(by[b]=by[b]||[]).push({d:h.date.slice(0,10),e:e1rm(l.w,l.r),pr:!!l.pr})}));
+    let best=null;
+    Object.keys(by).forEach(b=>{const l=by[b];if(l.length<8)return;
+      const recent=l.filter(x=>x.d>=cut),before=l.filter(x=>x.d<cut);
+      if(recent.length<3||!before.length)return;
+      if(recent.some(x=>x.pr))return;
+      const mx=a=>Math.max.apply(null,a.map(x=>x.e));
+      const g=mx(recent)/mx(before);
+      if(g>1.04&&(!best||g>best.g))best={b:b,g:g}});
+    if(best)add(best.b+' climbed '+Math.round((best.g-1)*100)+'% without a headline',
+      'No single set announced it — the estimated max just rose '+Math.round((best.g-1)*100)+'% this month through ordinary work. The quietest kind of progress is usually the most repeatable.')}catch(e){}
+  // weekend vs weekday sessions
+  try{const we=[],wd=[];
+    H.filter(h=>!h.run).forEach(h=>{const d=new Date(h.date).getDay();
+      const t=h.log.reduce((a,l)=>a+(l.w||0)*(l.r||0),0);
+      if(t)(d===0||d===6?we:wd).push(t)});
+    const avg=a=>a.reduce((x,y)=>x+y,0)/a.length;
+    if(we.length>=4&&wd.length>=6&&avg(we)>avg(wd)*1.2)
+      add('Weekend sessions run '+Math.round((avg(we)/avg(wd)-1)*100)+'% bigger',
+        'More time means more volume — '+tonStr(Math.round(avg(we)))+' against '+tonStr(Math.round(avg(wd)))+' on weekdays, on average. If a lift is stuck, give it a Saturday.')}catch(e){}
+  // a milestone on the horizon — a forecast, never a countdown
+  try{const n=H.filter(h=>!h.run).length;
+    const next=n<100?100:n<250?250:n<500?500:n<1000?1000:null;
+    if(next&&n>=next*0.7){
+      const first=H.filter(h=>!h.run)[0];
+      const wks=Math.max(1,(Date.now()-new Date(first.date).getTime())/(7*864e5));
+      const rate=n/wks;
+      if(rate>0.5){const weeksLeft=Math.round((next-n)/rate);
+        const when=new Date(Date.now()+weeksLeft*7*864e5);
+        add('Session '+next+' lands around '+when.toLocaleDateString(undefined,{month:'long',year:'numeric'}),
+          'You are at '+n+', averaging '+(Math.round(rate*10)/10)+' a week since '+fmtDate(first.date)+'. At your own pace — no deadline, just the shape of the road.')}}}catch(e){}
   return out}
 function noticedToday(){
   const pool=noticedPool();
