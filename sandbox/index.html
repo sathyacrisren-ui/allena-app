@@ -380,7 +380,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='cce50c';  // stamped by tools/build.py with the content hash
+const BUILD_ID='51f639';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -11963,6 +11963,60 @@ function sheetHtml(){
       '</div>'+
       '<button data-a="histImpGo" class="big disp mt" style="background:'+((f.date||'').trim()?'var(--amber)':'var(--raised)')+';color:'+((f.date||'').trim()?'#1F1E1D':'var(--faint)')+';font-size:15px">Bring it in</button>'+
       '<p style="color:var(--faint);font-size:11px;line-height:1.55;margin-top:10px">Sessions are spread across each week and marked as imported with approximate dates — honest labels, real data.</p>')}
+  if(S.sheet.t==='impguide'){
+    const src=S.impg||'garmin';
+    const G={
+      garmin:{name:'Garmin',intro:'The Garmin Connect app cannot export — the website can. Five minutes, once.',
+        addr:'connect.garmin.com',
+        steps:[
+          ['Open Safari and go to connect.garmin.com','Sign in with your Garmin login. Stay in the browser — if it pushes you toward the app, decline.'],
+          ['Ask for the desktop site','Tap the ᴀA button in Safari’s address bar, then “Request Desktop Website”. The export button only exists on the desktop layout.'],
+          ['Find your activities','Open the ☰ menu → Activities → All Activities.'],
+          ['Scroll down a few times','The list loads as you scroll, and ONLY the rows that have loaded will export. Scroll until your oldest training appears.'],
+          ['Tap Export CSV (top right)','The file saves to Files → Downloads as Activities.csv.'],
+          ['Come back to Allena','Import → My training history → choose Activities.csv. Done.']],
+        wrong:[['No Export CSV button','You are on the mobile layout — step 2 again.'],
+          ['Only a handful of rows imported','The list was not scrolled far enough — step 4, then export again.']]},
+      strava:{name:'Strava',intro:'Free, works for every Strava account — and the page name is scarier than it is.',
+        addr:'strava.com',
+        steps:[
+          ['Open Safari and go to strava.com','Sign in. The Strava app has no export — it has to be the website.'],
+          ['Open your account settings','Tap your profile picture → Settings → My Account.'],
+          ['Tap “Download or Delete Your Account”','Despite the name, requesting the download deletes nothing. It is Strava’s only export door.'],
+          ['Tap “Request Your Archive”','Under “Download Request”. Strava builds the file and emails it — usually within the hour.'],
+          ['Open the email, tap the zip','Save to Files, then tap the zip in Files to unpack it. Inside is a folder with many files — the one that matters is activities.csv.'],
+          ['Come back to Allena','Import → My training history → choose activities.csv. Done.']],
+        wrong:[['The email never came','Check which email address the Strava account uses — the archive goes there.'],
+          ['The zip is full of files','Ignore all of them except activities.csv.']]},
+      health:{name:'Apple Health',intro:'If your watch already syncs to Health, everything is sitting on this phone.',
+        addr:'',
+        steps:[
+          ['Open the Health app','Tap your picture, top right.'],
+          ['Export All Health Data','It is at the very bottom. Tap Export — it takes a minute to build.'],
+          ['Save to Files','The share sheet opens — choose Save to Files.'],
+          ['Unpack the zip','In Files, tap the zip → it opens to apple_health_export → export.xml.'],
+          ['Come back to Allena','Import → My training history → choose export.xml. Hundreds of MB is fine — Allena reads it in pieces.']],
+        wrong:[['Nothing imported','Your watch’s app may not be writing workouts into Health — check that app’s Health permission, sync a workout, retry.']]}};
+    const g=G[src];
+    return wrapSheet('Getting your file, step by step',
+      '<div style="display:flex;gap:6px">'+['garmin','strava','health'].map(k=>
+        '<button data-a="impgSrc" data-v="'+k+'" class="pill'+(src===k?' on':'')+'" style="flex:1;text-align:center;font-size:12.5px">'+G[k].name+'</button>').join('')+'</div>'+
+      '<p style="color:var(--dim);font-size:13px;line-height:1.55;margin-top:14px">'+g.intro+'</p>'+
+      (g.addr?'<button data-a="impgCopy" data-v="https://'+g.addr+'" class="card mt" style="width:100%;text-align:left;padding:11px 15px;display:flex;align-items:center;gap:10px">'+
+        '<span class="mono" style="font-size:13px;color:var(--amber);flex:1">'+g.addr+'</span>'+
+        '<span class="mono" style="font-size:10px;color:var(--faint)">COPY → PASTE IN SAFARI</span></button>':'')+
+      '<div class="card mt" style="padding:4px 15px">'+g.steps.map((st,i)=>
+        '<div style="display:flex;gap:12px;padding:11px 0'+(i?';border-top:1px solid var(--line)':'')+'">'+
+        '<span class="mono" style="width:22px;height:22px;border-radius:22px;background:var(--raised);border:1px solid var(--line);color:var(--amber);font-size:11px;display:flex;align-items:center;justify-content:center;flex:none;margin-top:1px">'+(i+1)+'</span>'+
+        '<span style="flex:1;min-width:0"><span style="font-size:13.5px;font-weight:600;display:block">'+st[0]+'</span>'+
+        '<span style="color:var(--dim);font-size:12px;line-height:1.5;display:block;margin-top:2px">'+st[1]+'</span></span></div>').join('')+'</div>'+
+      '<p class="eyebrow mt2">If it goes wrong</p>'+
+      '<div class="card mt" style="padding:4px 15px">'+g.wrong.map((w,i)=>
+        '<div style="padding:10px 0'+(i?';border-top:1px solid var(--line)':'')+'">'+
+        '<span style="font-size:12.5px;font-weight:600;display:block">'+w[0]+'</span>'+
+        '<span style="color:var(--dim);font-size:12px;line-height:1.5;display:block;margin-top:2px">'+w[1]+'</span></div>').join('')+'</div>'+
+      (src!=='health'&&svState&&!svState()?'<p style="color:var(--faint);font-size:11.5px;line-height:1.55;margin-top:12px">Paid Strava? “Connect Strava” in the run import does all of this in one tap.</p>':'')+
+      '<button data-a="impGuideBack" class="btn mt" style="color:var(--dim)">Back to import</button>')}
   if(S.sheet.t==='intake'){
     if(S.hkBusy)return wrapSheet('Import your data',
       '<p class="mono" style="color:var(--amber);font-size:12px">Reading the export — big files take a minute…</p>');
@@ -11993,6 +12047,7 @@ function sheetHtml(){
        '<div style="padding:9px 0'+(i?';border-top:1px solid var(--line)':'')+'">'+
        '<span style="font-size:13px;font-weight:600;display:block">'+x[0]+'</span>'+
        '<span style="color:var(--faint);font-size:11.5px;line-height:1.45">'+x[1]+'</span></div>').join('')+'</div>'+
+      '<button data-a="impGuideOpen" data-v="intake" class="btn mt" style="color:var(--amber)">Where do I get my file? The step-by-step guide</button>'+
       '<p style="color:var(--faint);font-size:11px;line-height:1.55;margin-top:10px">Backup files restore from Settings → Restore — that one replaces data, so it lives behind its own door. Nothing here uploads anywhere; files are read on this phone.</p>')}
   if(S.sheet.t==='rungoal'){
     const f=S.rgoal||(S.rgoal={goal:'base',date:''});
@@ -12329,6 +12384,7 @@ function sheetHtml(){
         '<div style="padding:9px 0'+(i?';border-top:1px solid var(--line)':'')+'">'+
         '<span style="font-size:13px;font-weight:600;display:block">'+esc(x[0])+'</span>'+
         '<span style="color:var(--faint);font-size:11.5px;line-height:1.45">'+esc(x[1])+'</span></div>').join('')+'</div>'+
+      '<button data-a="impGuideOpen" data-v="runimp" class="btn" style="width:100%;color:var(--amber)">The full step-by-step guide</button>'+
       '<textarea data-in="rimp.text" rows="7" placeholder="Paste the CSV, the activity list, or a GPX file here" style="margin-top:12px;font-size:13px">'+esc(R.text||'')+'</textarea>'+
       '<label class="btn mt" style="display:block;text-align:center;cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(R.fileName?esc(midName(R.fileName))+' — choose another':'Or choose a file — Excel, CSV, GPX, TCX')+
       '<input type="file" accept=".xlsx,.csv,.tsv,.txt,.gpx,.tcx,text/plain,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" data-rimpfile="1" style="display:none"></label>'+
@@ -14113,6 +14169,10 @@ function runAction(a,v,t,e){
       break}
     case 'rimpBack':S.rimp.res=null;render();break;
     case 'svGo':svConnect();break;
+    case 'impGuideOpen':S.impgBack=v||'';S.impg=S.impg||'garmin';S.sheet={t:'impguide'};render();break;
+    case 'impgSrc':S.impg=v;render();break;
+    case 'impgCopy':{try{navigator.clipboard.writeText(v).then(function(){flash('Copied — paste it into Safari\'s address bar.')})}catch(e){flash('Could not copy — type it into Safari: '+v)}break}
+    case 'impGuideBack':S.sheet=S.impgBack?{t:S.impgBack}:null;render();break;
     case 'svSync':svPull(false);break;
     case 'svOff':ldel('training-strava-v1');flash('Strava disconnected. Activities already in stay.');render();break;
     case 'rimpGo':{const r=runImportCommit(S.rimp.res.runs);
