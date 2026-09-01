@@ -386,7 +386,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='2b1476';  // stamped by tools/build.py with the content hash
+const BUILD_ID='b5df2a';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -5106,6 +5106,53 @@ function runPlanGoal(goal,dateStr,timeStr,daysPick,longPick){
       days:days,longDay:longDay,pace:pS(easyP),items:items,template:combined?combined.template:null,
       note:(paceNote?paceNote+' ':'')+(combined&&combined.conflict?combined.conflict+' ':'')+'Weeks 1\u20132 are easy running plus strides only \u2014 pain-free volume is what earns the speed work (that is the intensity gate). Paces come from your own easy median: tempo \u224810% faster, intervals \u224816%. Tune by feel; the effort is the prescription. '+(S.acl&&S.acl.on?'With the knee in rehab, swap intervals for tempo until your physio clears sharp speed.':'')}}
   catch(e){return{block:'Could not read the history.'}}}
+function rpMatchRun(r){
+  /* the umbrella move (owner call, 2 Sep): whoever wrote the plan —
+     Garmin Coach, Runna, Allena — the watch records the run, Health
+     syncs it, and Allena ticks the matching planned item. Device-
+     sourced runs tick as witnessed; typed ones tick plainly. */
+  try{
+    if(!isRunType(r.type)||!(r.km>0))return null;
+    const rp=S.runplan;if(!rp||!(rp.items||[]).length)return null;
+    const wk=Math.min(rpWeek(rp),Math.max.apply(null,rp.items.map(i=>+i.week||1)));
+    const it=rp.items.find(i=>+i.week===wk);
+    if(!it||!it.sched||!it.sched.length)return null;
+    const DN7=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+    const dow=(new Date(r.date+'T12:00').getDay()+6)%7;
+    let best=null;
+    it.sched.forEach(s2=>{
+      if(s2.done||s2.km==null)return;
+      const dd=Math.abs(DN7.indexOf(s2.d)-dow);
+      if(dd>1)return;                                  // same day or one off — plans flex
+      const kd=Math.abs(r.km-s2.km);
+      if(kd>Math.max(1.5,s2.km*0.3))return;            // the distance has to rhyme
+      const score=dd*2+kd;
+      if(!best||score<best.score)best={s:s2,score:score}});
+    if(!best)return null;
+    const device=/via (Apple Health|Strava)/i.test(String(r.note||''));
+    best.s.done={id:r.id,km:r.km,date:r.date,src:device?'device':'manual'};
+    lset('training-runplan-v1',rp);
+    return{kind:best.s.kind,km:best.s.km,device:device}
+  }catch(e){return null}}
+function rpSchedRow(it){
+  /* this week's plan as chips: filled green = done (ring = device-
+     witnessed), amber = today, dim = coming, quiet outline = passed */
+  try{
+    if(!it||!it.sched||!it.sched.length)return '';
+    const DN7=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+    const todayDow=(new Date().getDay()+6)%7;
+    return '<div style="display:flex;gap:6px;margin-top:10px">'+it.sched.map(s2=>{
+      const di=DN7.indexOf(s2.d);
+      const done=!!s2.done,dev=done&&s2.done.src==='device';
+      const isToday=di===todayDow,past=di<todayDow&&!done;
+      const bg=done?'var(--green)':'transparent';
+      const bd=done?'var(--green)':isToday?'var(--amber)':past?'var(--line)':'var(--line)';
+      const fg=done?'#12210f':isToday?'var(--amber)':'var(--dim)';
+      return '<div style="flex:1;text-align:center;padding:7px 0 6px;border:1.5px solid '+bd+';border-radius:11px;background:'+bg+(dev?';box-shadow:0 0 0 2px rgba(48,209,88,.25)':'')+'">'+
+        '<span class="mono" style="font-size:8.5px;letter-spacing:.05em;color:'+fg+';display:block">'+s2.d.toUpperCase()+'</span>'+
+        '<span class="mono" style="font-size:11px;font-weight:700;color:'+fg+';display:block;margin-top:1px">'+
+        (done?'✓':s2.km!=null?udNum(s2.km):'·')+'</span>'+
+        '<span class="mono" style="font-size:7.5px;color:'+(done?'#12210f':'var(--faint)')+';display:block">'+String(s2.kind||'').toUpperCase().slice(0,5)+'</span></div>'}).join('')+'</div>'}catch(e){return ''}}
 function runPlanCard(){
   /* the imported running progression, week by week — carried from the
      spreadsheet instead of silently dropped. The ACWR band outranks
@@ -5125,6 +5172,7 @@ function runPlanCard(){
         return '<p class="mono" style="color:var(--amber);font-size:10.5px;margin-top:4px">RACE DAY IN '+dd+' DAYS \u00b7 '+esc(rp.raceDate)+(rp.goalTime?' \u00b7 GOAL '+esc(rp.goalTime)+' ('+esc(rp.goalPace||'')+'/km)':'')+'</p>'})():
        (rp.goalTime?'<p class="mono" style="color:var(--amber);font-size:10.5px;margin-top:4px">GOAL '+esc(rp.goalTime)+' \u00b7 '+esc(rp.goalPace||'')+'/km</p>':''))+
       '<p style="font-size:13.5px;line-height:1.55;margin-top:6px">'+esc((cur&&cur.desc)||'')+'</p>'+
+      rpSchedRow(cur)+
       (a!=null&&a>1.3?'<p style="color:var(--dim);font-size:12px;line-height:1.5;margin-top:6px">Load is already '+a+'\u00d7 your four-week average — the 0.8\u20131.3 band outranks the plan this week. Ease it.</p>':'')+
       ((rp.weekAdj&&rp.weekAdj.wk===wk)?'<p style="color:var(--dim);font-size:12px;line-height:1.5;margin-top:6px;border-top:1px solid var(--line);padding-top:6px">'+esc(rp.weekAdj.note)+'</p>':'')+
       ((rp.adjLog&&rp.adjLog.length)?'<p style="color:var(--dim);font-size:11.5px;line-height:1.5;margin-top:6px;border-top:1px solid var(--line);padding-top:6px">'+esc(rp.adjLog[rp.adjLog.length-1].why)+'</p>':'')+
@@ -5711,6 +5759,8 @@ function runAdd(r){
     log:[{ex:(isRun?'Running — '+label.toLowerCase():label+' — cardio'),setNo:1,w:0,r:0,km:r.km,mins:r.mins,rpe:r.rpe,secs:Math.round((r.mins||0)*60)}]});
   S.history.sort((a,b)=>a.date.localeCompare(b.date));saveHistory();
   try{runPlanNudge()}catch(e){} // every run re-reconciles the week's plan
+  try{const mt=rpMatchRun(r);
+    if(mt&&mt.device)flash('Plan ticked — the '+(mt.kind||'run')+' ('+udNum(mt.km)+' '+udUnit()+'), witnessed by your watch.')}catch(e){}
 }
 function runDel(id){
   S.runs=runs().filter(r=>r.id!==id);runSave();
