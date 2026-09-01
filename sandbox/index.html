@@ -386,7 +386,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='543211';  // stamped by tools/build.py with the content hash
+const BUILD_ID='a19e17';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -1587,6 +1587,7 @@ function doRestore(txt){try{const o=JSON.parse(txt);
       if(k2==='training-sandbox-v1'||k2===K_A)return;   // device/demo state, not data
       try{if(localStorage.getItem(k2)==null&&K[k2]!=null)lset(k2,K[k2])}catch(e){}});
   }
+  try{runWalkRepair()}catch(e){}   // restored activities get the pace gate too
   flash('Restored — '+added+' new session'+(added===1?'':'s')+'. '+backupSummary(o));
   render()}catch(e){flash("Couldn't restore: "+((e&&e.message)||'unreadable file').slice(0,80))}}
 
@@ -3104,9 +3105,10 @@ function noticedPool(){
     if(st.weeks>=3)add(st.weeks+' weeks without missing one',
       'Consistency beats every programming decision you will ever make. This is the number that actually predicts where you end up.',3)}catch(e){}
   // running
-  try{if((S.runs||[]).length>=5){const km=(S.runs||[]).reduce((a,r)=>a+(r.km||0),0);
-    add(udNum(Math.round(km))+' '+udUnit()+' logged',
-      'Over '+S.runs.length+' runs. Every one of them is in the same recovery picture as your lifting, which is not true in any other app you could be using.',3)}}catch(e){}
+  try{const realR=(S.runs||[]).filter(r=>isRunType(r.type));
+    if(realR.length>=5){const km=realR.reduce((a,r)=>a+(r.km||0),0);
+    add(udNum(Math.round(km))+' '+udUnit()+' run',
+      'Over '+realR.length+' runs. Every one of them is in the same recovery picture as your lifting, which is not true in any other app you could be using.',3)}}catch(e){}
   // rehab
   try{const q=((S.acl&&S.acl.tests)||[]).filter(t=>t.kind==='quad');
     if(q.length>=2){const d=q[q.length-1].lsi-q[0].lsi;
@@ -3164,7 +3166,8 @@ function noticedPool(){
     if(prs>=3)add(prs+' rep PRs in the last four weeks',
       'Each one is a set that beat everything before it. Whatever the plan says, the last month has been going somewhere.')}catch(e){}
   // the long-run habit
-  try{const lr=(S.runs||[]).filter(r=>r.km>=(S.runs||[]).reduce((a,r2)=>Math.max(a,r2.km||0),0)*0.75&&r.km>=10);
+  try{const rl=(S.runs||[]).filter(r=>isRunType(r.type));
+    const lr=rl.filter(r=>r.km>=rl.reduce((a,r2)=>Math.max(a,r2.km||0),0)*0.75&&r.km>=10);
     if(lr.length>=4)add(lr.length+' long runs banked',
       'Your longest is '+Math.round(Math.max.apply(null,lr.map(r=>r.km))*10)/10+' km. The long run is the one session that changes what every other run costs.',3)}catch(e){}
   /* ── the obscure tier (owner call, Sep 2026): relationships a
@@ -4655,8 +4658,8 @@ function viewRun(){
   // every run, grouped the way a runner actually looks for one
   const mode=S.runGroup||'month';
   const groups=runGroups(R,mode);
-  h+=collapser('allruns','Every run',
-    R.length+' runs · '+udNum(Math.round(R.reduce((a,r)=>a+(r.km||0),0)))+' '+udUnit()+' · grouped by '+
+  h+=collapser('allruns','Every activity',
+    actsLabel(R)+' · '+udNum(Math.round(R.reduce((a,r)=>a+(r.km||0),0)))+' '+udUnit()+' · grouped by '+
       ({month:'month',type:'session type',week:'week',dist:'distance'})[mode],
     '<select data-runsel="1" style="width:100%;margin-top:10px;padding:13px 14px;font-size:14px;background:var(--raised);border:1px solid var(--line);border-radius:12px;color:var(--text);-webkit-appearance:none;appearance:none">'+
     [['month','Grouped by month'],['week','Grouped by week'],['type','Grouped by session type'],['dist','Grouped by distance']].map(x=>
@@ -4790,14 +4793,14 @@ function runGroups(R,mode){
       const s2=sum(l);
       const best=l.filter(r=>r.km&&r.mins).sort((a,b2)=>(a.mins/a.km)-(b2.mins/b2.km))[0];
       out.push({k:String(b[0]),label:b[2],colour:b[3],
-        sub:l.length+(l.length===1?' run · avg ':' runs · avg ')+s2.pace+(best?' · best '+paceStr(best.mins,best.km)+' over '+udNum(best.km)+' '+udUnit():''),runs:l})})}
+        sub:actsLabel(l)+' · avg '+s2.pace+(best?' · best '+paceStr(best.mins,best.km)+' over '+udNum(best.km)+' '+udUnit():''),runs:l})})}
   else if(mode==='week'){
     const by={};
     list.forEach(r=>{const w=weekRange(r.date+'T12:00');(by[w.key]=by[w.key]||{label:w.label,l:[]}).l.push(r)});
     Object.keys(by).sort().reverse().forEach(k=>{
       const s2=sum(by[k].l);
       out.push({k:k,label:by[k].label,colour:null,
-        sub:by[k].l.length+(by[k].l.length===1?' run · ':' runs · ')+udNum(s2.km)+' '+udUnit()+' · '+Math.round(s2.mins)+' min'+(s2.pace?' · avg '+s2.pace:''),runs:by[k].l})})}
+        sub:actsLabel(by[k].l)+' · '+udNum(s2.km)+' '+udUnit()+' · '+Math.round(s2.mins)+' min'+(s2.pace?' · avg '+s2.pace:''),runs:by[k].l})})}
   else{
     const by={};
     list.forEach(r=>{const k=r.date.slice(0,7);
@@ -4807,7 +4810,7 @@ function runGroups(R,mode){
       const s2=sum(by[k].l);
       const longest=by[k].l.reduce((a,r)=>r.km>a.km?r:a,by[k].l[0]);
       out.push({k:k,label:by[k].label,colour:null,
-        sub:udNum(s2.km)+' '+udUnit()+' · '+by[k].l.length+(by[k].l.length===1?' run':' runs')+(s2.pace?' · avg '+s2.pace:'')+' · longest '+udNum(longest.km)+' '+udUnit(),runs:by[k].l})})}
+        sub:udNum(s2.km)+' '+udUnit()+' · '+actsLabel(by[k].l)+(s2.pace?' · avg '+s2.pace:'')+' · longest '+udNum(longest.km)+' '+udUnit(),runs:by[k].l})})}
   return out}
 function runRow(r){
   const open=!!S.openSec['run:'+r.id];
@@ -6946,6 +6949,16 @@ function hkReadiness(rows){
   }catch(e){}}
 try{window.hkReadiness=hkReadiness}catch(e){}
 
+function actsLabel(l){
+  /* honest counting: '4 runs · 3 walks', never walks wearing 'runs' */
+  const nR=l.filter(r=>isRunType(r.type)).length;
+  const nW=l.filter(r=>r.type==='walk').length;
+  const nO=l.length-nR-nW;
+  const bits=[];
+  if(nR)bits.push(nR+(nR===1?' run':' runs'));
+  if(nW)bits.push(nW+(nW===1?' walk':' walks'));
+  if(nO)bits.push(nO+' cardio');
+  return bits.join(' · ')||'nothing yet'}
 function runWalkRepair(){
   /* self-heal for activities already in the store before the pace gate
      existed — reclassifies in place and fixes the history mirror */
@@ -7934,7 +7947,7 @@ function questGen(wk,preferK){
        d:'You have done '+bestN+' in a week before, so this is proven ground. Which days is up to you.',
        target:target,basis:{what:'most sessions in one week',proven:bestN,target:target}})}}
   // 3. nudge past your biggest running week
-  if(S.runOn){const cut=recentCutKey();const byWk={};(S.runs||[]).forEach(r=>{if(r.date<cut)return;const k=questWeekKey(r.date);
+  if(S.runOn){const cut=recentCutKey();const byWk={};(S.runs||[]).forEach(r=>{if(r.date<cut||!isRunType(r.type))return;const k=questWeekKey(r.date);
      byWk[k]=(byWk[k]||0)+(r.km||0)});delete byWk[wk];
    const vals=Object.keys(byWk).map(k=>byWk[k]);
    if(vals.length>=2){const bestKm=Math.max.apply(null,vals);
@@ -8000,7 +8013,7 @@ function questHave(q,wk){
   if(q.k==='reps')return (S.history||[]).some(h=>h.complete&&!h.run&&inWk(h.date.slice(0,10))&&
     (h.log||[]).some(l=>gBase(l.ex)===q.ex&&l.w>=q.w&&l.r>=q.r))?1:0;
   if(q.k==='sess')return (S.history||[]).filter(h=>h.complete&&!h.run&&inWk(h.date.slice(0,10))).length;
-  if(q.k==='runkm')return Math.round((S.runs||[]).filter(r=>inWk(r.date)).reduce((a,r)=>a+(r.km||0),0)*10)/10;
+  if(q.k==='runkm')return Math.round((S.runs||[]).filter(r=>inWk(r.date)&&isRunType(r.type)).reduce((a,r)=>a+(r.km||0),0)*10)/10;
   if(q.k==='ready')return Object.keys((S.gar&&S.gar.days)||{}).filter(k=>inWk(k)&&S.gar.days[k].am!=null).length;
   if(q.k==='rehab')return ((S.acl&&S.acl.checks)||[]).filter(c=>inWk(c.date)).length;
   if(q.k==='rehabsess'){const rp=S.lib.programs.filter(p=>p.acl||p.rehabProto).map(p=>p.id);
@@ -10669,7 +10682,8 @@ function ghostData(){
     const dk9=h.date.slice(0,10);
     const k=questWeekKey(h.date);byWk[k]=(byWk[k]||0)+1;
     if(dk9<cut)delete byWk[k]});
-  (S.runs||[]).forEach(r=>{if(r.date<cut&&questWeekKey(r.date)!==wk)return;
+  (S.runs||[]).forEach(r=>{if(!isRunType(r.type))return;
+    if(r.date<cut&&questWeekKey(r.date)!==wk)return;
     const k=questWeekKey(r.date);kmWk[k]=(kmWk[k]||0)+(r.km||0)});
   const past=Object.keys(byWk).filter(k=>k<wk);
   if(!past.length)return null;
@@ -11101,7 +11115,7 @@ function viewHistory(){
       const list=mons[mk],km=list.reduce((a,r)=>a+(r.km||0),0);
       h+='<div style="display:flex;justify-content:space-between;align-items:baseline;margin-top:20px">'+
         '<p class="eyebrow">'+esc(monthName(mk))+'</p>'+
-        '<span class="mono" style="color:var(--faint);font-size:11px">'+list.length+' run'+(list.length===1?'':'s')+' \u00b7 '+udStr(km)+'</span></div>'+
+        '<span class="mono" style="color:var(--faint);font-size:11px">'+actsLabel(list)+' \u00b7 '+udStr(km)+'</span></div>'+
         '<div style="margin-top:8px;display:flex;flex-direction:column;gap:8px">'+list.map(r=>runRow(r)).join('')+'</div>'});
     return h+'</div>'}
   /* lifting, by month — newest first, each session expandable in place */
