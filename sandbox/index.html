@@ -373,7 +373,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='1097d0';  // stamped by tools/build.py with the content hash
+const BUILD_ID='9df7f0';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -1374,7 +1374,11 @@ A.saveExit=complete=>{const s=S.sess;if(!s)return;
   const ok=upsert(rec);
   const before=(S.patCache&&S.patCache.v||[]).map(x=>x.t);
   const wasComplete=complete,recId=rec&&rec.id;
-  if(complete){ldel(K_A);S.sess=null;wakeOff()}
+  /* save & exit ENDS the session either way (owner call, Sep 2026):
+     with the minimize pill for keep-it-running, an exit that quietly
+     stayed live read as a bug. Unfinished records resume from Today
+     or History. */
+  ldel(K_A);S.sess=null;wakeOff();
   try{const now=patternsRefresh();
     const fresh=now.filter(x=>before.indexOf(x.t)<0&&x.tone==='warn');
     if(fresh.length)S.newPattern=fresh[0].t}catch(e){}
@@ -1382,7 +1386,7 @@ A.saveExit=complete=>{const s=S.sess;if(!s)return;
   if(wasComplete&&S.gar.on&&garDay().pre!=null&&garDay().post==null){
     S.gform={post:'',sid:recId};S.sheet={t:'gpost'};render()}
   if(complete&&S.autoBk.on)setTimeout(function(){A.backup(true)},400);try{acctSyncSoon()}catch(e){}
-  flash(ok?(complete?'Session saved.':'Saved so far. Resume it any time from Today.'):'Storage is full or blocked — export a backup from Data.')};
+  flash(ok?(complete?'Session saved.':'Saved as unfinished \u2014 pick it back up from Today whenever.'):'Storage is full or blocked — export a backup from Data.')};
 A.discardYes=()=>{if(S.sess){S.history=S.history.filter(h=>h.id!==String(S.sess.startedAt));saveHistory()}
   audioCancel();ldel(K_A);S.sess=null;S.restEnd=null;S.holdEnd=null;S.sheet=null;S.view='home';wakeOff();flash('Session discarded.')};
 A.resumeHist=id=>{const rec=S.history.find(h=>h.id===id);if(!rec)return;
@@ -9981,6 +9985,11 @@ function viewToday(){
     '<p class="eyebrow" style="color:var(--amber)">Session in progress</p>'+
     '<p class="disp" style="font-size:16.5px;font-weight:600;margin-top:4px">'+esc(S.sess.dayName)+'</p>'+
     '<p class="mono" style="color:var(--dim);font-size:12px;margin-top:4px">'+S.sess.log.length+' of '+S.sess.sets.length+' sets logged · tap to resume</p></button>';
+  else{const unf=(S.history||[]).filter(h=>!h.complete&&!h.run&&(h.log||[]).length&&(Date.now()-new Date(h.date).getTime())<36e5*20).slice(-1)[0];
+    if(unf)h+='<button data-a="resumeHist" data-v="'+unf.id+'" class="card" style="width:100%;text-align:left;padding:16px;border-color:var(--line);background:var(--raised);margin-top:18px">'+
+      '<p class="eyebrow">Unfinished session</p>'+
+      '<p class="disp" style="font-size:16.5px;font-weight:600;margin-top:4px">'+esc(unf.dayTitle||'Session')+'</p>'+
+      '<p class="mono" style="color:var(--dim);font-size:12px;margin-top:4px">'+unf.log.length+' sets saved · tap to pick it back up</p></button>'}
   h+=calCard();
   h+=holdCard();
   h+=ghostCard();
@@ -10300,6 +10309,7 @@ function viewHistory(){
               statBox(vol?tonStr(vol):'\u2014','volume')+'</div>'+
             (r.log.length?'<div style="margin-top:10px">'+logLines(r.log,'editHist',r.id)+'</div>':'')+
             '<div class="row mt" style="gap:8px;margin-top:12px">'+
+            (!r.complete&&!r.run?'<button data-a="resumeHist" data-v="'+r.id+'" class="btn" style="flex:1;border-color:var(--green);color:var(--green);font-size:12.5px">Resume</button>':'')+
             '<button data-a="histEdit" data-v="'+r.id+'" class="btn" style="flex:1;border-color:var(--amber);color:var(--amber);font-size:12.5px">Edit details</button>'+
             '<button data-a="delHist" data-v="'+r.id+'" class="btn" style="flex:1;color:var(--red);font-size:12.5px">Delete</button></div>'+
             '</div>':'')}).join('')+'</div>'});
@@ -13087,6 +13097,7 @@ function runAction(a,v,t,e){
     case 'skipRest':A.skipRest();break;
     case 'addRest':A.addRest();break;
     case 'saveExit':A.saveExit(false);break;
+    case 'resumeHist':A.resumeHist(v);break;
     case 'complete':A.saveExit(true);break;
     case 'discardAsk':case 'discard':S.sheet={t:'discard'};render();break;
     case 'discardYes':A.discardYes();break;
