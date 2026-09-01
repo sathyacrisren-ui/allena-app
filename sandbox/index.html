@@ -386,7 +386,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='1a921c';  // stamped by tools/build.py with the content hash
+const BUILD_ID='30fdf4';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -5766,7 +5766,7 @@ function aeroCard(){
      :down?'Down '+Math.abs(e.pct)+'% on the five before — tired weeks read slower. Judge it over a month, not a run.'
      :'Holding steady across your last ten HR runs. Every run with heart rate moves this number.')+'</p></div>'}
 function runPB(dist){
-  const near=runs().filter(r=>r.km&&Math.abs(r.km-dist)<=dist*0.06&&r.mins);
+  const near=runs().filter(r=>isRunType(r.type)&&r.km&&Math.abs(r.km-dist)<=dist*0.06&&r.mins);
   if(!near.length)return null;
   return near.reduce((a,r)=>r.mins<a.mins?r:a,near[0])}
 /* the bit no running app does: what the run costs the gym, and the reverse */
@@ -6295,16 +6295,23 @@ function hkParseFile(file,done){
    webkit message handler named "allena". */
 function inWrapper(){
   try{return !!(window.webkit&&window.webkit.messageHandlers&&window.webkit.messageHandlers.allena)}catch(e){return false}}
+/* the type label can lie — Apple Watch walks are often typed as
+   'Running' inside Health (owner-caught: a 16 min/km 'run', a 2h45
+   '10K best'). Pace doesn't lie: slower than 10.5 min/km is walking,
+   whatever the label says. */
+function paceSaysWalk(t,km,mins){
+  return isRunType(t)&&km>=1&&mins>0&&(mins/km)>10.5}
 function hkNative(list){
   try{
     if(typeof list==='string')list=JSON.parse(list);
     if(!Array.isArray(list))return;
     const out=[];
     list.forEach(w=>{
-      const t=HK_MAP[String(w.act||'').replace('HKWorkoutActivityType','')];
+      let t=HK_MAP[String(w.act||'').replace('HKWorkoutActivityType','')];
       if(!t)return;
       const mins=Math.round(+w.mins||0);
       if(!mins||mins<3)return;
+      if(paceSaysWalk(t,+w.km||0,mins))t='walk';
       const date=String(w.date||'').slice(0,10),time=String(w.time||'08:00').slice(0,5);
       if(!/^\d{4}-\d{2}-\d{2}$/.test(date))return;
       out.push({date:date,time:time,type:t,
@@ -6786,8 +6793,9 @@ function svBase(){
 function svRows(list){
   const out=[];
   (list||[]).forEach(a=>{
-    const t=SV_MAP[String(a.type||'')];if(!t)return;
+    let t=SV_MAP[String(a.type||'')];if(!t)return;
     const mins=Math.round(+a.mins||0);if(!mins||mins<3)return;
+    if(paceSaysWalk(t,+a.km||0,mins))t='walk';
     const d=String(a.date||'');
     const date=d.slice(0,10),time=/T(\d{2}:\d{2})/.test(d)?d.match(/T(\d{2}:\d{2})/)[1]:'08:00';
     if(!/^\d{4}-\d{2}-\d{2}$/.test(date))return;
@@ -6898,6 +6906,60 @@ function notifSync(){
       {type:'notif',on:!!P.on,items:notifPlan(),badge:P.on?badge:0}))
   }catch(e){}}
 try{setTimeout(notifSync,5000)}catch(e){}
+
+/* ── auto readiness from the Watch (Sep 2026) ────────────────
+   Overnight HRV + resting HR against the user's own 30-day
+   baseline → a 0–100 morning readiness, filled silently so the
+   popup never fires. A manually entered morning ALWAYS outranks
+   the derived one, and under 7 days of signal it stays quiet —
+   a baseline has to exist before deviation means anything. */
+function hkReadinessScore(rows){
+  const ok=rows.filter(r=>r.hrv>0&&r.rhr>0);
+  if(ok.length<7)return null;
+  const med=a=>{const s9=a.slice().sort((x,y)=>x-y);return s9[Math.floor(s9.length/2)]};
+  const sd=(a,m)=>Math.sqrt(a.reduce((x,y)=>x+(y-m)*(y-m),0)/a.length)||1;
+  const hs=ok.map(r=>r.hrv),rs=ok.map(r=>r.rhr);
+  const mh=med(hs),mr=med(rs),sh=sd(hs,mh),sr=sd(rs,mr);
+  const out={};
+  ok.forEach(r=>{
+    const z=0.6*((r.hrv-mh)/sh)-0.4*((r.rhr-mr)/sr);
+    out[r.date]=Math.max(15,Math.min(95,Math.round(58+z*14)))});
+  return out}
+function hkReadiness(rows){
+  try{
+    if(typeof rows==='string')rows=JSON.parse(rows);
+    if(!Array.isArray(rows))return;
+    const scores=hkReadinessScore(rows);
+    if(!scores)return;
+    S.gar=S.gar||{days:{}};S.gar.days=S.gar.days||{};
+    let n=0,todayFilled=false;
+    Object.keys(scores).forEach(k=>{
+      const d=S.gar.days[k]=S.gar.days[k]||{};
+      if(d.am!=null&&!d.auto)return;          // a human's number outranks the derived one
+      if(d.am!==scores[k]){d.am=scores[k];d.auto=1;n++}
+      if(k===today())todayFilled=true});
+    if(!n)return;
+    const first=!S.gar.watch;
+    S.gar.on=true;S.gar.morning=true;S.gar.watch=1;garSave();
+    if(first)flash('Readiness now reads itself — overnight HRV and resting heart rate from your Watch.');
+    if(todayFilled)render()
+  }catch(e){}}
+try{window.hkReadiness=hkReadiness}catch(e){}
+
+function runWalkRepair(){
+  /* self-heal for activities already in the store before the pace gate
+     existed — reclassifies in place and fixes the history mirror */
+  try{
+    let n=0;
+    (S.runs||[]).forEach(r=>{
+      if(!paceSaysWalk(r.type,r.km||0,r.mins||0))return;
+      r.type='walk';n++;
+      const h=(S.history||[]).find(x=>x.id==='run-'+r.id);
+      if(h){h.block='Cardio';h.dayTitle='Walk';
+        if(h.log&&h.log[0])h.log[0].ex='Walk — cardio'}});
+    if(n){runSave();saveHistory()}
+    return n}catch(e){return 0}}
+try{setTimeout(runWalkRepair,1500)}catch(e){}
 const RARITY=[['common','#8A8782','Noticed'],['uncommon','#30D158','Worth knowing'],
   ['rare','#D9D6CD','Rare find'],['epic','#FFFFFF','Big one']];
 function rarityOf(k){return RARITY.find(x=>x[0]===k)||RARITY[0]}
@@ -7811,8 +7873,12 @@ function dashTiles(){
   if(p&&!p.acl){const a=weekAdherence(p,S.week);
     if(a&&a.setsPlanned)out.push(tile(a.pct==null?'—':a.pct+'%','THIS WEEK',adhTone(a.pct),'adhOpen'))}
   {const k=today(),g=(S.gar&&S.gar.days||{})[k]||{};
-   if(S.gar&&S.gar.on)out.push(tile(g.am!=null?g.am:'?','READINESS',
-     g.am!=null?(g.am>=70?'var(--green)':g.am>=50?'var(--amber)':'var(--red)'):'var(--amber)','sigBb'))}
+   /* logged → the trend graph; unlogged → the prompt (owner ask:
+      'where is the body battery trend graph?' — here.) */
+   if(S.gar&&S.gar.on)out.push(g.am!=null
+     ?tile(g.am,'READINESS'+(g.auto?' · WATCH':''),
+       g.am>=70?'var(--green)':g.am>=50?'var(--amber)':'var(--red)','chartOpen','bb:')
+     :tile('?','READINESS','var(--amber)','sigBb'))}
   if(S.runOn){const a=acwr();
     out.push(tile(a==null?'—':a+'×','RUN LOAD',a==null?'var(--faint)':a>1.5?'var(--red)':a>1.3?'var(--amber)':'var(--green)','nav','run'))}
   if(S.acl&&S.acl.on){const c=checkToday();
