@@ -264,7 +264,24 @@ const e1rm=(w,r)=>(r>0&&w>0?w*(1+r/30):0);
 const fmtDate=i=>new Date(i).toLocaleDateString(undefined,{day:'numeric',month:'short',year:'2-digit'});
 const rir=v=>{const n=parseFloat(v);return isFinite(n)?Math.max(0,10-n):null};
 const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const entryStr=l=>l.secs!=null?l.secs+'s'+(l.perSide?'/side':''):(l.w?l.w:'BW')+' × '+l.r+(l.rpe!=null?' @'+l.rpe:'');
+/* ── units (Sep 2026): storage is METRIC forever — kg and km on disk,
+   never rewritten, so backups and history stay portable. lb and miles
+   are a skin: the uw/ud helpers convert on the way out, and the
+   uwIn/udIn helpers convert back at the keyboard. */
+const K_UNITS='training-units-v1';
+const LB_KG=2.2046226218,MI_KM=0.621371;
+let UNITS=lget(K_UNITS,{w:'kg',d:'km'});
+function unitsSet(k,v){UNITS[k]=v;lset(K_UNITS,UNITS)}
+const uwNum=kg=>(kg==null||kg==='')?kg:(UNITS.w==='lb'?Math.round(kg*LB_KG*2)/2:kg);
+const uwIn=v=>UNITS.w==='lb'?Math.round(v/LB_KG*4)/4:v;      // typed lb → stored kg (quarter-kg grain)
+const uwUnit=()=>UNITS.w;
+const uwStr=kg=>uwNum(kg)+' '+UNITS.w;
+const volStr=kg=>(UNITS.w==='lb'?Math.round(kg*LB_KG):Math.round(kg)).toLocaleString()+' '+UNITS.w;
+const udNum=km=>(km==null||km==='')?km:(UNITS.d==='mi'?Math.round(km*MI_KM*10)/10:Math.round(km*10)/10);
+const udIn=v=>UNITS.d==='mi'?Math.round(v/MI_KM*100)/100:v;  // typed mi → stored km
+const udUnit=()=>UNITS.d;
+const udStr=km=>udNum(km)+' '+UNITS.d;
+const entryStr=l=>l.secs!=null?l.secs+'s'+(l.perSide?'/side':''):(l.w?uwNum(l.w):'BW')+' × '+l.r+(l.rpe!=null?' @'+l.rpe:'');
 function download(blob,name){const u=URL.createObjectURL(blob);const a=document.createElement('a');
   a.href=u;a.download=name;document.body.appendChild(a);a.click();
   setTimeout(()=>{URL.revokeObjectURL(u);a.remove()},1500)}
@@ -341,7 +358,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='f15ddf';  // stamped by tools/build.py with the content hash
+const BUILD_ID='7e4728';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -954,6 +971,7 @@ function coachContext(){
       (d9.today||0)+' of the '+dpDayCap()+'/day cap, witnessed-live '+d9.live.toLocaleString()+' ("'+lt9[1]+'" tier). '+
       'How points work: every honest logged fact earns one (a set, an effort, a note, a readiness check-in, a run field, a scan metric, a rehab entry); implausible sessions earn zero; the day cap means grinding fake data can never beat simply training. '+
       'WITNESSED means this phone ran the clock and the set timestamps spread like real training (roughly 25s+ per set of span; up to 6 sets a minute so supersets and drop sets are fine); typed or imported sessions keep their points but are never witnessed, and only witnessed work will ever compete against other people. Nothing is purchasable, nothing expires.')}catch(e){}}
+  if(UNITS.w==='lb'||UNITS.d==='mi')out.push('UNITS: the user reads '+(UNITS.w==='lb'?'weights in POUNDS':'weights in kg')+' and '+(UNITS.d==='mi'?'distances in MILES':'distances in km')+'. All numbers in this context are kg and km — CONVERT every number you speak into their units (1 kg = 2.2 lb, 1 km = 0.62 mi), and never mix the two in one answer.');
   const cs=coachStats();if(cs)out.push(cs);
   if(foc){
     /* the chat was opened ABOUT a session — that session is the
@@ -1267,14 +1285,14 @@ A.begin=()=>{audioInit();S.holdWait=false;const c=S.sess.sets[S.sess.idx];S.setS
 A.finish=()=>{S.holdWait=false;const c=S.sess.sets[S.sess.idx],p=lastFor(c.ex,c.setNo);
   if(c.secs){S.holdEnd=null;
     S.draft={w:'',r:'',secs:c.secs,rpe:null};S.sess.phase='logging'}
-  else{S.draft={w:c.targetW!=null?c.targetW:(p?p.w:''),r:typeof c.targetReps==='number'?c.targetReps:(p?p.r:''),secs:'',rpe:null};
+  else{const w0=c.targetW!=null?c.targetW:(p?p.w:'');S.draft={w:(w0===''||w0==null)?'':uwNum(w0),r:typeof c.targetReps==='number'?c.targetReps:(p?p.r:''),secs:'',rpe:null};
     S.sess.phase='logging'}
   persistActive();render()};
 A.commit=(confirmed)=>{const s=S.sess,c=s.sets[s.idx],timed=!!c.secs;
   if(timed?!(+S.draft.secs>0):(S.draft.rpe==null||!S.draft.r))return;
   const e={ex:c.ex,setNo:c.setNo,targetW:c.targetW,targetReps:c.targetReps,targetRpe:c.targetRpe};
   if(timed){e.secs=+S.draft.secs;e.perSide=c.perSide;e.w=0;e.r=0;e.rpe=S.draft.rpe}
-  else{e.w=+S.draft.w||0;e.r=+S.draft.r||0;e.rpe=S.draft.rpe}
+  else{e.w=uwIn(+S.draft.w||0);e.r=+S.draft.r||0;e.rpe=S.draft.rpe}
   if(!confirmed&&!timed){const sn=entrySanity(e,c);
     if(sn){S.sanity=sn;S.sheet={t:'sanity'};render();return}}
   const pr=isPR(e);if(pr)e.pr=true;
@@ -2406,7 +2424,9 @@ function impApplyParsed(f,o){
     if(errs.length&&!(o.days&&o.days.length)){f.err=errs.join(' ');f.busy=false;if(S.think&&S.think.key==='impread')S.think=null;return render()}
     o.own=true;
     S.own={prog:o,review:null};
-    S.imp=null;S.view='own';S.busyDone=1;render();return;
+    S.imp=null;S.view='own';S.busyDone=1;
+    if(S.impDataOffer)S.sheet={t:'progdata'};   // the sheet also held logged sets — offer them
+    render();return;
 }
 function impApplyCached(f,o){
   flash('Same file as before \u2014 reused the last conversion, no tokens spent.');
@@ -2573,7 +2593,14 @@ function viewOwnReview(){
         '<p style="font-size:14px;font-weight:600;color:'+(f.hard?'var(--red)':'var(--amber)')+'">'+esc(f.t)+'</p>'+
         '<p style="color:var(--dim);font-size:12.5px;line-height:1.6;margin-top:4px">'+esc(f.d)+'</p>'+
         (f.fix?'<button data-a="ownFix" data-v="'+i+'" class="btn mt" style="font-size:12px;color:var(--amber)">'+esc(f.fix.label)+'</button>':'')+'</div>').join('')+'</div>'}
+  if(d.fixLog&&d.fixLog.length)
+    h+='<div class="card mt" style="padding:14px 16px;border-color:var(--green)">'+
+      '<p class="eyebrow" style="color:var(--green)">What Allena changed</p>'+
+      d.fixLog.map(c=>'<p style="color:var(--dim);font-size:12.5px;line-height:1.55;margin-top:5px">· '+esc(c)+'</p>').join('')+
+      '<p style="color:var(--faint);font-size:11px;line-height:1.5;margin-top:8px">All of it is editable — Keep editing shows every change in place.</p></div>';
+  const fixable=a.flags.some(f=>/^(Low volume|Not trained|No target efforts)/.test(f.t));
   h+='<button data-a="ownSave" class="big disp mt2" style="background:var(--amber);color:#1F1E1D;font-size:16px">Start this block</button>'+
+    (fixable?'<button data-a="ownAllena" class="btn mt" style="border-color:var(--amber);color:var(--amber)">Let Allena adjust it</button>':'')+
     '<button data-a="ownBack" class="btn mt">Keep editing</button>';
   return h+'</div>'}
 function reviewOwn(p){
@@ -2617,6 +2644,69 @@ function reviewOwn(p){
   const days=p.days.length;
   if(days>=6)flags.push({t:days+' days a week',d:'Frequency matters less than weekly volume per muscle. Three or four hard days often beat six rushed ones — worth being sure the extra days are adding sets rather than spreading them.'});
   return{flags:flags,sets:sets,per:per}}
+function ownAutoFix(){
+  /* the third button (owner call, Sep 2026): Allena applies the
+     mechanical fixes herself. Deterministic — no AI call — and every
+     change is named, because a program edited silently is a program
+     the lifter no longer knows. Restriction flags are never
+     auto-touched: those need the human. */
+  const d=S.own;if(!d||!d.review)return null;
+  const p=d.prog,changes=[];
+  const per={};
+  p.days.forEach(dy=>dy.exercises.forEach(e=>{const n=(e.sets['default']||[]).length;
+    MUSCLE_RULES.forEach(r=>{if(r[1].test(e.name))per[r[0]]=(per[r[0]]||0)+n})}));
+  const skip={'Core':1,'Lower back':1,'Adductors':1,'Front delts':1,'Upper back':1};
+  // 1. low volume — one more set on exercises already training the muscle
+  Object.keys(per).filter(m=>per[m]>0&&per[m]<6&&!skip[m]).forEach(m=>{
+    let need=6-per[m];
+    const rule=MUSCLE_RULES.find(r=>r[0]===m);if(!rule)return;
+    p.days.forEach(dy=>dy.exercises.forEach(e=>{
+      if(need<=0||!rule[1].test(e.name))return;
+      const ss=e.sets['default']||[];
+      if(!ss.length||ss.length>=5)return;
+      ss.push(Object.assign({},ss[ss.length-1]));
+      need--;per[m]++;
+      changes.push('+1 set of '+String(e.name).replace(/ — .*/,'')+' — '+m.toLowerCase()+' up to '+per[m]+' sets/wk')}))});
+  // 2. missing muscles — one honest basic each, on the lightest day,
+  //    chosen from what the lifter actually HAS (owner call, Sep 2026:
+  //    Allena cannot prescribe a machine to someone without one).
+  //    Candidates run gym-first down to bodyweight; unknown equipment
+  //    means the bodyweight pick plus an honest note.
+  const eqx=(S.prof&&S.prof.eqx)||{};
+  const fullGym=(S.prof&&S.prof.eq==='full');
+  const eqKnown=fullGym||Object.keys(eqx).some(k=>eqx[k]);
+  const has=t=>fullGym||!!eqx[t];
+  const GAP_EX={
+    'Chest':[['Push-up',null]],
+    'Lats':[['Lat pulldown','cb'],['Pull-up','pullup'],['Dumbbell row','db'],['Inverted row',null]],
+    'Quads':[['Goblet squat','db'],['Leg press','mc'],['Bodyweight squat',null]],
+    'Hamstrings':[['Romanian deadlift','bb'],['Dumbbell RDL','db'],['Leg curl','mc'],['Nordic curl',null]],
+    'Glutes':[['Hip thrust','bb'],['Dumbbell hip thrust','db'],['Glute bridge',null]],
+    'Side delts':[['Lateral raise','db'],['Cable lateral raise','cb'],['Band lateral raise','band']]};
+  const excl9=exclFor((S.prof&&S.prof.restr)||{});
+  ['Chest','Lats','Quads','Hamstrings','Glutes','Side delts'].forEach(m=>{
+    if(per[m])return;
+    const cand=(GAP_EX[m]||[]).find(c=>c[1]==null||has(c[1]));
+    if(!cand){changes.push('left the '+m.toLowerCase()+' gap alone — nothing in your equipment covers it (needs at least a dumbbell or band)');return}
+    const name=cand[0];
+    try{if(exTags(name).some(t=>excl9.has(t))&&!(typeof isAllowed==='function'&&isAllowed(name))){
+      changes.push('left the '+m.toLowerCase()+' gap alone — '+name+' clashes with your restrictions');return}}catch(e){}
+    const day=p.days.slice().sort((a,b)=>
+      a.exercises.reduce((x,e)=>x+(e.sets['default']||[]).length,0)-
+      b.exercises.reduce((x,e)=>x+(e.sets['default']||[]).length,0))[0];
+    day.exercises.push({name:name,sets:{'default':[{reps:'10-12',rpe:8},{reps:'10-12',rpe:8},{reps:'10-12',rpe:8}]}});
+    per[m]=3;
+    changes.push('added '+name+' 3×10-12 @8 to '+day.name+' — '+m.toLowerCase()+' was untrained'+
+      (eqKnown?'':' (equipment unknown, so this pick needs none — swap it freely, or tell Allena your setup in the program builder)'))});
+  // 3. missing target efforts — compounds @7, accessories @8
+  let filled=0;
+  p.days.forEach(dy=>dy.exercises.forEach(e=>{
+    (e.sets['default']||[]).forEach(st=>{
+      if(st.rpe==null){st.rpe=/squat|deadlift|bench|overhead|\bohp\b|\bpress\b/i.test(e.name)?7:8;filled++}})}));
+  if(filled)changes.push('set target efforts on '+filled+' sets — compounds @7, accessories @8, so the load management can work');
+  d.review=reviewOwn(p);
+  d.fixLog=changes;
+  return changes}
 function viewImport(){
   const f=S.imp;if(!f)return '';
   let h='<div class="view pad stg" style="padding-top:24px">'+
@@ -4409,7 +4499,7 @@ function runRow(r){
   return '<div class="card" style="padding:0;overflow:hidden'+(open?';border-color:var(--text);border-width:2px':'')+'">'+
     '<button data-a="secToggle" data-v="run:'+esc(r.id)+'" style="width:100%;text-align:left;padding:12px 14px;display:flex;align-items:center;gap:10px">'+
     '<span style="flex:1;min-width:0"><span class="mono" style="font-size:12.5px;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+
-      r.km+' km · '+paceStr(r.mins,r.km)+'</span>'+
+      udStr(r.km)+' · '+paceStr(r.mins,r.km)+'</span>'+
     '<span class="mono" style="display:block;color:var(--faint);font-size:10.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+
       esc(fmtDate(r.date+'T12:00'))+' · '+esc(label.toLowerCase())+(r.hr?' · '+r.hr+' bpm':'')+'</span></span>'+
     '<span class="mono" style="color:var(--faint);font-size:13px;flex:none">'+(open?'⌄':'›')+'</span></button>'+
@@ -5292,9 +5382,9 @@ function runAdd(r){
 function runDel(id){
   S.runs=runs().filter(r=>r.id!==id);runSave();
   S.history=S.history.filter(h=>h.id!=='run-'+id);saveHistory()}
-function paceStr(min,km){if(!min||!km)return '';const p=min/km;
+function paceStr(min,km){if(!min||!km)return '';const p=UNITS.d==='mi'?min/(km*MI_KM):min/km;
   const m=Math.floor(p),sec=Math.round((p-m)*60);
-  return m+':'+String(sec).padStart(2,'0')+' /km'}
+  return m+':'+String(sec).padStart(2,'0')+' /'+udUnit()}
 function paceMin(r){return (r.km&&r.mins)?r.mins/r.km:null}
 function runLoad(r){
   // session load: minutes × intensity, the standard sRPE approach
@@ -7235,6 +7325,21 @@ function verdictCard(){
      moved to its own pill below (sessionCard) — owner call, Aug 2026. */
   const pr=todayProgress(),st=dayStreak();
   const n=noticedToday(),t=todayState();
+  /* the empty account gets a front door, not a hollow loop (owner
+     call, Sep 2026): with no program, no history and no tasks, the
+     hero's job is getting started — build, or bring what you have. */
+  const p0=activeProgSafe();
+  if((!p0||p0.empty)&&!(S.history||[]).length&&!pr.tasks.length)
+    return '<div class="card an-hero" style="padding:18px;border-radius:22px;margin-top:16px">'+
+      '<div style="display:flex;align-items:center;gap:9px">'+
+      '<img src="'+MARK+'" alt="" style="width:17px;height:17px;object-fit:contain">'+
+      '<p class="mono" style="flex:1;font-size:9.5px;color:var(--amber);letter-spacing:.06em">GETTING STARTED</p></div>'+
+      '<p class="disp gradhead" style="font-size:24px;line-height:1.18;margin-top:10px">Where do you want to begin?</p>'+
+      '<p style="color:var(--dim);font-size:13.5px;line-height:1.6;margin-top:5px">Answer a few questions and Allena builds a block around you — or bring the training you already have and it reads the evidence.</p>'+
+      '<button data-a="setupOpen" class="big disp mt" style="background:var(--amber);color:#1F1E1D;font-size:15px">Build a program with Allena</button>'+
+      '<div class="row" style="gap:8px;margin-top:8px">'+
+      '<button data-a="intakeOpen" class="btn" style="flex:1;font-size:12.5px">Import history or a program</button>'+
+      '<button data-a="suRestore" class="btn" style="flex:1;font-size:12.5px">Restore a backup</button></div></div>';
   const done=pr.complete;
   let inner='<div style="display:flex;align-items:center;gap:9px">'+
     '<img src="'+MARK+'" alt="" style="width:17px;height:17px;object-fit:contain">'+
@@ -7275,7 +7380,11 @@ function verdictCard(){
     (typeof deepLine==='function'?deepLine():'')+
     '</div>'}
 function sessionCard(){
-  /* the session, as its own pill under the hero */
+  /* the session, as its own pill under the hero. An empty program has
+     no week to complete — zero planned sessions is not "all logged"
+     (owner-caught vacuous truth, Sep 2026). */
+  const p0=activeProgSafe();
+  if((!p0||p0.empty)&&!(S.history||[]).some(h=>h.complete))return '';
   const v=todayVerdict();
   const col=v.tone==='good'?'var(--green)':v.tone==='warn'?'var(--amber)':'var(--text)';
   return '<div class="card mt" style="padding:14px 16px;border-color:'+
@@ -8402,8 +8511,8 @@ function logLines(list,action,sid){return list.map((l,i)=>
 function targetStr(c){
   if(c.secs)return '<span class="mono" style="font-size:clamp(34px,12vw,50px);font-weight:600;line-height:1">'+c.secs+'</span>'+
     '<span class="mono" style="color:var(--dim);font-size:16px">sec'+(c.perSide?' / side':'')+'</span>';
-  return '<span class="mono" style="font-size:clamp(34px,12vw,50px);font-weight:600;line-height:1">'+(c.targetW==null?'—':c.targetW)+'</span>'+
-   (c.targetW!=null?'<span class="mono" style="color:var(--dim);font-size:16px">kg</span>':'')+
+  return '<span class="mono" style="font-size:clamp(34px,12vw,50px);font-weight:600;line-height:1">'+(c.targetW==null?'—':uwNum(c.targetW))+'</span>'+
+   (c.targetW!=null?'<span class="mono" style="color:var(--dim);font-size:16px">'+uwUnit()+'</span>':'')+
    '<span class="mono" style="color:var(--dim);font-size:clamp(18px,6.5vw,24px);margin-left:4px;white-space:nowrap">× '+c.targetReps+(c.perSide?' / side':'')+'</span>'}
 
 /* ══ views ══════════════════════════════════════════════ */
@@ -8430,7 +8539,7 @@ function streakWeeks(){const per={};
   t-=7*864e5;
   while((per[isoWeek(new Date(t).toISOString())]||0)>=2){n++;t-=7*864e5}
   return n}
-function tonStr(t){return t>=1000?(t/1000).toFixed(1)+'\u00A0t':Math.round(t)+'\u00A0kg'}
+function tonStr(t){if(UNITS.w==='lb')return Math.round(t*LB_KG).toLocaleString()+'\u00A0lb';return t>=1000?(t/1000).toFixed(1)+'\u00A0t':Math.round(t)+'\u00A0kg'}
 function statBox(v,l){return '<div class="card" style="flex:1;padding:10px 8px;text-align:center">'+
   '<p class="mono" style="font-size:17px;font-weight:600">'+v+'</p>'+
   '<p style="color:var(--faint);font-size:10px;letter-spacing:.06em;text-transform:uppercase;margin-top:2px">'+l+'</p></div>'}
@@ -9654,7 +9763,7 @@ function viewSession(){
      '<p class="eyebrow" style="color:var(--green);margin:0">Session complete</p></div>'+
      '<h1 class="disp" style="font-size:26px;font-weight:600;line-height:1.1;margin-top:6px">'+esc(s.dayName||'')+'</h1>'+
      '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:20px">'+
-     [[s.log.length,'sets'],[Math.max(1,Math.round((Date.now()-s.startedAt)/60000)),'minutes'],[vol?Math.round(vol).toLocaleString()+' kg':'—',vol?'volume':'']]
+     [[s.log.length,'sets'],[Math.max(1,Math.round((Date.now()-s.startedAt)/60000)),'minutes'],[vol?volStr(vol):'—',vol?'volume':'']]
       .map((x,i)=>'<div class="card an-pop" style="padding:12px;animation-delay:'+(0.08+i*0.1).toFixed(2)+'s"><p class="mono" style="font-size:20px;font-weight:600">'+x[0]+'</p><p style="color:var(--faint);font-size:11px">'+x[1]+'</p></div>').join('')+'</div>';
     {/* the payoff: watch the dashes fill in, the points land, the level move */
      try{
@@ -9712,8 +9821,8 @@ function viewSession(){
       '<div style="display:flex;align-items:center;gap:10px"><img src="'+MARK+'" alt="" class="an-mark" style="width:20px;height:20px;object-fit:contain">'+
       '<p class="mono" style="font-size:10.5px;color:var(--amber);letter-spacing:.06em">'+(prs.length===1?'A NEW BEST':prs.length+' NEW BESTS')+'</p></div>'+
       prs.map(p=>'<p style="font-size:14px;line-height:1.5;margin-top:7px"><b>'+esc(p.ex)+'</b> '+
-        '<span class="mono" style="color:var(--faint);font-size:12px">'+p.prev+' → </span>'+
-        '<span class="mono" style="color:var(--amber);font-weight:600">'+p.e+' kg</span>'+
+        '<span class="mono" style="color:var(--faint);font-size:12px">'+uwNum(p.prev)+' → </span>'+
+        '<span class="mono" style="color:var(--amber);font-weight:600">'+uwStr(p.e)+'</span>'+
         '<span style="color:var(--faint);font-size:11.5px"> estimated one-rep max</span></p>').join('')+'</div>';
     if(s.log.length)h+='<div class="mt2"><p class="eyebrow">Sets — tap to fix any</p><div style="margin-top:8px">'+logLines(s.log,'editLive')+'</div></div>';
     h+='<div class="mt2"><p class="eyebrow">Session notes</p><div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px;margin-top:12px">'+
@@ -9800,7 +9909,7 @@ function viewSession(){
   if(s.phase==='logging'){
     // the set is done — the card is a reference strip, not a billboard
     body+='<p class="mono" style="font-size:13px;color:var(--dim)"><span style="color:var(--faint)">TARGET</span> '+
-      '<span style="color:var(--text);font-weight:600">'+(cur.secs?cur.secs+'s':(cur.targetW!=null?cur.targetW+' kg':''))+(cur.targetReps?' × '+cur.targetReps:'')+'</span>'+
+      '<span style="color:var(--text);font-weight:600">'+(cur.secs?cur.secs+'s':(cur.targetW!=null?uwStr(cur.targetW):''))+(cur.targetReps?' × '+cur.targetReps:'')+'</span>'+
       (cur.targetRpe!=null?' · RPE '+cur.targetRpe:'')+'</p>'+
       (last?'<p class="mono" style="font-size:12px;color:var(--faint);margin-top:4px">'+((last.week&&last.week!==s.week)?'WEEK '+last.week:'LAST')+' '+esc(entryStr(last))+'</p>':'');
   }else{
@@ -9811,7 +9920,7 @@ function viewSession(){
     if(last){const dw=(last.week&&last.week!==s.week)?'WEEK '+last.week:'LAST TIME';
       let delta='';
       if(!cur.secs&&last.w&&cur.targetW!=null&&last.w!==cur.targetW)
-        delta=' · '+(cur.targetW>last.w?'+':'')+Math.round((cur.targetW-last.w)*10)/10+' kg';
+        delta=' · '+(cur.targetW>last.w?'+':'')+(UNITS.w==='lb'?Math.round((cur.targetW-last.w)*LB_KG*2)/2:Math.round((cur.targetW-last.w)*10)/10)+' '+uwUnit();
       body+='<div style="margin-top:9px;padding-top:9px;border-top:1px solid var(--line)">'+
         '<p class="mono" style="color:var(--amber);font-size:11px">'+dw+' · SET '+last.setNo+'</p>'+
         '<p class="mono" style="color:var(--dim);font-size:13px;margin-top:2px">'+esc(entryStr(last))+
@@ -9829,7 +9938,7 @@ function viewSession(){
     body+='<div class="mt"><p class="eyebrow" style="color:var(--amber)">'+(timed?'How long did you hold?':'What did you actually do?')+'</p>';
     if(timed)body+='<div style="margin-top:10px">'+stepper('draft.secs','Seconds'+(cur.perSide?' per side':''),S.draft.secs,5,'sec')+'</div>';
     else body+='<div style="display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,0.8fr);gap:12px;margin-top:10px">'+
-      stepper('draft.w','Weight (kg)',S.draft.w,2.5,'')+stepper('draft.r','Reps'+(cur.perSide?' / side':''),S.draft.r,1,'')+'</div>'+
+      stepper('draft.w','Weight ('+uwUnit()+')',S.draft.w,(UNITS.w==='lb'?5:2.5),'')+stepper('draft.r','Reps'+(cur.perSide?' / side':''),S.draft.r,1,'')+'</div>'+
       '<p style="color:var(--dim);font-size:11px;letter-spacing:.1em;text-transform:uppercase;margin:12px 0 7px">RPE</p>'+rpeGrid('draft.rpe',S.draft.rpe);
     body+='</div>';
     foot+='<button data-a="commit" class="big disp" style="background:'+(ready?'var(--green)':'var(--raised)')+';color:'+(ready?'#131313':'var(--faint)')+';font-size:17px">'+
@@ -9884,7 +9993,7 @@ function viewHistory(){
       const list=mons[mk],km=list.reduce((a,r)=>a+(r.km||0),0);
       h+='<div style="display:flex;justify-content:space-between;align-items:baseline;margin-top:20px">'+
         '<p class="eyebrow">'+esc(monthName(mk))+'</p>'+
-        '<span class="mono" style="color:var(--faint);font-size:11px">'+list.length+' run'+(list.length===1?'':'s')+' \u00b7 '+Math.round(km)+' km</span></div>'+
+        '<span class="mono" style="color:var(--faint);font-size:11px">'+list.length+' run'+(list.length===1?'':'s')+' \u00b7 '+udStr(km)+'</span></div>'+
         '<div style="margin-top:8px;display:flex;flex-direction:column;gap:8px">'+list.map(r=>runRow(r)).join('')+'</div>'});
     return h+'</div>'}
   /* lifting, by month — newest first, each session expandable in place */
@@ -10787,6 +10896,13 @@ function dataRaw(){
      if(onCount)h2+='<button data-a="rehabAllOff" class="btn mt" style="color:var(--dim);font-size:12.5px">Turn them all off</button>';
      return h2})()+
    '</div>'+
+   '<div class="mt2"><p class="eyebrow">Units</p>'+
+   '<div class="card mt" style="padding:13px 15px">'+
+   '<div style="display:flex;align-items:center;gap:10px"><span style="flex:1;font-size:13.5px;font-weight:600">Weight</span>'+
+   ['kg','lb'].map(u=>'<button data-a="unitW" data-v="'+u+'" class="pill" style="width:64px;padding:9px 0'+(UNITS.w===u?';background:var(--text);color:#1F1E1D;border-color:var(--text);font-weight:600':'')+'">'+u+'</button>').join('')+'</div>'+
+   '<div style="display:flex;align-items:center;gap:10px;margin-top:10px;border-top:1px solid var(--line);padding-top:10px"><span style="flex:1;font-size:13.5px;font-weight:600">Distance</span>'+
+   ['km','mi'].map(u=>'<button data-a="unitD" data-v="'+u+'" class="pill" style="width:64px;padding:9px 0'+(UNITS.d===u?';background:var(--text);color:#1F1E1D;border-color:var(--text);font-weight:600':'')+'">'+u+'</button>').join('')+'</div>'+
+   '<p style="color:var(--faint);font-size:11px;line-height:1.5;margin-top:10px">Display and typing only — everything is stored metric underneath, so backups and history never change.</p></div></div>'+
    '<div class="mt2"><p class="eyebrow">Running</p>'+
    '<p style="color:var(--faint);font-size:12px;line-height:1.55;margin-top:8px">A separate tab for runs, with running load folded into the same recovery picture as your lifting.</p>'+
    '<button data-a="runToggle" class="card mt" style="width:100%;text-align:left;padding:13px 15px;display:flex;align-items:center;gap:11px'+((S.runOn||runs().length)?';border-color:var(--amber)':'')+'">'+
@@ -11602,6 +11718,13 @@ function sheetHtml(){
     return wrapSheet(S.shareTitle||'Your tree',
       (S.shareImg?'<img src="'+S.shareImg+'" alt="Tree share card" style="width:100%;border-radius:14px;border:1px solid var(--line)">':'')+
       '<p style="color:var(--dim);font-size:12.5px;line-height:1.55;margin-top:10px">Long-press the image, then Save Image. Nothing on it beyond what you can see.</p>')}
+  if(S.sheet.t==='progdata'){
+    const o9=S.impDataOffer;if(!o9)return '';
+    return wrapSheet('This sheet holds more',
+      '<p style="color:var(--dim);font-size:13.5px;line-height:1.6">The program landed. The same spreadsheet also carries <b style="color:var(--text)">'+o9.totalSets+' logged sets across '+o9.weeks+' weeks</b> of performed training — real weights and reps, not the plan.</p>'+
+      '<p style="color:var(--dim);font-size:13px;line-height:1.6;margin-top:8px">Bring them into your history too? Allena reads them exactly, on this phone, and asks one date to anchor the weeks.</p>'+
+      '<button data-a="progDataGo" class="big disp mt2" style="background:var(--amber);color:#1F1E1D;font-size:15px">Import the logged training</button>'+
+      '<button data-a="progDataSkip" class="btn mt" style="color:var(--dim)">Just the program</button>')}
   if(S.sheet.t==='wkclock'){
     const body=weekCardBody();
     return wrapSheet('The week clock',
@@ -11712,7 +11835,7 @@ function sheetHtml(){
       '<p style="color:var(--faint);font-size:11.5px;line-height:1.45;margin-top:7px">'+
         esc((RUN_TYPES.find(t2=>t2[0]===f.type)||['','',''])[2])+'</p>'+
       '<div class="row mt2" style="gap:10px">'+
-        '<div style="flex:1">'+stepper('rform.km','Distance (km)',f.km,0.5,'')+'</div>'+
+        '<div style="flex:1">'+stepper('rform.km','Distance ('+udUnit()+')',f.km,0.5,'')+'</div>'+
         '<div style="flex:1">'+stepper('rform.mins','Minutes',f.mins,1,'')+'</div></div>'+
       (f.km&&f.mins?'<p class="mono" style="color:var(--amber);font-size:12px;margin-top:8px">'+paceStr(f.mins,f.km)+'</p>':'')+
       '<p class="eyebrow mt2">How hard was it?</p>'+
@@ -12363,6 +12486,13 @@ document.addEventListener('input',e=>{const d=e.target.dataset;
     const kind=e.target.dataset.intakefile; // 'data' | 'program' — the user said which
     const routeText=function(txt,raw,grid){
       if(kind==='program'){
+        /* a program sheet can carry performed weeks too (owner call,
+           Sep 2026) — the plan lands as a plan, and the logged sets
+           are OFFERED as history afterwards, never assumed. One
+           filled week stays a plan; two or more is a record. */
+        try{if(grid){const g9=liftGridParse(grid);
+          if(g9&&g9.weeks&&g9.weeks.length>=2&&g9.totalSets>=10)
+            S.impDataOffer={grid:grid,totalSets:g9.totalSets,weeks:g9.weeks.length,fileName:fl.name}}}catch(e){}
         impNew();S.imp.text=(raw||txt).slice(0,26000);S.imp.fileName=fl.name;S.imp.grid=grid||null;
         S.imp.kindHint='plan';S.sheet=null;S.view='import';render();impParse();return}
       // data intent: runs, lifting history, or both — no guessing about which job
@@ -13382,22 +13512,23 @@ function runAction(a,v,t,e){
       else if(/tempo|threshold/i.test(t2))S.rform.type='tempo';
       else if(/long run/i.test(t2))S.rform.type='long';
       else if(/race|parkrun/i.test(t2))S.rform.type='race';
+      if(UNITS.d==='mi'&&S.rform.km)S.rform.km=Math.round(S.rform.km*MI_KM*100)/100; // the form speaks the user's unit
       render();
-      flash(S.rform.km&&S.rform.mins?('Read '+S.rform.km+' km in '+S.rform.mins+' min — check it before saving.')
+      flash(S.rform.km&&S.rform.mins?('Read '+S.rform.km+' '+udUnit()+' in '+S.rform.mins+' min — check it before saving.')
         :'Could not find a distance and a time in that. Type them in instead.');break}
     case 'runSaveGo':{const f=S.rform;
       if(!(f.km>0&&f.mins>0)){flash('A distance and a time, and it is logged.');break}
       const zt=['z1','z2','z3','z4','z5'].reduce((a,k)=>a+(+f[k]||0),0);
       if(f.id)runDel(f.id);
-      runAdd({id:f.id||Date.now().toString(36),date:f.date||today(),type:f.type,km:+f.km,mins:+f.mins,
+      runAdd({id:f.id||Date.now().toString(36),date:f.date||today(),type:f.type,km:udIn(+f.km),mins:+f.mins,
         rpe:f.rpe,hr:+f.hr||null,elev:+f.elev||null,note:(f.note||'').trim(),
         z:zt?{z1:+f.z1||0,z2:+f.z2||0,z3:+f.z3||0,z4:+f.z4||0,z5:+f.z5||0}:null});
       S.rform=null;S.sheet=null;S.patCache=null;render();
       {let extra='';
        try{const rp=S.runplan;
         if(rp&&rp.items&&!f.id){const it=rp.items.find(i=>+i.week===Math.min(rpWeek(rp),rp.items.length));
-         if(it&&it.km!=null)extra=' \u00b7 '+rpWeekKm(0)+' of ~'+it.km+' km this plan week'}}catch(e){}
-       flash((f.id?'Updated — ':'Logged — ')+f.km+' km at '+paceStr(f.mins,f.km)+'.'+extra)}break}
+         if(it&&it.km!=null)extra=' \u00b7 '+udNum(rpWeekKm(0))+' of ~'+udNum(it.km)+' '+udUnit()+' this plan week'}}catch(e){}
+       flash((f.id?'Updated — ':'Logged — ')+f.km+' '+udUnit()+' at '+paceStr(f.mins,udIn(+f.km))+'.'+extra)}break}
     case 'runDelAsk':{const r=runs().find(x=>x.id===v);if(!r)break;
       S.confirm={t:'Delete this run?',
         d:r.km+' km on '+fmtDate(r.date+'T12:00')+'. It comes out of your weekly load and recovery too.',
@@ -13405,7 +13536,7 @@ function runAction(a,v,t,e){
     case 'runDel':{runDel(v);S.patCache=null;S.sheet=null;render();flash('Run removed.');break}
     case 'runEdit':{const r=runs().find(x=>x.id===v);if(!r)break;
       const zz=r.z||{};
-      S.rform={id:r.id,type:r.type,km:r.km,mins:r.mins,rpe:r.rpe,hr:r.hr||0,elev:r.elev||0,
+      S.rform={id:r.id,type:r.type,km:udNum(r.km),mins:r.mins,rpe:r.rpe,hr:r.hr||0,elev:r.elev||0,
         note:r.note||'',paste:'',date:r.date,
         z1:zz.z1||0,z2:zz.z2||0,z3:zz.z3||0,z4:zz.z4||0,z5:zz.z5||0,zopen:!!r.z};
       S.sheet={t:'runlog'};render();break}
@@ -13550,7 +13681,14 @@ function runAction(a,v,t,e){
       lset(K_GOALS,S.goals);f.ex=null;render();break}
     case 'gDel':S.goals=S.goals.filter(g=>g.id!==v);lset(K_GOALS,S.goals);render();break;
     case 'progNoteToggle':S.progNoteOpen=!S.progNoteOpen;render();break;
+    case 'unitW':unitsSet('w',v);render();flash(v==='lb'?'Weights now read in pounds — stored metric underneath.':'Weights back to kilograms.');break;
+    case 'unitD':unitsSet('d',v);render();flash(v==='mi'?'Distances now read in miles — stored metric underneath.':'Distances back to kilometres.');break;
     case 'progNoteOpen':S.sheet={t:'prognote'};render();break;
+    case 'progDataGo':{const o9=S.impDataOffer;if(!o9)break;
+      S.impDataOffer=null;S.sheet=null;
+      impNew();S.imp.grid=o9.grid;S.imp.fileName=o9.fileName;S.imp.kindHint='hist';
+      S.view='import';render();impParse();break}
+    case 'progDataSkip':S.impDataOffer=null;S.sheet=null;render();break;
     case 'weekClockOpen':S.sheet={t:'wkclock'};render();break;
     case 'progRename':{const el9=document.querySelector('[data-in="progname"]');
       const nm=el9?String(el9.value).trim():'';
@@ -13641,6 +13779,10 @@ function runAction(a,v,t,e){
       p.days.forEach(d=>{d.exercises=d.exercises.filter(e=>String(e.name).trim())});
       S.own.review=reviewOwn(p);S.view='ownreview';render();break}
     case 'ownBack':S.view='own';render();break;
+    case 'ownAllena':{const ch=ownAutoFix();
+      if(!ch||!ch.length)flash('Nothing here Allena can fix mechanically — the remaining flags need your call.');
+      else flash(ch.length+' adjustment'+(ch.length===1?'':'s')+' made — every one is listed and editable.');
+      render();break}
     case 'ownFix':{const f=S.own.review.flags[+v];if(f&&f.fix&&f.fix.run)f.fix.run();
       S.own.review=reviewOwn(S.own.prog);render();break}
     case 'ownSave':{const p=S.own.prog;p.baseWeeks=p.weeks;
