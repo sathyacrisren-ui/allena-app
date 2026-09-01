@@ -380,7 +380,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='03ebdd';  // stamped by tools/build.py with the content hash
+const BUILD_ID='50a05c';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -6906,6 +6906,10 @@ function bootLines(){
   if(b)L.push(['Your collection',b+' found']);
   L.push(['Ready','']);
   return L.slice(0,5)}
+function bootLineHtml(i){
+  const L=bootLines();i=Math.min(i,L.length-1);
+  return '<p class="mono boot-line" style="color:var(--amber);font-size:11.5px;letter-spacing:.05em">'+esc(L[i][0])+'</p>'+
+    (L[i][1]?'<p class="mono boot-line" style="color:var(--faint);font-size:10.5px;margin-top:5px;animation-delay:.08s">'+esc(L[i][1])+'</p>':'')}
 function bootHtml(step){
   const L=bootLines(),i=Math.min(step,L.length-1);
   const C=169;
@@ -6919,10 +6923,7 @@ function bootHtml(step){
     '<h1 class="disp brand" style="font-size:30px;font-weight:600;margin-top:20px">Allena</h1>'+
     '<div style="position:relative;height:2px;width:150px;border-radius:2px;background:var(--line);overflow:hidden;margin-top:16px">'+
     '<div class="boot-sweep"></div></div>'+
-    '<div style="margin-top:18px;min-height:42px">'+
-    '<p class="mono boot-line" style="color:var(--amber);font-size:11.5px;letter-spacing:.05em">'+esc(L[i][0])+'</p>'+
-    (L[i][1]?'<p class="mono boot-line" style="color:var(--faint);font-size:10.5px;margin-top:5px;animation-delay:.08s">'+esc(L[i][1])+'</p>':'')+
-    '</div>'+
+    '<div id="bootlines" style="margin-top:18px;min-height:42px">'+bootLineHtml(i)+'</div>'+
     '<p class="mono" style="position:absolute;bottom:34px;color:var(--faint);font-size:10px;opacity:.6">tap to skip</p>'+
     '</div>'}
 function bootStart(){
@@ -12808,7 +12809,18 @@ function render(){
     document.getElementById('app').innerHTML=body;
     let extra=document.getElementById('extra');
     if(!extra){extra=document.createElement('div');extra.id='extra';document.body.appendChild(extra)}
-    extra.innerHTML=extraHtml+(S.boot!=null?bootHtml(S.boot):'');
+    extra.innerHTML=extraHtml;
+    /* the boot overlay also lives OUTSIDE the render cycle: it mounts
+       once, and step ticks (or a mid-boot render — e.g. the iOS wrapper
+       delivering Health data) update only the text lines, so the ring
+       animations never restart (glitched on-device, owner-reported). */
+    {let bh=document.getElementById('bootHost');
+     if(S.boot!=null){
+       if(!bh){bh=document.createElement('div');bh.id='bootHost';
+         bh.innerHTML=bootHtml(S.boot);bh.dataset.step=S.boot;document.body.appendChild(bh)}
+       else if(bh.dataset.step!=String(S.boot)){bh.dataset.step=S.boot;
+         const bl=bh.querySelector('#bootlines');if(bl)bl.innerHTML=bootLineHtml(S.boot)}}
+     else if(bh)bh.remove()}
     /* the deep-read constellation lives OUTSIDE the render cycle — a
        mid-animation render used to rebuild it and restart the whole
        sequence (beta-reported). It mounts once and is only removed. */
