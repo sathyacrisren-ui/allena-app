@@ -361,7 +361,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='0d1a1a';  // stamped by tools/build.py with the content hash
+const BUILD_ID='4b7f26';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -12425,11 +12425,11 @@ function sheetHtml(){
   if(S.sheet.t==='edit'){
     const e=S.sheet.scope==='live'?S.sess.log[S.sheet.i]:(S.history.find(h=>h.id===S.sheet.sid)||{log:[]}).log[S.sheet.i];
     if(!e)return '';
-    if(S.sheet.w===undefined){S.sheet.w=e.w||'';S.sheet.r=e.r||'';S.sheet.secs=e.secs||'';S.sheet.rpe=e.rpe==null?null:e.rpe;S.sheet.timed=e.secs!=null}
+    if(S.sheet.w===undefined){S.sheet.w=e.w?uwNum(e.w):'';S.sheet.r=e.r||'';S.sheet.secs=e.secs||'';S.sheet.rpe=e.rpe==null?null:e.rpe;S.sheet.timed=e.secs!=null}
     let inner=S.sheet.timed
       ?stepper('sheet.secs','Seconds held',S.sheet.secs,5,'sec')
       :'<div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px">'+
-        stepper('sheet.w','Weight',S.sheet.w,2.5,'kg')+stepper('sheet.r','Reps',S.sheet.r,1,'')+'</div>'+
+        stepper('sheet.w','Weight',S.sheet.w,(UNITS.w==='lb'?5:2.5),uwUnit())+stepper('sheet.r','Reps',S.sheet.r,1,'')+'</div>'+
         '<p style="color:var(--dim);font-size:11px;letter-spacing:.1em;text-transform:uppercase;margin:16px 0 8px">RPE</p>'+
         rpeGrid('sheet.rpe',S.sheet.rpe);
     inner+='<button data-a="editSave" class="big disp mt" style="background:var(--green);color:#1F1E1D;font-size:17px">Save changes</button>'+
@@ -12875,7 +12875,11 @@ function runAction(a,v,t,e){
     case 'editLive':S.sheet={t:'edit',scope:'live',i:+v};render();break;
     case 'editHist':S.sheet={t:'edit',scope:'hist',sid:t.dataset.sid,i:+v};render();break;
     case 'editSave':{const sh=S.sheet;
-      const patch=sh.timed?{secs:+sh.secs||0}:{w:+sh.w||0,r:+sh.r||0,rpe:sh.rpe};
+      /* a set is reps (weight may be empty — bodyweight) or seconds;
+         a 0×0 set is not a correction, it is an erasure — refuse it */
+      if(sh.timed&&!(+sh.secs>0)){flash('A hold needs its seconds.');break}
+      if(!sh.timed&&!(+sh.r>0)){flash('Reps are needed — leave weight empty for bodyweight, or delete the set instead.');break}
+      const patch=sh.timed?{secs:+sh.secs||0}:{w:Math.round(uwIn(+sh.w||0)*4)/4,r:+sh.r||0,rpe:sh.rpe};
       if(sh.scope==='live'){Object.assign(S.sess.log[sh.i],patch);upsert(record(S.sess.phase==='done'));persistActive()}
       else{const h=S.history.find(x=>x.id===sh.sid);if(h){Object.assign(h.log[sh.i],patch);saveHistory()}}
       S.sheet=null;render();break}
@@ -14060,10 +14064,17 @@ function runAction(a,v,t,e){
     case 'qSkipEx':{const st=S.quick.rows[+v];
       S.quick.rows=S.quick.rows.filter(r=>r.exNo!==st.exNo);vib(12);render();break}
     case 'quickSave':{const q=S.quick;
+      /* the same day + same session logged twice is usually a mistap —
+         say so before doubling the record (owner call, Sep 2026) */
+      const dup=(S.history||[]).some(h=>h.complete&&!h.run&&String(h.date).slice(0,10)===q.date&&(h.dayTitle||'')===(q.dayName||''));
+      if(dup&&!q.dupOk){S.confirm={t:'Already logged that day',
+        d:(q.dayName||'That session')+' is already in your history for '+fmtDate(q.date+'T12:00')+'. Logging it again creates a second copy of the whole session.',
+        go:'quickDupGo',v:'',soft:true,ok:'Log it again anyway',no:'Never mind'};
+        S.sheet={t:'confirm'};render();break}
       const log=[];
       q.rows.forEach(r=>{if(r.skip)return;
         if(r.secs){if(!(+r.s>0))return;log.push({ex:r.ex,setNo:r.setNo,w:0,r:0,secs:+r.s,perSide:r.perSide,rpe:r.rpe,targetW:r.targetW,targetReps:r.targetReps,targetRpe:r.targetRpe})}
-        else{if(!(+r.w>0&&+r.r>0))return;log.push({ex:r.ex,setNo:r.setNo,w:+r.w,r:+r.r,rpe:r.rpe,targetW:r.targetW,targetReps:r.targetReps,targetRpe:r.targetRpe})}});
+        else{if(!(+r.r>0))return;log.push({ex:r.ex,setNo:r.setNo,w:Math.round(uwIn(+r.w||0)*4)/4,r:+r.r,rpe:r.rpe,targetW:r.targetW,targetReps:r.targetReps,targetRpe:r.targetRpe})}});
       if(!log.length){flash('Fill in at least one set.');break}
       const when=new Date(q.date+'T12:00:00').getTime()||Date.now();
       const sessStub={startedAt:when,sets:q.rows,log:log,block:q.block,progId:q.progId,dayIdx:q.dayIdx,dayName:q.dayName,week:q.week};
@@ -14076,6 +14087,7 @@ function runAction(a,v,t,e){
       S.quick=null;S.view='history';render();
       flash('Logged '+log.length+' sets for '+fmtDate(rec.date)+'.');
       if(S.autoBk.on)setTimeout(function(){A.backup(true)},400);try{acctSyncSoon()}catch(e){}break}
+    case 'quickDupGo':{if(S.quick)S.quick.dupOk=true;S.sheet=null;runAction('quickSave');break}
     case 'autoBkToggle':S.autoBk.on=!S.autoBk.on;lset('training-autobk-v1',S.autoBk);flash(S.autoBk.on?'Auto-backup on.':'Auto-backup off.');break;
     case 'barSave':BAR=Math.max(5,+S.bar||20);lset(K_BAR,BAR);S.bar=BAR;flash('Bar set to '+BAR+' kg.');break;
     case 'aiSave':{lset(K_AI,S.ai);
