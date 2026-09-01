@@ -361,7 +361,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='fa4d4f';  // stamped by tools/build.py with the content hash
+const BUILD_ID='0d1a1a';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -7084,17 +7084,33 @@ function wrapBuild(ym){
     if(l.length)disc={t:l[0].t,rar:l[0].rar}}catch(e){}
   // ONE honest worth-fixing line
   let fix='Nothing glaring. The boring answer is to keep doing exactly this.';
-  try{const p=activeProgSafe(),b=p?blockAdherence(p):null;
+  try{const p=activeProgSafe();
+    /* adherence can only be judged for a month the program actually
+       ran in — imported history is a record, not a missed plan
+       (owner-caught: a month of imports read as "0% of planned sets") */
+    const ranThisMonth=p&&(S.history||[]).some(h=>h.complete&&!h.run&&!h.imported&&!h.approx&&!h.demo&&h.progId===p.id&&(h.date||'').slice(0,7)===ym);
+    const b=ranThisMonth?blockAdherence(p):null;
     if(b&&b.worst&&b.worst.length&&b.worst[0].times>=2)
       fix=String(b.worst[0].n).replace(/ — .*/,'')+' got left out '+b.worst[0].times+' times. Either it earns a place or it goes — skipping it silently does neither.';
     else if(b&&b.pct!=null&&b.pct<75)
       fix='You did '+b.pct+'% of the planned sets. The block only works if it mostly happens.';
+    else if(!ranThisMonth&&cur.sessions)
+      fix='This month is imported record, not a plan Allena ran — the worth-fixing lines start once your weeks happen live in the app.';
     else if(S.gar&&S.gar.on){const days=S.gar.days||{};
       const logged=Object.keys(days).filter(k=>k.slice(0,7)===ym&&days[k].am!=null).length;
       if(logged<10&&cur.sessions>=6)fix='Only '+logged+' readiness mornings all month. That is the input that lets Allena pick your hard days — it is thirty seconds.'}}catch(e){}
   return{ym:ym,name:ymName(ym),built:today(),
     sessions:cur.sessions,ton:cur.ton,tonPrev:prev.ton,sets:cur.sets,
     km:cur.km,kmPrev:prev.km,move:move,disc:disc,fix:fix}}
+function wrapRepair(ym){
+  /* wraps built before the adherence guard scolded imported months
+     ("0% of the planned sets") — rebuild those in place on open */
+  try{const r=wraps()[ym];if(!r)return;
+    if(!/% of the planned sets/.test(r.fix||''))return;
+    const p=activeProgSafe();
+    const ran=p&&(S.history||[]).some(h=>h.complete&&!h.run&&!h.imported&&!h.approx&&!h.demo&&h.progId===p.id&&(h.date||'').slice(0,7)===ym);
+    if(ran)return;
+    const nb=wrapBuild(ym);if(nb){wraps()[ym]=nb;wrapSaveAll()}}catch(e){}}
 function wrapDue(){
   const pm=prevYm(today().slice(0,7));
   if(wraps()[pm])return null;
@@ -7455,10 +7471,19 @@ function verdictCard(){
       '<div style="display:flex;align-items:center;gap:9px;margin-top:12px">'+dots+'</div>'}
   else{
     const next=pr.tasks.filter(x=>!x.done)[0];
+    /* the button exists only when it DOES something (owner call, Sep
+       2026 — "Open today" was a duplicate of the All link). A check-in
+       task opens its check-in; the session task starts the session;
+       anything else gets no button at all. */
+    let cta=null;
+    if(next&&next.go)cta={a:next.go,v:'',label:'Do it now'};
+    else if(next&&next.k==='session'){
+      try{const v9=todayVerdict();
+        if(v9&&v9.cta)cta={a:v9.cta.a,v:v9.cta.v,label:'Start the session'}}catch(e){}
+      if(!cta)cta={a:'nav',v:'home',label:'To the program'}}
     inner+='<p class="disp gradhead" style="font-size:24px;line-height:1.18;margin-top:10px">'+esc(next?next.n:'Today')+'</p>'+
       (next?'<p style="color:var(--dim);font-size:13.5px;line-height:1.6;margin-top:5px">'+esc(next.sub)+'</p>':'')+
-      '<button data-a="'+(next&&next.go?next.go:'todayOpen')+'" class="big disp mt" style="background:var(--amber);color:#1F1E1D;font-size:15px">'+
-        (next&&next.go?'Do it now':'Open today')+'</button>'+
+      (cta?'<button data-a="'+cta.a+'"'+(cta.v?' data-v="'+esc(String(cta.v))+'"':'')+' class="big disp mt" style="background:var(--amber);color:#1F1E1D;font-size:15px">'+esc(cta.label)+'</button>':'')+
       '<div style="display:flex;align-items:center;gap:9px;margin-top:13px;padding-top:12px;border-top:1px solid var(--line)">'+dots+
       '<span class="mono" style="flex:1;color:var(--faint);font-size:10.5px">'+pr.done+' of '+pr.total+' · finishing the small ones is what unlocks tonight’s find</span>'+
       '<button data-a="todayOpen" class="mono" style="color:var(--amber);font-size:11px;flex:none">All</button></div>'}
@@ -9692,7 +9717,7 @@ function deepCard(){
       inner='<p style="color:var(--dim);font-size:12.5px;line-height:1.6;margin-top:8px">Ten weeks of your numbers, handed to the model with one demand: find what the rules cannot, and cite the figures it stands on. Interpretation, clearly labelled — never dressed up as measurement.</p>'+
         '<p class="mono" style="color:var(--amber);font-size:10.5px;margin-top:8px">'+esc(rdy.line)+'</p>'+
         '<button data-a="deepRun" class="big disp mt" style="background:var(--amber);color:#1F1E1D">Run a deep read</button>'+
-        '<p class="mono" style="color:var(--faint);font-size:10px;margin-top:8px;text-align:center">once a day · only when there is new data to read · about a cent</p>';
+        '<p class="mono" style="color:var(--faint);font-size:10px;margin-top:8px;text-align:center">once a day · only when there is new data to read</p>';
     else if(!st.last){
       const have=(S.history||[]).filter(h=>h.complete&&!h.run).length+(typeof runs==='function'?runs():[]).length;
       inner='<p style="color:var(--dim);font-size:12.5px;line-height:1.6;margin-top:8px">The model reads ten weeks of your numbers and finds what the rules cannot. It needs about 8 logged sessions or runs before there is anything worth reading — '+have+' so far.</p>'}
@@ -11037,7 +11062,7 @@ function dataRaw(){
    '<span style="color:var(--faint);font-size:11.5px">Bar and plates drawn on the set screen</span></span></button></div>'+
    '<div class="mt2"><p class="eyebrow">Account &amp; sync</p>'+accountSection()+'</div>'+
    '<div class="mt2"><p class="eyebrow">Allena — AI coach</p>'+
-   '<p style="color:var(--dim);font-size:13px;line-height:1.55;margin-top:8px">Two ways to bring Allena\'s chat to life. Easiest: paste an <b>Allena cloud link</b> if you have one — no account, no key. Or paste your own Anthropic API key (console.anthropic.com). Either lives only in this phone\'s storage. Fresh session context rides along with every message, and only the last few turns are kept — a question costs a fraction of a cent.</p>'+
+   '<p style="color:var(--dim);font-size:13px;line-height:1.55;margin-top:8px">Two ways to bring Allena\'s chat to life. Easiest: paste an <b>Allena cloud link</b> if you have one — no account, no key. Or paste your own Anthropic API key (console.anthropic.com). Either lives only in this phone\'s storage. Fresh session context rides along with every message, and only the last few turns are kept.</p>'+
    '<input data-in="ai.proxy" value="'+esc(S.ai.proxy||'')+'" placeholder="Allena cloud link (https://…)" autocomplete="off" class="mono" style="width:100%;margin-top:10px;background:var(--surface);border:1px solid var(--line);border-radius:10px;color:var(--text);padding:12px;font-size:12px;outline:none">'+
    '<input data-in="ai.key" value="'+esc(S.ai.key)+'" placeholder="or your own key: sk-ant-…" autocomplete="off" class="mono" style="width:100%;margin-top:8px;background:var(--surface);border:1px solid var(--line);border-radius:10px;color:var(--text);padding:12px;font-size:12px;outline:none">'+
    '<div class="row" style="margin-top:8px">'+MODELS.map(m=>'<button data-a="aiModel" data-v="'+m[0]+'" class="pill" style="flex:1'+(S.ai.model===m[0]?';background:var(--text);color:#1F1E1D;border-color:var(--text);font-weight:600':'')+'">'+m[1]+'</button>').join('')+'</div>'+
@@ -12928,9 +12953,10 @@ function runAction(a,v,t,e){
     case 'sheetClose':S.sheet=null;render();break;
     case 'wrapGo':{const ym=v;S.sheet={t:'wrap',ym:ym};
       thinkStart('wrap',[['Reading '+ymName(ym)],['Comparing with '+ymName(prevYm(ym))],['Weighing what to say honestly']],function(){
-        if(!wraps()[ym]){const r=wrapBuild(ym);if(r){wraps()[ym]=r;wrapSaveAll()}}});
+        if(!wraps()[ym]){const r=wrapBuild(ym);if(r){wraps()[ym]=r;wrapSaveAll()}}
+        try{wrapRepair(ym)}catch(e){}});
       render();break}
-    case 'wrapOpen':S.sheet={t:'wrap',ym:v};render();break;
+    case 'wrapOpen':try{wrapRepair(v)}catch(e){};S.sheet={t:'wrap',ym:v};render();break;
     case 'wrapCopy':{const r=wraps()[v];
       if(r){try{navigator.clipboard.writeText(wrapText(r)).then(function(){flash('Copied.')})}catch(e){flash('Could not copy.')}}break}
     case 'shareLevel':{const[g9,l9]=String(v||'').split(':');shareLevelRun(+g9||0,+l9||null);break}
