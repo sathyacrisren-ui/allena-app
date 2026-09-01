@@ -361,7 +361,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='528ade';  // stamped by tools/build.py with the content hash
+const BUILD_ID='8b2696';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -5096,7 +5096,7 @@ function viewPoints(){
      ['Blossom',tr.rare+' rare find'+(tr.rare===1?'':'s')],
      ['Roots',tr.weeks+' week'+(tr.weeks===1?'':'s')+' of consistency'],
      ['Season',treeSeason().name],
-     tr.runs?['The river',udStr(tr.km)+' run']:null].filter(Boolean)
+     tr.runs?['Blue limbs',udStr(tr.km)+' run']:null].filter(Boolean)
      .map((x,i)=>'<div style="display:flex;justify-content:space-between;align-items:baseline;padding:10px 0'+(i?';border-top:1px solid var(--line)':'')+'">'+
        '<span style="font-size:12.5px;color:var(--dim)">'+esc(x[0])+'</span>'+
        '<span class="mono" style="font-size:12px">'+esc(x[1])+'</span></div>').join('')+'</div>'+
@@ -7051,12 +7051,18 @@ function growTree(W,Hh){
      leafed out at ~6 levels whatever the depth cap said. A deeper
      record earns finer twigs — the canopy genuinely thickens. */
   const leafLen=t.pts>8000?4.5:t.pts>2500?6:9;
-  function branch(x,y,ang,len,wdt,depth){
+  /* running grows INTO the tree (owner call, Sep 2026): whole limbs
+     turn blue, their leaves blue-tinted — the share of blue limbs
+     scales with the km behind them. Blossom stays amber everywhere;
+     colour still means one thing. */
+  const pBlue=(t.runs&&t.km>0)?Math.min(0.5,0.08+t.km/400):0;
+  function branch(x,y,ang,len,wdt,depth,blue){
     if(depth>maxDepth||len<3||leaves>budget)return;
+    if(!blue&&depth===2&&pBlue&&R()<pBlue)blue=true;
     const x2=x+Math.cos(ang)*len,y2=y+Math.sin(ang)*len;
     bd(x2,y2,leafSize+2.6);
     out+='<line x1="'+x.toFixed(1)+'" y1="'+y.toFixed(1)+'" x2="'+x2.toFixed(1)+'" y2="'+y2.toFixed(1)+
-      '" stroke="'+col+'" stroke-width="'+Math.max(0.7,wdt).toFixed(2)+'" stroke-linecap="round" opacity="'+
+      '" stroke="'+(blue?'#1E9BFF':col)+'" stroke-width="'+Math.max(0.7,wdt).toFixed(2)+'" stroke-linecap="round" opacity="'+
       (0.55+depth*0.06).toFixed(2)+'"/>';
     if(depth>=maxDepth-1||len<leafLen){
       // a leaf for the work, a blossom for a rare find
@@ -7067,14 +7073,14 @@ function growTree(W,Hh){
           out+='<circle cx="'+x2.toFixed(1)+'" cy="'+y2.toFixed(1)+'" r="'+(leafSize+1.4).toFixed(1)+
             '" fill="var(--amber)" opacity=".9"/>'}
         else out+='<circle cx="'+x2.toFixed(1)+'" cy="'+y2.toFixed(1)+'" r="'+
-          (leafSize*(0.7+R()*0.6)).toFixed(1)+'" fill="'+leafCol+'" opacity="'+(0.45+R()*0.4).toFixed(2)+'"/>'}
+          (leafSize*(0.7+R()*0.6)).toFixed(1)+'" fill="'+(blue?'#7CC4FF':leafCol)+'" opacity="'+(0.45+R()*0.4).toFixed(2)+'"/>'}
       return}
     // how many ways it splits comes from how many lifts you train
     const forks=2+(t.liftCount>=6&&R()<0.35?1:0);
     for(let i=0;i<forks;i++){
       const spread=(0.42+R()*0.34);
       const a=ang+(i-(forks-1)/2)*spread+(R()-0.5)*0.18;
-      branch(x2,y2,a,len*(0.66+R()*0.16),wdt*0.68,depth+1)}}
+      branch(x2,y2,a,len*(0.66+R()*0.16),wdt*0.68,depth+1,blue)}}
   if(t.sessions<1&&t.pts<40){
     // nothing logged yet: a seed, and an honest one
     out+='<circle cx="'+(W/2)+'" cy="'+(groundY-9)+'" r="7" fill="'+col+'" opacity=".5"/>'+
@@ -7083,19 +7089,7 @@ function growTree(W,Hh){
     return'<svg viewBox="0 0 '+W+' '+Hh+'" style="width:100%;aspect-ratio:'+W+'/'+Hh+';display:block" aria-hidden="true">'+out+'</svg>'}
   branch(W/2,groundY,-Math.PI/2,trunkH,
     Math.max(1.6,(2+t.sessions*0.06)*(1+Math.min(1.2,t.pts/8000))),0);
-  /* running is the river (replaced the sweeps, owner call Sep 2026):
-     a quiet blue current beneath the roots — it feeds the tree rather
-     than sprouting from it. Longer and fuller with the km behind it. */
-  if(t.runs&&t.km>0){
-    const rw=Math.min(W*0.46,26+t.km*0.35);
-    const layers=Math.min(3,1+Math.floor(t.km/150));
-    for(let i=0;i<layers;i++){
-      const y0=groundY+18+i*6,amp=(2.2+i*0.8);
-      bd(W/2-rw,y0+amp,3);bd(W/2+rw,y0+amp,3);
-      const seg=rw/3;
-      let d='M'+(W/2-rw).toFixed(1)+' '+y0;
-      for(let k=0;k<6;k++)d+=' q'+(seg/2).toFixed(1)+' '+((k%2?amp:-amp).toFixed(1))+' '+seg.toFixed(1)+' 0';
-      out+='<path d="'+d+'" stroke="#1E9BFF" stroke-width="'+(1.6-i*0.35).toFixed(2)+'" fill="none" opacity="'+(0.42-i*0.09).toFixed(2)+'" stroke-linecap="round"/>'}}
+
   const pad=8,vbX=mnX-pad,vbY=mnY-pad,vbW=(mxX-mnX)+pad*2,vbH=(mxY-mnY)+pad*2;
   return'<svg viewBox="'+vbX.toFixed(1)+' '+vbY.toFixed(1)+' '+vbW.toFixed(1)+' '+vbH.toFixed(1)+
     '" style="width:100%;aspect-ratio:'+vbW.toFixed(1)+'/'+vbH.toFixed(1)+';display:block" aria-hidden="true">'+out+'</svg>'}
