@@ -169,8 +169,20 @@ pre{background:var(--surface);border:1px solid var(--line);border-radius:10px;pa
 .chatbody{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:18px 18px 8px;max-width:460px;width:100%;margin:0 auto}
 .chatbar{flex:none;padding:8px 14px calc(10px + env(safe-area-inset-bottom));background:var(--bg);border-top:1px solid var(--line);max-width:460px;width:100%;margin:0 auto}
 .chatwrap.kb .chatbar{padding-bottom:10px}
-.composer{display:flex;align-items:flex-end;gap:8px;background:var(--surface);border:1px solid var(--line);border-radius:22px;padding:3px 4px 3px 14px}
-.sendbtn{flex:none;width:34px;height:34px;border-radius:34px;background:var(--amber);color:#1A1917;font-size:17px;font-weight:700;line-height:1;display:flex;align-items:center;justify-content:center;transition:opacity .15s}
+/* tactile motion (Sep 2026): every tap answers back — a springy press,
+   messages that arrive, a composer that wakes when touched */
+button{transition:transform .16s cubic-bezier(.34,1.56,.64,1),opacity .16s,background-color .18s,border-color .18s}
+button:active{transform:scale(.96)}
+.msg-in{animation:msgIn .34s cubic-bezier(.22,1,.36,1) both}
+@keyframes msgIn{from{opacity:0;transform:translateY(10px) scale(.985)}to{opacity:1;transform:none}}
+.tdots{display:inline-flex;gap:4px;padding:12px 2px 4px}
+.tdots span{width:6px;height:6px;border-radius:6px;background:var(--dim);animation:tb 1.1s infinite ease-in-out}
+.tdots span:nth-child(2){animation-delay:.15s}.tdots span:nth-child(3){animation-delay:.3s}
+@keyframes tb{0%,60%,100%{transform:translateY(0);opacity:.35}30%{transform:translateY(-4px);opacity:1}}
+.composer{display:flex;align-items:flex-end;gap:8px;background:var(--surface);border:1px solid var(--line);border-radius:22px;padding:3px 4px 3px 14px;transition:border-color .25s,box-shadow .25s}
+.composer:focus-within{border-color:rgba(240,238,230,.45);box-shadow:0 0 0 3px rgba(240,238,230,.06)}
+.sendbtn{flex:none;width:34px;height:34px;border-radius:34px;background:var(--amber);color:#1A1917;font-size:17px;font-weight:700;line-height:1;display:flex;align-items:center;justify-content:center;transition:opacity .2s,transform .2s cubic-bezier(.34,1.56,.64,1)}
+.sendbtn:active{transform:scale(.88)}
 .msg-u{align-self:flex-end;margin:0 0 14px auto;max-width:84%;width:fit-content;background:var(--raised);border-radius:16px;padding:10px 14px;font-size:15px;line-height:1.5}
 .msg-a{margin:0 0 18px 0;font-size:15px;line-height:1.62;color:var(--text)}
 .msg-a b{font-weight:600}
@@ -361,7 +373,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='c56109';  // stamped by tools/build.py with the content hash
+const BUILD_ID='6d28a9';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -2378,7 +2390,7 @@ function viewCoach(){
        :topic==='session'?'Ask me about this session.'
        :'Ask me about your program — I can see this week, your recovery and what is left.')+'</p>'+
       '<div style="display:flex;flex-direction:column;gap:7px;margin-top:12px">'+
-      (CHIPS[topic]||CHIPS.program).map(q=>'<button data-a="askChip" data-v="'+esc(q)+'" class="card" style="width:100%;text-align:left;padding:11px 14px;font-size:13px;color:var(--dim)">'+esc(q)+'</button>').join('')+'</div>';
+      (CHIPS[topic]||CHIPS.program).map((q,qi)=>'<button data-a="askChip" data-v="'+esc(q)+'" class="card msg-in" style="width:100%;text-align:left;padding:11px 14px;font-size:13px;color:var(--dim);animation-delay:'+(qi*0.06).toFixed(2)+'s">'+esc(q)+'</button>').join('')+'</div>';
     if(recent.length){
       h+='<button data-a="coachSessToggle" class="card" style="width:100%;text-align:left;padding:12px 14px;margin-top:14px;display:flex;align-items:center;gap:10px">'+
         '<span style="flex:1;font-size:13.5px;font-weight:600">Ask about a session</span>'+
@@ -2389,14 +2401,15 @@ function viewCoach(){
           '<span class="mono" style="color:var(--faint);font-size:10px;flex:none">'+fmtDate(x.date)+'</span></button>').join('')+'</div>';
       h+='<p style="color:var(--faint);font-size:12px;line-height:1.55;margin-top:12px">Or just ask — your week, goals and recovery are already in the room.</p>'}
     else h+='<p style="color:var(--faint);font-size:12.5px;line-height:1.55;margin-top:10px">Nothing logged yet. Ask about programming, technique or setting things up.</p>'}
-  else h+=th.map((m,i)=>m.r==='user'
-      ?'<div class="msg-u">'+esc(m.t)+'</div>'
-      :'<div class="msg-a">'+md(m.t)+actChip(m,i)+'</div>').join('')+
-     (S.coach.busy?'<div class="mono" style="color:var(--faint);font-size:12px;padding:4px 2px">Allena is thinking…</div>':'');
+  else h+=th.map((m,i)=>{const inn=i===th.length-1?' msg-in':'';
+      return m.r==='user'
+      ?'<div class="msg-u'+inn+'">'+esc(m.t)+'</div>'
+      :'<div class="msg-a'+inn+'">'+md(m.t)+actChip(m,i)+'</div>'}).join('')+
+     (S.coach.busy?'<div class="tdots msg-in"><span></span><span></span><span></span></div>':'');
   h+='</div>';
   h+='<div class="chatbar"><div class="composer">'+
     '<textarea data-in="coach.input" rows="1" placeholder="Ask Allena…" style="flex:1;min-width:0;background:none;border:none;outline:none;color:var(--text);font-size:16px;line-height:1.45;padding:9px 2px;resize:none;max-height:120px">'+esc(S.coach.input)+'</textarea>'+
-    '<button data-a="'+(aiReady()?'coachSend':'coachApp')+'" class="sendbtn" style="opacity:'+(S.coach.input.trim()?'1':'.35')+'">↑</button></div>'+
+    '<button data-a="'+(aiReady()?'coachSend':'coachApp')+'" class="sendbtn" style="opacity:'+(S.coach.input.trim()?'1':'.35')+';transform:scale('+(S.coach.input.trim()?'1':'.88')+')">↑</button></div>'+
     (aiReady()?'':'<p style="color:var(--faint);font-size:10.5px;text-align:center;margin-top:7px">Sends to the Claude app · add a key or Allena cloud link in Data → Allena to chat here</p>')+
     '</div></div>';
   return h}
@@ -12670,7 +12683,7 @@ function render(){
     /* the session, minimized (owner call, Sep 2026): browse anywhere,
        the clock keeps ticking, one tap returns. Ticks via #spTime
        without re-rendering. */
-    if(!S.sess||S.view==='session'||S.sess.phase==='done')return '';
+    if(!S.sess||S.view==='session'||S.view==='coach'||S.sess.phase==='done')return '';  // never cover the composer
     const s2=S.sess,cur=s2.sets[Math.min(s2.idx,s2.sets.length-1)];
     const resting=s2.phase==='resting'&&S.restEnd;
     const left=resting?Math.max(0,Math.ceil((S.restEnd-Date.now())/1000)):0;
