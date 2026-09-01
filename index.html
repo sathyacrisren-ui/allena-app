@@ -386,7 +386,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='f13aeb';  // stamped by tools/build.py with the content hash
+const BUILD_ID='5ae56c';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -6799,6 +6799,50 @@ function svAutoSync(){
   if(Date.now()-(st.last||0)<20*3600*1000)return;
   svPull(true)}
 try{if(!svCapture())setTimeout(svAutoSync,4000)}catch(e){}
+
+/* ── local notifications (Sep 2026) ──────────────────────────
+   Only inside the wrapper, only opt-in, and every notification
+   carries a real fact tied to a real date — the standing ban on
+   guilt and escalation is structural: there is no code path for
+   a 'we miss you'. The web side plans the next few days from
+   real events; the native side schedules them locally. No
+   server, no tokens. */
+const K_NOTIF='training-notif-v1';
+function notifPrefs(){return S.notifP||(S.notifP=lget(K_NOTIF,{on:false,morning:true,appt:true,wrap:true,quest:true}))}
+function notifSave(){lset(K_NOTIF,S.notifP)}
+function notifPlan(){
+  const P=notifPrefs(),items=[];
+  if(!P.on)return items;
+  const at=(d,h,m)=>{const x=new Date(d+'T12:00');x.setHours(h,m,0,0);return Math.round(x.getTime()/1000)};
+  const dk=n=>dayKey(new Date(Date.now()+n*864e5));
+  if(P.morning&&S.gar&&S.gar.on)for(let i=1;i<=3;i++)
+    items.push({id:'am'+dk(i),ts:at(dk(i),7,30),title:'Allena',
+      body:'Log the morning and today’s call unlocks.'});
+  if(P.appt){const a=apptNext&&apptNext();
+    if(a&&a.date){
+      const before=dayKey(new Date(new Date(a.date+'T12:00')-864e5));
+      if(before>=today())items.push({id:'ap1'+a.date,ts:at(before,18,0),title:'Allena',
+        body:'Physio tomorrow'+(a.time?' at '+a.time:'')+' — the report is ready to bring.'});
+      items.push({id:'ap2'+a.date,ts:at(a.date,8,0),title:'Allena',
+        body:'Physio today'+(a.time?' at '+a.time:'')+' — the report is one tap away.'})}}
+  if(P.wrap){const now=new Date(),first=new Date(now.getFullYear(),now.getMonth()+1,1);
+    if((first-now)/864e5<=7){
+      const ym=today().slice(0,7);
+      items.push({id:'wr'+ym,ts:Math.round(first.setHours(9,0,0,0)/1000),title:'Allena',
+        body:'Your '+ymName(ym)+' wrap is ready.'})}}
+  if(P.quest){const d=new Date();const dow=(d.getDay()+6)%7;
+    const mon=dayKey(new Date(Date.now()+(7-dow)*864e5));
+    items.push({id:'q'+mon,ts:at(mon,9,0),title:'Allena',body:'A new quest is up for the week.'})}
+  return items.filter(x=>x.ts*1000>Date.now())}
+function notifSync(){
+  try{
+    if(!inWrapper())return;
+    const P=notifPrefs();
+    const badge=(typeof unseenFindings==='function')?unseenFindings():0;
+    window.webkit.messageHandlers.allena.postMessage(JSON.stringify(
+      {type:'notif',on:!!P.on,items:notifPlan(),badge:P.on?badge:0}))
+  }catch(e){}}
+try{setTimeout(notifSync,5000)}catch(e){}
 const RARITY=[['common','#8A8782','Noticed'],['uncommon','#30D158','Worth knowing'],
   ['rare','#D9D6CD','Rare find'],['epic','#FFFFFF','Big one']];
 function rarityOf(k){return RARITY.find(x=>x[0]===k)||RARITY[0]}
@@ -11737,6 +11781,20 @@ function viewData(){
     setRow(I.check,'Daily check-in',(S.daily&&S.daily.on)?'On':'Off','Daily creatine tracker'),
     setRow(I.pill,'Creatine',(S.supp&&S.supp.on)?'On':'Off','Daily creatine tracker'),
     setRow(I.check,'Profile & goals','','Profile')]);
+  if(inWrapper()){const NP=notifPrefs();
+   h+='<p class="eyebrow mt2">Notifications</p>'+
+   '<div class="card mt" style="padding:13px 15px">'+
+   '<div style="display:flex;align-items:center;gap:10px"><span style="flex:1;font-size:13.5px;font-weight:600">Allena can speak up</span>'+
+   '<button data-a="notifOn" class="pill'+(NP.on?' on':'')+'" style="width:64px;padding:9px 0">'+(NP.on?'On':'Off')+'</button></div>'+
+   (NP.on?[['morning','The morning call','Log the check-in, the forecast unlocks'],
+     ['appt','Physio appointments','The day before and the morning of'],
+     ['wrap','The monthly wrap','When it lands, on the 1st'],
+     ['quest','The weekly quest','Monday morning']].map(k=>
+     '<div style="display:flex;align-items:center;gap:10px;margin-top:10px;border-top:1px solid var(--line);padding-top:10px">'+
+     '<span style="flex:1;min-width:0"><span style="font-size:13px;font-weight:600;display:block">'+k[1]+'</span>'+
+     '<span style="color:var(--faint);font-size:11px">'+k[2]+'</span></span>'+
+     '<button data-a="notifKind" data-v="'+k[0]+'" class="pill'+(NP[k[0]]?' on':'')+'" style="width:56px;padding:8px 0;font-size:11px">'+(NP[k[0]]?'On':'Off')+'</button></div>').join(''):'')+
+   '<p style="color:var(--faint);font-size:11px;line-height:1.5;margin-top:10px">Every notification carries a real fact tied to a real date. There is no “we miss you” — by design, there never will be.</p></div>'}
   h+='<p class="eyebrow mt2">Units</p>'+
    '<div class="card mt" style="padding:13px 15px">'+
    '<div style="display:flex;align-items:center;gap:10px"><span style="flex:1;font-size:13.5px;font-weight:600">Weight</span>'+
@@ -14678,6 +14736,9 @@ function runAction(a,v,t,e){
     case 'svGo':svConnect();break;
     case 'suGateGo':if(S.setup)S.setup.gate=false;render();break;
     case 'suGateBack':if(S.setup)S.setup.gate=true;render();break;
+    case 'notifOn':{const P=notifPrefs();P.on=!P.on;notifSave();notifSync();render();
+      if(P.on)flash('iOS will ask permission once — allow it and Allena can speak up.');break}
+    case 'notifKind':{const P=notifPrefs();P[v]=!P[v];notifSave();notifSync();render();break}
     case 'fghostOpen':S.sheet={t:'fghost'};render();break;
     case 'fghostCopy':{try{navigator.clipboard.writeText(fghostCode()+' — my Allena ghost code. Paste it in Today → The ghost → Race a friend.');flash('Copied — send it to them.')}catch(e){flash('Could not copy.')}break}
     case 'fghostGo':{const f=fghostParse(S.fgIn);
