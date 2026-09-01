@@ -361,7 +361,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='bd0ee7';  // stamped by tools/build.py with the content hash
+const BUILD_ID='fa4d4f';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -2410,7 +2410,8 @@ function impApplyParsed(f,o){
       histExpandSets(o);
       S.histImp={block:String(o.block||'Imported history').slice(0,60),weeks:o.weeks.slice(0,52)};
       S.hdate={date:'',mode:'start'};
-      S.imp=null;S.view='today';S.sheet={t:'histdate'};S.busyDone=1;render();return}
+      S.imp=null;S.view='today';S.busyDone=1;
+      histAliasStart(function(){S.sheet={t:'histdate'};render()});return}
     if(o.running&&o.running.length){
       // the sheet's running progression survives the import — rule 4:
       // nothing silently disappears
@@ -2457,8 +2458,9 @@ async function impParse(){
       S.histImp={block:String((f.fileName||'Imported history').replace(/\.[a-z0-9]+$/i,'')).slice(0,60),
         weeks:g.weeks.slice(0,52)};
       S.hdate={date:'',mode:'start'};
-      S.imp=null;S.view='today';S.sheet={t:'histdate'};S.busyDone=1;render();
-      flash(g.totalSets+' sets read straight off the sheet — no cloud needed.');return}}
+      S.imp=null;S.view='today';S.busyDone=1;
+      histAliasStart(function(){S.sheet={t:'histdate'};render();
+        flash(g.totalSets+' sets read straight off the sheet — no cloud needed.')});return}}
   if(!aiReady())return flash('Add your API key or Allena cloud link under Data → Allena first.');
   f.busy=true;f.err=null;
   if(typeof thinkStart==='function')thinkStart('impread',[
@@ -2598,12 +2600,14 @@ function viewOwnReview(){
         (f.fix?'<button data-a="ownFix" data-v="'+i+'" class="btn mt" style="font-size:12px;color:var(--amber)">'+esc(f.fix.label)+'</button>':'')+'</div>').join('')+'</div>'}
   if(d.fixLog&&d.fixLog.length)
     h+='<div class="card mt" style="padding:14px 16px;border-color:var(--green)">'+
-      '<p class="eyebrow" style="color:var(--green)">What Allena changed</p>'+
+      '<p class="eyebrow" style="color:var(--green)">What Allena changed — the preview</p>'+
       d.fixLog.map(c=>'<p style="color:var(--dim);font-size:12.5px;line-height:1.55;margin-top:5px">· '+esc(c)+'</p>').join('')+
-      '<p style="color:var(--faint);font-size:11px;line-height:1.5;margin-top:8px">All of it is editable — Keep editing shows every change in place.</p></div>';
+      '<p style="color:var(--faint);font-size:11px;line-height:1.5;margin-top:8px">Keep editing shows every change in place. Start accepts them; the undo below puts the block back exactly as it was.</p></div>';
   const fixable=a.flags.some(f=>/^(Low volume|Not trained|No target efforts)/.test(f.t));
   h+='<button data-a="ownSave" class="big disp mt2" style="background:var(--amber);color:#1F1E1D;font-size:16px">Start this block</button>'+
-    (fixable?'<button data-a="ownAllena" class="btn mt" style="border-color:var(--amber);color:var(--amber)">Let Allena adjust it</button>':'')+
+    (d.fixLog&&d.fixLog.length
+      ?'<button data-a="ownFixUndo" class="btn mt" style="color:var(--dim)">Undo Allena’s adjustments</button>'
+      :fixable?'<button data-a="ownAllena" class="btn mt" style="border-color:var(--amber);color:var(--amber)">Let Allena adjust it</button>':'')+
     '<button data-a="ownBack" class="btn mt">Keep editing</button>';
   return h+'</div>'}
 function reviewOwn(p){
@@ -2647,13 +2651,17 @@ function reviewOwn(p){
   const days=p.days.length;
   if(days>=6)flags.push({t:days+' days a week',d:'Frequency matters less than weekly volume per muscle. Three or four hard days often beat six rushed ones — worth being sure the extra days are adding sets rather than spreading them.'});
   return{flags:flags,sets:sets,per:per}}
-function ownAutoFix(){
+function ownAutoFix(goal){
   /* the third button (owner call, Sep 2026): Allena applies the
      mechanical fixes herself. Deterministic — no AI call — and every
      change is named, because a program edited silently is a program
      the lifter no longer knows. Restriction flags are never
      auto-touched: those need the human. */
   const d=S.own;if(!d||!d.review)return null;
+  if(d.fixLog&&d.fixLog.length)return null;      // one pass only — undo first
+  d.prev=JSON.parse(JSON.stringify(d.prog));     // the way back
+  goal=goal||d.prog.kind||'muscle';
+  const SCHEME=goal==='strength'?{n:4,reps:'5-6',rpe:7}:goal==='general'?{n:3,reps:'8-12',rpe:8}:{n:3,reps:'10-12',rpe:8};
   const p=d.prog,changes=[];
   const per={};
   p.days.forEach(dy=>dy.exercises.forEach(e=>{const n=(e.sets['default']||[]).length;
@@ -2697,9 +2705,9 @@ function ownAutoFix(){
     const day=p.days.slice().sort((a,b)=>
       a.exercises.reduce((x,e)=>x+(e.sets['default']||[]).length,0)-
       b.exercises.reduce((x,e)=>x+(e.sets['default']||[]).length,0))[0];
-    day.exercises.push({name:name,sets:{'default':[{reps:'10-12',rpe:8},{reps:'10-12',rpe:8},{reps:'10-12',rpe:8}]}});
-    per[m]=3;
-    changes.push('added '+name+' 3×10-12 @8 to '+day.name+' — '+m.toLowerCase()+' was untrained'+
+    day.exercises.push({name:name,sets:{'default':Array.from({length:SCHEME.n},()=>({reps:SCHEME.reps,rpe:SCHEME.rpe}))}});
+    per[m]=SCHEME.n;
+    changes.push('added '+name+' '+SCHEME.n+'×'+SCHEME.reps+' @'+SCHEME.rpe+' to '+day.name+' — '+m.toLowerCase()+' was untrained'+
       (eqKnown?'':' (equipment unknown, so this pick needs none — swap it freely, or tell Allena your setup in the program builder)'))});
   // 3. missing target efforts — compounds @7, accessories @8
   let filled=0;
@@ -2707,6 +2715,8 @@ function ownAutoFix(){
     (e.sets['default']||[]).forEach(st=>{
       if(st.rpe==null){st.rpe=/squat|deadlift|bench|overhead|\bohp\b|\bpress\b/i.test(e.name)?7:8;filled++}})}));
   if(filled)changes.push('set target efforts on '+filled+' sets — compounds @7, accessories @8, so the load management can work');
+  if(goal&&p.kind!==goal){p.kind=goal;
+    changes.push('block tuned for '+(goal==='strength'?'strength — additions run '+SCHEME.n+'×'+SCHEME.reps+' @'+SCHEME.rpe:goal==='general'?'general fitness':'building muscle'))}
   d.review=reviewOwn(p);
   d.fixLog=changes;
   return changes}
@@ -2893,7 +2903,10 @@ function todayProgress(){
   const core=T.filter(x=>!x.optional);
   const coreDone=core.filter(x=>x.done).length;
   return{done:done,total:T.length,pct:T.length?Math.round(done/T.length*100):0,
-    complete:core.length>0&&coreDone===core.length,
+    /* with no core tasks configured (no readiness, no rehab), a day
+       where everything offered is done IS done — otherwise the hero
+       says "Open today" forever and the nightly find never unlocks */
+    complete:core.length>0?coreDone===core.length:(T.length>0&&done===T.length),
     core:core.length,coreDone:coreDone,tasks:T}}
 function todayPoints(){
   // points earned today, so the counter visibly moves
@@ -6299,6 +6312,80 @@ function histCommit(recs){
   S.history.sort((a,b)=>String(a.date).localeCompare(String(b.date)));
   saveHistory();
   return{added:kept.length,replaced:replaced,skippedReal:skipped}}
+
+/* ══ exercise aliasing at import (owner call, Sep 2026) ══════
+   Hand-typed sheets call the same lift three things — "bench",
+   "bb bench press", "Bench Press" — and unilateral work arrives
+   as "DB row left arm 12 / right arm 11". Identity is resolved
+   deterministically: abbreviations expand, side markers strip
+   (the sets keep a perSide flag), exact matches merge silently
+   under the fullest name, and a bare name that could belong to
+   ONE fuller name merges automatically only when the loads
+   agree (median within ±33%). Anything genuinely ambiguous —
+   two candidates, or loads that disagree — is ASKED, never
+   guessed. */
+function exAliasNorm(n){
+  let s=String(n||'').toLowerCase().trim();
+  const side=/\b(left|right)\b\s*(arm|leg|side)?|\b[lr]\s*(arm|leg)\b|\b(single|one)[- ]arm\b|\bper[- ]side\b|\beach[- ](side|arm|leg)\b/g;
+  const hasSide=side.test(s);
+  s=s.replace(side,' ');
+  s=s.replace(/\bbb\b/g,'barbell').replace(/\b(db|dumbbells?|dumbell)\b/g,'dumbbell')
+     .replace(/\bbp\b/g,'bench press').replace(/\bohp\b/g,'overhead press')
+     .replace(/\brdl\b/g,'romanian deadlift').replace(/\bkb\b/g,'kettlebell')
+     .replace(/[^a-z0-9 ]/g,' ').replace(/\b([a-z]{3,})s\b/g,'$1')
+     .replace(/\s+/g,' ').trim();
+  return{key:s,side:hasSide}}
+function histAliasBuild(weeks){
+  const stats={};   // key -> {names:{raw:count}, ws:[], side:false}
+  (weeks||[]).forEach(w=>(w.sessions||[]).forEach(sx=>(sx.exercises||[]).forEach(e=>{
+    const nm=exAliasNorm(e.name);
+    const st=stats[nm.key]=stats[nm.key]||{names:{},ws:[],side:false};
+    st.names[e.name]=(st.names[e.name]||0)+1;
+    if(nm.side)st.side=true;
+    (e.sets||[]).forEach(s2=>{if(s2.w>0)st.ws.push(s2.w)})})));
+  const med=a=>{if(!a.length)return null;const b=a.slice().sort((x,y)=>x-y);return b[Math.floor(b.length/2)]};
+  const keys=Object.keys(stats).filter(k=>k);
+  const canon={};   // key -> display name (most used, longest on ties)
+  keys.forEach(k=>{const ns=Object.keys(stats[k].names);
+    ns.sort((a,b)=>stats[k].names[b]-stats[k].names[a]||b.length-a.length);
+    canon[k]=ns[0]});
+  const autos=[],asks=[];
+  keys.forEach(k=>{
+    const toks=k.split(' ');
+    const sups=keys.filter(k2=>k2!==k&&k2.split(' ').length>toks.length&&
+      toks.every(t=>k2.split(' ').indexOf(t)>=0));
+    if(!sups.length)return;
+    const mA=med(stats[k].ws);
+    const fit=sups.filter(k2=>{const mB=med(stats[k2].ws);
+      return mA==null||mB==null||(mA/mB>0.75&&mA/mB<1.33)});
+    if(sups.length===1&&fit.length===1)
+      autos.push({from:k,to:sups[0],why:'loads agree'});
+    else asks.push({from:k,cands:sups.slice(0,3)})});
+  return{stats:stats,canon:canon,autos:autos,asks:asks,med:med}}
+function histAliasApply(weeks,map,canon,sideKeys){
+  /* map: normKey -> normKey it belongs to (or itself). Renames every
+     exercise to the canonical display name of its final key; sets that
+     carried a side marker keep perSide:true so nothing is conflated. */
+  (weeks||[]).forEach(w=>(w.sessions||[]).forEach(sx=>(sx.exercises||[]).forEach(e=>{
+    const nm=exAliasNorm(e.name);
+    const fin=map[nm.key]||nm.key;
+    const disp=canon[fin]||e.name;
+    if(e.name!==disp)e.name=disp;
+    if(nm.side)(e.sets||[]).forEach(s2=>{s2.perSide=true})})))}
+function histAliasStart(next){
+  /* runs on S.histImp before the anchor sheet: silent exact merges are
+     already inherent (same key); token-subset merges apply when loads
+     agree; real ambiguity opens the question sheet. */
+  try{
+    const hi=S.histImp;if(!hi||!hi.weeks)return next();
+    const r=histAliasBuild(hi.weeks);
+    const map={};r.autos.forEach(a=>{map[a.from]=a.to});
+    if(!r.asks.length){
+      histAliasApply(hi.weeks,map,r.canon);
+      if(r.autos.length)flash(r.autos.map(a=>'“'+r.canon[a.from]+'” read as “'+r.canon[a.to]+'”').join('; ')+' — the loads matched.');
+      return next()}
+    S.halias={r:r,map:map,picks:{},next:next};
+    S.sheet={t:'histalias'};render()}catch(e){next()}}
 const RARITY=[['common','#8A8782','Noticed'],['uncommon','#30D158','Worth knowing'],
   ['rare','#D9D6CD','Rare find'],['epic','#FFFFFF','Big one']];
 function rarityOf(k){return RARITY.find(x=>x[0]===k)||RARITY[0]}
@@ -9596,7 +9683,7 @@ function deepCard(){
       '</div>'+
       (function(){const w=deepStore().watches;if(!w.length)return '';
         return '<p class="mono" style="color:var(--blue);font-size:9.5px;letter-spacing:.04em;margin-top:9px">WATCHING: '+w.map(x=>esc(x.t)).join(' \u00b7 ')+' \u2014 the next read reports on '+(w.length===1?'it':'each')+'</p>'})()+
-      '<p class="mono" style="color:var(--faint);font-size:10px;margin-top:9px">Banked in your collection. A fresh read unlocks in about '+Math.max(1,Math.ceil((new Date(today()+'T24:00').getTime()-Date.now())/36e5))+'h.</p>';
+      '<p class="mono" style="color:var(--faint);font-size:10px;margin-top:9px">Banked in your collection. The next read opens when it has something new to see — train, run or check in, and tomorrow it reads again.</p>';
   else if(!aiReady())
     inner='<p style="color:var(--dim);font-size:12.5px;line-height:1.6;margin-top:8px">The rule engines find what was pre-imagined; the model finds the rest — lags, thresholds, relationships between your signals. Sign in (Settings → account) and this unlocks with no key needed.</p>';
   else{
@@ -11503,7 +11590,11 @@ function sheetHtml(){
       '<div class="row mt2" style="gap:8px">'+
       [['start','Week 1 started'],['end','Last week ended']].map(m2=>
         '<button data-a="hdateMode" data-v="'+m2[0]+'" class="pill" style="flex:1;font-size:12px'+(f.mode===m2[0]?';background:var(--text);color:#1F1E1D;border-color:var(--text);font-weight:600':'')+'">'+m2[1]+'</button>').join('')+'</div>'+
-      '<input type="date" data-in="hdate.date" value="'+esc(f.date||'')+'" style="margin-top:10px">'+
+      /* iOS renders an empty date input as a blank pill — say what it is */
+      '<div style="position:relative;margin-top:10px">'+
+      '<input type="date" data-in="hdate.date" value="'+esc(f.date||'')+'" style="width:100%;min-height:48px">'+
+      (f.date?'':'<span style="position:absolute;left:13px;top:50%;transform:translateY(-50%);color:var(--faint);font-size:14px;pointer-events:none">Tap to choose the date</span>')+
+      '</div>'+
       '<button data-a="histImpGo" class="big disp mt" style="background:'+((f.date||'').trim()?'var(--amber)':'var(--raised)')+';color:'+((f.date||'').trim()?'#1F1E1D':'var(--faint)')+';font-size:15px">Bring it in</button>'+
       '<p style="color:var(--faint);font-size:11px;line-height:1.55;margin-top:10px">Sessions are spread across each week and marked as imported with approximate dates — honest labels, real data.</p>')}
   if(S.sheet.t==='intake'){
@@ -11721,6 +11812,40 @@ function sheetHtml(){
     return wrapSheet(S.shareTitle||'Your tree',
       (S.shareImg?'<img src="'+S.shareImg+'" alt="Tree share card" style="width:100%;border-radius:14px;border:1px solid var(--line)">':'')+
       '<p style="color:var(--dim);font-size:12.5px;line-height:1.55;margin-top:10px">Long-press the image, then Save Image. Nothing on it beyond what you can see.</p>')}
+  if(S.sheet.t==='histalias'){
+    const ha=S.halias;if(!ha)return '';
+    const r=ha.r;
+    let inner='<p style="color:var(--dim);font-size:13px;line-height:1.6">The sheet names some lifts more than one way. Allena merged the ones the numbers prove'+(r.autos.length?' ('+r.autos.map(a=>'“'+esc(r.canon[a.from])+'” → “'+esc(r.canon[a.to])+'”').join(', ')+')':'')+' — these it will not guess:</p>';
+    r.asks.forEach((q,i)=>{
+      const pick=ha.picks[i];
+      inner+='<div class="card mt" style="padding:13px 15px">'+
+        '<p style="font-size:14px;font-weight:600">“'+esc(r.canon[q.from])+'”'+
+        '<span class="mono" style="color:var(--faint);font-size:10px;font-weight:400"> · '+(r.stats[q.from].ws.length||0)+' sets'+(r.med(r.stats[q.from].ws)?' · ~'+uwNum(r.med(r.stats[q.from].ws))+' '+uwUnit():'')+'</span></p>'+
+        '<div style="display:flex;flex-wrap:wrap;gap:7px;margin-top:9px">'+
+        q.cands.map(c=>'<button data-a="haPick" data-v="'+i+':'+esc(c)+'" class="pill" style="flex:none;white-space:nowrap;font-size:12px'+(pick===c?';background:var(--text);color:#1F1E1D;border-color:var(--text);font-weight:600':'')+'">Same as “'+esc(r.canon[c])+'”'+(r.med(r.stats[c].ws)?' (~'+uwNum(r.med(r.stats[c].ws))+' '+uwUnit()+')':'')+'</button>').join('')+
+        '<button data-a="haPick" data-v="'+i+':__own" class="pill" style="flex:none;font-size:12px'+(pick==='__own'?';background:var(--text);color:#1F1E1D;border-color:var(--text);font-weight:600':'')+'">Its own exercise</button></div></div>'});
+    const allPicked=r.asks.every((q,i)=>ha.picks[i]!=null);
+    return wrapSheet('Same exercise, or not?',inner+
+      (allPicked?'<button data-a="haGo" class="big disp mt2" style="background:var(--amber);color:#1F1E1D;font-size:15px">Continue the import</button>'
+        :'<button class="big disp mt2" style="background:var(--raised);color:var(--faint);font-size:15px" disabled>Answer each one to continue</button>')+
+      '<p style="color:var(--faint);font-size:11px;line-height:1.5;margin-top:8px">Left/right entries were matched to their exercise and marked per-side automatically.</p>')}
+  if(S.sheet.t==='ownadjust'){
+    const f=S.oadj||(S.oadj={eqx:{},full:false,goal:'muscle'});
+    const EQ=[['bb','Barbell'],['db','Dumbbells'],['mc','Machines'],['cb','Cables'],['pullup','Pull-up bar'],['bench','Bench'],['band','Bands']];
+    const chip=(on,a,v,label)=>'<button data-a="'+a+'" data-v="'+v+'" class="pill" style="flex:none;white-space:nowrap'+(on?';background:var(--text);color:#1F1E1D;border-color:var(--text);font-weight:600':'')+'">'+label+'</button>';
+    return wrapSheet('Before Allena adjusts it',
+      '<p style="color:var(--dim);font-size:13px;line-height:1.6">Two things shape the fixes: what you can train with, and what the block is for. Every change gets listed, and one tap undoes the lot.</p>'+
+      '<p class="eyebrow mt2">Your equipment</p>'+
+      '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px">'+
+      chip(f.full,'oaFull','1','Full gym — everything')+
+      (f.full?'':EQ.map(e9=>chip(!!f.eqx[e9[0]],'oaEq',e9[0],e9[1])).join(''))+'</div>'+
+      '<p class="eyebrow mt2">This block is for</p>'+
+      '<div class="row" style="gap:8px;margin-top:8px">'+
+      chip(f.goal==='muscle','oaGoal','muscle','Muscle')+
+      chip(f.goal==='strength','oaGoal','strength','Strength')+
+      chip(f.goal==='general','oaGoal','general','General')+'</div>'+
+      '<button data-a="oaGo" class="big disp mt2" style="background:var(--amber);color:#1F1E1D;font-size:15px">Make the adjustments</button>'+
+      '<p style="color:var(--faint);font-size:11px;line-height:1.5;margin-top:8px">Deterministic, on this phone — no tokens. Restriction clashes are never auto-touched.</p>')}
   if(S.sheet.t==='progdata'){
     const o9=S.impDataOffer;if(!o9)return '';
     return wrapSheet('This sheet holds more',
@@ -12447,6 +12572,9 @@ document.addEventListener('touchstart',e=>{const g=e.target.closest&&e.target.cl
 document.addEventListener('change',e=>{if(e.target&&e.target.dataset&&e.target.dataset.acldate){
   S.adate=S.adate||{};S.adate.val=e.target.value;
   try{render()}catch(e2){}}},true); // re-render so the picked date replaces the placeholder
+document.addEventListener('change',e=>{ // any date input with a placeholder overlay: re-render on pick
+  if(e.target&&e.target.type==='date'&&e.target.dataset&&e.target.dataset.in){
+    try{render()}catch(e2){}}},true);
 document.addEventListener('input',e=>{const d=e.target.dataset;
   if(d.acldate){S.adate=S.adate||{};S.adate.val=e.target.value;return}
   if(e.target.dataset.ownname){S.own.prog.block=e.target.value;return}
@@ -13693,6 +13821,15 @@ function runAction(a,v,t,e){
       impNew();S.imp.grid=o9.grid;S.imp.fileName=o9.fileName;S.imp.kindHint='hist';
       S.view='import';render();impParse();break}
     case 'progDataSkip':S.impDataOffer=null;S.sheet=null;render();break;
+    case 'haPick':{const ha=S.halias;if(!ha)break;
+      const ix=String(v).indexOf(':');
+      ha.picks[+String(v).slice(0,ix)]=String(v).slice(ix+1);render();break}
+    case 'haGo':{const ha=S.halias;if(!ha)break;
+      ha.r.asks.forEach((q,i)=>{const pk=ha.picks[i];
+        if(pk&&pk!=='__own')ha.map[q.from]=pk});
+      histAliasApply(S.histImp&&S.histImp.weeks,ha.map,ha.r.canon);
+      const nx=ha.next;S.halias=null;
+      if(typeof nx==='function')nx();else{S.sheet=null;render()}break}
     case 'weekClockOpen':S.sheet={t:'wkclock'};render();break;
     case 'progRename':{const el9=document.querySelector('[data-in="progname"]');
       const nm=el9?String(el9.value).trim():'';
@@ -13783,9 +13920,23 @@ function runAction(a,v,t,e){
       p.days.forEach(d=>{d.exercises=d.exercises.filter(e=>String(e.name).trim())});
       S.own.review=reviewOwn(p);S.view='ownreview';render();break}
     case 'ownBack':S.view='own';render();break;
-    case 'ownAllena':{const ch=ownAutoFix();
+    case 'ownAllena':{const pf=S.prof||{};
+      S.oadj={eqx:Object.assign({},pf.eqx||{}),full:pf.eq==='full',goal:(S.own&&S.own.prog&&S.own.prog.kind)||'muscle'};
+      S.sheet={t:'ownadjust'};render();break}
+    case 'oaFull':{S.oadj.full=!S.oadj.full;render();break}
+    case 'oaEq':{S.oadj.eqx[v]=!S.oadj.eqx[v];render();break}
+    case 'oaGoal':{S.oadj.goal=v;render();break}
+    case 'oaGo':{const f9=S.oadj||{};
+      S.prof=Object.assign({},S.prof||{},{eq:f9.full?'full':'custom',eqx:f9.full?(S.prof&&S.prof.eqx)||{}:f9.eqx});
+      lset(K_PROF,S.prof);
+      S.sheet=null;
+      const ch=ownAutoFix(f9.goal);
       if(!ch||!ch.length)flash('Nothing here Allena can fix mechanically — the remaining flags need your call.');
-      else flash(ch.length+' adjustment'+(ch.length===1?'':'s')+' made — every one is listed and editable.');
+      else flash(ch.length+' adjustment'+(ch.length===1?'':'s')+' made — preview below, one tap undoes them.');
+      render();break}
+    case 'ownFixUndo':{const d9=S.own;
+      if(d9&&d9.prev){d9.prog=d9.prev;d9.prev=null;d9.fixLog=null;d9.review=reviewOwn(d9.prog);
+        flash('Back exactly as you wrote it.')}
       render();break}
     case 'ownFix':{const f=S.own.review.flags[+v];if(f&&f.fix&&f.fix.run)f.fix.run();
       S.own.review=reviewOwn(S.own.prog);render();break}
