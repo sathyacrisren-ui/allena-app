@@ -387,7 +387,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='9341d5';  // stamped by tools/build.py with the content hash
+const BUILD_ID='6becf7';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -6368,13 +6368,62 @@ function inWrapper(){
    whatever the label says. */
 function paceSaysWalk(t,km,mins){
   return isRunType(t)&&km>=1&&mins>0&&(mins/km)>10.5}
+/* ── the watch's gym witness (Sep 2026) ──────────────────────
+   HealthKit carries NO sets/reps/weights — a strength workout
+   arrives as duration + HR only. That summary is still a witness:
+   it corroborates an Allena session recorded in the same window
+   (the watch was on the wrist that trained), and an unmatched one
+   becomes an honest 'your watch saw a session' offer instead of
+   silence. Never invents lifts. */
+const K_WG='training-watchgym-v1';
+function watchGym(){return S.watchGym||(S.watchGym=lget(K_WG,[]))}
+function watchGymAdd(rows){
+  const wg=watchGym(),have=new Set(wg.map(x=>x.id));
+  let n=0;
+  rows.forEach(r=>{if(have.has(r.id))return;wg.push(r);n++});
+  if(n){while(wg.length>60)wg.shift();lset(K_WG,wg);watchCorroborate()}
+  return n}
+function watchCorroborate(){
+  try{
+    const wg=watchGym();let dirty=false;
+    wg.forEach(w=>{
+      if(w.used)return;
+      const h=(S.history||[]).find(x=>{
+        if(x.run||!x.complete||x.watch)return false;
+        if(String(x.date).slice(0,10)!==w.date)return false;
+        const hs=new Date(x.date).getTime(),he=hs+(x.minutes||45)*60000;
+        const ws=new Date(w.date+'T'+(w.time||'12:00')).getTime(),we=ws+(w.mins||30)*60000;
+        return ws<he&&we>hs});
+      if(h){h.watch={mins:w.mins,hr:w.hr||0,src:w.src||''};w.used=1;dirty=true}});
+    if(dirty){saveHistory();lset(K_WG,watchGym())}
+  }catch(e){}}
+function watchGymCard(){
+  /* an unmatched watch session from the last 3 days, offered once */
+  try{
+    const cut=dayKey(new Date(Date.now()-3*864e5));
+    const w=watchGym().slice().reverse().find(x=>!x.used&&!x.dismissed&&x.date>=cut&&x.date<=today());
+    if(!w)return '';
+    return '<div class="card mt" style="padding:14px 16px">'+
+      '<p class="mono" style="font-size:9px;color:var(--faint);letter-spacing:.06em">⌚ YOUR WATCH SAW A SESSION</p>'+
+      '<p style="font-size:13.5px;font-weight:600;margin-top:5px">'+w.mins+' min of strength on '+esc(fmtDate(w.date+'T12:00'))+(w.hr?' · avg HR '+w.hr:'')+'</p>'+
+      '<p style="color:var(--dim);font-size:12px;line-height:1.5;margin-top:4px">The watch cannot see sets or weights — log what you lifted and the two become one witnessed session.</p>'+
+      '<div class="row mt" style="gap:10px">'+
+      '<button data-a="wgLog" data-v="'+esc(w.id)+'" class="btn" style="flex:1;color:var(--amber)">Log the lifts</button>'+
+      '<button data-a="wgSkip" data-v="'+esc(w.id)+'" class="btn" style="flex:1;color:var(--dim)">It’s covered</button></div></div>'
+  }catch(e){return ''}}
 function hkNative(list){
   try{
     if(typeof list==='string')list=JSON.parse(list);
     if(!Array.isArray(list))return;
     const out=[];
     list.forEach(w=>{
-      let t=HK_MAP[String(w.act||'').replace('HKWorkoutActivityType','')];
+      const actName=String(w.act||'').replace('HKWorkoutActivityType','');
+      if(actName==='Strength'||actName==='HIIT'){
+        const mins9=Math.round(+w.mins||0);
+        if(mins9>=10)watchGymAdd([{id:'wg'+String(w.date)+String(w.time||''),date:String(w.date||'').slice(0,10),
+          time:String(w.time||'12:00').slice(0,5),mins:mins9,hr:Math.round(+w.hr||0),src:String(w.src||'').slice(0,24)}]);
+        return}
+      let t=HK_MAP[actName];
       if(!t)return;
       const mins=Math.round(+w.mins||0);
       if(!mins||mins<3)return;
@@ -10967,6 +11016,7 @@ function viewToday(){
   h+=apptCard();
   h+=comebackCard();
   h+=sessionCard();
+  h+=(typeof watchGymCard==='function'?watchGymCard():'');
   h+=unlockCard();
   h+=newFindsCard();
   h+='<div class="row mt" style="gap:10px">'+dashTiles()+'</div>';
@@ -14354,6 +14404,11 @@ function runAction(a,v,t,e){
     case 'anReset':S.anState='idle';S.anStep=0;S.discShow=null;render();break;
     case 'findingsOpen':{if(S.view!=='findings'){S.backTo=S.view;S.backDrawer=false}S.sheet=null;S.view='findings';render();break}
     case 'findingsGo':{if(S.view!=='findings'){S.backTo=S.view;S.backDrawer=false}S.sheet=null;S.view='findings';runAction('anRun');break}
+    case 'wgLog':{const w=watchGym().find(x=>x.id===v);
+      if(w){w.dismissed=1;lset('training-watchgym-v1',watchGym());
+        S.quick={date:w.date,mins:w.mins};S.view='quick';render()}break}
+    case 'wgSkip':{const w=watchGym().find(x=>x.id===v);
+      if(w){w.dismissed=1;lset('training-watchgym-v1',watchGym());render()}break}
     case 'mrowsToggle':S.openSec[v]=!S.openSec[v];render();break;
     case 'noticedShow':S.noticedBig=!S.noticedBig;render();break;
     case 'noticedOpen':{const t2=todayState();t2.revealed=true;todaySave(t2);vib(12);render();break}
