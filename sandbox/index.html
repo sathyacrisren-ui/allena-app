@@ -422,7 +422,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='0ac68f';  // stamped by tools/build.py with the content hash
+const BUILD_ID='3acb71';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -7949,6 +7949,27 @@ function healthDiscoveries(){
         if(active.length>=5&&still.length>=5){const a=hkdMed(active),s2=hkdMed(still);
           if(s2&&a&&s2-a>=2)add('uncommon','Your heart is calmer on active days',
             'Resting HR sits ~'+Math.round(s2-a)+' bpm lower on 8k+ step days than on quiet ones. Movement is its own medicine, and your ticker agrees.','signal')}}}catch(e){}
+    /* carbs → session volume (the fuel × the work it powers) */
+    try{
+      const dd=(S.daily&&S.daily.days)||{};
+      const hi=[],lo=[];
+      (S.history||[]).forEach(h=>{if(!h.complete||h.run)return;
+        const k=String(h.date).slice(0,10);const c=dd[k]&&dd[k].carb;if(c==null)return;
+        const ton=(h.log||[]).reduce((a,l)=>a+(l.w||0)*(l.r||0),0);if(!ton)return;
+        (c>=200?hi:lo).push(ton)});
+      if(hi.length>=4&&lo.length>=4){const avg=a=>a.reduce((x,y)=>x+y,0)/a.length;
+        const pct=Math.round((avg(hi)/avg(lo)-1)*100);
+        if(pct>=5)add('rare','You train bigger on carbs',
+          'Sessions on 200g+ carb days move '+pct+'% more total load than low-carb ones ('+hi.length+' vs '+lo.length+' sessions). Carbs are the fuel the work runs on.','signal')}}catch(e){}
+    /* the full-fuel streak — everything logged */
+    try{
+      const dd=(S.daily&&S.daily.days)||{};
+      const ks=Object.keys(dd).sort().slice(-30);
+      let run=0,best=0;
+      ks.forEach(k=>{const d=dd[k];const full=d.pr!=null&&d.carb!=null&&d.fat!=null;
+        run=full?run+1:0;best=Math.max(best,run)});
+      if(best>=5)add(best>=14?'rare':'uncommon',best+' days of full fuel logged',
+        best+' straight days with protein, carbs and fat all in — the complete picture of what powers the training.','signal')}catch(e){}
     /* VO2max × easy pace (the engine showing at easy effort) */
     try{
       const v=hkdSeries('vo2',90);
@@ -8025,7 +8046,11 @@ function corrDayData(){
   try{const g=(S.gar&&S.gar.days)||{};Object.keys(g).forEach(k=>{
     if(g[k].am!=null)put(k,'ready',g[k].am)})}catch(e){}
   try{const dd=(S.daily&&S.daily.days)||{};Object.keys(dd).forEach(k=>{
-    if(dd[k].bw!=null)put(k,'bw',dd[k].bw);if(dd[k].pr!=null)put(k,'protein',dd[k].pr)})}catch(e){}
+    if(dd[k].bw!=null)put(k,'bw',dd[k].bw);
+    if(dd[k].pr!=null)put(k,'protein',dd[k].pr);
+    if(dd[k].carb!=null)put(k,'carb',dd[k].carb);
+    if(dd[k].fat!=null)put(k,'fat',dd[k].fat);
+    if(dd[k].kcal!=null)put(k,'kcal',dd[k].kcal)})}catch(e){}
   // outcomes from training
   try{(S.history||[]).forEach(h=>{if(!h.complete||h.run)return;
     const k=String(h.date).slice(0,10);let best=0,rpes=[],ton=0;
@@ -8044,6 +8069,9 @@ const CORR_SIGNALS={
   steps:{n:'a big-step day',dir:'more steps'},
   ready:{n:'high readiness',dir:'higher readiness'},
   protein:{n:'a high-protein day',dir:'more protein'},
+  carb:{n:'a high-carb day',dir:'more carbs'},
+  fat:{n:'a high-fat day',dir:'more fat'},
+  kcal:{n:'a big-eating day',dir:'more calories'},
   bw:{n:'a heavier bodyweight',dir:'more bodyweight'}};
 const CORR_OUTCOMES={
   topset:{n:'top set',good:'up',dir:1},
