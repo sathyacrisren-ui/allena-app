@@ -551,7 +551,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='289a43';  // stamped by tools/build.py with the content hash
+const BUILD_ID='a40686';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -14594,50 +14594,6 @@ function sheetHtml(){
         (d.outcome==='called'?'the call landed.':d.outcome==='beat'?'you beat the call, and the model learns more from that than from being right.':'under the call. Recovery, or the call was hot — it recalibrates either way.')+'</p></div>':'')+
       (ps.n>=3?'<p class="mono" style="color:var(--faint);font-size:11px;margin-top:14px">THE LEDGER · '+ps.called+' of '+ps.n+' calls landed'+(ps.beat?' · beaten '+ps.beat+' time'+(ps.beat===1?'':'s'):'')+'</p>':'')+
       '<p style="color:var(--faint);font-size:11.5px;line-height:1.55;margin-top:12px">A forecast, not a target. It is what the model expects from the evidence — going past it teaches Allena more than hitting it.</p>')}
-  if(S.sheet.t==='impguide'){
-    /* one step per page, on purpose: the user is switching between
-       Safari and Allena with one hand — a single instruction and a big
-       Next keeps them locked in (owner call, Sep 2026, replacing the
-       everything-at-once list) */
-    const src=S.impg||'garmin';
-    const G={
-      garmin:{name:'Garmin',addr:'connect.garmin.com',steps:[
-        ['Open Safari and go to connect.garmin.com','Sign in with your Garmin login. Stay in the browser — if it pushes you toward the app, decline.',''],
-        ['Ask for the desktop site','Tap the ᴀA button in Safari’s address bar, then “Request Desktop Website”.','The export button only exists on the desktop layout — without this step it will not be there.'],
-        ['Find your activities','Open the ☰ menu → Activities → All Activities.',''],
-        ['Scroll down a few times','The list loads as you scroll, and only the rows that have loaded will export.','Scroll until your oldest training appears — a short scroll means a short file.'],
-        ['Tap Export CSV, top right','The file saves to Files → Downloads as Activities.csv.',''],
-        ['Come back to Allena','Import → My training history → choose Activities.csv. Done.','']]},
-      strava:{name:'Strava',addr:'strava.com',steps:[
-        ['Open Safari and go to strava.com','Sign in. The Strava app has no export — it has to be the website.',''],
-        ['Open your account settings','Tap your profile picture → Settings → My Account.',''],
-        ['Tap “Download or Delete Your Account”','Despite the name, requesting the download deletes nothing. It is Strava’s only export door.',''],
-        ['Tap “Request Your Archive”','Under “Download Request”. Strava builds the file and emails it — usually within the hour.','The email goes to the address the Strava account uses — check there.'],
-        ['Open the email, tap the zip','Save to Files, then tap the zip in Files to unpack it.','Inside is a folder full of files — the only one that matters is activities.csv.'],
-        ['Come back to Allena','Import → My training history → choose activities.csv. Done.','']]},
-      health:{name:'Apple Health',addr:'',steps:[
-        ['Open the Health app','Tap your picture, top right.',''],
-        ['Export All Health Data','It is at the very bottom. Tap Export — it takes a minute to build.',''],
-        ['Save to Files','The share sheet opens — choose Save to Files.',''],
-        ['Unpack the zip','In Files, tap the zip → it opens to apple_health_export → export.xml.',''],
-        ['Come back to Allena','Import → My training history → choose export.xml. Hundreds of MB is fine — Allena reads it in pieces.','Nothing imported afterwards? Your watch’s app may not write workouts into Health — check its Health permission, sync a workout, retry.']]}};
-    const g=G[src],i=Math.min(S.impgStep||0,g.steps.length-1),st=g.steps[i],last=i===g.steps.length-1;
-    return wrapSheet('Getting your file',
-      '<div style="display:flex;gap:6px">'+['garmin','strava','health'].map(k=>
-        '<button data-a="impgSrc" data-v="'+k+'" class="pill'+(src===k?' on':'')+'" style="flex:1;text-align:center;font-size:12.5px">'+G[k].name+'</button>').join('')+'</div>'+
-      '<p class="mono" style="color:var(--faint);font-size:10px;letter-spacing:.08em;margin-top:18px">STEP '+(i+1)+' OF '+g.steps.length+'</p>'+
-      '<p class="disp" style="font-size:21px;font-weight:600;line-height:1.25;margin-top:6px">'+st[0]+'</p>'+
-      '<p style="color:var(--dim);font-size:14px;line-height:1.6;margin-top:10px">'+st[1]+'</p>'+
-      (st[2]?'<div class="card mt" style="padding:11px 14px;border-color:var(--amber)"><p style="color:var(--dim);font-size:12.5px;line-height:1.55">'+st[2]+'</p></div>':'')+
-      (i===0&&g.addr?'<button data-a="impgCopy" data-v="https://'+g.addr+'" class="card mt" style="width:100%;text-align:left;padding:11px 15px;display:flex;align-items:center;gap:10px">'+
-        '<span class="mono" style="font-size:13px;color:var(--amber);flex:1">'+g.addr+'</span>'+
-        '<span class="mono" style="font-size:10px;color:var(--faint)">COPY</span></button>':'')+
-      '<div style="display:flex;gap:5px;justify-content:center;margin-top:22px">'+g.steps.map((_,d)=>
-        '<span style="width:6px;height:6px;border-radius:6px;background:'+(d<=i?'var(--amber)':'var(--line)')+'"></span>').join('')+'</div>'+
-      '<div class="row mt" style="gap:10px">'+
-      (i>0?'<button data-a="impgStep" data-v="-1" class="btn" style="flex:1">Back</button>':'')+
-      (last?'<button data-a="impGuideBack" class="big disp" style="flex:2;background:var(--amber);color:var(--bg);font-size:15px">To the import</button>'
-           :'<button data-a="impgStep" data-v="1" class="big disp" style="flex:2;background:var(--amber);color:var(--bg);font-size:15px">Next</button>')+'</div>')}
   if(S.sheet.t==='intake'){
     if(S.hkBusy)return wrapSheet('Import your data',
       '<p class="mono" style="color:var(--amber);font-size:12px">Reading the export — big files take a minute…</p>');
@@ -15494,6 +15450,61 @@ function wrapSheet(title,inner){
 
 /* ══ render ═════════════════════════════════════════════ */
 let lastAnimKey=null,lastSheetKey=null;
+
+function viewGuide(){
+  /* the file guide, full-page and swipeable (owner call, 3 Sep): one
+     step per screen, drag horizontally between them — the same
+     honest steps, page-by-page instead of a cramped sheet. */
+  const src=S.impg||'garmin';
+  const G={
+    garmin:{name:'Garmin',addr:'connect.garmin.com',steps:[
+      ['Open Safari and go to connect.garmin.com','Sign in with your Garmin login. Stay in the browser — if it pushes you toward the app, decline.',''],
+      ['Ask for the desktop site','Tap the \u1d00A button in Safari\u2019s address bar, then \u201cRequest Desktop Website\u201d.','The export button only exists on the desktop layout — without this step it will not be there.'],
+      ['Find your activities','Open the \u2630 menu \u2192 Activities \u2192 All Activities.',''],
+      ['Scroll down a few times','The list loads as you scroll, and only the rows that have loaded will export.','Scroll until your oldest training appears — a short scroll means a short file.'],
+      ['Tap Export CSV, top right','The file saves to Files \u2192 Downloads as Activities.csv.',''],
+      ['Come back to Allena','Import \u2192 My training history \u2192 choose Activities.csv. Done.','']]},
+    strava:{name:'Strava',addr:'strava.com',steps:[
+      ['Open Safari and go to strava.com','Sign in. The Strava app has no export — it has to be the website.',''],
+      ['Open your account settings','Tap your profile picture \u2192 Settings \u2192 My Account.',''],
+      ['Tap \u201cDownload or Delete Your Account\u201d','Despite the name, requesting the download deletes nothing. It is Strava\u2019s only export door.',''],
+      ['Tap \u201cRequest Your Archive\u201d','Under \u201cDownload Request\u201d. Strava builds the file and emails it — usually within the hour.','The email goes to the address the Strava account uses — check there.'],
+      ['Open the email, tap the zip','Save to Files, then tap the zip in Files to unpack it.','Inside is a folder full of files — the only one that matters is activities.csv.'],
+      ['Come back to Allena','Import \u2192 My training history \u2192 choose activities.csv. Done.','']]},
+    health:{name:'Apple Health',addr:'',steps:[
+      ['Open the Health app','Tap your picture, top right.',''],
+      ['Export All Health Data','It is at the very bottom. Tap Export — it takes a minute to build.',''],
+      ['Save to Files','The share sheet opens — choose Save to Files.',''],
+      ['Unpack the zip','In Files, tap the zip \u2192 it opens to apple_health_export \u2192 export.xml.',''],
+      ['Come back to Allena','Import \u2192 My training history \u2192 choose export.xml. Hundreds of MB is fine — Allena reads it in pieces.','Nothing imported afterwards? Your watch\u2019s app may not write workouts into Health — check its Health permission, sync a workout, retry.']]}};
+  const g=G[src],i=Math.min(S.impgStep||0,g.steps.length-1),last=i===g.steps.length-1;
+  const panel=(st,d)=>'<div style="flex:0 0 100%;min-width:0;padding:0 2px">'+
+    '<p class="mono" style="color:var(--faint);font-size:10px;letter-spacing:.08em">STEP '+(d+1)+' OF '+g.steps.length+'</p>'+
+    '<p class="disp" style="font-size:22px;font-weight:600;line-height:1.25;margin-top:6px">'+st[0]+'</p>'+
+    '<p style="color:var(--dim);font-size:14px;line-height:1.65;margin-top:10px">'+st[1]+'</p>'+
+    (st[2]?'<div class="card mt" style="padding:11px 14px;border-color:var(--amber)"><p style="color:var(--dim);font-size:12.5px;line-height:1.55">'+st[2]+'</p></div>':'')+
+    (d===0&&g.addr?'<button data-a="impgCopy" data-v="https://'+g.addr+'" class="card mt" style="width:100%;text-align:left;padding:11px 15px;display:flex;align-items:center;gap:10px">'+
+      '<span class="mono" style="font-size:13px;color:var(--amber);flex:1">'+g.addr+'</span>'+
+      '<span class="mono" style="font-size:10px;color:var(--faint)">COPY</span></button>':'')+
+    '</div>';
+  return '<div class="view pad modalrise" style="padding-top:20px">'+
+    '<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">'+
+    '<button data-a="impGuideBack" style="width:42px;height:42px;border-radius:42px;background:var(--surface);border:1px solid var(--line);color:var(--dim);display:flex;align-items:center;justify-content:center;flex:none;font-size:16px">\u2039</button>'+
+    '<h1 class="disp" style="font-size:19px;font-weight:600;flex:1;text-align:center;margin:0">Getting your file</h1>'+
+    '<span style="width:42px;flex:none"></span></div>'+
+    '<div style="display:flex;gap:6px">'+['garmin','strava','health'].map(k=>
+      '<button data-a="impgSrc" data-v="'+k+'" class="pill'+(src===k?' on':'')+'" style="flex:1;text-align:center;font-size:12.5px">'+G[k].name+'</button>').join('')+'</div>'+
+    '<div data-swipestep="1" style="overflow:hidden;margin-top:20px">'+
+    '<div class="swrow" style="display:flex;transform:translateX(-'+(i*100)+'%)">'+
+    g.steps.map(panel).join('')+'</div></div>'+
+    '<div style="display:flex;gap:5px;justify-content:center;margin-top:22px">'+g.steps.map((_,d)=>
+      '<span style="width:6px;height:6px;border-radius:6px;background:'+(d<=i?'var(--amber)':'var(--line)')+'"></span>').join('')+'</div>'+
+    '<div class="row mt" style="gap:10px">'+
+    (i>0?'<button data-a="impgStep" data-v="-1" class="btn" style="flex:1">Back</button>':'')+
+    (last?'<button data-a="impGuideBack" class="big disp" style="flex:2;background:var(--amber);color:var(--bg);font-size:15px">To the import</button>'
+         :'<button data-a="impgStep" data-v="1" class="big disp" style="flex:2;background:var(--amber);color:var(--bg);font-size:15px">Next</button>')+'</div>'+
+    '<p style="color:var(--faint);font-size:11px;text-align:center;margin-top:12px">Swipe between steps</p>'+
+    '</div>'}
 function render(){
   const ae=document.activeElement,key=ae&&ae.dataset?ae.dataset.in:null;
   const pos=key&&ae.selectionStart!=null?ae.selectionStart:null;
@@ -15524,6 +15535,7 @@ function render(){
   else if(S.view==='standing')body=viewStanding();
   else if(S.view==='you')body=viewYou();
   else if(S.view==='signals')body=viewSignals();
+  else if(S.view==='guide')body=viewGuide();
   else if(S.view==='chart')body=viewChart();
   else if(S.view==='own')body=viewOwn();
   else if(S.view==='ownreview')body=viewOwnReview();
@@ -15715,20 +15727,25 @@ setInterval(function(){try{
     line.style.left=px.toFixed(1)+'px';
     tip.style.left=Math.max(40,Math.min(r.width-40,px)).toFixed(1)+'px';
     tip.textContent=best.v+(w.dataset.suffix||'')+' · '+fmtShort(new Date(best.d+'T12:00').getTime())}
+  let holdT=null;
   document.addEventListener('touchstart',e=>{
     const w=e.target.closest&&e.target.closest('[data-scrub]');
     if(!w){clear();return}
-    armed=true;active=false;sx0=e.touches[0].clientX;sy0=e.touches[0].clientY},{passive:true});
+    armed=true;active=false;sx0=e.touches[0].clientX;sy0=e.touches[0].clientY;
+    /* hold still and the nearest point surfaces on its own, tree-style
+       (owner call, 3 Sep) — no drag needed to start reading */
+    clearTimeout(holdT);
+    holdT=setTimeout(function(){if(armed&&!active){active=true;try{vib(6)}catch(e2){}show(w,sx0)}},280)},{passive:true});
   document.addEventListener('touchmove',e=>{
     if(!armed)return;
     const w=e.target.closest&&e.target.closest('[data-scrub]');
     if(!w){clear();return}
     const dx=e.touches[0].clientX-sx0,dy=e.touches[0].clientY-sy0;
-    if(!active){if(Math.abs(dy)>Math.abs(dx)+6){armed=false;return}
+    if(!active){if(Math.abs(dy)>Math.abs(dx)+6){armed=false;clearTimeout(holdT);return}
       if(Math.abs(dx)>5)active=true;else return}
     show(w,e.touches[0].clientX);
     if(e.cancelable)e.preventDefault()},{passive:false});
-  document.addEventListener('touchend',()=>{armed=false;setTimeout(clear,1400)},{passive:true});
+  document.addEventListener('touchend',()=>{armed=false;clearTimeout(holdT);setTimeout(clear,1400)},{passive:true});
   document.addEventListener('mousedown',e=>{
     const w=e.target.closest&&e.target.closest('[data-scrub]');
     if(w){show(w,e.clientX);active=true}else clear()});
@@ -15813,6 +15830,42 @@ setInterval(function(){try{
     if(wrap)show(t.clientX,t.clientY,wrap);
     if(e.cancelable)e.preventDefault()},{passive:false});
   ['touchend','touchcancel'].forEach(ev=>document.addEventListener(ev,clear,{passive:true}));
+})();
+
+/* step swiper (owner call, 3 Sep): drag horizontally through the
+   guide's steps — the row follows the finger, snaps with animation,
+   then the state catches up. */
+(function(){let x0=null,y0=null,row=null,idx=0,n=1,drag=false;
+  document.addEventListener('touchstart',e=>{
+    row=null;x0=null;drag=false;
+    const w=e.target.closest&&e.target.closest('[data-swipestep]');
+    if(!w)return;
+    row=w.querySelector('.swrow');if(!row)return;
+    n=row.children.length;
+    const m9=/-(\d+)%/.exec(row.style.transform||'');idx=m9?Math.round(+m9[1]/100):0;
+    x0=e.touches[0].clientX;y0=e.touches[0].clientY},{passive:true});
+  document.addEventListener('touchmove',e=>{
+    if(x0==null||!row)return;
+    const dx=e.touches[0].clientX-x0,dy=Math.abs(e.touches[0].clientY-y0);
+    if(!drag){if(dy>Math.abs(dx)+6){x0=null;row=null;return}
+      if(Math.abs(dx)<10)return;drag=true;row.style.transition='none'}
+    const w9=row.parentElement.clientWidth||1;
+    let off=-idx*100+dx/w9*100;
+    off=Math.max(-(n-1)*100-8,Math.min(8,off));
+    row.style.transform='translateX('+off+'%)';
+    if(e.cancelable)e.preventDefault()},{passive:false});
+  document.addEventListener('touchend',e=>{
+    if(!drag||!row){x0=null;row=null;drag=false;return}
+    const r9=row;row=null;x0=null;drag=false;
+    const m9=/translateX\((-?\d+\.?\d*)%\)/.exec(r9.style.transform||'');
+    const off=m9?+m9[1]:-idx*100;
+    const moved=(-off/100)-idx;
+    let to=idx+(moved>0.18?1:moved<-0.18?-1:0);
+    to=Math.max(0,Math.min(n-1,to));
+    r9.style.transition='transform .26s cubic-bezier(.22,1,.36,1)';
+    r9.style.transform='translateX(-'+(to*100)+'%)';
+    if(to!==idx){try{vib(6)}catch(e2){}
+      setTimeout(function(){try{runAction('impgStep',to-idx)}catch(e2){}},230)}},{passive:true});
 })();
 
 /* edge-swipe from the left opens the drawer (owner call, Sep 2026) —
@@ -17201,11 +17254,13 @@ function runAction(a,v,t,e){
     case 'cbWhy':{const cb=cbStore();if(cb){cb.why=v;lset(K_CB,cb)}render();break}
     case 'wrapShare':wrapShareRun(v);break;
     case 'predOpen':S.sheet={t:'pred'};render();break;
-    case 'impGuideOpen':S.impgBack=v||'';S.impg=S.impg||'garmin';S.impgStep=0;S.sheet={t:'impguide'};render();break;
+    case 'impGuideOpen':S.impgBack=v||'';S.impg=S.impg||'garmin';S.impgStep=0;
+      S.sheet=null;S.guideFrom=S.view;S._navQuiet=1;S.view='guide';render();break;
     case 'impgSrc':S.impg=v;S.impgStep=0;render();break;
     case 'impgStep':S.impgStep=Math.max(0,(S.impgStep||0)+(+v));render();break;
     case 'impgCopy':{try{navigator.clipboard.writeText(v).then(function(){flash('Copied — paste it into Safari\'s address bar.')})}catch(e){flash('Could not copy — type it into Safari: '+v)}break}
-    case 'impGuideBack':S.sheet=S.impgBack?{t:S.impgBack}:null;render();break;
+    case 'impGuideBack':S.view=S.guideFrom||'today';S._navQuiet=1;
+      S.sheet=S.impgBack?{t:S.impgBack}:null;render();break;
     case 'svSync':svPull(false);break;
     case 'svOff':ldel('training-strava-v1');flash('Strava disconnected. Activities already in stay.');render();break;
     case 'rimpGo':{const r=runImportCommit(S.rimp.res.runs);
