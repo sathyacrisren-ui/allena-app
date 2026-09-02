@@ -551,7 +551,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='8dce89';  // stamped by tools/build.py with the content hash
+const BUILD_ID='e39b1d';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -12329,7 +12329,7 @@ async function deepRun(){
   { // the same gate the card shows — no button path spends tokens on old data
     const st0=deepStore();
     if(st0.last===today())return flash('Today\u2019s read is done — a fresh one unlocks tomorrow.');
-    if(!deepReadyInfo())return flash(st0.last?'Nothing new since the last read — it reopens when new data lands.':'Not enough logged data for a first read yet.');
+    if(!deepReadyInfo())return flash(st0.last?'Not enough new evidence yet — six new sessions or runs re-arm the read.':'Not enough logged data for a first read yet.');
     if(!aiSpend('deep'))return}
   { // the constellation: real sources, real counts, drawn while the model works
     const H9=(S.history||[]).filter(h=>h.complete&&!h.run);
@@ -12406,7 +12406,13 @@ function deepCard(){
       const have=(S.history||[]).filter(h=>h.complete&&!h.run).length+(typeof runs==='function'?runs():[]).length;
       inner='<p style="color:var(--dim);font-size:12.5px;line-height:1.6;margin-top:8px">The model reads ten weeks of your numbers and finds what the rules cannot. It needs about 8 logged sessions or runs before there is anything worth reading — '+have+' so far.</p>'}
     else
-      inner='<p style="color:var(--dim);font-size:12.5px;line-height:1.6;margin-top:8px">Nothing new since the last read'+(st.last?' on '+esc(st.last):'')+'. Re-reading the same numbers would cost tokens to say the same things — it reopens on its own when new sessions or runs land.</p>'}
+      inner=(function(){
+        const since9=st.last||'0000-00-00';
+        const ns=(S.history||[]).filter(h=>h.complete&&!h.run&&String(h.date).slice(0,10)>since9).length+
+          (typeof runs==='function'?runs():[]).filter(r=>String(r.date).slice(0,10)>since9).length;
+        return ns>0
+          ?'<p style="color:var(--dim);font-size:12.5px;line-height:1.6;margin-top:8px">'+ns+' of 6 new sessions toward the next read'+(st.last?' (last: '+esc(st.last)+')':'')+'. A read needs enough new evidence to say something genuinely new — re-reading near-identical numbers would cost tokens to repeat itself.</p>'
+          :'<p style="color:var(--dim);font-size:12.5px;line-height:1.6;margin-top:8px">Nothing new since the last read'+(st.last?' on '+esc(st.last):'')+'. Re-reading the same numbers would cost tokens to say the same things — it reopens on its own when new sessions or runs land.</p>'})()}
   return '<div class="card mt2 an-hero an-glow" style="padding:19px 18px;border-radius:22px;border-color:color-mix(in srgb, var(--text) 42%, transparent)">'+
     '<div style="display:flex;align-items:center;gap:16px">'+
     '<div style="transform:scale(1.8);transform-origin:left center;width:80px;flex:none">'+depthGlyph(3)+'</div>'+
