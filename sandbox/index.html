@@ -302,6 +302,24 @@ const haptic=kind=>{try{
   if(window.webkit&&window.webkit.messageHandlers&&window.webkit.messageHandlers.allena){
     window.webkit.messageHandlers.allena.postMessage(JSON.stringify({type:'haptic',kind:kind}));return true}
   }catch(e){}return false};
+/* ── ceremony haptics (owner call, Sep 2026) ────────────────
+   The big moments get PATTERNS, not taps — composed from the
+   bridge kinds the shipped wrapper already knows, so they work
+   without a native rebuild. One ceremony at a time: a second
+   request inside a running pattern is dropped, because three
+   overlapping drumrolls is noise, not celebration.
+   finish — rising drumroll into the chord (session complete)
+   find   — knock, knock, chord (a discovery or pattern reveals)
+   deep   — data ticks landing, then the full weight (deep read) */
+const HAPTIC_SEQ={
+  finish:[['success',0],['medium',180],['heavy',340],['heavy',470],['success',660]],
+  find:[['heavy',0],['medium',150],['success',380]],
+  deep:[['select',0],['select',80],['select',160],['select',240],['medium',430],['heavy',620],['success',820],['heavy',990]]};
+let _hapUntil=0;
+function hapticRun(name){const seq=HAPTIC_SEQ[name];if(!seq)return haptic(name);
+  const now=Date.now();if(now<_hapUntil)return false;
+  _hapUntil=now+seq[seq.length-1][1]+250;
+  seq.forEach(st=>setTimeout(function(){haptic(st[0])},st[1]));return true}
 const K_THEME='training-theme-v1';
 function applyTheme(){try{
   const t=lget(K_THEME,'system');
@@ -472,7 +490,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='c34059';  // stamped by tools/build.py with the content hash
+const BUILD_ID='2e216e';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -11801,7 +11819,7 @@ async function deepRun(){
     lset(K_DEEP,{last:today(),items:items});
     const doneAt=Date.now(),minRun=6800;
     const linger=S.deepAnim?Math.max(0,minRun-(doneAt-S.deepAnim.t0)):0;
-    setTimeout(function(){S.deepAnim=null;S.deepBusy=false;vib([25,45,25]);render()},linger);
+    setTimeout(function(){S.deepAnim=null;S.deepBusy=false;try{hapticRun('deep')}catch(e8){};vib([25,45,25]);render()},linger);
   }catch(e){S.deepBusy=false;S.deepAnim=null;flash('No connection.');render()}}
 function deepCard(){
   const st=deepStore();
@@ -12117,7 +12135,7 @@ function viewSession(){
     /* the finish celebration (owner/tester call — Dafydd: 'fireworks
        when I finish'). Every completed session gets the confetti burst
        and a congratulations, once per render, with the reveal haptic. */
-    if(!s._celebrated){s._celebrated=1;try{haptic('reveal')}catch(e){}}
+    if(!s._celebrated){s._celebrated=1;try{hapticRun('finish')}catch(e){}}
     const CONGRATS=['Nailed it.','That\u2019s the work.','Banked.','Another one down.','Strong finish.','In the log, in the body.','Done and dusted.'];
     const cg=CONGRATS[(s.log.length+Math.round(s.startedAt/1e6))%CONGRATS.length];
     let h='<div class="view pad stg" style="padding-top:28px">'+
@@ -12179,7 +12197,7 @@ function viewSession(){
     /* the level-up burst — the volume knob (owner call, 2 Sep) */
     try{const lvN=dpLevel(dataPoints().total).lv;
       if(A._lv0!=null&&lvN>A._lv0){
-        try{haptic('reveal')}catch(e9){}
+        try{hapticRun('find')}catch(e9){}
         h+='<div class="card mt2 an-hero an-ceremony an-pop" style="padding:20px;border-radius:22px;border-color:var(--amber);text-align:center">'+
           '<p class="mono" style="font-size:10px;color:var(--amber);letter-spacing:.12em">LEVEL UP</p>'+
           '<p class="disp gradhead" style="font-size:44px;line-height:1;margin-top:8px">'+lvN+'</p>'+
@@ -12190,7 +12208,7 @@ function viewSession(){
     {const rev=S.sessReveal;
      if(rev&&rev.show){const r=rarityOf(rev.show.rar);
       const big9=rev.show.rar==='epic'||rev.show.rar==='rare';
-      if(big9)try{haptic('reveal')}catch(e){}
+      if(big9)try{hapticRun('find')}catch(e){}
       h+='<div class="card mt2 an-hero an-glow an-pop'+(big9?' an-ceremony':'')+(rev.show.rar==='epic'?' an-shine':'')+'" style="padding:17px;border-radius:20px;border-color:'+r[1]+';position:relative;overflow:hidden">'+
         '<div style="display:flex;align-items:center;gap:9px">'+
         '<img src="'+MARK+'" alt="" class="an-mark" style="width:19px;height:19px;object-fit:contain">'+
@@ -14797,19 +14815,16 @@ function sheetHtml(){
   if(S.sheet.t==='plan'){
     const s2=S.sess;if(!s2)return '';
     const plan=A.exPlan(),curNo=s2.sets[Math.min(s2.idx,s2.sets.length-1)].exNo;
-    let inner='<p style="color:var(--dim);font-size:13px;line-height:1.55">Tap to jump to an exercise. Hold the '+
-      '<span class="mono" style="color:var(--dim)">⋮⋮</span> handle (or tap it) to reorder. Logged sets stay logged.</p>'+
-      (S.reorder!=null?'<button data-a="planDone" class="btn" style="width:100%;margin-top:10px;color:var(--amber);font-size:12.5px">Done reordering</button>':'')+
-      '<div style="margin-top:14px;display:flex;flex-direction:column;gap:8px">'+
-      plan.map(e=>{const total=e.sets.length,done=e.done,isCur=e.exNo===curNo;
+    let inner='<p style="color:var(--dim);font-size:13px;line-height:1.55">Tap to jump to an exercise. Hold, then drag to reorder. Logged sets stay logged.</p>'+
+      '<div data-draglist="plan" style="margin-top:14px;display:flex;flex-direction:column;gap:8px">'+
+      plan.map((e,pi)=>{const total=e.sets.length,done=e.done,isCur=e.exNo===curNo;
         const target=e.sets[0].st;
         const jumpTo=(e.sets.find(x=>!s2.log.some(l=>l.ex===x.st.ex&&l.setNo===x.st.setNo))||e.sets[0]).i;
         const state=done>=total?'done':(done>0?'part':'todo');
         const col=state==='done'?'var(--green)':state==='part'?'var(--amber)':'var(--line)';
-        const lifted=S.reorder===e.exNo;
-        return '<div class="card" data-planrow="'+e.exNo+'" style="padding:0;'+(isCur?'border-color:var(--amber);background:var(--raised);':'')+(lifted?'border-color:var(--amber);box-shadow:0 6px 18px rgba(0,0,0,.45);transform:scale(1.015);':'')+'transition:transform .12s ease">'+
+        return '<div class="card dragitem" data-dragitem="'+pi+'" style="padding:0;'+(isCur?'border-color:var(--amber);background:var(--raised);':'')+'">'+
           '<div style="display:flex;align-items:stretch">'+
-          '<button data-a="planJump" data-v="'+jumpTo+'" style="flex:1;min-width:0;text-align:left;padding:13px 4px 13px 15px">'+
+          '<button data-a="planJump" data-v="'+jumpTo+'" data-dragok style="flex:1;min-width:0;text-align:left;padding:13px 4px 13px 15px">'+
           '<div style="display:flex;align-items:center;gap:9px">'+
           '<span style="width:9px;height:9px;border-radius:9px;flex:none;background:'+col+'"></span>'+
           '<span style="flex:1;min-width:0;font-size:14px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;'+(state==='done'?'color:var(--dim)':'')+'">'+esc(e.ex)+'</span>'+
@@ -14817,11 +14832,7 @@ function sheetHtml(){
           '<span class="mono" style="color:var(--faint);font-size:11px;flex:none">'+done+'/'+total+'</span></div>'+
           '<p class="mono" style="color:var(--faint);font-size:10.5px;margin-top:4px;margin-left:18px">'+
           esc(target.secs?target.secs+'s'+(target.perSide?' per side':''):((target.targetW!=null?uwNum(target.targetW)+' '+uwUnit()+' × ':'')+(target.targetReps!=null?target.targetReps:'')))+'</p></button>'+
-          (lifted
-            ?'<div style="display:flex;flex-direction:column;justify-content:center;gap:2px;padding:0 10px;border-left:1px solid var(--line)">'+
-             '<button data-a="planUp" data-v="'+e.exNo+'" style="padding:6px 8px;color:var(--amber);font-size:15px">▲</button>'+
-             '<button data-a="planDown" data-v="'+e.exNo+'" style="padding:6px 8px;color:var(--amber);font-size:15px">▼</button></div>'
-            :'<button data-a="planGrab" data-v="'+e.exNo+'" style="padding:0 14px;color:var(--faint);font-size:15px;letter-spacing:1px;border-left:1px solid var(--line)">⋮⋮</button>')+
+          '<span class="mono" style="display:flex;align-items:center;padding:0 14px;color:var(--faint);font-size:15px;letter-spacing:1px;border-left:1px solid var(--line)">⋮⋮</span>'+
           '</div></div>'}).join('')+'</div>';
     const remaining=plan.reduce((a,e)=>a+(e.sets.length-e.done),0);
     inner+='<p class="mono" style="color:var(--faint);font-size:11px;margin-top:14px">'+remaining+' sets left of '+s2.sets.length+'</p>';
@@ -15034,7 +15045,7 @@ function render(){
     {let sh9=document.getElementById('signalHost');
      if(S.signalReveal){if(!sh9){sh9=document.createElement('div');sh9.id='signalHost';
        sh9.innerHTML=signalRevealHtml();document.body.appendChild(sh9);
-       try{haptic('reveal')}catch(e){}}}
+       try{hapticRun('find')}catch(e){}}}
      else if(sh9)sh9.remove()}
     /* the deep-read constellation lives OUTSIDE the render cycle — a
        mid-animation render used to rebuild it and restart the whole
@@ -15136,10 +15147,6 @@ setInterval(function(){try{
     if(e.touches[0].clientY-y0>70){y0=null;vib(10);runAction('sessMin')}},{passive:true});
   document.addEventListener('touchend',()=>{y0=null},{passive:true});
 })();
-let lpT=null;
-document.addEventListener('touchstart',e=>{const g=e.target.closest&&e.target.closest('[data-a="planGrab"]');
-  if(!g)return;clearTimeout(lpT);lpT=setTimeout(()=>{S.reorder=+g.dataset.v;vib(16);render()},320)},{passive:true});
-['touchend','touchmove','touchcancel'].forEach(ev=>document.addEventListener(ev,()=>clearTimeout(lpT),{passive:true}));
 document.addEventListener('change',e=>{if(e.target&&e.target.dataset&&e.target.dataset.acldate){
   S.adate=S.adate||{};S.adate.val=e.target.value;
   try{render()}catch(e2){}}},true); // re-render so the picked date replaces the placeholder
@@ -15440,7 +15447,9 @@ try{
     const it=e.target&&e.target.closest&&e.target.closest('[data-dragitem]');
     if(!it)return;
     // ignore when starting on a control inside the row (checkbox, +/- , swap)
-    if(e.target.closest('button')&&!e.target.closest('[data-dragitem]').isSameNode(e.target.closest('button')))return;
+    // — unless the button itself is the row's drag surface (data-dragok)
+    const bt=e.target.closest('button');
+    if(bt&&!bt.hasAttribute('data-dragok')&&!it.isSameNode(bt))return;
     const lst=it.closest('[data-draglist]');if(!lst)return;
     const t=e.touches[0];startY=t.clientY;
     timer=setTimeout(function(){
@@ -16574,12 +16583,14 @@ function runAction(a,v,t,e){
     case 'tuneReset':{const cur=S.sess.sets[S.sess.idx],prog=S.lib.programs.find(p=>p.id===S.sess.progId);
       applyAdj(cur.ex,-adjOf(prog,cur.ex),'reset');render();break}
     case 'undoAdj':undoAdj();break;
-    case 'planOpen':S.reorder=null;S.sheet={t:'plan'};render();break;
-    case 'planJump':if(S.reorder!=null){S.reorder=null;render();break}A.jumpTo(v);break;
-    case 'planGrab':S.reorder=+v;vib(14);render();break;
-    case 'planDone':S.reorder=null;render();break;
-    case 'planUp':if(A.moveEx(+v,-1)){vib(10);render()}break;
-    case 'planDown':if(A.moveEx(+v,1)){vib(10);render()}break;
+    case 'planOpen':S.sheet={t:'plan'};render();break;
+    case 'planJump':A.jumpTo(v);break;
+    case 'reorderPlan':{const p=String(v).split(':'),f=+p[0],tt=+p[1];
+      const order=A.exPlan().map(e=>e.exNo);
+      if(order[f]==null||order[tt]==null||f===tt)break;
+      const no=order[f],dir=tt>f?1:-1;let n=Math.abs(tt-f),moved=false;
+      while(n-->0&&A.moveEx(no,dir))moved=true;
+      if(moved){vib(10);render()}break}
     case 'deferEx':S.sheet=null;A.deferEx();break;
     case 'coachOpen':S.coachBack=S.view;
       S.coachTopic=(S.view==='progress'?'progress':(S.view==='acl'||S.view==='proto'||S.view==='aclpath')?'rehab':S.view==='session'?'session':'program');
@@ -17072,7 +17083,7 @@ function dailyFindAsk(){try{
   if(S.sheet)return false;                 // never stack on another prompt
   if(morningDue())return false;            // readiness goes first; we take the next open
   const t=todayState();t.dfShown=true;todaySave(t);
-  S.sheet={t:'dailyfind'};vib(12);render();return true}catch(e){return false}}
+  S.sheet={t:'dailyfind'};try{hapticRun('find')}catch(e7){};vib(12);render();return true}catch(e){return false}}
 function lockIcon(sz){
   return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" style="width:'+(sz||11)+'px;height:'+(sz||11)+'px;flex:none"><rect x="5.5" y="10.5" width="13" height="9" rx="2.5"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5"/></svg>'}
 
