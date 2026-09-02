@@ -195,6 +195,12 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
 .scroller{display:flex;gap:8px;overflow-x:auto;overflow-y:hidden;padding-bottom:2px;scrollbar-width:none;-webkit-overflow-scrolling:touch}
 .scroller::-webkit-scrollbar{display:none}
 @keyframes spin{to{transform:rotate(360deg)}}
+/* stepped full-screen flows: content up top, the actions ALWAYS at
+   the bottom of the screen (owner call, 3 Sep — buttons were riding
+   up under the copy leaving a void below) */
+.pinpage{min-height:100dvh;display:flex;flex-direction:column}
+.pinpage .pinbody{flex:1 1 auto}
+.pinpage .pinfoot{flex:none;padding-bottom:calc(16px + env(safe-area-inset-bottom))}
 /* the A-mark is a white asset — light mode inks it via the token
    (owner-caught: invisible on cream) */
 .mk{filter:var(--mkfilter,none)}
@@ -554,7 +560,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='87525a';  // stamped by tools/build.py with the content hash
+const BUILD_ID='9dfa6d';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -2107,11 +2113,12 @@ function viewSetup(){
     const wrapOn=(typeof inWrapper==='function')&&inWrapper();
     const steps=1+(wrapOn?2:0)+((typeof acctReady==='function'&&acctReady())?1:0);
     const shown=wi===0?1:wi===1?2:wi===2?3:steps;
-    const wpage=(title,body,foot)=>'<div class="view pad stg" style="padding-top:56px">'+
+    const wpage=(title,body,foot)=>'<div class="view pad stg pinpage" style="padding-top:56px">'+
       '<p class="mono" style="color:var(--amber);font-size:10px;letter-spacing:.14em">EARLY ACCESS</p>'+
-      '<h1 class="disp" style="font-size:26px;font-weight:600;margin-top:6px;line-height:1.15">'+title+'</h1>'+body+
-      '<div style="margin-top:24px;display:flex;flex-direction:column;gap:10px">'+foot+'</div>'+
-      (steps>1?'<p class="mono" style="color:var(--faint);font-size:9px;letter-spacing:.1em;margin-top:18px;text-align:center">'+Math.min(shown,steps)+' OF '+steps+'</p>':'')+'</div>';
+      '<h1 class="disp" style="font-size:26px;font-weight:600;margin-top:6px;line-height:1.15">'+title+'</h1>'+
+      '<div class="pinbody">'+body+'</div>'+
+      '<div class="pinfoot"><div style="display:flex;flex-direction:column;gap:10px">'+foot+'</div>'+
+      (steps>1?'<p class="mono" style="color:var(--faint);font-size:9px;letter-spacing:.1em;margin-top:16px;text-align:center">'+Math.min(shown,steps)+' OF '+steps+'</p>':'')+'</div></div>';
     if(wi===0)return wpage('You\u2019re in early',
       '<p style="color:var(--dim);font-size:14px;line-height:1.7;margin-top:10px">Allena is in closed beta, and you\u2019re in it because you already carry what it runs on: <b style="color:var(--text)">real training data</b> \u2014 a watch on the wrist, sessions in a log, runs on the road.</p>'+
       '<p style="color:var(--dim);font-size:14px;line-height:1.7;margin-top:12px">One engine reads your lifting, running and recovery together and finds what single-purpose apps cannot see. Everything is computed on this phone. Nothing is sold, and nothing is invented.</p>'+
@@ -2311,15 +2318,15 @@ function viewSetup(){
       '<button data-a="suOwn" class="btn mt" style="border-color:var(--amber);color:var(--amber)">I already know what I want to run</button>'+
       '<p style="color:var(--faint);font-size:11.5px;line-height:1.55;margin-top:8px">Write your own block instead. Allena keeps everything you just told her — your restrictions, equipment and days — and reviews what you build against it.</p>'}
   const pct=Math.round(st.step/(T.length-1)*100);
-  return '<div class="view pad stg" style="padding-top:26px">'+
+  return '<div class="view pad stg pinpage" style="padding-top:26px">'+
     '<div style="height:3px;background:var(--line);border-radius:3px"><div style="height:100%;width:'+pct+'%;background:var(--amber);border-radius:3px"></div></div>'+
     '<p class="mono" style="color:var(--faint);font-size:10px;letter-spacing:.08em;text-transform:uppercase;margin-top:12px">Step '+(st.step+1)+' of '+T.length+'</p>'+
-    '<h1 class="disp" style="font-size:24px;font-weight:600;margin-top:2px">'+T[st.step]+'</h1>'+b+
-    '<div class="row mt2">'+
+    '<h1 class="disp" style="font-size:24px;font-weight:600;margin-top:2px">'+T[st.step]+'</h1>'+
+    '<div class="pinbody">'+b+'</div>'+
+    '<div class="pinfoot"><div class="row mt2">'+
     (st.step>0?'<button data-a="suStep" data-v="-1" class="btn" style="flex:1">Back</button>'
       :st._deduced?'':'<button data-a="suGateBack" class="btn" style="flex:1">Back</button>')+
-    (st.step<T.length-1?'<button data-a="suStep" data-v="1" class="btn" style="flex:2;border-color:var(--amber);color:var(--amber)">Next</button>':'')+'</div>'+
-
+    (st.step<T.length-1?'<button data-a="suStep" data-v="1" class="btn" style="flex:2;border-color:var(--amber);color:var(--amber)">Next</button>':'')+'</div></div>'+
     '</div>'}
 
 function gBase(n){return String(n).split('—')[0].trim()}
@@ -15641,24 +15648,25 @@ function viewGuide(){
       '<span class="mono" style="font-size:13px;color:var(--amber);flex:1">'+g.addr+'</span>'+
       '<span class="mono" style="font-size:10px;color:var(--faint)">COPY</span></button>':'')+
     '</div>';
-  return '<div class="view pad modalrise" style="padding-top:20px">'+
+  return '<div class="view pad modalrise pinpage" style="padding-top:20px">'+
     '<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">'+
     '<button data-a="impGuideBack" style="width:42px;height:42px;border-radius:42px;background:var(--surface);border:1px solid var(--line);color:var(--dim);display:flex;align-items:center;justify-content:center;flex:none;font-size:16px">\u2039</button>'+
     '<h1 class="disp" style="font-size:19px;font-weight:600;flex:1;text-align:center;margin:0">Getting your file</h1>'+
     '<span style="width:42px;flex:none"></span></div>'+
     '<div style="display:flex;gap:6px">'+['garmin','strava','health'].map(k=>
       '<button data-a="impgSrc" data-v="'+k+'" class="pill'+(src===k?' on':'')+'" style="flex:1;text-align:center;font-size:12.5px">'+G[k].name+'</button>').join('')+'</div>'+
-    '<div data-swipestep="1" style="overflow:hidden;margin-top:20px">'+
+    '<div class="pinbody" data-swipestep="1" style="overflow:hidden;margin-top:20px">'+
     '<div class="swrow" style="display:flex;transform:translateX(-'+(i*100)+'%)">'+
     g.steps.map(panel).join('')+'</div></div>'+
-    '<div style="display:flex;gap:5px;justify-content:center;margin-top:22px">'+g.steps.map((_,d)=>
+    '<div class="pinfoot">'+
+    '<div style="display:flex;gap:5px;justify-content:center">'+g.steps.map((_,d)=>
       '<span style="width:6px;height:6px;border-radius:6px;background:'+(d<=i?'var(--amber)':'var(--line)')+'"></span>').join('')+'</div>'+
     '<div class="row mt" style="gap:10px">'+
     (i>0?'<button data-a="impgStep" data-v="-1" class="btn" style="flex:1">Back</button>':'')+
     (last?'<button data-a="impGuideBack" class="big disp" style="flex:2;background:var(--amber);color:var(--bg);font-size:15px">To the import</button>'
          :'<button data-a="impgStep" data-v="1" class="big disp" style="flex:2;background:var(--amber);color:var(--bg);font-size:15px">Next</button>')+'</div>'+
     '<p style="color:var(--faint);font-size:11px;text-align:center;margin-top:12px">Swipe between steps</p>'+
-    '</div>'}
+    '</div></div>'}
 function render(){
   const ae=document.activeElement,key=ae&&ae.dataset?ae.dataset.in:null;
   const pos=key&&ae.selectionStart!=null?ae.selectionStart:null;
