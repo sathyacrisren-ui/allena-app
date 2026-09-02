@@ -393,7 +393,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='a6a28c';  // stamped by tools/build.py with the content hash
+const BUILD_ID='3b3800';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -1447,6 +1447,7 @@ A.saveExit=complete=>{const s=S.sess;if(!s)return;
   if(wasComplete&&S.gar.on&&garDay().pre!=null&&garDay().post==null){
     S.gform={post:'',sid:recId};S.sheet={t:'gpost'};render()}
   if(complete&&S.autoBk.on)setTimeout(function(){A.backup(true)},400);try{acctSyncSoon()}catch(e){}
+  try{if(complete)setTimeout(function(){const h9=S.history[S.history.length-1];if(h9)hrWitnessAsk(h9)},1500)}catch(e){}
   flash(ok?(complete?'Session saved.':'Saved as unfinished \u2014 pick it back up from Today whenever.'):'Storage is full or blocked — export a backup from Data.')};
 A.discardYes=()=>{if(S.sess){S.history=S.history.filter(h=>h.id!==String(S.sess.startedAt));saveHistory()}
   audioCancel();ldel(K_A);S.sess=null;S.restEnd=null;S.holdEnd=null;S.sheet=null;S.view='home';wakeOff();flash('Session discarded.')};
@@ -3389,6 +3390,10 @@ function bankLiveTier(){
    a session with a running clock and rests between sets.
    ── */
 function dpDayCap(){return 220}          // one honest day is nowhere near this
+function heartWitnessed(h){
+  /* the tier above live: the wrist agreed with the clock */
+  return !!(h&&((h.hr&&(h.hr.n||0)>=10&&(h.hr.avg||0)>=95)||
+    (h.watch&&(h.watch.mins||0)>=15&&(h.watch.hr||0)>=95)))}
 function sessionLiveWhy(h){
   // a session recorded as it happened: real duration, sets spread over
   // time. demo and imported records can never be live — live means this
@@ -3402,6 +3407,8 @@ function sessionLiveWhy(h){
      (owner call, 2 Sep: what matters is the time). */
   if(h.watch&&(h.watch.mins||0)>=15&&(h.watch.hr||0)>=95)
     return{live:true,why:'witnessed by the watch — '+h.watch.mins+' min at avg HR '+h.watch.hr};
+  if(h.hr&&(h.hr.n||0)>=10&&(h.hr.avg||0)>=95)
+    return{live:true,why:'heart-witnessed — avg HR '+h.hr.avg+' across the session'};
   if(h.manual)
     return{live:false,why:'entered by hand — no clock, no watch'};
   if(!h.startedAt&&!h.minutes)return{live:false,why:'no clock on this session'};
@@ -7121,6 +7128,38 @@ function runWalkRepair(){
     if(n){runSave();saveHistory()}
     return n}catch(e){return 0}}
 try{setTimeout(runWalkRepair,1500)}catch(e){}
+
+/* ── the heart witness (Sep 2026) ────────────────────────────
+   The strongest proof there is: heart-rate samples over the
+   session's own window. The clock says WHEN the sets happened;
+   the wrist says the body was working while they did. Asked
+   after each finished session and back-filled for the last few;
+   corroboration upgrades, absence never demotes. */
+function hrWitnessAsk(h){
+  try{
+    if(!inWrapper()||!h||h.run||!h.startedAt)return;
+    const start=Math.round(h.startedAt/1000);
+    const end=Math.round((h.startedAt+Math.max(10,(h.minutes||30))*60000)/1000);
+    window.webkit.messageHandlers.allena.postMessage(JSON.stringify(
+      {type:'hr',id:String(h.id),start:start,end:end}))
+  }catch(e){}}
+function hrWitnessBackfill(){
+  try{
+    if(!inWrapper())return;
+    const cut=Date.now()-7*864e5;
+    (S.history||[]).filter(h=>h.complete&&!h.run&&!h.hr&&h.startedAt&&h.startedAt>cut)
+      .slice(-4).forEach(hrWitnessAsk)
+  }catch(e){}}
+function hkHR(id,res){
+  try{
+    if(!res||!(res.n>0))return;
+    const h=(S.history||[]).find(x=>String(x.id)===String(id));
+    if(!h||h.hr)return;
+    h.hr={avg:Math.round(res.avg),max:Math.round(res.max),n:res.n};
+    saveHistory();render()
+  }catch(e){}}
+try{window.hkHR=hkHR}catch(e){}
+try{setTimeout(hrWitnessBackfill,6000)}catch(e){}
 const RARITY=[['common','#8A8782','Noticed'],['uncommon','#30D158','Worth knowing'],
   ['rare','#D9D6CD','Rare find'],['epic','#FFFFFF','Big one']];
 function rarityOf(k){return RARITY.find(x=>x[0]===k)||RARITY[0]}
@@ -11152,8 +11191,10 @@ function viewSession(){
            competition-grade. */
         try{const lw=sessionLiveWhy({startedAt:s.startedAt,
             minutes:Math.max(1,Math.round((Date.now()-s.startedAt)/60000)),log:s.log});
+          const rec9=(S.history||[]).find(x=>String(x.id)===String(s.startedAt))||null;
           h+='<p class="mono" style="font-size:9px;letter-spacing:.06em;margin-top:7px;line-height:1.5;color:'+(lw.live?'var(--green)':'var(--faint)')+'">'+
-            (lw.live?'WITNESSED LIVE ✓':'NOT WITNESSED · '+esc(lw.why.toUpperCase()))+'</p>'}catch(e){}
+            (lw.live?(heartWitnessed(rec9)?'HEART-WITNESSED ♥ · THE WRIST AGREES WITH THE CLOCK':'WITNESSED LIVE ✓')
+              :'NOT WITNESSED · '+esc(lw.why.toUpperCase()))+'</p>'}catch(e){}
         if(rows.length)h+='<div style="margin-top:11px;display:flex;flex-direction:column;gap:7px">'+
           rows.map((r9,i9)=>'<div style="display:flex;align-items:center;gap:8px">'+
             '<span class="mono" style="color:var(--faint);font-size:9px;letter-spacing:.05em;width:78px;flex:none;text-transform:uppercase;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">'+esc(r9.m)+'</span>'+
