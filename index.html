@@ -72,6 +72,21 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
 @keyframes anTick{0%{stroke-dashoffset:28}100%{stroke-dashoffset:0}}
 @keyframes anBreathe{0%,100%{opacity:.55}50%{opacity:1}}
 .an-breathe{animation:anBreathe 2.6s ease-in-out infinite}
+@keyframes sigLink{from{stroke-dasharray:0 400}to{stroke-dasharray:400 0}}
+@keyframes sigPop{0%{transform:scale(0);opacity:0}60%{transform:scale(1.5)}100%{transform:scale(1);opacity:1}}
+@keyframes sigDust{0%{opacity:0}40%{opacity:.7}100%{opacity:0;transform:translateY(-8px)}}
+@keyframes sigRise{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+@keyframes sigFade{from{opacity:0}to{opacity:1}}
+#signalReveal{animation:sigFade .5s ease}
+#signalReveal .sig-link{stroke-dasharray:400 0;animation:sigLink 1.1s ease-out .3s both}
+#signalReveal .sig-a{animation:sigPop .5s ease .2s both}
+#signalReveal .sig-b{animation:sigPop .5s ease 1.3s both}
+#signalReveal .sig-dust{animation:sigDust 2.2s ease-out both;animation-iteration-count:2}
+#signalReveal .sig-eyebrow{animation:sigRise .6s ease 1.5s both}
+#signalReveal .sig-title{animation:sigRise .7s ease 1.75s both}
+#signalReveal .sig-body{animation:sigRise .7s ease 2.05s both}
+#signalReveal .sig-tap{animation:sigFade 1s ease 2.6s both}
+@media (prefers-reduced-motion:reduce){#signalReveal *{animation:none!important;opacity:1!important;stroke-dasharray:none!important}}
 @keyframes shineSweep{0%{transform:translateX(-120%) skewX(-18deg)}100%{transform:translateX(240%) skewX(-18deg)}}
 .an-shine::after{content:'';position:absolute;top:0;bottom:0;width:45%;left:0;
   background:linear-gradient(105deg,transparent,rgba(240,238,230,.14),transparent);
@@ -407,7 +422,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='e6a503';  // stamped by tools/build.py with the content hash
+const BUILD_ID='dd2995';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -8054,6 +8069,35 @@ function correlationDiscoveries(){
   return D}
 function correlationNoticed(){
   return correlations().slice(0,1).map(c=>{const p=corrPhrase(c);return{t:p.title,d:p.body,tier:1}})}
+
+/* ── the reveal (owner call, 3 Sep: 'super super cool, dramatic, in
+   your face when found') ─────────────────────────────────────
+   A new correlation is the rarest thing the app makes — the 'how
+   did it know that' moment. When one banks fresh, a full-screen
+   SIGNAL takes over: constellation lines drawing between two
+   points, the title rising, one tap to keep. Mounts once outside
+   the render cycle (the replay disease), respects reduced-motion. */
+function signalDue(){
+  try{
+    const bank=discBank();
+    const fresh=correlationDiscoveries().find(d=>!bank[d.id]);
+    return fresh||null}catch(e){return null}}
+function signalRevealHtml(){
+  const sg=S.signalReveal;if(!sg)return '';
+  return '<div id="signalReveal" data-a="signalKeep" style="position:fixed;inset:0;z-index:940;background:radial-gradient(circle at 50% 42%,#242b26,#141312 70%);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px;text-align:center;overflow:hidden">'+
+    '<svg viewBox="0 0 300 200" style="position:absolute;width:min(90vw,420px);opacity:.9;top:14%">'+
+    '<line class="sig-link" x1="70" y1="60" x2="230" y2="150" stroke="#30D158" stroke-width="1.4" opacity=".55"/>'+
+    '<circle class="sig-a" cx="70" cy="60" r="6" fill="#E8E5DC"/>'+
+    '<circle class="sig-b" cx="230" cy="150" r="6" fill="#30D158"/>'+
+    Array.from({length:22},(_,i)=>{const a=i*0.618*6.283,rr=30+((i*37)%120);
+      return '<circle class="sig-dust" style="animation-delay:'+(i*40)+'ms" cx="'+(150+Math.cos(a)*rr).toFixed(0)+'" cy="'+(100+Math.sin(a)*rr*0.6).toFixed(0)+'" r="1.3" fill="#7BA88A" opacity="0"/>'}).join('')+
+    '</svg>'+
+    '<div style="position:relative;margin-top:34vh">'+
+    '<p class="mono sig-eyebrow" style="font-size:11px;letter-spacing:.24em;color:#30D158">✦ A SIGNAL</p>'+
+    '<p class="disp sig-title" style="font-size:27px;line-height:1.2;font-weight:700;margin-top:12px;max-width:15ch">'+esc(sg.t)+'</p>'+
+    '<p class="sig-body" style="color:var(--dim);font-size:13.5px;line-height:1.6;margin-top:12px;max-width:34ch">'+esc(sg.d)+'</p>'+
+    '<p class="mono sig-tap" style="color:var(--faint);font-size:10.5px;letter-spacing:.06em;margin-top:26px">TAP TO KEEP IT</p>'+
+    '</div></div>'}
 function treeSeason(d){
   const m=(d?new Date(d):new Date()).getMonth()+1;
   if(m>=9&&m<=11)return{name:'Spring — fresh leaves',leaf:'#8FBF6E'};
@@ -9310,7 +9354,7 @@ const DISC_CATALOG=[
  ['quest','Quests','Weekly challenges taken on and finished.','Accept a weekly quest and see it through.'],
  ['insight','Deep reads','What the model found between your numbers.','Run a deep read from Findings.'],
  ['call','Called shots','Allena\'s forecasts, settled by what you did.','Train on a day Allena has made a call.'],
- ['signal','Body signals','Heart, sleep, engine — what the body says between sessions.','Sync a watch through Apple Health.'],
+ ['signal','Signals','The patterns hiding between your numbers — heart, sleep, engine, and the links only your data reveals.','Sync a watch through Apple Health.'],
  ['timing','Timing','When in the day and week your training goes best.','Log effort across different days and times.'],
  ['block','Blocks','How one block compares with the last.','Finish a block and start another.'],
  ['session','Sessions','The outliers — longest, hardest, biggest.','Train.'],
@@ -11764,6 +11808,8 @@ function viewToday(){
   if(demoPresent())h+='<button data-a="demoClear" class="card" style="width:100%;text-align:left;padding:11px 15px;margin-top:14px;border-color:var(--amber);display:flex;align-items:center;gap:10px">'+
     '<span class="mono" style="color:var(--amber);font-size:9.5px;flex:none">DEMO</span>'+
     '<span style="flex:1;font-size:12px;color:var(--dim)">Sample data is loaded so you can see the trends — tap to remove it and start clean.</span></button>';
+  try{if(!S.signalReveal&&!S.signalShownFor){const sg=signalDue();
+    if(sg){S.signalShownFor=sg.id;S.signalReveal=sg;setTimeout(function(){render()},400)}}}catch(e){}
   h+=verdictCard();
   h+=todayOrder().join('');
   return h+'</div>'}
@@ -14669,6 +14715,11 @@ function render(){
        else if(bh.dataset.step!=String(S.boot)){bh.dataset.step=S.boot;
          const bl=bh.querySelector('#bootlines');if(bl)bl.innerHTML=bootLineHtml(S.boot)}}
      else if(bh)bh.remove()}
+    {let sh9=document.getElementById('signalHost');
+     if(S.signalReveal){if(!sh9){sh9=document.createElement('div');sh9.id='signalHost';
+       sh9.innerHTML=signalRevealHtml();document.body.appendChild(sh9);
+       try{haptic('reveal')}catch(e){}}}
+     else if(sh9)sh9.remove()}
     /* the deep-read constellation lives OUTSIDE the render cycle — a
        mid-animation render used to rebuild it and restart the whole
        sequence (beta-reported). It mounts once and is only removed. */
@@ -15898,6 +15949,10 @@ function runAction(a,v,t,e){
     case 'svGo':svConnect();break;
     case 'suGateGo':if(S.setup)S.setup.gate=false;render();break;
     case 'suGateBack':if(S.setup)S.setup.gate=true;render();break;
+    case 'signalOpen':{const sg=signalDue();if(sg){S.signalReveal=sg;render()}break}
+    case 'signalKeep':{const sg=S.signalReveal;
+      if(sg){const bank=discBank();if(!bank[sg.id]){bank[sg.id]={t:sg.t,d:sg.d,rar:sg.rar,tag:'signal',found:today()};bankSave()}}
+      S.signalReveal=null;render();break}
     case 'notifAskYes':{const P=notifPrefs();P.asked=1;P.on=true;notifSave();notifSync();render();break}
     case 'notifAskNo':{const P=notifPrefs();P.asked=1;P.on=false;notifSave();render();
       flash('Any time — Settings \u2192 Notifications turns them on.');break}
