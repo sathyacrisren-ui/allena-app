@@ -407,7 +407,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='f5e457';  // stamped by tools/build.py with the content hash
+const BUILD_ID='f795eb';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -3363,6 +3363,7 @@ function noticedPool(){
         add('Session '+next+' lands around '+when.toLocaleDateString(undefined,{month:'long',year:'numeric'}),
           'You are at '+n+', averaging '+(Math.round(rate*10)/10)+' a week since '+fmtDate(first.date)+'. At your own pace — no deadline, just the shape of the road.')}}}catch(e){}
   try{if(typeof healthNoticed==='function')healthNoticed().forEach(x=>{if(x.t&&x.d)out.push({t:x.t,d:x.d,tier:1})})}catch(e){}
+  try{if(typeof correlationNoticed==='function')correlationNoticed().forEach(x=>{if(x.t&&x.d)out.push({t:x.t,d:x.d,tier:1})})}catch(e){}
   return out}
 function noticedToday(){
   const pool=noticedPool();
@@ -7646,6 +7647,7 @@ function discoveries(){
         b+' is moving — the estimated max is up about '+pct+'% on the three weeks before. Whatever this block is doing, it is working.','record')})
   }catch(e){}
   try{if(typeof healthDiscoveries==='function')healthDiscoveries().forEach(d9=>D.push(d9))}catch(e){}
+  try{if(typeof correlationDiscoveries==='function')correlationDiscoveries().forEach(d9=>D.push(d9))}catch(e){}
   return D}
 function discoverySeen(){return S.discSeen||(S.discSeen=lget('training-disc-v1',{}))}
 function markDiscoveries(){
@@ -7878,6 +7880,37 @@ function healthDiscoveries(){
       ks.forEach(k=>{const p9=dd[k].pr;run=(p9!=null&&p9>=target)?run+1:0;best=Math.max(best,run)});
       if(best>=5)add(best>=10?'rare':'uncommon','Protein showed up '+best+' days running',
         best+' straight days at or over ~'+target+' g'+(bw?' (1.6 g/kg of your logged weight)':'')+'. Muscle is built at the table as much as under the bar.','signal')}catch(e){}
+    /* protein → next-day recovery (nutrition × HRV) */
+    try{
+      const st=hkDailyStore(),dd=(S.daily&&S.daily.days)||{};
+      const hi=[],lo=[];
+      Object.keys(st.days).forEach(k=>{const v=st.days[k].hrv;if(v==null)return;
+        const prev=dayKey(new Date(new Date(k+'T12:00')-864e5));
+        const p9=dd[prev]&&dd[prev].pr;if(p9==null)return;
+        (p9>=120?hi:lo).push(v)});
+      if(hi.length>=5&&lo.length>=5){const a=hkdMed(hi),b=hkdMed(lo);
+        if(a&&b&&(a/b-1)>=0.06)add('rare','Protein days show up in your recovery',
+          'HRV runs '+Math.round((a/b-1)*100)+'% higher the morning after 120g+ protein ('+hi.length+' vs '+lo.length+' days). The recovery you can eat.','signal')}}catch(e){}
+    /* steps → resting HR (cardiac drift from NEAT) */
+    try{
+      const r=hkdSeries('rhr',45),sp=hkdSeries('steps',45);
+      if(r.length>=15&&sp.length>=15){
+        const active=r.filter(x=>{const s9=sp.find(y=>y.date===x.date);return s9&&s9.v>=8000}).map(x=>x.v);
+        const still=r.filter(x=>{const s9=sp.find(y=>y.date===x.date);return s9&&s9.v<5000}).map(x=>x.v);
+        if(active.length>=5&&still.length>=5){const a=hkdMed(active),s2=hkdMed(still);
+          if(s2&&a&&s2-a>=2)add('uncommon','Your heart is calmer on active days',
+            'Resting HR sits ~'+Math.round(s2-a)+' bpm lower on 8k+ step days than on quiet ones. Movement is its own medicine, and your ticker agrees.','signal')}}}catch(e){}
+    /* VO2max × easy pace (the engine showing at easy effort) */
+    try{
+      const v=hkdSeries('vo2',90);
+      const er=(S.runs||[]).filter(r=>isRunType(r.type)&&r.km>2&&r.mins>0&&r.hr>0);
+      if(v.length>=2&&er.length>=8){
+        const first=v[0].v,last=v[v.length-1].v;
+        const half=Math.floor(er.length/2);
+        const p0=er.slice(0,half).reduce((a,r)=>a+r.mins/r.km,0)/half;
+        const p1=er.slice(half).reduce((a,r)=>a+r.mins/r.km,0)/(er.length-half);
+        if(last>first&&p0-p1>0.05)add('rare','Your engine is showing on the road',
+          'VO\u2082max up '+(Math.round((last-first)*10)/10)+' and your easy pace '+Math.round((p0-p1)*60)+'s/'+udUnit()+' quicker over the same stretch — two instruments, one story.','signal')}}catch(e){}
   }catch(e){}
   return D}
 function healthNoticed(){
@@ -7904,6 +7937,123 @@ function healthNoticed(){
       'A huge movement day outside training. It is in your recovery picture — legs know, even when the log does not.');
   }catch(e){}
   return out}
+/* ══ the correlation discoverer (owner call, 3 Sep) ══════════
+   The crank. Instead of hand-writing every relationship, this
+   pairs EVERY daily signal against EVERY training outcome at
+   0/1/2-day lags, ranks them (Spearman — robust to the messy,
+   non-normal shapes real bodies make), and surfaces only what
+   clears a strict effect-and-sample gate. It finds patterns
+   nobody wrote a rule for — 'your top set runs 6% higher two
+   days after a big-step day' — per-user, novel, impossible to
+   fake. Honesty is structural: every line carries its sample
+   size and says 'a pattern, not proof of cause'. */
+function spearman(pairs){
+  const n=pairs.length;if(n<3)return null;
+  const rank=vals=>{
+    const idx=vals.map((v,i)=>[v,i]).sort((a,b)=>a[0]-b[0]);
+    const r=new Array(n);
+    for(let i=0;i<n;){let j=i;while(j+1<n&&idx[j+1][0]===idx[i][0])j++;
+      const avg=(i+j)/2+1;for(let k=i;k<=j;k++)r[idx[k][1]]=avg;i=j+1}
+    return r};
+  const rx=rank(pairs.map(p=>p[0])),ry=rank(pairs.map(p=>p[1]));
+  const mx=rx.reduce((a,b)=>a+b,0)/n,my=ry.reduce((a,b)=>a+b,0)/n;
+  let num=0,dx=0,dy=0;
+  for(let i=0;i<n;i++){const a=rx[i]-mx,b=ry[i]-my;num+=a*b;dx+=a*a;dy+=b*b}
+  if(dx<=0||dy<=0)return null;
+  const rho=num/Math.sqrt(dx*dy);
+  // two-sided significance from the t-approximation
+  const t=Math.abs(rho)*Math.sqrt((n-2)/Math.max(1e-9,1-rho*rho));
+  return{rho:rho,n:n,t:t}}
+function corrDayData(){
+  /* one row per calendar day: the signals available that morning,
+     and the training outcomes recorded that day */
+  const days={};
+  const put=(k,f,v)=>{if(v==null||!isFinite(v))return;(days[k]=days[k]||{})[f]=v};
+  try{const st=hkDailyStore().days||{};
+    Object.keys(st).forEach(k=>{const d=st[k];
+      put(k,'sleep',d.sleep);put(k,'hrv',d.hrv);put(k,'rhr',d.rhr);
+      put(k,'steps',d.steps);put(k,'vo2',d.vo2)})}catch(e){}
+  try{const g=(S.gar&&S.gar.days)||{};Object.keys(g).forEach(k=>{
+    if(g[k].am!=null)put(k,'ready',g[k].am)})}catch(e){}
+  try{const dd=(S.daily&&S.daily.days)||{};Object.keys(dd).forEach(k=>{
+    if(dd[k].bw!=null)put(k,'bw',dd[k].bw);if(dd[k].pr!=null)put(k,'protein',dd[k].pr)})}catch(e){}
+  // outcomes from training
+  try{(S.history||[]).forEach(h=>{if(!h.complete||h.run)return;
+    const k=String(h.date).slice(0,10);let best=0,rpes=[],ton=0;
+    (h.log||[]).forEach(l=>{if(l.w>0&&l.r>0){best=Math.max(best,e1rm(l.w,l.r));ton+=l.w*l.r}
+      if(l.rpe!=null)rpes.push(l.rpe)});
+    if(best>0)put(k,'topset',best);
+    if(ton>0)put(k,'tonnage',ton);
+    if(rpes.length)put(k,'effort',rpes.reduce((a,b)=>a+b,0)/rpes.length)})}catch(e){}
+  try{(S.runs||[]).forEach(r=>{if(!isRunType(r.type)||!(r.km>2&&r.mins>0))return;
+    put(String(r.date).slice(0,10),'pace',r.mins/r.km)})}catch(e){}
+  return days}
+const CORR_SIGNALS={
+  sleep:{n:'a good sleep',dir:'more sleep',unit:'min',hi:'slept-well'},
+  hrv:{n:'high HRV',dir:'higher HRV'},
+  rhr:{n:'a low resting heart rate',dir:'a lower resting heart rate',inv:1},
+  steps:{n:'a big-step day',dir:'more steps'},
+  ready:{n:'high readiness',dir:'higher readiness'},
+  protein:{n:'a high-protein day',dir:'more protein'},
+  bw:{n:'a heavier bodyweight',dir:'more bodyweight'}};
+const CORR_OUTCOMES={
+  topset:{n:'top set',good:'up',dir:1},
+  tonnage:{n:'session volume',good:'up',dir:1},
+  effort:{n:'how hard a session felt',good:'down',dir:-1,rpe:1},
+  pace:{n:'easy-run pace',good:'faster',dir:-1,pace:1}};
+function correlations(){
+  const found=[];
+  try{
+    const days=corrDayData();
+    const keys=Object.keys(days).sort();
+    if(keys.length<12)return found;
+    const idxByDate={};keys.forEach((k,i)=>idxByDate[k]=i);
+    const dateAt=lag=>k=>{const d=new Date(k+'T12:00');d.setDate(d.getDate()+lag);return dayKey(d)};
+    Object.keys(CORR_SIGNALS).forEach(sig=>{
+      Object.keys(CORR_OUTCOMES).forEach(out=>{
+        [0,1,2].forEach(lag=>{
+          const pairs=[];
+          keys.forEach(k=>{
+            const s=days[k]&&days[k][sig];
+            if(s==null)return;
+            const ok=days[dateAt(lag)(k)];
+            const o=ok&&ok[out];
+            if(o==null)return;
+            pairs.push([s,o])});
+          const r=spearman(pairs);
+          if(!r)return;
+          /* the strict gate — big effect, real sample, past the t-cut;
+             conservative on purpose because we test many pairs */
+          if(Math.abs(r.rho)<0.5||r.n<12||r.t<2.5)return;
+          found.push({sig:sig,out:out,lag:lag,rho:r.rho,n:r.n,
+            score:Math.abs(r.rho)*Math.sqrt(r.n)})})})});
+    found.sort((a,b)=>b.score-a.score);
+    // one per outcome so the set stays varied, top few overall
+    const seen={};
+    return found.filter(f=>{if(seen[f.out])return false;seen[f.out]=1;return true}).slice(0,3);
+  }catch(e){return[]}}
+function corrPhrase(c){
+  const S9=CORR_SIGNALS[c.sig],O=CORR_OUTCOMES[c.out];
+  // does the signal RISING move the outcome UP or DOWN?
+  const signalUp=S9.inv?-1:1;
+  const outcomeRises=(c.rho*signalUp)>0;   // true = they move together
+  const good=O.pace?(!outcomeRises):(O.rpe?(!outcomeRises):outcomeRises);
+  const when=c.lag===0?'on the same day':c.lag===1?'the day after':'two days after';
+  const move=O.pace?(outcomeRises?'slower':'faster')
+    :O.rpe?(outcomeRises?'harder':'easier')
+    :(outcomeRises?'higher':'lower');
+  const title=O.n.charAt(0).toUpperCase()+O.n.slice(1)+' runs '+move+' after '+S9.n;
+  const body='Across '+c.n+' days, your '+O.n+' tends to be '+move+' '+when+' '+S9.dir+' '+
+    '(correlation '+(Math.round(c.rho*100)/100)+'). A pattern in your own data, not proof of cause — but worth watching.';
+  return{title:title,body:body,strong:Math.abs(c.rho)>=0.65,good:good}}
+function correlationDiscoveries(){
+  const D=[];
+  correlations().forEach(c=>{
+    const p=corrPhrase(c);
+    D.push({rar:p.strong?'epic':'rare',t:p.title,d:p.body,tag:'signal',id:'corr:'+c.sig+':'+c.out+':'+c.lag})});
+  return D}
+function correlationNoticed(){
+  return correlations().slice(0,1).map(c=>{const p=corrPhrase(c);return{t:p.title,d:p.body,tier:1}})}
 function treeSeason(d){
   const m=(d?new Date(d):new Date()).getMonth()+1;
   if(m>=9&&m<=11)return{name:'Spring — fresh leaves',leaf:'#8FBF6E'};
