@@ -551,7 +551,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='3024e9';  // stamped by tools/build.py with the content hash
+const BUILD_ID='fe0df1';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -7700,7 +7700,14 @@ function hkHR(id,res){
     const h=(S.history||[]).find(x=>String(x.id)===String(id));
     if(!h||h.hr)return;
     h.hr={avg:Math.round(res.avg),max:Math.round(res.max),n:res.n};
-    saveHistory();render()
+    saveHistory();
+    /* the passive witness testifies too (owner call, 3 Sep): no
+       activity started on the watch, but its all-day heart rate was
+       sampling right through the session window */
+    try{if(typeof heartWitnessed==='function'&&heartWitnessed(h)){
+      flash('Your watch was listening \u2014 avg HR '+h.hr.avg+' through '+(String(h.date).slice(0,10)===today()?'today\u2019s':fmtDate(h.date)+'\u2019s')+' session. Heart-witnessed.');
+      haptic('success')}}catch(e9){}
+    render()
   }catch(e){}}
 try{window.hkHR=hkHR}catch(e){}
 try{setTimeout(hrWitnessBackfill,6000)}catch(e){}
@@ -11566,6 +11573,14 @@ function dayPriority(p,di,wk){
   return score}
 function isDropped(p,di,wk){const a=(S.dropped||{})[p.id+':'+wk];return !!(a&&a.indexOf(di)>=0)}
 function weekClosed(p,wk){return !!((S.weekStarts||{})[p.id+':'+wk+':closed'])}
+function weekTrainable(p,wk){
+  /* the forward gate (tester call — Angus; owner: 'True'): week N is
+     writable only once week N-1 is closed or fully logged, or the
+     user explicitly overrides. Nothing hard-locked, everything
+     deliberate. */
+  if(wk<=1)return true;
+  if((S.weekStarts||{})[p.id+':'+wk+':force'])return true;
+  return weekClosed(p,wk-1)||weekState(p,wk-1).full}
 function weekClock(){
   const p=activeProgSafe();if(!p||p.weeks<2)return null;
   const wk=S.week,ws=weekState(p,wk);
@@ -11958,12 +11973,14 @@ function dayCard(p,d,i,done,daily){
      Sep, after a tester re-ran week 1): the cards stay readable but
      nothing in them starts — the record lives in History */
   const locked=p.weeks>1&&weekClosed(p,S.week);
-  return '<button class="card" data-a="'+(locked?'weekLockedInfo':'prevOpen')+'" data-v="'+p.id+':'+i+'" style="width:100%;text-align:left;padding:16px;display:block">'+
+  const gated=!locked&&p.weeks>1&&!weekTrainable(p,S.week);
+  return '<button class="card" data-a="'+(locked?'weekLockedInfo':gated?'weekGateOpen':'prevOpen')+'" data-v="'+p.id+':'+i+'" style="width:100%;text-align:left;padding:16px;display:block">'+
     '<div style="display:flex;align-items:center;gap:8px">'+
     '<span style="width:9px;height:9px;border-radius:9px;background:'+dayCol(i)+';flex:none"></span>'+
     '<span class="eyebrow">'+(daily?'Daily':'Day '+(i+1))+'</span>'+
     (done?'<span class="mono" style="color:var(--green);font-size:10px">'+(daily?'✓ TODAY':'✓ DONE')+'</span>'
-         :locked?'<span class="mono" style="color:var(--faint);font-size:10px">WEEK CLOSED</span>':'')+
+         :locked?'<span class="mono" style="color:var(--faint);font-size:10px">WEEK CLOSED</span>'
+         :gated?'<span class="mono" style="color:var(--amber);font-size:10px">W'+(S.week-1)+' STILL OPEN</span>':'')+
     '<span style="flex:1"></span><span class="mono" style="color:var(--faint);font-size:14px">›</span></div>'+
     '<h2 class="disp" style="font-size:19px;font-weight:600;margin-top:6px;'+(done?'color:var(--dim)':'')+'">'+esc(d.name)+'</h2>'+
     muscleRowsHtml(p,i)+
@@ -14062,6 +14079,15 @@ function sheetHtml(){
       '<span style="color:var(--faint);font-size:11.5px">Unfinished sessions stay in your log but are left out of adherence</span></span></button>'+
       '<button data-a="histSave" class="big disp mt2" style="background:var(--amber);color:var(--bg);font-size:15px">Save changes</button>'+
       '<button data-a="delHist" data-v="'+esc(r.id)+'" class="btn mt" style="color:var(--red)">Delete this session</button>')}
+  if(S.sheet.t==='weekgate'){
+    const p9=activeProgSafe(),pw=S.week-1;
+    const ws9=p9?weekState(p9,pw):{n:0,total:0};
+    return wrapSheet('Week '+S.week+' is gated',
+      '<p style="color:var(--dim);font-size:13.5px;line-height:1.65">Week '+pw+' is still open — '+ws9.n+' of '+ws9.total+' sessions logged. Training ahead of an open week usually means a mis-tap, and a week trained out of order muddies every trend built on it.</p>'+
+      '<p style="color:var(--dim);font-size:13.5px;line-height:1.65;margin-top:10px">Two honest ways forward:</p>'+
+      '<button data-a="weekGateClose" class="big disp mt" style="background:var(--amber);color:var(--bg);font-size:15px">Close week '+pw+' and start week '+S.week+'</button>'+
+      '<button data-a="weekGateForce" class="btn mt" style="color:var(--dim)">Train week '+S.week+' anyway — I know</button>'+
+      '<p style="color:var(--faint);font-size:11px;line-height:1.55;margin-top:12px">Closing marks week '+pw+'\u2019s untrained sessions as skipped — visible, never deleted.</p>')}
   if(S.sheet.t==='delsession')return wrapSheet('Delete session',
     '<p style="color:var(--dim);font-size:14px;line-height:1.55">This removes the whole session and every set in it. It can\'t be undone.</p>'+
     '<button data-a="delHistYes" data-v="'+S.sheet.id+'" class="big disp mt" style="background:var(--red);color:#fff;font-size:16px">Delete</button>');
@@ -16440,6 +16466,12 @@ function runAction(a,v,t,e){
     case 'swapSide':{const cur2=S.sess.sets[S.sess.idx];S.holdWait=false;S.holdSide=2;
       S.holdEnd=Date.now()+cur2.secs*1000;render();break}
     case 'wuTick':{S.sess.wu=S.sess.wu||{};S.sess.wu[v]=!S.sess.wu[v];persistActive();render();break}
+    case 'weekGateOpen':S.sheet={t:'weekgate'};render();break;
+    case 'weekGateClose':{const p9=activeProgSafe();if(!p9)break;
+      setWeek(Math.max(1,S.week-1),p9.id);S.sheet=null;runAction('weekClose');break}
+    case 'weekGateForce':{const p9=activeProgSafe();if(!p9)break;
+      S.weekStarts=S.weekStarts||{};S.weekStarts[p9.id+':'+S.week+':force']=1;lset(K_WK,S.weekStarts);
+      S.sheet=null;flash('Week '+S.week+' opened — week '+(S.week-1)+' stays as it is.');render();break}
     case 'weekLockedInfo':flash('Week '+S.week+' is closed — its sessions live in History now. Tap the current W-pill to train this week\u2019s.');break;
     case 'clkNow':{const p9=activeProgSafe();if(p9){S.weekStarts=S.weekStarts||{};
       S.weekStarts[p9.id+':1']=today();S.weekStarts[p9.id+':ackclk']=1;lset(K_WK,S.weekStarts);
@@ -16448,10 +16480,13 @@ function runAction(a,v,t,e){
       S.weekStarts[p9.id+':ackclk']=1;lset(K_WK,S.weekStarts);
       flash('The clock starts the day of your first session.')}render();break}
     case 'prevOpen':{const [pid,di]=v.split(':');
-      /* a closed week never starts a session, whatever path leads here */
+      /* a closed week never starts a session, and a gated one asks
+         first — whatever path leads here */
       try{const p8=S.lib.programs.find(x=>x.id===pid);
         if(p8&&p8.weeks>1&&typeof weekClosed==='function'&&weekClosed(p8,S.week)){
-          flash('Week '+S.week+' is closed — its sessions live in History now.');break}}catch(e){}
+          flash('Week '+S.week+' is closed — its sessions live in History now.');break}
+        if(p8&&p8.weeks>1&&typeof weekTrainable==='function'&&!weekTrainable(p8,S.week)){
+          S.sheet={t:'weekgate'};render();break}}catch(e){}
       if(S.lib.activeId!==pid&&!S.lib.programs.find(p=>p.id===pid&&p.acl)){S.lib.activeId=pid;saveLib();setWeek(weekFor(pid),pid)}
       A.preview(+di,pid);break}
     case 'startIn':{const [pid,di]=v.split(':');
