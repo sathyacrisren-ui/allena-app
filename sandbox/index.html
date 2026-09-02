@@ -469,7 +469,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='769602';  // stamped by tools/build.py with the content hash
+const BUILD_ID='b875ec';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -14612,10 +14612,11 @@ function sheetHtml(){
       totalSets+' of '+allSets+' sets · about '+Math.max(mins,5)+' min'+
       (mins<fullMins?' (was '+fullMins+')':'')+'</p>'+
       (movedN?'<p class="mono" style="color:var(--amber);font-size:10.5px;margin-top:4px">Includes '+movedN+' exercise'+(movedN===1?'':'s')+' moved here from another session</p>':'');
-    inner+='<div style="margin-top:12px;display:flex;flex-direction:column;gap:8px">'+
+    inner+='<p class="mono" style="color:var(--faint);font-size:9px;letter-spacing:.05em;margin-top:14px">HOLD ANY EXERCISE TO REORDER</p>'+
+      '<div data-draglist="prev" style="margin-top:8px;display:flex;flex-direction:column;gap:8px">'+
       pv.ex.map((e,i)=>{const live=e.sets.filter(s2=>!s2.cut).length;
         const st=e.sets[0];
-        return '<div class="card" style="padding:12px 14px;display:flex;align-items:center;gap:11px;'+(e.keep?'':'opacity:.45')+(e.cut?';border-style:dashed':'')+'">'+
+        return '<div class="card dragitem" data-dragitem="'+i+'" style="padding:12px 14px;display:flex;align-items:center;gap:11px;'+(e.keep?'':'opacity:.45')+(e.cut?';border-style:dashed':'')+'">'+
           '<button data-a="prevKeep" data-v="'+i+'" style="width:22px;height:22px;border-radius:7px;flex:none;display:inline-flex;align-items:center;justify-content:center;font-size:12px;'+
           (e.keep?'background:var(--amber);color:#1F1E1D':'border:1.5px solid var(--line)')+'">'+(e.keep?'✓':'')+'</button>'+
           '<span style="flex:1;min-width:0"><span style="display:block;font-size:13.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap'+
@@ -15400,6 +15401,63 @@ try{
     localStorage.removeItem('training-pickflag-v1');
     setTimeout(function(){flash('iOS reloaded Allena while the file picker was open \u2014 it happens when the phone is tight on memory. Nothing was lost; try the import again, second runs usually stick.')},2800)}
 }catch(e){}
+
+/* ── hold-to-reorder (owner call, 3 Sep) ─────────────────────
+   Long-press any [data-dragitem] inside a [data-draglist], feel a
+   haptic, and drag it to reorder. Finger tracking with live gap-
+   opening; on release, runAction('reorder'+List, from:to). Cancels
+   to a scroll if the finger moves before the hold fires. */
+(function(){
+  let held=null,list=null,items=[],startY=0,fromIdx=0,curIdx=0,timer=null,itemH=0,active=false;
+  const clear=function(){
+    if(timer){clearTimeout(timer);timer=null}
+    if(held){held.style.transition='transform .18s ease';held.style.transform='';held.style.zIndex='';held.style.boxShadow='';held.classList.remove('dragging')}
+    items.forEach(function(el){el.style.transition='transform .18s ease';el.style.transform=''});
+    setTimeout(function(){items.forEach(function(el){if(el)el.style.transition=''})},200);
+    held=null;list=null;items=[];active=false};
+  document.addEventListener('touchstart',function(e){
+    const it=e.target&&e.target.closest&&e.target.closest('[data-dragitem]');
+    if(!it)return;
+    // ignore when starting on a control inside the row (checkbox, +/- , swap)
+    if(e.target.closest('button')&&!e.target.closest('[data-dragitem]').isSameNode(e.target.closest('button')))return;
+    const lst=it.closest('[data-draglist]');if(!lst)return;
+    const t=e.touches[0];startY=t.clientY;
+    timer=setTimeout(function(){
+      held=it;list=lst;active=true;
+      items=Array.prototype.slice.call(lst.querySelectorAll('[data-dragitem]'));
+      fromIdx=curIdx=items.indexOf(it);
+      itemH=it.getBoundingClientRect().height+8;
+      try{haptic('medium')}catch(e2){}
+      it.classList.add('dragging');it.style.transition='transform .06s ease';
+      it.style.zIndex='50';it.style.boxShadow='0 12px 30px rgba(0,0,0,.5)';it.style.transform='scale(1.03)';
+    },300);
+  },{passive:true});
+  document.addEventListener('touchmove',function(e){
+    if(!active){ // still in hold window — a real move means it's a scroll
+      if(timer){const dy=Math.abs(e.touches[0].clientY-startY);if(dy>10){clearTimeout(timer);timer=null}}
+      return}
+    e.preventDefault();
+    const t=e.touches[0],dy=t.clientY-startY;
+    held.style.transform='translateY('+dy+'px) scale(1.03)';
+    let target=fromIdx+Math.round(dy/itemH);
+    target=Math.max(0,Math.min(items.length-1,target));
+    if(target!==curIdx){curIdx=target;try{haptic('select')}catch(e2){}}
+    items.forEach(function(el,i){
+      if(el===held)return;
+      let shift=0;
+      if(fromIdx<curIdx&&i>fromIdx&&i<=curIdx)shift=-itemH;
+      else if(fromIdx>curIdx&&i<fromIdx&&i>=curIdx)shift=itemH;
+      el.style.transform=shift?'translateY('+shift+'px)':''});
+  },{passive:false});
+  document.addEventListener('touchend',function(){
+    if(active&&curIdx!==fromIdx){
+      const which=list.getAttribute('data-draglist');
+      const f=fromIdx,tt=curIdx;clear();
+      try{runAction('reorder'+which.charAt(0).toUpperCase()+which.slice(1),f+':'+tt)}catch(e){}
+      return}
+    clear();
+  },{passive:true});
+})();
 function sheetScrollBack(){
   /* returning to the preview sheet should land where you were —
      render() may run inside a view transition, so restore on a
@@ -16268,6 +16326,16 @@ function runAction(a,v,t,e){
     case 'reportEmail':{const subj=encodeURIComponent('Allena beta — build '+BUILD_ID);
       const body=encodeURIComponent('\n\n———\nBuild '+BUILD_ID+(SANDBOX?' (sandbox)':'')+'\n'+navigator.userAgent+'\n(describe what happened, and attach a screenshot if you can)');
       try{location.href='mailto:sathyacrisren@gmail.com?subject='+subj+'&body='+body}catch(e){flash('Could not open mail — email sathyacrisren@gmail.com')}break}
+    case 'reorderPrev':{const [from,to]=String(v).split(':').map(Number);
+      if(S.prev&&S.prev.ex&&from!==to&&from>=0&&to>=0&&from<S.prev.ex.length&&to<S.prev.ex.length){
+        const arr=S.prev.ex;const [it]=arr.splice(from,1);arr.splice(to,0,it);
+        /* the day's exercise ORDER follows the reorder — a persisted
+           choice, not just a preview shuffle (owner call, 3 Sep) */
+        try{const p9=S.lib.programs.find(x=>x.id===S.prev.pid)||activeProgSafe();
+          const d9=p9&&p9.days[S.prev.di];
+          if(d9&&d9.exercises){const names=arr.map(e=>e.name);
+            d9.exercises.sort((a,b)=>names.indexOf(a.name)-names.indexOf(b.name));saveLib()}}catch(e){}
+      }render();break}
     case 'availEq':{S.prof=S.prof||{};S.prof.eqx=S.prof.eqx||{};
       if(S.prof.eq==='full'){/* expand full into explicit set so one can be turned off */
         ['bb','rack','db','mc','cb','pullup','bench','band','kb','cardio'].forEach(k=>S.prof.eqx[k]=1);S.prof.eq='custom'}
