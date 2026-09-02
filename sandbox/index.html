@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no,interactive-widget=resizes-content">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -55,7 +55,12 @@
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;margin:0;padding:0}
 html,body{background:var(--bg);color:var(--text);
   font-family:'Inter',-apple-system,system-ui,sans-serif;
-  -webkit-text-size-adjust:100%;overscroll-behavior-y:none;overflow-x:hidden}
+  -webkit-text-size-adjust:100%;overscroll-behavior-y:none;overflow-x:hidden;
+  /* feel native: no text selection, no long-press callout, no tap
+     highlight (owner-caught — you could select text like a webpage) */
+  -webkit-user-select:none;user-select:none;-webkit-touch-callout:none;
+  -webkit-tap-highlight-color:transparent}
+input,textarea{-webkit-user-select:text;user-select:text}
 button{font-family:inherit;border:none;background:none;color:inherit;cursor:pointer;transition:transform .08s ease,opacity .12s}
 button:active{transform:scale(.96);opacity:.85}
 input,textarea,select{font-family:inherit;background:var(--raised);border:1px solid transparent;border-radius:14px;
@@ -110,6 +115,10 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
 #signalReveal .sig-body{animation:sigRise .7s ease 2.05s both}
 #signalReveal .sig-tap{animation:sigFade 1s ease 2.6s both}
 @media (prefers-reduced-motion:reduce){#signalReveal *{animation:none!important;opacity:1!important;stroke-dasharray:none!important}}
+@keyframes confettiFall{0%{transform:translateY(-20px) rotate(0);opacity:0}12%{opacity:1}100%{transform:translateY(120px) rotate(320deg);opacity:0}}
+.confetti-burst{position:absolute;left:0;right:0;top:0;height:1px;pointer-events:none;z-index:5}
+.confetti-burst i{position:absolute;top:0;width:7px;height:11px;border-radius:2px;opacity:0;animation:confettiFall 1.5s ease-in forwards}
+@media (prefers-reduced-motion:reduce){.confetti-burst{display:none}}
 @keyframes shineSweep{0%{transform:translateX(-120%) skewX(-18deg)}100%{transform:translateX(240%) skewX(-18deg)}}
 .an-shine::after{content:'';position:absolute;top:0;bottom:0;width:45%;left:0;
   background:linear-gradient(105deg,transparent,rgba(240,238,230,.14),transparent);
@@ -225,10 +234,16 @@ pre{background:var(--surface);border:1px solid var(--line);border-radius:10px;pa
 /* the live-session banner: flush at the very top, into the status
    band like an iPhone call bar; the app body reserves its height so
    nothing is ever covered */
-#sessBanner{position:fixed;top:calc(env(safe-area-inset-top) + 2px);left:50%;transform:translateX(-50%);
+#sessBanner{position:fixed;top:calc(env(safe-area-inset-top) + 6px);left:50%;transform:translateX(-50%);
   max-width:90vw;z-index:96;display:flex;align-items:center;gap:7px;padding:5px 13px;background:var(--raised);
   border-radius:999px;box-shadow:0 5px 18px rgba(0,0,0,.45);white-space:nowrap}
-body.sesslive #app{padding-top:calc(env(safe-area-inset-top) + 10px)} /* the view's own top padding supplies the rest — capsule sits snug above the title */
+/* the pill zone (owner-caught: the sesslive #app padding STACKED on
+   the view's own 22px top pad, leaving a big gap above the title on
+   Dynamic Island phones). Now: the view's top pad is neutralised
+   under sesslive and #app reserves exactly the pill's height, so the
+   title sits a consistent ~8px under the capsule. */
+body.sesslive #app{padding-top:calc(env(safe-area-inset-top) + 44px)}
+body.sesslive #app .view{padding-top:8px!important}
 /* tactile motion (Sep 2026): every tap answers back — a springy press,
    messages that arrive, a composer that wakes when touched */
 button{transition:transform .16s cubic-bezier(.34,1.56,.64,1),opacity .16s,background-color .18s,border-color .18s}
@@ -454,7 +469,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='8cf0d4';  // stamped by tools/build.py with the content hash
+const BUILD_ID='769602';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -3099,6 +3114,74 @@ async function pplanPhotoParse(dataUrl){
     S.ppBusy=false;render();
     flash(rows.length+' exercise'+(rows.length===1?'':'s')+' read in — check them before saving.')
   }catch(e){S.ppBusy=false;S.ppErr=String((e&&e.message)||'could not read the photo');render()}}
+
+/* ── equipment change reworks the block (IA overhaul, 3 Sep) ──
+   A user changes gyms mid-block; Allena swaps exercises needing
+   gear they no longer have for equivalents they do, drops what she
+   can't cover, and reports every change before it lands. */
+const EQUIP_NEED={
+  bb:/barbell|\bbench press\b|back squat|front squat|romanian deadlift|\bdeadlift\b|hip thrust|overhead press|\bbb\b|\bohp\b/i,
+  rack:/back squat|front squat|rack pull/i,
+  db:/dumbbell|\bdb\b|goblet|incline db|db row/i,
+  mc:/machine|leg press|leg extension|leg curl|hack squat|pec deck|chest press machine|pulldown|lat pulldown/i,
+  cb:/cable|pushdown|face pull|crossover|cable/i,
+  pullup:/pull-?up|chin-?up/i,
+  bench:/bench press|incline|decline|db press/i,
+  band:/band/i,
+  kb:/kettlebell|\bkb\b/i,
+  cardio:/treadmill|rower|bike|elliptical|erg/i};
+function equipHas(k){const p=S.prof||{};if(p.eq==='full')return true;return !!(p.eqx&&p.eqx[k])}
+function equipMissingFor(name){
+  const out=[];
+  Object.keys(EQUIP_NEED).forEach(k=>{if(EQUIP_NEED[k].test(name)&&!equipHas(k))out.push(k)});
+  return out}
+function equipReworkPlan(){
+  const p=activeProgSafe();if(!p||p.acl||p.rehabProto)return null;
+  const swaps=[],drops=[];
+  const excl9=(typeof exclFor==='function')?exclFor(restrEff()):new Set();
+  p.days.forEach(d=>{
+    (d.exercises||[]).forEach(ex=>{
+      const miss=equipMissingFor(ex.name);
+      if(!miss.length)return;
+      // find the muscle and a covered alternative from GAP_EX-style ladders
+      let prime=null;try{const h=muscleHits(ex.name);prime=Object.keys(h).sort((a,b)=>h[b]-h[a])[0]}catch(e){}
+      const LAD={
+        'Chest':[['Push-up',null],['Dumbbell press','db'],['Machine chest press','mc']],
+        'Quads':[['Goblet squat','db'],['Leg press','mc'],['Bodyweight squat',null]],
+        'Hamstrings':[['Dumbbell RDL','db'],['Leg curl','mc'],['Nordic curl',null]],
+        'Glutes':[['Dumbbell hip thrust','db'],['Glute bridge',null]],
+        'Lats':[['Dumbbell row','db'],['Lat pulldown','cb'],['Inverted row',null]],
+        'Back':[['Dumbbell row','db'],['Seated cable row','cb'],['Inverted row',null]],
+        'Side delts':[['Dumbbell lateral raise','db'],['Band lateral raise','band']],
+        'Biceps':[['Dumbbell curl','db'],['Band curl','band']],
+        'Triceps':[['Dumbbell overhead extension','db'],['Bench dip',null]]};
+      const cand=(LAD[prime]||[]).find(c=>{
+        if(c[1]!=null&&!equipHas(c[1]))return false;
+        if(equipMissingFor(c[0]).length)return false;
+        try{if(exTags(c[0]).some(t=>excl9.has(t))&&!(typeof isAllowed==='function'&&isAllowed(c[0])))return false}catch(e){}
+        return true});
+      if(cand)swaps.push({day:d.name,from:ex.name,to:cand[0],ref:ex});
+      else drops.push({day:d.name,name:ex.name,ref:ex,day_obj:d})});
+  });
+  return{swaps:swaps,drops:drops}}
+function equipRework(){
+  const plan=equipReworkPlan();
+  if(!plan||(!plan.swaps.length&&!plan.drops.length))
+    return{summary:'Everything in your block already fits your equipment — nothing to change.',plan:plan};
+  const L=[];
+  if(plan.swaps.length)L.push(plan.swaps.length+' swap'+(plan.swaps.length===1?'':'s')+': '+
+    plan.swaps.slice(0,4).map(s=>s.from.replace(/ — .*/,'')+' → '+s.to).join(', ')+(plan.swaps.length>4?'…':''));
+  if(plan.drops.length)L.push(plan.drops.length+' dropped (nothing covers them): '+
+    plan.drops.slice(0,4).map(d=>d.name.replace(/ — .*/,'')).join(', ')+(plan.drops.length>4?'…':''));
+  return{summary:L.join('\n\n')+'\n\nHistory is never touched. You can undo by turning the equipment back on.',plan:plan};
+}
+function equipReworkApply(){
+  const plan=equipReworkPlan();if(!plan)return;
+  const p=activeProgSafe();if(!p)return;
+  plan.swaps.forEach(s=>{s.ref.name=s.to});
+  plan.drops.forEach(d=>{d.day_obj.exercises=d.day_obj.exercises.filter(e=>e!==d.ref)});
+  if(typeof saveLib==='function')saveLib();
+}
 function todayState(){
   const raw=lget(todayKey(),null);
   return raw||{done:{},revealed:false,seenIdx:null}}
@@ -7016,9 +7099,14 @@ function histCommit(recs){
   kept.forEach(r=>S.history.push(r));
   S.history.sort((a,b)=>String(a.date).localeCompare(String(b.date)));
   saveHistory();
-  // exact-name variants self-heal after every import (db row / DB Rows /
-  // db one arm row); ambiguous merges stay behind Settings → Tidy names
-  try{const r9=historyAliasScan();historyAliasApplyMap({},r9.canon)}catch(e){}
+  /* names tidy themselves on every import now (owner call, 3 Sep — no
+     more manual Tidy button): exact variants heal, AND the confident
+     auto-merges (unique parent, loads agree) apply automatically. Only
+     genuinely ambiguous ones would ever need a human, and those simply
+     stay as-is rather than nagging. */
+  try{const r9=historyAliasScan();
+    const map={};(r9.autos||[]).forEach(a=>{map[a.from]=a.to});
+    historyAliasApplyMap(map,r9.canon)}catch(e){}
   return{added:kept.length,replaced:replaced,skippedReal:skipped}}
 
 /* ══ exercise aliasing at import (owner call, Sep 2026) ══════
@@ -12008,7 +12096,17 @@ function viewSession(){
   if(s.phase==='done'){
     const vol=s.log.reduce((a,l)=>a+(l.w||0)*(l.r||0),0),legs=/leg|acl|knee/i.test(s.dayName||'');
     const prs=sessionPRs(s);
+    /* the finish celebration (owner/tester call — Dafydd: 'fireworks
+       when I finish'). Every completed session gets the confetti burst
+       and a congratulations, once per render, with the reveal haptic. */
+    if(!s._celebrated){s._celebrated=1;try{haptic('reveal')}catch(e){}}
+    const CONGRATS=['Nailed it.','That\u2019s the work.','Banked.','Another one down.','Strong finish.','In the log, in the body.','Done and dusted.'];
+    const cg=CONGRATS[(s.log.length+Math.round(s.startedAt/1e6))%CONGRATS.length];
     let h='<div class="view pad stg" style="padding-top:28px">'+
+     '<div class="confetti-burst" aria-hidden="true">'+
+     Array.from({length:16},(_,i)=>{const cols=['var(--green)','var(--amber)','#1E9BFF','var(--gold)'];
+       return '<i style="left:'+((i*6.3)%100)+'%;background:'+cols[i%4]+';animation-delay:'+(i%5*60)+'ms"></i>'}).join('')+'</div>'+
+     '<p class="disp gradhead an-hero" style="font-size:30px;line-height:1.05;margin-bottom:12px">'+cg+'</p>'+
      '<div class="an-pop" style="display:flex;align-items:center;gap:10px">'+
      '<svg viewBox="0 0 24 24" style="width:24px;height:24px;flex:none"><circle cx="12" cy="12" r="10.5" fill="none" stroke="var(--green)" stroke-width="1.4" opacity=".35"/>'+
      '<path class="an-tick" d="M7.5 12.4l3.1 3.1 6-6.4" fill="none" stroke="var(--green)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>'+
@@ -13000,8 +13098,11 @@ function dataChunks(){
 function navRow(icon,label,value,a,v,opts){
   /* the settings-row language, app-wide: icon · label · value · chevron */
   opts=opts||{};
+  const iconHtml=icon==='logo'
+    ?'<img src="'+MARK+'" alt="" style="width:18px;height:18px;object-fit:contain;flex:none'+((typeof lget==='function'&&lget('training-theme-v1','system')==='light')?';filter:invert(1) brightness(.4)':'')+'">'
+    :'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px;color:'+(opts.tint||'var(--dim)')+';flex:none">'+icon+'</svg>';
   return '<button data-a="'+a+'"'+(v!=null?' data-v="'+esc(String(v))+'"':'')+' style="width:100%;text-align:left;padding:13px 16px;display:flex;align-items:center;gap:12px;border-top:1px solid var(--line)">'+
-    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px;color:'+(opts.tint||'var(--dim)')+';flex:none">'+icon+'</svg>'+
+    iconHtml+
     '<span style="flex:1;min-width:0;overflow:hidden"><span style="display:block;font-size:14px;font-weight:'+(opts.sub?'600':'500')+';overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(label)+
     (opts.dot?'<span style="display:inline-block;width:7px;height:7px;border-radius:7px;background:var(--red);margin-left:6px;vertical-align:middle"></span>':'')+'</span>'+
     (opts.sub?'<span style="display:block;color:var(--faint);font-size:11.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:1px">'+esc(opts.sub)+'</span>':'')+'</span>'+
@@ -13035,7 +13136,10 @@ const SET_ICONS={
   moon:'<path d="M20 13.5A8 8 0 1 1 10.5 4 6.5 6.5 0 0 0 20 13.5z"/>',
   body2:'<circle cx="12" cy="5.5" r="2.5"/><path d="M12 8.5v6M8 10.5h8M12 14.5l-2.8 6M12 14.5l2.8 6"/>',
   gear:'<path d="M4 7.5h16M4 12h16M4 16.5h16"/><circle cx="9.5" cy="7.5" r="2" fill="var(--bg)"/><circle cx="15" cy="12" r="2" fill="var(--bg)"/><circle cx="8" cy="16.5" r="2" fill="var(--bg)"/>',
-  spark:'<path d="M12 3.5l1.9 5.6 5.6 1.9-5.6 1.9L12 18.5l-1.9-5.6-5.6-1.9 5.6-1.9z"/><path d="M18.8 3.6v3.2M20.4 5.2h-3.2"/>'};
+  spark:'<path d="M12 3.5l1.9 5.6 5.6 1.9-5.6 1.9L12 18.5l-1.9-5.6-5.6-1.9 5.6-1.9z"/><path d="M18.8 3.6v3.2M20.4 5.2h-3.2"/>',
+  wrench:'<path d="M14.5 6.5a3.5 3.5 0 0 0-4.6 4.6L4 17l3 3 5.9-5.9a3.5 3.5 0 0 0 4.6-4.6l-2.2 2.2-2-2z"/>',
+  bug:'<rect x="8" y="8" width="8" height="10" rx="4"/><path d="M8 11H4M20 11h-4M8 15H4M20 15h-4M9 7l-1.5-2M15 7l1.5-2M12 4v4"/>',
+  bell:'<path d="M6 9a6 6 0 0 1 12 0c0 5 2 6 2 6H4s2-1 2-6z"/><path d="M10 20a2 2 0 0 0 4 0"/>'};
 function viewData(){
   const byTitle=dataChunks();
   const a=(typeof acct==='function')?acct():null;
@@ -13058,16 +13162,12 @@ function viewData(){
   const progCount=(S.lib.programs||[]).filter(p=>!p.acl&&!p.rehabProto).length;
   h+=setGroup('Program',[
     setRow(I.prog,'Program library',progCount+' program'+(progCount===1?'':'s'),'Program library'),
-    setRow(I.own,'Your own block','','Your own block'),
-    setRow(I.load,'Load a program','','Load a program'),
-    setRow(I.prog,'Program format','','Program format')]);
-  h+=setGroup('Tracking',[
+    setRow(I.own,'Your own block','','Your own block')]);
+  {const dc=((S.gar&&S.gar.on)||(S.daily&&S.daily.on)||(S.supp&&S.supp.on));
+   h+=setGroup('Tracking',[
     setRow(I.rehab,'Rehab pathway',(S.acl&&S.acl.on)?('Phase '+S.acl.phase+' of 5'):'Off','Rehab pathway'),
     setRow(I.run,'Running',S.runOn?'On':'Off','Running'),
-    setRow(I.heart,'Readiness — Body Battery',(S.gar&&S.gar.on)?'On':'Off','Garmin readiness'),
-    setRow(I.check,'Daily check-in',(S.daily&&S.daily.on)?'On':'Off','Daily creatine tracker'),
-    setRow(I.pill,'Creatine',(S.supp&&S.supp.on)?'On':'Off','Daily creatine tracker'),
-    setRow(I.check,'Profile & goals','','Profile')]);
+    setRow(I.heart,'Daily check-in',dc?'On':'Off','Daily check-in')]);}
   {const th=lget('training-theme-v1','system');
    h+='<p class="eyebrow mt2">Appearance</p>'+
    '<div class="card mt" style="padding:13px 15px">'+
@@ -13075,42 +13175,24 @@ function viewData(){
    [['system','Auto'],['dark','Dark'],['light','Light']].map(x=>
      '<button data-a="themeSet" data-v="'+x[0]+'" class="pill" style="flex:1;padding:9px 0'+(th===x[0]?';background:var(--text);color:var(--bg);border-color:var(--text);font-weight:600':'')+'">'+x[1]+'</button>').join('')+'</div>'+
    '<p style="color:var(--faint);font-size:11px;line-height:1.5;margin-top:9px">Auto follows your phone. Allena is dark by nature — light is warm cream, and a few canvases (share cards, the tree) stay dark on purpose.</p></div>';}
-  if(inWrapper()){const NP=notifPrefs();
-   h+='<p class="eyebrow mt2">Notifications</p>'+
-   '<div class="card mt" style="padding:13px 15px">'+
-   '<div style="display:flex;align-items:center;gap:10px"><span style="flex:1;font-size:13.5px;font-weight:600">Allena can speak up</span>'+
-   '<button data-a="notifOn" class="pill'+(NP.on?' on':'')+'" style="width:64px;padding:9px 0">'+(NP.on?'On':'Off')+'</button></div>'+
-   (NP.on?[['reveal','The evening reveal','Finds herald themselves at 7:30pm — never locked, always announced'],
-     ['morning','The morning call','Log the check-in, the forecast unlocks'],
-     ['appt','Physio appointments','The day before and the morning of'],
-     ['wrap','The monthly wrap','When it lands, on the 1st'],
-     ['quest','The weekly quest','Monday morning']].map(k=>
-     '<div style="display:flex;align-items:center;gap:10px;margin-top:10px;border-top:1px solid var(--line);padding-top:10px">'+
-     '<span style="flex:1;min-width:0"><span style="font-size:13px;font-weight:600;display:block">'+k[1]+'</span>'+
-     '<span style="color:var(--faint);font-size:11px">'+k[2]+'</span></span>'+
-     '<button data-a="notifKind" data-v="'+k[0]+'" class="pill'+(NP[k[0]]?' on':'')+'" style="width:56px;padding:8px 0;font-size:11px">'+(NP[k[0]]?'On':'Off')+'</button></div>').join(''):'')+
-   '<p style="color:var(--faint);font-size:11px;line-height:1.5;margin-top:10px">Every notification carries a real fact tied to a real date. There is no “we miss you” — by design, there never will be.</p></div>'}
-  h+='<p class="eyebrow mt2">Units</p>'+
-   '<div class="card mt" style="padding:13px 15px">'+
-   '<div style="display:flex;align-items:center;gap:10px"><span style="flex:1;font-size:13.5px;font-weight:600">Weight</span>'+
-   ['kg','lb'].map(u=>'<button data-a="unitW" data-v="'+u+'" class="pill" style="width:64px;padding:9px 0'+(UNITS.w===u?';background:var(--text);color:#1F1E1D;border-color:var(--text);font-weight:600':'')+'">'+u+'</button>').join('')+'</div>'+
-   '<div style="display:flex;align-items:center;gap:10px;margin-top:10px;border-top:1px solid var(--line);padding-top:10px"><span style="flex:1;font-size:13.5px;font-weight:600">Distance</span>'+
-   ['km','mi'].map(u=>'<button data-a="unitD" data-v="'+u+'" class="pill" style="width:64px;padding:9px 0'+(UNITS.d===u?';background:var(--text);color:#1F1E1D;border-color:var(--text);font-weight:600':'')+'">'+u+'</button>').join('')+'</div>'+
-   '<p style="color:var(--faint);font-size:11px;line-height:1.5;margin-top:10px">Display and typing only — everything is stored metric underneath, so backups and history never change.</p></div>';
-  h+=setGroup('Equipment',[
-    setRow(I.bar,'Bar & plates',uwNum(BAR)+' '+uwUnit()+' bar','Barbell weight')]);
+  const eqRows=[setRow(I.bar,'Bar & plates',uwNum(BAR)+' '+uwUnit()+' bar','Barbell weight'),
+    setRow(I.wrench,'What you can train on','','Available equipment'),
+    setRow(I.gear,'Units',UNITS.w+' · '+UNITS.d,'Units')];
+  h+=setGroup('Equipment',eqRows);
+  if(inWrapper())h+=setGroup('Notifications',[
+    setRow(I.bell,'What Allena tells you',notifPrefs().on?'On':'Off','Notifications')]);
   h+=setGroup('Allena',[
-    setRow(I.check,'Report something broken','','__beta'),
-    setRow(I.ai,'AI coach',
+    setRow('logo','Allena chat',
       ((S.ai&&(S.ai.proxy||'').trim())?'Cloud link':(S.ai&&S.ai.key)?'Own key':signed?'Signed in':'Claude app'),
       'Allena — AI coach')]);
   h+=setGroup('Your data',[
-    navRow(I.own,'Tidy exercise names','','aliasSweep',''),
     setRow(I.save,'Export a backup',backupDue()?'due':'','Export'),
-    setRow(I.back,'Restore','','Restore'),
-    setRow(I.demo,'Demo data',demoPresent()?'loaded':'','Demo data'),
+    setRow(I.back,'Restore from backup','','Restore'),
     setRow(I.back,'Start fresh','','Start fresh')]);
-  const KNOWN=['Account & sync','Program library','Your own block','Load a program','Program format','Rehab pathway','Running','Garmin readiness','Daily creatine tracker','Profile','Barbell weight','Allena — AI coach','Export','Restore','Demo data','Start fresh'];
+  h+=setGroup('Beta testing',[
+    setRow(I.bug,'Report a problem','','__report'),
+    setRow(I.demo,'Demo data',demoPresent()?'loaded':'','Demo data')]);
+  const KNOWN=['Account & sync','Program library','Your own block','Rehab pathway','Running','Daily check-in','Profile','Barbell weight','Available equipment','Units','Notifications','Report a problem','Allena — AI coach','Export','Restore','Demo data','Start fresh'];
   const left=Object.keys(byTitle).filter(k=>KNOWN.indexOf(k)<0);
   if(left.length)h+=setGroup('More',left.map(k=>setRow(I.prog,k,'',k)));
   h+='<div style="height:8px"></div>';
@@ -13143,13 +13225,7 @@ function dataRaw(){
    '<button data-a="exportXlsx" class="btn" style="background:var(--green);color:#1F1E1D;font-weight:600;border:none">Download Excel log</button>'+
    '<button data-a="backup" class="btn">Download full backup (JSON)</button>'+
    '<button data-a="copyProgram" class="btn">Copy active program\'s JSON</button></div></div>'+
-   '<div class="mt2"><p class="eyebrow">Load a program</p>'+
-   '<p style="color:var(--dim);font-size:13px;line-height:1.55;margin-top:8px">Paste one program, or several as {"programs":[…]}. A program with the same name replaces the old version; new names are added to the library. History is never touched.</p>'+
-   '<textarea data-in="paste" rows="5" placeholder="Paste program JSON here…" style="margin-top:12px">'+esc(S.paste)+'</textarea>'+
-   '<div class="row" style="margin-top:8px"><button data-a="loadPasted" class="btn" style="flex:1;'+(S.paste.trim()?'background:var(--blue);color:#fff;border:none':'background:var(--raised);color:var(--faint)')+'">Load pasted</button>'+
-   '<button data-a="pickProgramFile" class="btn" style="flex:1">Load .json file</button></div>'+
-   (S.errs.length?'<div style="margin-top:12px;padding:12px;border-radius:10px;background:#3A241F;border:1px solid var(--red)">'+
-     S.errs.map(e=>'<p style="color:#E8A79B;font-size:12.5px;line-height:1.5">'+esc(e)+'</p>').join('')+'</div>':'')+'</div>'+
+
    '<div class="mt2"><p class="eyebrow">Restore</p>'+
    '<button data-a="pickBackup" class="btn" style="margin-top:12px">Restore from backup</button>'+
    '<p style="color:var(--faint);font-size:12px;line-height:1.5;margin-top:8px">Merges sessions and any missing programs. Nothing is overwritten or duplicated.</p></div>'+
@@ -13214,18 +13290,20 @@ function dataRaw(){
    '<div class="mt2"><p class="eyebrow">Start fresh</p>'+
    '<p style="color:var(--dim);font-size:12.5px;line-height:1.55;margin-top:8px">Erases every session, program, run, rehab record, chat and setting on this device and restarts the app as a new install. There is no undo — export a backup first if any of it matters.</p>'+
    '<button data-a="wipeAsk" class="btn mt" style="border-color:var(--red);color:var(--red)">Erase everything on this device</button></div>'+
-   '<div class="mt2"><p class="eyebrow">Garmin readiness</p>'+
+   '<div class="mt2"><p class="eyebrow">Daily check-in</p>'+
+   '<p style="color:var(--faint);font-size:12px;line-height:1.55;margin-top:8px">The small daily inputs that let Allena read you — each one earns its place by making a real find possible.</p>'+
+   '<p class="mono" style="color:var(--faint);font-size:9.5px;letter-spacing:.07em;margin-top:16px">READINESS SCORE</p>'+
    '<button data-a="garToggle" class="btn mt" style="'+(S.gar.on?'border-color:var(--amber);color:var(--amber)':'')+'">'+(S.gar.on?'On — asks before and after sessions':'Off — turn on')+'</button>'+
-   '<p style="color:var(--faint);font-size:12px;line-height:1.55;margin-top:8px">Enter your Body Battery before a session; Allena compares it to your own baseline and offers to ease the workout. Enter it again after, so she learns what each session costs.</p>'+
+   '<p style="color:var(--faint);font-size:12px;line-height:1.55;margin-top:8px">A 0–100 morning number. On an Apple Watch, Allena can read it herself from overnight heart-rate and sleep. On a Garmin, enter your Body Battery. Either way she compares it to your own baseline and eases the workout when you are run down.</p>'+
    (S.gar.on?'<div class="row" style="margin-top:10px">'+
      '<button data-a="garMorning" class="pill" style="flex:1;'+(S.gar.morning?'border-color:var(--amber);color:var(--amber)':'')+'">Morning '+(S.gar.morning?'on':'off')+'</button>'+
-     '<button data-a="garSteps" class="pill" style="flex:1;'+(S.gar.steps?'border-color:var(--amber);color:var(--amber)':'')+'">Steps '+(S.gar.steps?'on':'off')+'</button></div>':'')+'</div>'+
-   '<div class="mt2"><p class="eyebrow">Daily creatine tracker</p>'+
-   '<button data-a="creaToggle" class="btn mt" style="'+(S.supp.on?'border-color:var(--amber);color:var(--amber)':'')+'">'+(S.supp.on?'On — showing on Train':'Off — turn on')+'</button>'+
-   '<p style="color:var(--faint);font-size:12px;line-height:1.5;margin-top:8px">Adds a daily tick box and a 7-day strip to the Train tab. 5 g a day of monohydrate; consistency is what matters, not timing.</p>'+
-   '<p class="eyebrow" style="margin-top:18px">Daily check-in</p>'+
-   '<button data-a="dailyToggle" class="btn mt" style="'+(S.daily.on?'border-color:var(--teal);color:var(--teal)':'')+'">'+(S.daily.on?'On — bodyweight · protein · water on Train':'Off — turn on')+'</button>'+
-   '<p style="color:var(--faint);font-size:12px;line-height:1.5;margin-top:8px">Bodyweight builds a trend chart in Progress. All of it feeds the coach.</p></div>'+
+     '<button data-a="garSteps" class="pill" style="flex:1;'+(S.gar.steps?'border-color:var(--amber);color:var(--amber)':'')+'">Steps '+(S.gar.steps?'on':'off')+'</button></div>':'')+
+   '<p class="mono" style="color:var(--faint);font-size:9.5px;letter-spacing:.07em;margin-top:20px">BODYWEIGHT, PROTEIN & WATER</p>'+
+   '<button data-a="dailyToggle" class="btn mt" style="'+(S.daily.on?'border-color:var(--teal);color:var(--teal)':'')+'">'+(S.daily.on?'On — on the Today check-in':'Off — turn on')+'</button>'+
+   '<p style="color:var(--faint);font-size:12px;line-height:1.5;margin-top:8px">Bodyweight builds a trend chart and powers the ratio finds; protein feeds the nutrition patterns. All of it feeds the coach.</p>'+
+   '<p class="mono" style="color:var(--faint);font-size:9.5px;letter-spacing:.07em;margin-top:20px">CREATINE</p>'+
+   '<button data-a="creaToggle" class="btn mt" style="'+(S.supp.on?'border-color:var(--amber);color:var(--amber)':'')+'">'+(S.supp.on?'On — daily tick on Today':'Off — turn on')+'</button>'+
+   '<p style="color:var(--faint);font-size:12px;line-height:1.5;margin-top:8px">A daily tick and a 7-day strip. 5 g of monohydrate; consistency is what matters, not timing. Turn on a daily reminder in Notifications so you never miss it.</p></div>'+
    '<div class="mt2"><p class="eyebrow">Barbell weight</p>'+
    '<p style="color:var(--dim);font-size:13px;line-height:1.55;margin-top:8px">Used for plate loading and warm-up ramps. Standard Olympic bar is 20 kg.</p>'+
    '<div style="margin-top:10px">'+stepper('bar','Bar',BAR,2.5,'kg')+'</div>'+
@@ -13238,7 +13316,15 @@ function dataRaw(){
    (S.lay.plates!==false?'background:var(--amber);color:#1F1E1D':'border:1.5px solid var(--line)')+'">'+(S.lay.plates!==false?'✓':'')+'</span>'+
    '<span style="flex:1"><span style="display:block;font-size:13.5px;font-weight:600">Show the plate diagram</span>'+
    '<span style="color:var(--faint);font-size:11.5px">Bar and plates drawn on the set screen</span></span></button></div>'+
-   '<div class="mt2"><p class="eyebrow">Account &amp; sync</p>'+accountSection()+'</div>'+
+   '<div class="mt2"><p class="eyebrow">Account &amp; sync</p>'+accountSection()+
+     '<div style="border-top:1px solid var(--line);margin-top:16px;padding-top:14px"><p class="mono" style="color:var(--faint);font-size:9.5px;letter-spacing:.07em">PROFILE &amp; GOALS</p>'+
+     (S.prof&&S.prof.goal?'<p style="font-size:14px;font-weight:600;margin-top:8px">'+esc(S.prof.name||'You')+'</p>'+
+       '<p class="mono" style="color:var(--faint);font-size:11.5px;margin-top:3px">'+esc(S.prof.goal+' · '+S.prof.days+' days/wk')+(restrList(S.prof)?' · '+esc(restrList(S.prof)):'')+'</p>'
+       :'<p style="color:var(--dim);font-size:13px;margin-top:8px">No profile yet — Allena can build a program from a few questions.</p>')+
+     ((!S.prof||!S.prof.name)?'<div class="row mt" style="gap:8px"><input data-in="pname" value="" placeholder="Your name" autocomplete="off" style="flex:1;min-width:0;background:var(--surface);border:1px solid var(--line);border-radius:10px;color:var(--text);padding:11px;font-size:14px;outline:none"><button data-a="pnameSave" class="pill" style="flex:none">Save</button></div>':'')+
+     '<button data-a="setupOpen" class="btn mt">'+(S.prof&&S.prof.goal?'Edit profile &amp; generate a new block':'Set up a personalised program')+'</button>'+
+     ((S.goals||[]).length?'<p class="mono" style="color:var(--faint);font-size:11px;margin-top:12px">Goals: '+esc((S.goals||[]).map(g=>g.ex).join(', '))+'</p>':'')+
+     '</div></div>'+
    '<div class="mt2"><p class="eyebrow">Allena — AI coach</p>'+
    '<p style="color:var(--dim);font-size:13px;line-height:1.55;margin-top:8px">Two ways to bring Allena\'s chat to life. Easiest: paste an <b>Allena cloud link</b> if you have one — no account, no key. Or paste your own Anthropic API key (console.anthropic.com). Either lives only in this phone\'s storage. Fresh session context rides along with every message, and only the last few turns are kept.</p>'+
    '<input data-in="ai.proxy" value="'+esc(S.ai.proxy||'')+'" placeholder="Allena cloud link (https://…)" autocomplete="off" class="mono" style="width:100%;margin-top:10px;background:var(--surface);border:1px solid var(--line);border-radius:10px;color:var(--text);padding:12px;font-size:12px;outline:none">'+
@@ -13247,12 +13333,57 @@ function dataRaw(){
    (function(){const ready9=!!(((S.ai.proxy||'').trim())||((S.ai.key||'').trim()));
      return '<button data-a="aiSave" class="btn mt" style="'+(ready9?'background:var(--amber);color:#1F1E1D;border:none;font-weight:600':'')+'">Save Allena settings</button>'})()+
    '<p style="color:var(--faint);font-size:12px;line-height:1.5;margin-top:8px">Without a key, Allena still works — it opens the Claude app with your session pre-attached.</p></div>'+
-   '<div class="mt2"><p class="eyebrow">Program format</p><pre style="margin-top:12px">'+esc(
-'{\n  "block": "Bench Block 2",\n  "kind": "strength",   // or mobility / posture\n  "weeks": 6,           // 1 = no week selector\n  "note": "optional program-level note",\n  "days": [{\n    "name": "Heavy Press",\n    "accent": "#D42D2D",\n    "note": "optional subtitle",\n    "exercises": [{\n      "name": "Bench — top set",\n      "bar": true,       // shows plate loading\n      "rest": 270,       // seconds (0-5 = no rest step)\n      "cue": "optional form cue shown before the set",\n      "sets": {\n        "1": [{"w":102.5,"reps":4,"rpe":"8-9"}],\n        "default": [{"reps":"8-12","rpe":8}]\n      }\n    },{\n      "name": "Couch stretch",\n      "rest": 20,\n      "sets": { "default": [\n        {"secs":45,"perSide":true},\n        {"secs":45,"perSide":true}\n      ]}\n    }]\n  }]\n}')+'</pre>'+
-   '<p style="color:var(--faint);font-size:12px;line-height:1.55;margin-top:8px">"default" applies to every week; a week number overrides it. Omit a week and the exercise is skipped that week. Omit "w" to pick the weight yourself. "secs" makes it a timed hold with its own countdown; add "perSide" and the timer runs once per side.</p></div>'+
+
+   '<div class="mt2"><p class="eyebrow">Units</p>'+
+   '<div class="card mt" style="padding:13px 15px">'+
+   '<div style="display:flex;align-items:center;gap:10px"><span style="flex:1;font-size:13.5px;font-weight:600">Weight</span>'+
+   ['kg','lb'].map(u=>'<button data-a="unitW" data-v="'+u+'" class="pill" style="width:64px;padding:9px 0'+(UNITS.w===u?';background:var(--text);color:var(--bg);border-color:var(--text);font-weight:600':'')+'">'+u+'</button>').join('')+'</div>'+
+   '<div style="display:flex;align-items:center;gap:10px;margin-top:10px;border-top:1px solid var(--line);padding-top:10px"><span style="flex:1;font-size:13.5px;font-weight:600">Distance</span>'+
+   ['km','mi'].map(u=>'<button data-a="unitD" data-v="'+u+'" class="pill" style="width:64px;padding:9px 0'+(UNITS.d===u?';background:var(--text);color:var(--bg);border-color:var(--text);font-weight:600':'')+'">'+u+'</button>').join('')+'</div>'+
+   '<p style="color:var(--faint);font-size:11px;line-height:1.5;margin-top:10px">Display and typing only — everything is stored metric underneath, so backups and history never change.</p></div></div>'+
+   '<div class="mt2"><p class="eyebrow">Available equipment</p>'+availEquipHtml()+'</div>'+
+   (inWrapper()?'<div class="mt2"><p class="eyebrow">Notifications</p>'+notifPageHtml()+'</div>':'')+
+   '<div class="mt2"><p class="eyebrow">Report a problem</p>'+reportPageHtml()+'</div>'+
    '<p class="mono" style="color:var(--faint);font-size:10px;text-align:center;margin-top:22px;letter-spacing:.06em">BUILD '+BUILD_ID+(SANDBOX?' · SANDBOX':'')+
    ' · <a href="about.html" target="_blank" style="color:var(--faint);text-decoration:underline">about</a></p></div>'}
 
+
+/* ── Settings page helpers (IA overhaul, 3 Sep) ────────────── */
+function notifPageHtml(){
+  const NP=notifPrefs();
+  const kinds=[['reveal','The evening reveal','Finds herald themselves at 7:30pm — never locked, always announced'],
+    ['morning','The morning call','Log the check-in, the forecast unlocks'],
+    ['appt','Physio appointments','The day before and the morning of'],
+    ['creatine','Creatine reminder','A gentle daily nudge to take it'],
+    ['wrap','The monthly wrap','When it lands, on the 1st'],
+    ['quest','The weekly quest','Monday morning']];
+  return '<div class="card mt" style="padding:13px 15px">'+
+    '<div style="display:flex;align-items:center;gap:10px"><span style="flex:1;font-size:13.5px;font-weight:600">Allena can speak up</span>'+
+    '<button data-a="notifOn" class="pill'+(NP.on?' on':'')+'" style="width:64px;padding:9px 0">'+(NP.on?'On':'Off')+'</button></div>'+
+    (NP.on?kinds.map(k=>'<div style="display:flex;align-items:center;gap:10px;margin-top:10px;border-top:1px solid var(--line);padding-top:10px">'+
+      '<span style="flex:1;min-width:0"><span style="font-size:13px;font-weight:600;display:block">'+k[1]+'</span>'+
+      '<span style="color:var(--faint);font-size:11px">'+k[2]+'</span></span>'+
+      '<button data-a="notifKind" data-v="'+k[0]+'" class="pill'+(NP[k[0]]?' on':'')+'" style="width:56px;padding:8px 0;font-size:11px">'+(NP[k[0]]?'On':'Off')+'</button></div>').join(''):'')+
+    '<p style="color:var(--faint);font-size:11px;line-height:1.5;margin-top:10px">Every notification carries a real fact tied to a real date. There is no “we miss you” — by design, there never will be.</p></div>'}
+function reportPageHtml(){
+  return '<p style="color:var(--dim);font-size:13px;line-height:1.6;margin-top:8px">Something broken, confusing, or just not right? One tap opens an email to the developer — Allena fills in what build you are on so you do not have to.</p>'+
+    '<button data-a="reportEmail" class="big disp mt" style="background:var(--amber);color:var(--bg);font-size:15px">Email the developer</button>'+
+    '<p style="color:var(--faint);font-size:11.5px;line-height:1.5;margin-top:10px">Beta build '+BUILD_ID+'. Screenshots help — attach them in the email.</p>'}
+function availEquipHtml(){
+  const EQ=[['bb','Barbell & plates'],['rack','Squat rack / cage'],['db','Dumbbells'],
+    ['mc','Pin-loaded machines'],['cb','Cable stack'],['pullup','Pull-up bar'],
+    ['bench','Adjustable bench'],['band','Resistance bands'],['kb','Kettlebells'],['cardio','Bike / rower / treadmill']];
+  const eqx=(S.prof&&S.prof.eqx)||{};
+  const full=S.prof&&S.prof.eq==='full';
+  return '<p style="color:var(--faint);font-size:12px;line-height:1.55;margin-top:8px">What you can actually train on right now. Change gyms mid-block? Update this and Allena reworks the rest of your program around what is left — swapping what it can, flagging what it cannot.</p>'+
+    '<div style="margin-top:12px;display:flex;flex-direction:column;gap:7px">'+
+    EQ.map(x=>{const on=full||!!eqx[x[0]];
+      return '<button data-a="availEq" data-v="'+x[0]+'" class="card" style="width:100%;text-align:left;padding:11px 14px;display:flex;align-items:center;gap:11px'+(on?';border-color:var(--amber)':'')+'">'+
+      '<span style="width:21px;height:21px;border-radius:7px;flex:none;display:inline-flex;align-items:center;justify-content:center;font-size:11px;'+
+      (on?'background:var(--amber);color:var(--bg)':'border:1.5px solid var(--line)')+'">'+(on?'✓':'')+'</span>'+
+      '<span style="flex:1;font-size:13.5px;font-weight:600">'+esc(x[1])+'</span></button>'}).join('')+'</div>'+
+    '<button data-a="availEqApply" class="btn mt2" style="border-color:var(--amber);color:var(--amber)">Rework my block around this</button>'+
+    '<p style="color:var(--faint);font-size:11px;line-height:1.5;margin-top:8px">Nothing changes until you tap that — and Allena tells you exactly what she swapped or dropped before it lands.</p>'}
 function sheetHtml(){
   if(!S.sheet)return '';
   if(S.sheet.t==='discard')return wrapSheet('Discard session',
@@ -15240,6 +15371,13 @@ document.addEventListener('click',e=>{if(S.boot!=null&&e.target&&e.target.closes
       const b=document.getElementById('coachThread');
       if(b&&kb>40)b.scrollTop=b.scrollHeight})};
   vv.addEventListener('resize',fit);
+  /* belt-and-braces (owner-caught in the wrapper: the composer got
+     eaten by the keyboard). On focus of any chat input, pin + scroll
+     it visible after the keyboard settles. */
+  document.addEventListener('focusin',function(e){
+    const t=e.target;if(!t||!(t.matches&&t.matches('.chatwrap textarea, .chatwrap input')))return;
+    setTimeout(function(){fit();try{t.scrollIntoView({block:'center'})}catch(e2){}},220)});
+  vv.addEventListener('resize',fit);
   // vv 'scroll' fires on ordinary page scrolls too — only the chat's
   // pinned composer needs it; everywhere else it must never run
   vv.addEventListener('scroll',function(){if(document.querySelector('.chatwrap'))fit()});
@@ -15436,7 +15574,9 @@ function runAction(a,v,t,e){
     case 'dpShare':{try{navigator.clipboard.writeText(dpShareText());flash('Copied — paste it wherever you like.')}
       catch(e){flash('Could not copy on this device.')}break}
     case 'sigBw':{S.sheet=null;S.daily.on=true;lset(K_DAILY,S.daily);
-      S.gform={bw:''};S.sheet={t:'bwq'};render();break}
+      const dks=Object.keys((S.daily&&S.daily.days)||{}).filter(k=>S.daily.days[k].bw!=null).sort();
+      const lastBw=dks.length?S.daily.days[dks[dks.length-1]].bw:null;
+      S.gform={bw:lastBw!=null?String(uwNum(lastBw)):''};S.sheet={t:'bwq'};render();break}
     case 'sigBb':{S.sheet=null;
       if(!(S.gar&&S.gar.on)){S.gar=S.gar||{days:{}};S.gar.on=true;S.gar.morning=true;garSave()}
       const dd2=(S.gar.days||{})[today()]||{};
@@ -16125,6 +16265,16 @@ function runAction(a,v,t,e){
     case 'notifAskNo':{const P=notifPrefs();P.asked=1;P.on=false;notifSave();render();
       flash('Any time — Settings \u2192 Notifications turns them on.');break}
     case 'themeSet':lset('training-theme-v1',v);applyTheme();render();break;
+    case 'reportEmail':{const subj=encodeURIComponent('Allena beta — build '+BUILD_ID);
+      const body=encodeURIComponent('\n\n———\nBuild '+BUILD_ID+(SANDBOX?' (sandbox)':'')+'\n'+navigator.userAgent+'\n(describe what happened, and attach a screenshot if you can)');
+      try{location.href='mailto:sathyacrisren@gmail.com?subject='+subj+'&body='+body}catch(e){flash('Could not open mail — email sathyacrisren@gmail.com')}break}
+    case 'availEq':{S.prof=S.prof||{};S.prof.eqx=S.prof.eqx||{};
+      if(S.prof.eq==='full'){/* expand full into explicit set so one can be turned off */
+        ['bb','rack','db','mc','cb','pullup','bench','band','kb','cardio'].forEach(k=>S.prof.eqx[k]=1);S.prof.eq='custom'}
+      S.prof.eqx[v]=!S.prof.eqx[v];lset(K_PROF,S.prof);render();break}
+    case 'availEqApply':{try{const r=equipRework();
+      S.confirm={t:'Rework the block?',m:r.summary,yes:'availEqGo',v:''};render()}catch(e){flash('Nothing to rework.')}break}
+    case 'availEqGo':{try{equipReworkApply();S.confirm=null;render();flash('Block reworked around your equipment.')}catch(e){S.confirm=null;flash('Could not rework.')}break}
     case 'notifOn':{const P=notifPrefs();P.on=!P.on;P.asked=1;notifSave();notifSync();render();
       if(P.on)flash('iOS will ask permission once — allow it and Allena can speak up.');break}
     case 'notifKind':{const P=notifPrefs();P[v]=!P[v];notifSave();notifSync();render();break}
