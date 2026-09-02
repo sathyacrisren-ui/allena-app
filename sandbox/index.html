@@ -558,7 +558,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='bc05de';  // stamped by tools/build.py with the content hash
+const BUILD_ID='267cbf';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -1349,7 +1349,11 @@ function snapshotData(){
   const d=dataPoints(),t=dpTier(d.total),tr=treeData(),st=bankStats();
   // quest deliberately NOT synced: its title names an exercise, which is
   // training data. The server column stays for a future anonymised form.
-  return{points:d.total,live_points:d.live,tier:t[1],
+  /* the precision layer made totals decimal (Sep 2026) but the
+     server columns are int — the synced score card rounds; the
+     precise figure lives on-device. (A future migration to numeric
+     can carry decimals when competition needs them.) */
+  return{points:Math.round(d.total),live_points:Math.round(d.live),tier:t[1],
     tree:{pts:tr.pts,sessions:tr.sessions,lifts:tr.liftCount,runs:tr.runs,
       km:tr.km,rare:tr.rare,found:tr.found,weeks:tr.weeks,days:tr.days},
     collection_count:st.total}}
@@ -1369,7 +1373,8 @@ async function acctSync(loud){
     if(r.ok){lset(K_ACCT,Object.assign({},acct(),{lastSync:today()}));
       try{haptic('success')}catch(e9){}
       done(true);return true}
-    if(loud)flash('Sync failed ('+r.status+').');
+    let why='';try{why=(await r.text()).slice(0,120)}catch(e9){}
+    if(loud)flash('Sync failed ('+r.status+')'+(why?' — '+why:'')+'.');
     done(false);return false}catch(e){if(loud)flash('No connection.');done(false);return false}}
 let acctSyncT=null;
 function acctSyncSoon(){
