@@ -83,8 +83,10 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
 #app{max-width:460px;margin:0 auto;padding:0 0 calc(20px + env(safe-area-inset-bottom));min-height:100vh;overflow-x:hidden}
 #app:has(.sessfix){padding-bottom:0;min-height:0}
 .sessfix{height:100dvh;display:flex;flex-direction:column;overflow:hidden}
-.sessbody{flex:1;min-height:0;overflow-y:auto;padding-top:12px;-webkit-overflow-scrolling:touch}
-.sessfoot{flex:none;padding:10px 20px calc(12px + env(safe-area-inset-bottom));border-top:1px solid var(--line);background:var(--bg)}
+.sessbody{flex:1;min-height:0;overflow-y:auto;padding-top:8px;-webkit-overflow-scrolling:touch}
+/* one solid page: no dividing line between the actions and the rest
+   (owner call, Sep 2026) */
+.sessfoot{flex:none;padding:6px 20px calc(8px + env(safe-area-inset-bottom));background:var(--bg)}
 .sessfoot .big{margin-top:0}
 #app>.view:first-child{margin-top:calc(env(safe-area-inset-top) - 6px)}
 /* the session screen is a 100dvh instrument that pads its own safe
@@ -187,6 +189,7 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
 .pill.on{background:var(--text);color:var(--bg);border-color:var(--text);font-weight:600}
 .scroller{display:flex;gap:8px;overflow-x:auto;overflow-y:hidden;padding-bottom:2px;scrollbar-width:none;-webkit-overflow-scrolling:touch}
 .scroller::-webkit-scrollbar{display:none}
+@keyframes pillpop{0%{transform:translateX(-50%) scale(.45);opacity:0}60%{transform:translateX(-50%) scale(1.06)}100%{transform:translateX(-50%) scale(1);opacity:1}}
 #drawer{position:fixed;inset:0;z-index:60;pointer-events:none}
 #drawer .scrim{position:absolute;inset:0;background:rgba(0,0,0,.55);opacity:0;transition:opacity .22s ease}
 #drawer .panel{position:absolute;top:0;left:0;bottom:0;width:84%;max-width:330px;background:var(--bg);
@@ -249,20 +252,17 @@ pre{background:var(--surface);border:1px solid var(--line);border-radius:10px;pa
    Dynamic Island phones). Now: the view's top pad is neutralised
    under sesslive and #app reserves exactly the pill's height, so the
    title sits a consistent ~8px under the capsule. */
-body.sesslive #app{padding-top:calc(env(safe-area-inset-top) + 44px)}
-body.sesslive #app .view{padding-top:8px!important}
+body.sesslive:not(.island) #app{padding-top:calc(env(safe-area-inset-top) + 44px)}
+body.sesslive:not(.island) #app .view{padding-top:8px!important}
 /* the first view's own safe-area margin must not STACK on the
    reserved pill zone — that double-counted the inset and left a huge
    dead band above the title (owner screenshot, Sep 2026) */
-body.sesslive #app>.view:first-child{margin-top:0}
+body.sesslive:not(.island) #app>.view:first-child{margin-top:0}
 /* Dynamic Island phones (inset ≥ 55, set by the probe in 00-core):
-   the pill fuses to the island's underside — pure black, overlapping
-   its bottom curve, so the island reads as extending to show the
-   live session. Beside-the-camera text cannot fit: the clock ends
-   ~107pt in and the battery cluster mirrors it, which is why iOS
-   itself caps the island at ~161pt. Under it is the native look. */
-body.island #sessBanner{top:44px;background:#000}
-body.island.sesslive #app{padding-top:calc(env(safe-area-inset-top) + 26px)}
+   the small pill floats top-centre in the status band, tucked under
+   the island, and the page reserves NOTHING for it — headings stay
+   exactly where they live without a session (owner call, Sep 2026). */
+body.island #sessBanner{top:44px}
 /* tactile motion (Sep 2026): every tap answers back — a springy press,
    messages that arrive, a composer that wakes when touched */
 button{transition:transform .16s cubic-bezier(.34,1.56,.64,1),opacity .16s,background-color .18s,border-color .18s}
@@ -515,7 +515,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='c45529';  // stamped by tools/build.py with the content hash
+const BUILD_ID='f22b5c';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -674,15 +674,15 @@ function warmupHtml(wu,cur,sess){
   sess.wu=sess.wu||{};
   if(wu.generic)return '<div class="card mt" style="padding:14px 16px"><p class="eyebrow">Warm-up</p>'+
     '<p style="color:var(--dim);font-size:12.5px;line-height:1.5;margin-top:6px">Ramp up over two easy sets before your first working weight.</p></div>';
-  return '<div class="card mt" style="padding:14px 16px"><p class="eyebrow">Warm-up — tap as you go</p>'+
+  return '<div class="card mt" style="padding:11px 14px"><p class="eyebrow">Warm-up — tap as you go</p>'+
     '<div style="margin-top:8px">'+wu.rows.map((r,i)=>{
       const k=cur.exNo+'-'+i,done=!!sess.wu[k];
-      return '<button data-a="wuTick" data-v="'+k+'" class="mono" style="display:flex;align-items:center;gap:10px;width:100%;padding:8px 0;font-size:14px;text-align:left;'+
+      return '<button data-a="wuTick" data-v="'+k+'" class="mono" style="display:flex;align-items:center;gap:10px;width:100%;padding:5px 0;font-size:13.5px;text-align:left;'+
         (done?'color:var(--faint);text-decoration:line-through':'color:var(--text)')+'">'+
         '<span style="width:18px;height:18px;border-radius:18px;flex:none;display:inline-flex;align-items:center;justify-content:center;font-size:11px;'+
         (done?'background:var(--green);color:var(--bg)':'border:1.5px solid var(--line)')+'">'+(done?'✓':'')+'</span>'+
         (r[0]===BAR?'Bar · '+uwNum(BAR)+' '+uwUnit():uwNum(r[0])+' '+uwUnit())+' × '+r[1]+'</button>'}).join('')+'</div>'+
-    '<p style="color:var(--faint);font-size:11px;margin-top:6px">30–60 s between warm-up sets. Not logged, not counted.</p></div>'}
+    '<p style="color:var(--faint);font-size:10.5px;margin-top:4px">30–60 s between warm-up sets. Not logged, not counted.</p></div>'}
 const SUBS={
  'bench':[{n:'Dumbbell bench press',f:.40,u:'per DB',note:'Two DBs. Slightly higher reps if the top set is a double or triple.'},
           {n:'Machine chest press',f:1,u:'kg',note:'Match the reps and RPE, not the number on the stack.'},
@@ -10840,15 +10840,15 @@ function plateHtml(w){const{ok,list}=platesFor(w);
   if(!S.lay.plates)return '';
   if(!list.length)return '<p class="eyebrow" style="text-align:center;margin-top:10px">'+(ok?'Empty bar · '+uwNum(BAR)+' '+uwUnit():"Can't load exactly")+'</p>';
   const tall=Math.max.apply(null,list.map(p=>p.h));
-  return '<div style="display:flex;align-items:center;justify-content:center;gap:3px;height:'+(tall+14)+'px">'+
+  return '<div style="display:flex;align-items:center;justify-content:center;gap:3px;height:'+(Math.round(tall*0.72)+10)+'px">'+
       '<div style="width:40px;height:7px;background:linear-gradient(180deg,#A29B90,#6E6860);border-radius:2px;flex:none"></div>'+
-      list.map(p=>'<div style="width:'+p.w+'px;height:'+p.h+'px;background:'+p.c+';border-radius:2px;flex:none"></div>').join('')+
+      list.map(p=>'<div style="width:'+Math.max(7,Math.round(p.w*0.9))+'px;height:'+Math.round(p.h*0.72)+'px;background:'+p.c+';border-radius:2px;flex:none"></div>').join('')+
       '<div style="width:6px;height:26px;background:#5A544B;border-radius:2px;flex:none;margin-left:2px"></div>'+
     '</div>'+
-    '<div style="display:flex;flex-wrap:wrap;justify-content:center;gap:5px;margin-top:10px">'+
+    '<div style="display:flex;flex-wrap:wrap;justify-content:center;gap:5px;margin-top:7px">'+
       list.map(p=>'<span class="mono" style="display:inline-flex;align-items:center;gap:5px;font-size:10.5px;color:var(--dim);border:1px solid var(--line);border-radius:20px;padding:2px 8px">'+
         '<span style="width:7px;height:7px;border-radius:2px;background:'+p.c+'"></span>'+p.kg+'</span>').join('')+'</div>'+
-    '<p class="eyebrow" style="text-align:center;margin-top:8px">'+(ok?'Per side · '+uwNum(BAR)+' '+uwUnit()+' bar':"Can't load exactly")+'</p>'}
+    '<p class="eyebrow" style="text-align:center;margin-top:6px">'+(ok?'Per side · '+uwNum(BAR)+' '+uwUnit()+' bar':"Can't load exactly")+'</p>'}
 function stepper(key,label,val,step,suffix){
   return '<div style="min-width:0">'+(label?'<p style="color:var(--dim);font-size:11px;letter-spacing:.1em;text-transform:uppercase;margin-bottom:8px">'+label+'</p>':'')+
    '<div class="step"><button data-a="bump" data-k="'+key+'" data-d="-'+step+'">−</button>'+
@@ -10870,11 +10870,11 @@ function logLines(list,action,sid){return list.map((l,i)=>
   '<span style="color:var(--dim)">'+esc(l.ex)+' #'+l.setNo+'</span>'+
   '<span>'+esc(entryStr(l))+(l.pr?' <span style="color:var(--amber)">★</span>':'')+' <span style="color:var(--faint)">›</span></span></button>').join('')}
 function targetStr(c){
-  if(c.secs)return '<span class="mono" style="font-size:clamp(34px,12vw,50px);font-weight:600;line-height:1">'+c.secs+'</span>'+
+  if(c.secs)return '<span class="mono" style="font-size:clamp(26px,8.5vw,36px);font-weight:600;line-height:1">'+c.secs+'</span>'+
     '<span class="mono" style="color:var(--dim);font-size:16px">sec'+(c.perSide?' / side':'')+'</span>';
-  return '<span class="mono" style="font-size:clamp(34px,12vw,50px);font-weight:600;line-height:1">'+(c.targetW==null?'—':uwNum(c.targetW))+'</span>'+
+  return '<span class="mono" style="font-size:clamp(26px,8.5vw,36px);font-weight:600;line-height:1">'+(c.targetW==null?'—':uwNum(c.targetW))+'</span>'+
    (c.targetW!=null?'<span class="mono" style="color:var(--dim);font-size:16px">'+uwUnit()+'</span>':'')+
-   '<span class="mono" style="color:var(--dim);font-size:clamp(18px,6.5vw,24px);margin-left:4px;white-space:nowrap">× '+c.targetReps+(c.perSide?' / side':'')+'</span>'}
+   '<span class="mono" style="color:var(--dim);font-size:clamp(15px,5vw,19px);margin-left:4px;white-space:nowrap">× '+c.targetReps+(c.perSide?' / side':'')+'</span>'}
 
 /* ══ views ══════════════════════════════════════════════ */
 function weekDone(progId,wk){const set=new Set();
@@ -12516,9 +12516,9 @@ function viewSession(){
      the action buttons never move (owner rule, Aug 31). */
   let body='',foot='';
   body+='<p class="eyebrow">Set '+cur.setNo+' of '+cur.of+' · Exercise '+cur.exNo+'</p>'+
-   '<h1 class="disp" style="font-size:21px;font-weight:600;line-height:1.15;margin-top:4px">'+esc(cur.ex)+'</h1>'+
+   '<h1 class="disp" style="font-size:18px;font-weight:600;line-height:1.15;margin-top:2px">'+esc(cur.ex)+'</h1>'+
    (cur.origEx?'<p class="mono" style="color:var(--amber);font-size:11px;margin-top:3px">SWAPPED FROM '+esc(cur.origEx.toUpperCase())+(cur.subUnit?' · '+esc(cur.subUnit):'')+'</p>':'')+
-   '<div class="card mt" style="padding:'+(s.phase==='logging'?'11px 14px':'14px 16px')+';border-top:3px solid '+acc+'">';
+   '<div class="card mt" style="padding:'+(s.phase==='logging'?'11px 14px':'11px 14px')+';border-top:3px solid '+acc+'">';
   if(s.phase==='logging'){
     // the set is done — the card is a reference strip, not a billboard
     body+='<p class="mono" style="font-size:13px;color:var(--dim)"><span style="color:var(--faint)">TARGET</span> '+
@@ -12527,18 +12527,18 @@ function viewSession(){
       (last?'<p class="mono" style="font-size:12px;color:var(--faint);margin-top:4px">'+((last.week&&last.week!==s.week)?'WEEK '+last.week:'LAST')+' '+esc(entryStr(last))+'</p>':'');
   }else{
     body+='<p class="eyebrow">Target</p>'+
-    '<div style="display:flex;align-items:baseline;gap:8px;row-gap:2px;margin-top:6px;flex-wrap:wrap">'+targetStr(cur)+'</div>'+(cur.adj?'<p class="mono" style="color:var(--amber);font-size:10.5px;margin-top:3px">'+(cur.adj>0?'+':'')+uwNum(cur.adj)+' '+uwUnit()+' — adjusted from your logs</p>':'')+
-    (cur.targetRpe!=null?'<p class="mono" style="color:'+acc+';font-size:12.5px;font-weight:600;margin-top:6px">RPE '+cur.targetRpe+
+    '<div style="display:flex;align-items:baseline;gap:8px;row-gap:2px;margin-top:4px;flex-wrap:wrap">'+targetStr(cur)+'</div>'+(cur.adj?'<p class="mono" style="color:var(--amber);font-size:10.5px;margin-top:3px">'+(cur.adj>0?'+':'')+uwNum(cur.adj)+' '+uwUnit()+' — adjusted from your logs</p>':'')+
+    (cur.targetRpe!=null?'<p class="mono" style="color:'+acc+';font-size:12px;font-weight:600;margin-top:4px">RPE '+cur.targetRpe+
       (rir(cur.targetRpe)!==null?'<span style="color:var(--faint);font-weight:400"> · '+(rir(cur.targetRpe)===0?'nothing left':rir(cur.targetRpe)+' reps in reserve')+'</span>':'')+'</p>':'');
     if(last){const dw=(last.week&&last.week!==s.week)?'WEEK '+last.week:'LAST TIME';
       let delta='';
       if(!cur.secs&&last.w&&cur.targetW!=null&&last.w!==cur.targetW)
         delta=' · '+(cur.targetW>last.w?'+':'')+(UNITS.w==='lb'?Math.round((cur.targetW-last.w)*LB_KG*2)/2:Math.round((cur.targetW-last.w)*10)/10)+' '+uwUnit();
-      body+='<div style="margin-top:9px;padding-top:9px;border-top:1px solid var(--line)">'+
+      body+='<div style="margin-top:7px;padding-top:7px;border-top:1px solid var(--line)">'+
         '<p class="mono" style="color:var(--amber);font-size:11px">'+dw+' · SET '+last.setNo+'</p>'+
         '<p class="mono" style="color:var(--dim);font-size:13px;margin-top:2px">'+esc(entryStr(last))+
         '<span style="color:var(--faint);font-size:11px">'+delta+' · '+fmtDate(last.date)+'</span></p></div>'}
-    if(cur.bar&&cur.targetW!=null&&S.lay.plates!==false)body+='<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--line)">'+plateHtml(cur.targetW)+'</div>';
+    if(cur.bar&&cur.targetW!=null&&S.lay.plates!==false)body+='<div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--line)">'+plateHtml(cur.targetW)+'</div>';
   }
   body+='</div>';
   if(cur.cue&&s.phase==='ready')body+='<div class="cue mt" style="border-left-color:'+acc+'">'+esc(cur.cue)+'</div>';
@@ -12561,11 +12561,11 @@ function viewSession(){
   if(s.phase==='ready')foot+='<button data-a="begin" class="big disp" style="background:'+acc+';color:var(--bg)">'+
     (cur.secs?'Start '+cur.secs+'s hold':'Start set '+cur.setNo)+'</button>';
   if(s.phase==='working')foot+='<button data-a="finish" class="big disp" style="background:var(--text);color:var(--bg)">Finish set</button>';
-  if(s.phase!=='logging')foot+='<div class="row" style="margin-top:9px">'+
-    '<button data-a="modifyOpen" class="btn" style="flex:1;color:var(--amber);font-size:12.5px;padding:11px 8px">Modify</button>'+
-    '<button data-a="planOpen" class="btn" style="flex:1;color:var(--dim);font-size:12.5px;padding:11px 8px">Plan</button>'+
-    '<button data-a="saveExit" class="btn" style="flex:1;color:var(--dim);font-size:12.5px;padding:11px 8px">Save &amp; exit</button></div>';
-  foot+='<button data-a="discard" style="width:100%;padding:8px;color:var(--faint);font-size:11.5px;margin-top:4px">Discard this session</button>';
+  if(s.phase!=='logging')foot+='<div class="row" style="margin-top:6px">'+
+    '<button data-a="modifyOpen" class="btn" style="flex:1;color:var(--amber);font-size:12.5px;padding:9px 8px">Modify</button>'+
+    '<button data-a="planOpen" class="btn" style="flex:1;color:var(--dim);font-size:12.5px;padding:9px 8px">Plan</button>'+
+    '<button data-a="saveExit" class="btn" style="flex:1;color:var(--dim);font-size:12.5px;padding:9px 8px">Save &amp; exit</button></div>';
+  foot+='<button data-a="discard" style="width:100%;padding:5px;color:var(--faint);font-size:11px;margin-top:2px">Discard this session</button>';
   return '<div class="view sessfix">'+h+'<div class="sessbody pad">'+body+'</div>'+
      '<div class="sessfoot">'+foot+'</div></div>'}
 
@@ -15240,6 +15240,8 @@ function render(){
     let extra=document.getElementById('extra');
     if(!extra){extra=document.createElement('div');extra.id='extra';document.body.appendChild(extra)}
     extra.innerHTML=extraHtml;
+    try{if(S._pillPop){S._pillPop=0;const pb=document.getElementById('sessBanner');
+      if(pb)pb.style.animation='pillpop .38s cubic-bezier(.34,1.56,.64,1)'}}catch(e){}
     /* an OPEN sheet re-rendered (typing, toggles) must not replay its
        slide-up — only a newly opened sheet animates. Same for a toast
        that is still showing. */
@@ -15354,14 +15356,46 @@ setInterval(function(){try{
   document.addEventListener('mouseup',()=>{active=false;setTimeout(clear,1400)});
 })();
 
-/* swipe down on the session top bar minimizes it — the pill takes over */
-(function(){let y0=null;
-  document.addEventListener('touchstart',e=>{const b=e.target.closest&&e.target.closest('[data-sessbar]');
-    y0=b?e.touches[0].clientY:null},{passive:true});
+/* swipe down anywhere on the session screen minimizes it into the
+   live pill, sheet-style (owner call, Sep 2026): the screen follows
+   the finger, rounds its corners, and past the threshold slides away
+   — then the pill pops in. Starts only when the session body is
+   scrolled to the top, so a normal scroll never fights it; inputs,
+   steppers and the RPE grid opt out; open sheets suppress it. */
+(function(){let y0=null,fix=null,dragging=false;
+  document.addEventListener('touchstart',e=>{
+    fix=null;y0=null;dragging=false;
+    if(!e.target.closest||!e.target.closest('.sessfix'))return;
+    if(e.target.closest('input,textarea,.rpe,.step'))return;
+    if(document.querySelector('#extra .sheet'))return;
+    const f=document.querySelector('.sessfix');if(!f)return;
+    const b=f.querySelector('.sessbody');
+    if(b&&b.scrollTop>2)return;
+    y0=e.touches[0].clientY;fix=f},{passive:true});
   document.addEventListener('touchmove',e=>{
-    if(y0==null)return;
-    if(e.touches[0].clientY-y0>70){y0=null;vib(10);runAction('sessMin')}},{passive:true});
-  document.addEventListener('touchend',()=>{y0=null},{passive:true});
+    if(y0==null||!fix)return;
+    const dy=e.touches[0].clientY-y0;
+    if(dy<=0){if(!dragging){y0=null;fix=null}return}
+    if(!dragging){if(dy<14)return;dragging=true;fix.style.transition='none';try{vib(6)}catch(e2){}}
+    const d=Math.min(dy*0.55,260);
+    fix.style.transform='translateY('+d+'px) scale('+(1-d/1600).toFixed(4)+')';
+    fix.style.borderRadius=Math.min(28,d/3)+'px';
+    fix.style.overflow='hidden';
+    if(e.cancelable)e.preventDefault()},{passive:false});
+  document.addEventListener('touchend',()=>{
+    if(!dragging||!fix){y0=null;fix=null;dragging=false;return}
+    const m9=/translateY\(([\d.]+)px\)/.exec(fix.style.transform||'');
+    const d=m9?+m9[1]:0;
+    const f=fix;fix=null;y0=null;dragging=false;
+    if(d>90){
+      f.style.transition='transform .26s cubic-bezier(.4,0,.2,1),opacity .24s ease';
+      f.style.transform='translateY(45vh) scale(.88)';f.style.opacity='0';
+      try{haptic('light')}catch(e2){}
+      setTimeout(function(){S._pillPop=1;runAction('sessMin')},220)}
+    else{
+      f.style.transition='transform .24s cubic-bezier(.34,1.4,.64,1)';
+      f.style.transform='';f.style.borderRadius='';
+      setTimeout(function(){try{f.style.transition='';f.style.overflow=''}catch(e2){}},260)}},{passive:true});
 })();
 document.addEventListener('change',e=>{if(e.target&&e.target.dataset&&e.target.dataset.acldate){
   S.adate=S.adate||{};S.adate.val=e.target.value;
