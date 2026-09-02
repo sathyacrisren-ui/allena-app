@@ -393,7 +393,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='ad078b';  // stamped by tools/build.py with the content hash
+const BUILD_ID='415a50';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -3938,6 +3938,18 @@ function rehabAlternatives(name){
     const list=p.mode==='staged'?((p.stages[Math.min(st.stage,p.stages.length)-1]||{}).ex||[]):p.routine;
     addFrom(list,p.n.toLowerCase())});
   return pool.sort((a,b)=>b.score-a.score).slice(0,6)}
+function pplanTimed(str){
+  /* '30s', '30 s', '30sec', '30 seconds', '0:45', '1:00', with an
+     optional 'each side'/'per side'/'/side' — anything else is reps */
+  const t=String(str||'').trim().toLowerCase();
+  const perSide=/(each|per)\s*side|\/\s*side/.test(t);
+  let m=/^(\d+)\s*s(ec(ond)?s?)?\b/.exec(t);
+  if(m)return{secs:+m[1],perSide:perSide};
+  m=/^(\d+):(\d{2})\b/.exec(t);
+  if(m)return{secs:+m[1]*60+ +m[2],perSide:perSide};
+  m=/^(\d+)\s*min(ute)?s?\b/.exec(t);
+  if(m)return{secs:+m[1]*60,perSide:perSide};
+  return null}
 function protoProgram(k){
   const p=protoFor(k);if(!p)return null;
   const st=rehabState(k);
@@ -3945,7 +3957,7 @@ function protoProgram(k){
   const days=[{name:p.mode==='staged'?(p.stages[st.stage-1]||{}).n||p.n:p.n,
     note:p.mode==='staged'?'Stage '+st.stage+' of '+p.stages.length:(p.freq||''),
     exercises:list.map(e=>({name:e.n,rest:e.secs?30:75,cue:e.cue||null,
-      sets:{'default':Array.from({length:e.s||3},()=>e.secs?{secs:e.secs}:{reps:e.reps||10,rpe:null})}}))}];
+      sets:{'default':Array.from({length:e.s||3},()=>e.secs?{secs:e.secs,perSide:!!e.perSide}:{reps:e.reps||10,rpe:null})}}))}];
   return{id:'reh-'+k,rehabProto:k,kind:'rehab',weeks:1,block:p.n+' — rehab',note:p.why,days:days}}
 
 /* ══ ACL pathway ════════════════════════════════════════════
@@ -13321,12 +13333,12 @@ function sheetHtml(){
       (f.ex.length?'<div class="card mt" style="padding:4px 15px">'+
         f.ex.map((e,i)=>'<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--line)">'+
           '<span style="flex:1;min-width:0;font-size:13.5px">'+esc(e.n)+'</span>'+
-          '<span class="mono" style="color:var(--faint);font-size:11.5px;flex:none">'+e.s+'×'+esc(e.r)+'</span>'+
+          '<span class="mono" style="color:var(--faint);font-size:11.5px;flex:none">'+e.s+' × '+esc(e.r)+(/^\d+s$/.test(e.r)?' hold'+(e.perSide?' · each side':''):'')+'</span>'+
           '<button data-a="pplanExDel" data-v="'+i+'" style="color:var(--faint);font-size:14px;padding:5px 7px;flex:none">✕</button></div>').join('')+'</div>':'')+
       '<div style="display:grid;grid-template-columns:2fr 64px 84px;gap:8px;margin-top:10px">'+
       '<input data-in="pform.exn" value="'+esc(f.exn||'')+'" placeholder="Exercise">'+
       '<input data-in="pform.exs" value="'+esc(f.exs||'')+'" placeholder="sets" inputmode="numeric">'+
-      '<input data-in="pform.exr" value="'+esc(f.exr||'')+'" placeholder="reps"></div>'+
+      '<input data-in="pform.exr" value="'+esc(f.exr||'')+'" placeholder="reps or 30s"></div>'+
       '<button data-a="pplanEx" class="btn mt" style="color:var(--dim);font-size:13px">+ Add exercise</button>'+
       '<button data-a="pplanSave" class="big disp mt" style="background:'+((f.name||'').trim()&&f.ex.length?'var(--amber)':'var(--raised)')+';color:'+((f.name||'').trim()&&f.ex.length?'#1F1E1D':'var(--faint)')+';font-size:15px">Save the plan</button>'+
       (f.id?'<button data-a="pplanDelAsk" data-v="'+f.id+'" class="btn mt" style="color:var(--red);font-size:12.5px">Remove this plan</button>':'')+
@@ -14953,7 +14965,14 @@ function runAction(a,v,t,e){
       S.sheet={t:'pplan'};render();break}
     case 'pplanEx':{const f=S.pform;if(!f)break;
       if(!(f.exn||'').trim()){flash('Name the exercise first.');break}
-      f.ex.push({n:f.exn.trim(),s:Math.max(1,parseInt(f.exs,10)||3),r:(f.exr||'').trim()||'10'});
+      /* timed holds parse generously — physios write '30 sec', '0:45',
+         '30s each side', not a canonical token (owner-hit: timed
+         exercises silently became fake reps) */
+      const raw=(f.exr||'').trim()||'10';
+      const tm=pplanTimed(raw);
+      f.ex.push(tm?{n:f.exn.trim(),s:Math.max(1,parseInt(f.exs,10)||3),r:tm.secs+'s',perSide:tm.perSide}
+                 :{n:f.exn.trim(),s:Math.max(1,parseInt(f.exs,10)||3),r:raw});
+      if(tm)flash(tm.secs+'-second hold'+(tm.perSide?', each side':'')+' — timed, with a countdown in the session.');
       f.exn='';f.exr='';render();break}
     case 'pplanExDel':{if(S.pform)S.pform.ex.splice(+v,1);render();break}
     case 'pplanSave':{const f=S.pform;if(!f)break;
@@ -14965,8 +14984,9 @@ function runAction(a,v,t,e){
         why:(f.notes||'').trim()||'Written with your physio. Progress it at your appointments — Allena runs the sessions, counts adherence and builds the report in between.',
         freq:(f.freq||'').trim()||'As prescribed by your physio.',
         progress:'At your physio\u2019s call — bring the report and adjust it together.',
-        routine:f.ex.map(e=>{const m2=/^(\d+)\s*s$/i.exec(e.r);
-          return m2?{n:e.n,s:e.s,secs:+m2[1],cue:''}:{n:e.n,s:e.s,reps:e.r,cue:''}})};
+        routine:f.ex.map(e=>{const tm2=pplanTimed(e.r);
+          return tm2?{n:e.n,s:e.s,secs:tm2.secs,perSide:!!(e.perSide||tm2.perSide),cue:''}
+                    :{n:e.n,s:e.s,reps:e.r,cue:''}})};
       physSave();S.sheet=null;S.pform=null;S.protoK=id;S.view='proto';
       flash('Plan saved.');render();break}
     case 'pplanDelAsk':{S.confirm={t:'Remove this plan?',
