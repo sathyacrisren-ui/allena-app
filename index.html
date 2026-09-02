@@ -387,7 +387,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='255e8b';  // stamped by tools/build.py with the content hash
+const BUILD_ID='79604c';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -3387,8 +3387,17 @@ function sessionLiveWhy(h){
   // a session recorded as it happened: real duration, sets spread over
   // time. demo and imported records can never be live — live means this
   // phone ran the clock, and sample data or an upload did not.
-  if(!h||h.manual||h.imported||h.demo||h.approx||h.run||h.progId==='imported')
-    return{live:false,why:'entered by hand or imported — the clock was not running'};
+  if(!h)return{live:false,why:'nothing here'};
+  if(h.imported||h.demo||h.approx||h.run||h.progId==='imported')
+    return{live:false,why:'imported — no device witnessed it'};
+  /* the clock is ONE witness; the wrist is another. A typed session
+     the watch corroborated (overlapping strength workout, working
+     heart rate) is live — the watch proves the time was spent
+     (owner call, 2 Sep: what matters is the time). */
+  if(h.watch&&(h.watch.mins||0)>=15&&(h.watch.hr||0)>=95)
+    return{live:true,why:'witnessed by the watch — '+h.watch.mins+' min at avg HR '+h.watch.hr};
+  if(h.manual)
+    return{live:false,why:'entered by hand — no clock, no watch'};
   if(!h.startedAt&&!h.minutes)return{live:false,why:'no clock on this session'};
   const mins=h.minutes||0,sets=(h.log||[]).length;
   if(!sets)return{live:false,why:'nothing logged'};
@@ -3453,10 +3462,18 @@ function dataPoints(){
     if(sessionLive(h))live+=earned;
     B.sessions+=sess;B.sets+=sets;B.effort+=effort;B.notes+=notes});
   (S.runs||[]).forEach(r=>{
-    B.runs+=2;                                   // distance and time
-    if(r.hr)B.runs+=1;if(r.elev)B.runs+=1;if(r.rpe)B.runs+=1;
+    /* cardio spends from the same day budget as sessions — typed runs
+       were the one uncapped seam — and a zone breakdown only pays when
+       a heart rate stands behind it */
+    let earn=2;                                  // distance and time
+    if(r.hr)earn+=1;if(r.elev)earn+=1;if(r.rpe)earn+=1;
     if(r.note)B.notes+=1;
-    if(zoneMins(r))B.zones+=5});
+    let zearn=(zoneMins(r)&&r.hr)?5:0;
+    const day=(r.date||'').slice(0,10);
+    const used=byDay[day]||0,room=Math.max(0,dpDayCap()-used);
+    if(earn+zearn>room){const f=room/(earn+zearn||1);earn=Math.floor(earn*f);zearn=Math.floor(zearn*f)}
+    byDay[day]=(byDay[day]||0)+earn+zearn;
+    B.runs+=earn;B.zones+=zearn});
   const g=(S.gar&&S.gar.days)||{};
   Object.keys(g).forEach(k=>{const d=g[k]||{};
     if(d.am!=null)B.readiness+=1;if(d.pre!=null)B.readiness+=1;
