@@ -558,7 +558,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='267cbf';  // stamped by tools/build.py with the content hash
+const BUILD_ID='35fc47';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -3128,7 +3128,7 @@ function viewImport(){
     h+=(!aiReady()?aiLockHtml('Reading this file')
       :'<button data-a="impParse" class="big disp mt2" style="background:'+((f.text.trim()||f.img)&&!f.busy?'var(--amber)':'var(--raised)')+';color:'+((f.text.trim()||f.img)&&!f.busy?'var(--bg)':'var(--faint)')+';font-size:15px">'+(f.busy?'Reading…':'Read it with Allena')+'</button>')+
       '<p style="color:var(--faint);font-size:11.5px;line-height:1.55;margin-top:8px">It lands in the block editor so you can fix anything Allena misread, then she reviews the whole thing before you run it.</p>';
-    if(!S.ai.key)h+='<p style="color:var(--faint);font-size:11.5px;margin-top:8px">Needs your API key — Data → Allena.</p>';
+    if(!aiReady())h+='<p style="color:var(--faint);font-size:11.5px;margin-top:8px">Sign in (Settings → your name) and this just works — no key needed.</p>';
   }
   return h+'</div>'}
 function impApplyFix(p){
@@ -3179,7 +3179,7 @@ function viewScans(){
   return h+'</div>'}
 function scanSheet(){
   const f=S.sform;
-  let inner='<p style="color:var(--dim);font-size:13px;line-height:1.55">Upload a photo of the printout'+(S.ai.key?' and Allena will read the numbers off it':'')+'. Check them before saving — the numbers are what get tracked, not the picture.</p>';
+  let inner='<p style="color:var(--dim);font-size:13px;line-height:1.55">Upload a photo of the printout'+(aiReady()?' and Allena will read the numbers off it':'')+'. Check them before saving — the numbers are what get tracked, not the picture.</p>';
   inner+='<label class="btn mt" style="display:block;text-align:center;cursor:pointer">'+(f.img?'Choose a different photo':'Choose a photo')+
     '<input type="file" accept="image/*" data-scanfile="1" style="display:none"></label>';
   if(f.img)inner+='<img src="'+f.img+'" style="width:100%;max-height:190px;object-fit:contain;border-radius:12px;margin-top:10px;background:var(--surface)">';
@@ -14066,7 +14066,7 @@ function dataRaw(){
    '<input data-in="ai.proxy" value="'+esc(S.ai.proxy||'')+'" placeholder="Allena cloud link (https://…)" autocomplete="off" class="mono" style="width:100%;margin-top:10px;background:var(--surface);border:1px solid var(--line);border-radius:10px;color:var(--text);padding:12px;font-size:12px;outline:none">'+
    '<input data-in="ai.key" value="'+esc(S.ai.key)+'" placeholder="or your own key: sk-ant-…" autocomplete="off" class="mono" style="width:100%;margin-top:8px;background:var(--surface);border:1px solid var(--line);border-radius:10px;color:var(--text);padding:12px;font-size:12px;outline:none">'+
    '<div class="row" style="margin-top:8px">'+MODELS.map(m=>'<button data-a="aiModel" data-v="'+m[0]+'" class="pill" style="flex:1'+(S.ai.model===m[0]?';background:var(--text);color:var(--bg);border-color:var(--text);font-weight:600':'')+'">'+m[1]+'</button>').join('')+'</div>'+
-   (function(){const ready9=!!(((S.ai.proxy||'').trim())||((S.ai.key||'').trim()));
+   (function(){const ready9=aiReady();
      return '<button data-a="aiSave" class="btn mt" style="'+(ready9?'background:var(--amber);color:var(--bg);border:none;font-weight:600':'')+'">Save Allena settings</button>'})()+
    '<p style="color:var(--faint);font-size:12px;line-height:1.5;margin-top:8px">Without a key, Allena still works — it opens the Claude app with your session pre-attached.</p></div>'+
 
@@ -15573,12 +15573,12 @@ function sheetHtml(){
     inner+='<div class="scroller" style="margin-top:12px">'+chips.map(q=>
       '<button data-a="coachChip" data-v="'+esc(q)+'" class="pill">'+esc(q)+'</button>').join('')+'</div>';
     inner+='<textarea data-in="coach.input" rows="2" placeholder="Ask Allena…" style="margin-top:10px">'+esc(S.coach.input)+'</textarea>';
-    if(S.ai.key){
+    if(aiReady()){
       inner+='<button data-a="coachSend" class="big disp mt" style="background:var(--blue);color:#fff;font-size:16px'+(S.coach.busy?';opacity:.5':'')+'">Ask Allena</button>'+
         '<button data-a="coachApp" class="btn mt" style="border:none;color:var(--faint);font-size:12.5px;padding:8px">Open in the Claude app instead</button>';
     }else{
       inner+='<button data-a="coachApp" class="big disp mt" style="background:var(--blue);color:#fff;font-size:16px">Send to the Claude app</button>'+
-        '<p style="color:var(--faint);font-size:12px;line-height:1.55;margin-top:10px">Opens the Claude app with your question and full session attached. To chat inside this app instead, add an API key under Data → Allena.</p>';
+        '<p style="color:var(--faint);font-size:12px;line-height:1.55;margin-top:10px">Opens the Claude app with your question and full session attached. Or sign in (Settings → your name → Account &amp; sync) and the chat works right here — no key, nothing to set up.</p>';
     }
     if(S.coach.thread.length)inner+='<button data-a="coachClear" style="width:100%;padding:10px;color:var(--faint);font-size:11.5px;margin-top:6px">Start a new conversation</button>';
     return wrapSheet('Allena',inner)}
@@ -17714,7 +17714,7 @@ function runAction(a,v,t,e){
     case 'coachFocus':S.coach.focus=v||null;S.coach.sent=false;render();break;
     case 'coachClear':S.coach.thread=[];S.coach.input='';S.coach.sent=false;render();break;
     case 'coachChip':{const q=t.dataset.v;
-      if(S.ai.key&&!S.coach.busy){S.coach.input='';askClaude(q)}
+      if(aiReady()&&!S.coach.busy){S.coach.input='';askClaude(q)}
       else{S.coach.input=q;render()}break}
     case 'coachSend':if(!(S.coach.input||'').trim()){flash('Type something first.');break}
       if(!S.coach.busy&&aiReady())askClaude(S.coach.input.trim());break;
