@@ -551,7 +551,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='a40686';  // stamped by tools/build.py with the content hash
+const BUILD_ID='c10035';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -11560,6 +11560,7 @@ function dayPriority(p,di,wk){
     if(st.targetW!=null&&st.targetW>=60)score+=1});
   return score}
 function isDropped(p,di,wk){const a=(S.dropped||{})[p.id+':'+wk];return !!(a&&a.indexOf(di)>=0)}
+function weekClosed(p,wk){return !!((S.weekStarts||{})[p.id+':'+wk+':closed'])}
 function weekClock(){
   const p=activeProgSafe();if(!p||p.weeks<2)return null;
   const wk=S.week,ws=weekState(p,wk);
@@ -11919,9 +11920,21 @@ function secProgram(p,ws){
       else if(st.full)css='background:var(--surface);color:var(--green);border:1px solid var(--greensoft)';
       else if(st.part)css='background:var(--surface);color:var(--text);border:1px solid var(--amber)';
       else css='background:var(--surface);color:var(--dim);border:1px solid var(--line)';
-      h+='<button class="mono" data-a="week" data-v="'+w+'" style="flex:1 0 12%;padding:9px 0;border-radius:9px;font-weight:600;font-size:14px;'+css+'">'+
-        w+(st.full&&w!==S.week?' ✓':'')+'</button>'}
+      h+='<button class="mono" data-a="week" data-v="'+w+'" style="flex:1 0 12%;padding:9px 0;border-radius:9px;font-weight:600;font-size:13px;'+css+'">'+
+        'W'+w+(weekClosed(p,w)&&w!==S.week?' \u2713':st.full&&w!==S.week?' \u2713':'')+'</button>'}
     h+='</div>';
+    h+='<p class="mono" style="color:var(--faint);font-size:9px;letter-spacing:.06em;margin-top:8px">THE BLOCK\u2019S WEEKS \u2014 YOU ARE IN W'+S.week+'. TAP ONE TO LOOK BACK.</p>';
+    /* the week-1 clock explainer (owner call, 3 Sep, after Angus
+       mislogged a week): a NEW block explains the clock before it
+       starts ticking — and offers to start it now or on first
+       training. One-time, per block. */
+    if(!(S.weekStarts||{})[p.id+':1']&&!(S.weekStarts||{})[p.id+':ackclk'])
+      h+='<div style="border-top:1px solid var(--line);margin-top:12px;padding-top:12px">'+
+        '<p class="eyebrow" style="color:var(--amber)">Before week 1 starts</p>'+
+        '<p style="color:var(--dim);font-size:12.5px;line-height:1.6;margin-top:6px">Each week of this block is a <b style="color:var(--text)">7-day clock</b>. It starts the day of your first session (or right now, your call), counts your sessions against the week\u2019s plan, and when it runs out you close the week and the next one starts clean. The W-pills above are the block\u2019s weeks \u2014 train in the one that is lit.</p>'+
+        '<div class="row mt" style="gap:8px">'+
+        '<button data-a="clkNow" class="btn" style="flex:1;border-color:var(--amber);color:var(--amber);font-size:12.5px">Start the clock today</button>'+
+        '<button data-a="clkFirst" class="btn" style="flex:1;color:var(--dim);font-size:12.5px">When I first train</button></div></div>';
     if(lastDateFor(p.id,S.week))h+='<p class="mono" style="font-size:11px;color:var(--faint);margin-top:10px">last trained: '+fmtDate(lastDateFor(p.id,S.week))+'</p>';
     if(ws.full&&S.week<p.weeks&&!blockDone(p))h+='<button data-a="week" data-v="'+(S.week+1)+'" style="width:100%;text-align:left;padding:12px 0 2px;display:flex;align-items:center;gap:10px;border-top:1px solid var(--line);margin-top:12px">'+
       '<span style="width:8px;height:8px;border-radius:8px;background:var(--green);flex:none"></span>'+
@@ -11936,11 +11949,16 @@ function dayCard(p,d,i,done,daily){
   const base=buildSets(p,i,S.week);if(!base.length)return '';
   const sets=sessionSets(p,i,S.week);
   const mins=estMins(sets);
-  return '<button class="card" data-a="prevOpen" data-v="'+p.id+':'+i+'" style="width:100%;text-align:left;padding:16px;display:block">'+
+  /* a CLOSED week's sessions are done being trained (owner call, 3
+     Sep, after a tester re-ran week 1): the cards stay readable but
+     nothing in them starts — the record lives in History */
+  const locked=p.weeks>1&&weekClosed(p,S.week);
+  return '<button class="card" data-a="'+(locked?'weekLockedInfo':'prevOpen')+'" data-v="'+p.id+':'+i+'" style="width:100%;text-align:left;padding:16px;display:block">'+
     '<div style="display:flex;align-items:center;gap:8px">'+
     '<span style="width:9px;height:9px;border-radius:9px;background:'+dayCol(i)+';flex:none"></span>'+
     '<span class="eyebrow">'+(daily?'Daily':'Day '+(i+1))+'</span>'+
-    (done?'<span class="mono" style="color:var(--green);font-size:10px">'+(daily?'✓ TODAY':'✓ DONE')+'</span>':'')+
+    (done?'<span class="mono" style="color:var(--green);font-size:10px">'+(daily?'✓ TODAY':'✓ DONE')+'</span>'
+         :locked?'<span class="mono" style="color:var(--faint);font-size:10px">WEEK CLOSED</span>':'')+
     '<span style="flex:1"></span><span class="mono" style="color:var(--faint);font-size:14px">›</span></div>'+
     '<h2 class="disp" style="font-size:19px;font-weight:600;margin-top:6px;'+(done?'color:var(--dim)':'')+'">'+esc(d.name)+'</h2>'+
     muscleRowsHtml(p,i)+
@@ -16417,7 +16435,18 @@ function runAction(a,v,t,e){
     case 'swapSide':{const cur2=S.sess.sets[S.sess.idx];S.holdWait=false;S.holdSide=2;
       S.holdEnd=Date.now()+cur2.secs*1000;render();break}
     case 'wuTick':{S.sess.wu=S.sess.wu||{};S.sess.wu[v]=!S.sess.wu[v];persistActive();render();break}
+    case 'weekLockedInfo':flash('Week '+S.week+' is closed — its sessions live in History now. Tap the current W-pill to train this week\u2019s.');break;
+    case 'clkNow':{const p9=activeProgSafe();if(p9){S.weekStarts=S.weekStarts||{};
+      S.weekStarts[p9.id+':1']=today();S.weekStarts[p9.id+':ackclk']=1;lset(K_WK,S.weekStarts);
+      flash('Week 1 started today — seven days on the clock.')}render();break}
+    case 'clkFirst':{const p9=activeProgSafe();if(p9){S.weekStarts=S.weekStarts||{};
+      S.weekStarts[p9.id+':ackclk']=1;lset(K_WK,S.weekStarts);
+      flash('The clock starts the day of your first session.')}render();break}
     case 'prevOpen':{const [pid,di]=v.split(':');
+      /* a closed week never starts a session, whatever path leads here */
+      try{const p8=S.lib.programs.find(x=>x.id===pid);
+        if(p8&&p8.weeks>1&&typeof weekClosed==='function'&&weekClosed(p8,S.week)){
+          flash('Week '+S.week+' is closed — its sessions live in History now.');break}}catch(e){}
       if(S.lib.activeId!==pid&&!S.lib.programs.find(p=>p.id===pid&&p.acl)){S.lib.activeId=pid;saveLib();setWeek(weekFor(pid),pid)}
       A.preview(+di,pid);break}
     case 'startIn':{const [pid,di]=v.split(':');
