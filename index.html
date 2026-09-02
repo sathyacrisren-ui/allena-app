@@ -422,7 +422,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='b3b7e4';  // stamped by tools/build.py with the content hash
+const BUILD_ID='b8cd9c';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -11644,7 +11644,10 @@ async function deepRun(){
   if((S.history||[]).filter(h=>h.complete).length<8){flash('Too little data for nuance yet — log a couple more weeks first.');return}
   S.deepBusy=true;render();
   try{
-    const res=await claudeFetch({model:(S.ai&&S.ai.model)||'claude-haiku-4-5-20251001',
+    /* the deep read runs on the strongest model (owner call, 3 Sep):
+       it is the once-in-a-while, high-value synthesis, so it is worth
+       Fable 5's depth over the chat's faster default. */
+    const res=await claudeFetch({model:'claude-fable-5',
       max_tokens:900,system:DEEP_SYS,
       messages:[{role:'user',content:deepContext()}]});
     const d=await res.json();
@@ -11685,6 +11688,7 @@ function deepCard(){
       inner='<p style="color:var(--dim);font-size:12.5px;line-height:1.6;margin-top:8px">Ten weeks of your numbers, handed to the model with one demand: find what the rules cannot, and cite the figures it stands on. Interpretation, clearly labelled — never dressed up as measurement.</p>'+
         '<p class="mono" style="color:var(--amber);font-size:10.5px;margin-top:8px">'+esc(rdy.line)+'</p>'+
         '<button data-a="deepRun" class="big disp mt" style="background:var(--amber);color:#1F1E1D">Run a deep read</button>'+
+        '<p class="mono" style="color:var(--faint);font-size:9.5px;letter-spacing:.05em;margin-top:8px;text-align:center">RUN ON FABLE 5 \u2014 ALLENA\u2019S DEEPEST READ</p>'+
         '<p class="mono" style="color:var(--faint);font-size:10px;margin-top:8px;text-align:center">once a day · only when there is new data to read</p>';
     else if(!st.last){
       const have=(S.history||[]).filter(h=>h.complete&&!h.run).length+(typeof runs==='function'?runs():[]).length;
