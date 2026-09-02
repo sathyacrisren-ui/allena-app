@@ -515,7 +515,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='7adb6c';  // stamped by tools/build.py with the content hash
+const BUILD_ID='f8cd29';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -13272,10 +13272,7 @@ function viewProgress(){
   if(tabRehab){h+='<div class="row" style="margin-top:14px">'+
     [['train','Training'],['rehab','Rehab']].map(x=>'<button data-a="progTab" data-v="'+x[0]+'" class="pill" style="flex:1;padding:11px 0'+((S.progTab||'train')===x[0]?';background:var(--text);color:var(--bg);border-color:var(--text);font-weight:600':'')+'">'+x[1]+'</button>').join('')+'</div>';
     if((S.progTab||'train')==='rehab')return h+rehabProgress()+'</div>'}
-  const po=(S.lay.porder||['goals','trends','tonnage','lifetime','bb','scan','recovery','bw','bests']).slice();
-  /* standing joined after layouts were saved — it LEADS the page
-     (owner call, Sep 2026): where you stand before what you did */
-  if(po.indexOf('standing')<0)po.unshift('standing');
+  const po=porderNow();
   po.forEach(k=>{
     if(k==='patterns')return;    // patterns live on Today now
     if(S.lay.phide&&S.lay.phide[k])return;const f=SEC[k];if(!f)return;
@@ -13287,6 +13284,13 @@ function viewProgress(){
   h+=wrapsCard();
   h+='<button data-a="playoutOpen" style="width:100%;margin-top:26px;padding:12px;color:var(--faint);font-size:11.5px;letter-spacing:.04em">Rearrange this screen</button>';
   return h+'</div>'}
+function porderNow(){
+  /* the one source of truth for Progress section order — standing
+     joined after layouts were saved, and it LEADS the page (owner
+     call, Sep 2026): where you stand before what you did */
+  const po=(S.lay.porder||['goals','trends','tonnage','lifetime','bb','scan','recovery','bw','bests']).slice();
+  if(po.indexOf('standing')<0)po.unshift('standing');
+  return po}
 function weekRange(iso){
   const d=new Date(iso);
   if(isNaN(d.getTime())){const t=String(iso);return{start:null,label:t,key:t}}
@@ -13852,27 +13856,25 @@ function sheetHtml(){
       '<p style="color:var(--faint);font-size:11px;line-height:1.5;margin-top:10px">Ask Allena to review it first if you want a second opinion — she sees the same stats.</p>';
     return wrapSheet('Next block',inner)}
   if(S.sheet.t==='playout'){
-    const o=S.lay.porder||[];
-    let inner='<p style="color:var(--dim);font-size:13px;line-height:1.55">Reorder the Progress tab or hide sections you don\'t look at.</p>'+
-      '<div style="display:flex;flex-direction:column;gap:8px;margin-top:14px">'+
+    const o=(typeof porderNow==='function'?porderNow():(S.lay.porder||[]));
+    let inner='<p style="color:var(--dim);font-size:13px;line-height:1.55">Hold a section, then drag it into place — or hide the ones you don\'t look at.</p>'+
+      '<div data-draglist="playout" style="display:flex;flex-direction:column;gap:8px;margin-top:14px">'+
       o.map((k,i)=>{const off=S.lay.phide&&S.lay.phide[k];
-        return '<div class="card" style="display:flex;align-items:center;gap:6px;padding:10px 8px 10px 14px">'+
+        return '<div class="card dragitem" data-dragitem="'+i+'" style="display:flex;align-items:center;gap:6px;padding:10px 8px 10px 14px">'+
         '<span style="flex:1;min-width:0;font-size:13.5px;'+(off?'color:var(--faint)':'')+'">'+esc(PSECTION_LABELS[k]||k)+'</span>'+
         '<button data-a="pHide" data-v="'+k+'" class="mono" style="flex:none;padding:6px 8px;font-size:10.5px;color:'+(off?'var(--faint)':'var(--amber)')+'">'+(off?'hidden':'shown')+'</button>'+
-        '<button data-a="pMove" data-v="'+k+':-1" style="flex:none;padding:6px 8px;color:'+(i===0?'var(--line)':'var(--dim)')+';font-size:14px">▲</button>'+
-        '<button data-a="pMove" data-v="'+k+':1" style="flex:none;padding:6px 8px;color:'+(i===o.length-1?'var(--line)':'var(--dim)')+';font-size:14px">▼</button></div>'}).join('')+'</div>'+
+        '<span class="mono" style="flex:none;padding:0 8px;color:var(--faint);font-size:14px;letter-spacing:1px">⋮⋮</span></div>'}).join('')+'</div>'+
       '<button data-a="pReset" class="btn mt">Reset to default</button>';
     return wrapSheet('Rearrange Progress',inner)}
   if(S.sheet.t==='layout'){
     const o=S.lay.order||[];
-    let inner='<p style="color:var(--dim);font-size:13px;line-height:1.55">Move sections up or down, or hide what you don\'t use.</p>'+
-      '<div style="display:flex;flex-direction:column;gap:8px;margin-top:14px">'+
+    let inner='<p style="color:var(--dim);font-size:13px;line-height:1.55">Hold a section, then drag it into place — or hide what you don\'t use.</p>'+
+      '<div data-draglist="layout" style="display:flex;flex-direction:column;gap:8px;margin-top:14px">'+
       o.map((k,i)=>{const off=S.lay.hide&&S.lay.hide[k];
-        return '<div class="card" style="display:flex;align-items:center;gap:6px;padding:10px 8px 10px 14px">'+
+        return '<div class="card dragitem" data-dragitem="'+i+'" style="display:flex;align-items:center;gap:6px;padding:10px 8px 10px 14px">'+
         '<span style="flex:1;min-width:0;font-size:13.5px;'+(off?'color:var(--faint)':'')+'">'+esc(SECTION_LABELS[k]||k)+'</span>'+
         '<button data-a="layHide" data-v="'+k+'" class="mono" style="flex:none;padding:6px 8px;font-size:10.5px;color:'+(off?'var(--faint)':'var(--amber)')+'">'+(off?'hidden':'shown')+'</button>'+
-        '<button data-a="layMove" data-v="'+k+':-1" style="flex:none;padding:6px 8px;color:'+(i===0?'var(--line)':'var(--dim)')+';font-size:14px">▲</button>'+
-        '<button data-a="layMove" data-v="'+k+':1" style="flex:none;padding:6px 8px;color:'+(i===o.length-1?'var(--line)':'var(--dim)')+';font-size:14px">▼</button></div>'}).join('')+'</div>';
+        '<span class="mono" style="flex:none;padding:0 8px;color:var(--faint);font-size:14px;letter-spacing:1px">⋮⋮</span></div>'}).join('')+'</div>';
 
     inner+='<button data-a="layReset" class="btn mt">Reset to default</button>';
     return wrapSheet('Rearrange screen',inner)}
@@ -15987,14 +15989,16 @@ function runAction(a,v,t,e){
       if(!S.openSec[v])S.scrollTo='sec-'+v;      // opening: bring it into view
       else S.scrollTo=null;
       S.openSec[v]=!S.openSec[v];render();break;
-    case 'pMove':{const [k,d]=t.dataset.v.split(':');const o=S.lay.porder.slice();
-      const i2=o.indexOf(k),j2=i2+ +d;if(i2<0||j2<0||j2>=o.length)break;
-      o.splice(j2,0,o.splice(i2,1)[0]);S.lay.porder=o;lset(K_LAY,S.lay);vib(10);render();break}
+    case 'reorderPlayout':{const p9=String(v).split(':'),f9=+p9[0],t9=+p9[1];
+      const o=(typeof porderNow==='function'?porderNow():(S.lay.porder||[]).slice());
+      if(o[f9]==null||o[t9]==null||f9===t9)break;
+      o.splice(t9,0,o.splice(f9,1)[0]);S.lay.porder=o;lset(K_LAY,S.lay);vib(10);render();break}
     case 'pHide':{S.lay.phide=S.lay.phide||{};S.lay.phide[v]=!S.lay.phide[v];lset(K_LAY,S.lay);render();break}
     case 'pReset':S.lay.porder=['patterns','goals','trends','tonnage','lifetime','bb','scan','recovery','bw','bests','balance'];S.lay.phide={};lset(K_LAY,S.lay);render();break;
-    case 'layMove':{const [k,d]=t.dataset.v.split(':');const o=S.lay.order.slice();
-      const i2=o.indexOf(k),j2=i2+ +d;if(i2<0||j2<0||j2>=o.length)break;
-      o.splice(j2,0,o.splice(i2,1)[0]);S.lay.order=o;lset(K_LAY,S.lay);vib(10);render();break}
+    case 'reorderLayout':{const p9=String(v).split(':'),f9=+p9[0],t9=+p9[1];
+      const o=(S.lay.order||[]).slice();
+      if(o[f9]==null||o[t9]==null||f9===t9)break;
+      o.splice(t9,0,o.splice(f9,1)[0]);S.lay.order=o;lset(K_LAY,S.lay);vib(10);render();break}
     case 'layHide':{S.lay.hide=S.lay.hide||{};S.lay.hide[v]=!S.lay.hide[v];lset(K_LAY,S.lay);render();break}
     case 'layPlates':S.lay.plates=!(S.lay.plates!==false);lset(K_LAY,S.lay);render();break;
     case 'layReset':S.lay={order:['stats','program','sessions','goals','habits','support'],hide:{},checklist:true};lset(K_LAY,S.lay);render();break;
