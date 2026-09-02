@@ -551,7 +551,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='c4517b';  // stamped by tools/build.py with the content hash
+const BUILD_ID='a18a21';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -7517,6 +7517,31 @@ function notifPlan(){
       const ts9=Math.max(noon,Date.now()+45*60000);
       items.push({id:'dr'+today(),ts:Math.round(ts9/1000),title:'Allena',
         body:'A deep read is ready \u2014 enough new training has landed since the last one.'})}}catch(e){}}
+  /* the fuse (owner ruling, 3 Sep): when an analysis is ONE unit
+     from unlocking, that is the most motivating true fact the app
+     holds — it gets the 11:00 slot. Real threshold, filled by
+     logging, never by waiting. */
+  if(P.reveal){try{
+    const W9=(typeof watchList==='function')?watchList():[];
+    const nr=W9.slice().sort((a,b)=>(a.need-a.have)-(b.need-b.have)||b.pct-a.pct)[0];
+    if(nr&&nr.need-nr.have===1){
+      const at11=new Date(today()+'T11:00:00').getTime();
+      if(at11>Date.now()+60000)
+        items.push({id:'fu'+today(),ts:Math.round(at11/1000),title:'Allena',
+          body:'One away: \u201c'+String(nr.t)+'\u201d \u2014 '+nr.have+' of '+nr.need+'. Today\u2019s logging can light it.'})}}catch(e){}}
+  /* the day's call — 16:30, only while today's session is still owed.
+     A real prescription with its real reason, never a guilt ping;
+     replanned away the moment the session is done (notifSync re-runs
+     on every foreground). */
+  if(P.morning){try{
+    const trained=(S.history||[]).some(h=>h.complete&&!h.run&&String(h.date).slice(0,10)===today());
+    if(!trained){
+      const rec=(typeof recommendToday==='function')?recommendToday():null;
+      if(rec&&rec.top&&!rec.empty){
+        const at430=new Date(today()+'T16:30:00').getTime();
+        if(at430>Date.now()+60000)
+          items.push({id:'dc'+today(),ts:Math.round(at430/1000),title:'Allena',
+            body:'Today\u2019s call: '+String(rec.top.name)+' \u2014 '+String(rec.why||'').slice(0,110)+'.'})}}}catch(e){}}
   /* the honest reachable-find nudge (owner call, 3 Sep, reframed): NOT
      'go run to unlock' as blind bait — only when a find is genuinely
      one action away, and it names the real thing. Fires at most one a
@@ -7538,7 +7563,18 @@ function notifPlan(){
   if(P.quest){const d=new Date();const dow=(d.getDay()+6)%7;
     const mon=dayKey(new Date(Date.now()+(7-dow)*864e5));
     items.push({id:'q'+mon,ts:at(mon,9,0),title:'Allena',body:'A new quest is up for the week.'})}
-  return items.filter(x=>x.ts*1000>Date.now())}
+  /* scattered, capped, ranked: slots are spread across the day
+     (7:30 readiness \u00b7 11:00 fuse \u00b7 12:00 deep read \u00b7 15:30
+     reachable find \u00b7 16:30 the call \u00b7 18/8:00 physio \u00b7 19:30
+     reveal) and each day keeps its best FOUR at most — scatter is
+     texture, five pings is spam. */
+  const priOf=id=>/^ap/.test(id)?0:/^am/.test(id)?1:/^dr/.test(id)?2:/^fu/.test(id)?3:/^nf/.test(id)?4:/^dc/.test(id)?5:/^rv/.test(id)?6:/^q\d/.test(id)?7:/^wr/.test(id)?8:9;
+  const byD={};
+  items.forEach(it=>{const d9=dayKey(new Date(it.ts*1000));(byD[d9]=byD[d9]||[]).push(it)});
+  const keep=[];
+  Object.keys(byD).forEach(d9=>{byD[d9].sort((a,b)=>priOf(a.id)-priOf(b.id));
+    keep.push.apply(keep,byD[d9].slice(0,4))});
+  return keep.filter(x=>x.ts*1000>Date.now())}
 function notifAskCard(){
   /* the pre-prompt (owner call, 3 Sep): our card asks first, with the
      why; the iOS sheet only appears when the user says yes — a cold
