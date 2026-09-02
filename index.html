@@ -515,7 +515,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='1a6e53';  // stamped by tools/build.py with the content hash
+const BUILD_ID='149e78';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -12463,10 +12463,10 @@ function viewSession(){
 
   if(s.phase==='resting'){
     const total=s.sets[s.idx].rest,left=Math.ceil((S.restEnd-Date.now())/1000),nx=s.sets[s.idx+1];
-    h+='<div class="view pad" style="padding-top:36px;display:flex;flex-direction:column;align-items:center">'+
+    let rb='<div style="display:flex;flex-direction:column;align-items:center">'+
      '<p class="eyebrow" id="restLbl">'+(left<=10?'Get ready':'Rest')+'</p>'+ringHtml('rest',left,total,left<=10?'var(--amber)':'var(--blue)');
-    h+=hintHtml('mt2');
-    if(nx)h+='<div style="text-align:center;margin-top:28px"><p class="eyebrow">Up next</p>'+
+    rb+=hintHtml('mt2');
+    if(nx)rb+='<div style="text-align:center;margin-top:16px"><p class="eyebrow">Up next</p>'+
       '<p class="disp" style="font-size:17px;font-weight:600;margin-top:4px">'+esc(nx.ex)+'</p>'+
       '<p class="mono" style="color:var(--dim);font-size:14px;margin-top:4px;padding:0 8px">Set '+nx.setNo+' · '+
       (nx.secs?nx.secs+'s hold'+(nx.perSide?' / side':''):(nx.targetW!=null?uwNum(nx.targetW)+' '+uwUnit()+' ':'')+'× '+nx.targetReps+(nx.targetRpe!=null?' @ RPE '+nx.targetRpe:''))+'</p>'+
@@ -12474,7 +12474,7 @@ function viewSession(){
     {const plan=A.exPlan(),curNo=s.sets[Math.min(s.idx,s.sets.length-1)].exNo;
      const remain=plan.filter(e=>e.done<e.sets.length);
      const setsLeft=s.sets.length-s.log.filter(l=>l.w!=null||l.secs).length;
-     h+='<button data-a="planOpen" class="card mt3" style="width:100%;text-align:left;padding:14px 16px;display:block">'+
+     rb+='<button data-a="planOpen" class="card mt2" style="width:100%;text-align:left;padding:12px 16px;display:block">'+
        '<div style="display:flex;align-items:center;gap:11px">'+
        '<span style="flex:1;min-width:0"><span style="display:block;font-size:13.5px;font-weight:600">What is left</span>'+
        '<span class="mono" style="display:block;color:var(--faint);font-size:10.5px">'+
@@ -12487,13 +12487,14 @@ function viewSession(){
        (remain.length>1?'<p class="mono" style="color:var(--faint);font-size:10px;margin-top:9px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">then '+
          esc(remain.filter(e=>e.exNo!==curNo).slice(0,3).map(e=>String(e.sets[0].st.ex).replace(/ — .*/,'')).join(' · '))+'</p>':'')+
        '</button>'}
-    h+='<div class="row mt2" style="width:100%"><button data-a="addRest" class="btn disp" style="flex:1">+30 sec</button>'+
-     '<button data-a="skipRest" class="btn disp" style="flex:1;background:var(--text);color:var(--bg);font-weight:600;border:none">Skip rest</button></div></div>';
-    return h}
+    rb+='</div>';
+    return '<div class="view sessfix">'+h+'<div class="sessbody pad" style="padding-top:10px">'+rb+'</div>'+
+      '<div class="sessfoot"><div class="row" style="width:100%"><button data-a="addRest" class="btn disp" style="flex:1">+30 sec</button>'+
+      '<button data-a="skipRest" class="btn disp" style="flex:1;background:var(--text);color:var(--bg);font-weight:600;border:none">Skip rest</button></div></div></div>'}
 
   if(s.phase==='hold'){
     if(S.holdWait){
-      h+='<div class="view pad" style="padding-top:36px;display:flex;flex-direction:column;align-items:center">'+
+      h+='<div class="view pad" style="padding-top:14px;display:flex;flex-direction:column;align-items:center">'+
        '<p class="eyebrow" style="color:var(--green)">Side 1 done</p>'+
        '<p class="disp" style="font-size:19px;font-weight:600;margin-top:6px;text-align:center">'+esc(cur.ex)+'</p>'+
        '<div style="width:200px;height:200px;margin-top:24px;border-radius:200px;border:9px solid var(--green);display:flex;align-items:center;justify-content:center">'+
@@ -12503,7 +12504,7 @@ function viewSession(){
        '<button data-a="finish" style="width:100%;padding:14px;color:var(--faint);font-size:12px;margin-top:8px">Log without the second side</button></div>';
       return h}
     const left=Math.ceil((S.holdEnd-Date.now())/1000);
-    h+='<div class="view pad" style="padding-top:36px;display:flex;flex-direction:column;align-items:center">'+
+    h+='<div class="view pad" style="padding-top:14px;display:flex;flex-direction:column;align-items:center">'+
      '<p class="eyebrow" style="color:'+acc+'" id="holdLbl">'+(cur.perSide?'Hold — side '+S.holdSide+' of 2':'Hold')+'</p>'+
      '<p class="disp" style="font-size:19px;font-weight:600;margin-top:6px;text-align:center">'+esc(cur.ex)+'</p>'+
      ringHtml('hold',left,cur.secs,acc)+
@@ -15223,11 +15224,10 @@ function render(){
     /* the slim one-line capsule at the very top (owner call, Sep 2026):
        time · exercise · set — coloured ring, nothing underneath covered
        because #app reserves the height */
-    return '<button data-a="resume" id="sessBanner" style="border:1.5px solid '+(resting?'#1E9BFF':'var(--green)')+'">'+
-      '<span class="mono" id="spTime" data-end="'+(resting?S.restEnd:'')+'" style="font-size:12.5px;font-weight:700;color:'+(resting?'#1E9BFF':'var(--green)')+';flex:none">'+(resting?mmss(left):'LIVE')+'</span>'+
-      '<span style="min-width:0;overflow:hidden;text-overflow:ellipsis;font-size:12px;color:var(--text)">'+esc(String(cur.ex||'').replace(/ \u2014 .*/,''))+'</span>'+
-      '<span class="mono" style="font-size:10.5px;color:var(--faint);flex:none">\u00b7 set '+cur.setNo+'/'+cur.of+'</span>'+
-      '<span class="mono" style="color:var(--amber);font-size:12px;flex:none">\u203a</span></button>'};
+    /* the SMALL pill (owner call, twice): just LIVE in green, or the
+       rest countdown in blue — no exercise, no set count. Tap resumes. */
+    return '<button data-a="resume" id="sessBanner" style="border:1.5px solid '+(resting?'#1E9BFF':'var(--green)')+';padding:4px 13px">'+
+      '<span class="mono" id="spTime" data-end="'+(resting?S.restEnd:'')+'" style="font-size:12px;font-weight:700;letter-spacing:.04em;color:'+(resting?'#1E9BFF':'var(--green)')+';flex:none">'+(resting?mmss(left):'LIVE')+'</span></button>'};
   const extraHtml=sessPillHtml()+drawerHtml()+sheetHtml()+(S.toast?'<div class="toast"><div class="'+(S.toastGold?'gold':'')+'">'+esc(S.toast)+'</div></div>':'');
   const keyA=S.view+'|'+(S.sess&&S.view==='session'?S.sess.phase+':'+S.sess.idx:'');
   const sheetKey=S.sheet?S.sheet.t:'';
