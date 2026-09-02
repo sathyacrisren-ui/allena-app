@@ -87,7 +87,7 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
 /* one solid page: no dividing line between the actions and the rest
    (owner call, Sep 2026) */
 .sessfoot{flex:none;padding:6px 20px calc(8px + env(safe-area-inset-bottom));background:var(--bg)}
-.sessfoot .big{margin-top:0}
+.sessfoot .big{margin-top:0;padding:13px 22px;font-size:15.5px;box-shadow:none}
 #app>.view:first-child{margin-top:calc(env(safe-area-inset-top) - 6px)}
 /* the session screen is a 100dvh instrument that pads its own safe
    area — the first-view notch margin stacked on it and shoved the
@@ -515,7 +515,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='f485c6';  // stamped by tools/build.py with the content hash
+const BUILD_ID='1a6e53';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -13406,8 +13406,8 @@ function viewData(){
    '<button data-a="back" style="width:42px;height:42px;border-radius:42px;background:var(--surface);border:1px solid var(--line);color:var(--dim);display:flex;align-items:center;justify-content:center;flex:none;font-size:17px">✕</button>'+
    '<h1 class="disp" style="font-size:19px;font-weight:600;flex:1;text-align:center;margin:0">Settings</h1>'+
    '<span style="width:42px;flex:none"></span></div>';
-  /* profile header → account sheet */
-  h+='<button data-a="dsetOpen" data-v="Account & sync" class="card mt2" style="width:100%;text-align:left;padding:15px 16px;display:flex;align-items:center;gap:13px">'+
+  /* profile header → the You page (name/age/sex + account) */
+  h+='<button data-a="meOpen" class="card mt2" style="width:100%;text-align:left;padding:15px 16px;display:flex;align-items:center;gap:13px">'+
     '<span style="width:44px;height:44px;border-radius:44px;background:var(--raised);border:1px solid '+(signed?'var(--green)':'var(--line)')+';display:flex;align-items:center;justify-content:center;flex:none">'+
     '<span class="disp" style="font-size:18px;font-weight:600;color:'+(signed?'var(--green)':'var(--dim)')+'">'+esc(String(nm).slice(0,1).toUpperCase())+'</span></span>'+
     '<span style="flex:1;min-width:0"><span style="display:block;font-size:15.5px;font-weight:600">'+esc(nm)+'</span>'+
@@ -13448,7 +13448,7 @@ function viewData(){
   h+=setGroup('Beta testing',[
     setRow(I.bug,'Report a problem','','__report'),
     setRow(I.demo,'Demo data',demoPresent()?'loaded':'','Demo data')]);
-  const KNOWN=['Account & sync','Program library','Your own block','Rehab pathway','Running','Daily check-in','Profile','Barbell weight','Available equipment','Units','Notifications','Report a problem','Allena — AI coach','Export','Restore','Demo data','Start fresh'];
+  const KNOWN=['You','Account & sync','Program library','Your own block','Rehab pathway','Running','Daily check-in','Profile','Barbell weight','Available equipment','Units','Notifications','Report a problem','Allena — AI coach','Export','Restore','Demo data','Start fresh'];
   const left=Object.keys(byTitle).filter(k=>KNOWN.indexOf(k)<0);
   if(left.length)h+=setGroup('More',left.map(k=>setRow(I.prog,k,'',k)));
   h+='<div style="height:8px"></div>';
@@ -13572,6 +13572,7 @@ function dataRaw(){
    (S.lay.plates!==false?'background:var(--amber);color:var(--bg)':'border:1.5px solid var(--line)')+'">'+(S.lay.plates!==false?'✓':'')+'</span>'+
    '<span style="flex:1"><span style="display:block;font-size:13.5px;font-weight:600">Show the plate diagram</span>'+
    '<span style="color:var(--faint);font-size:11.5px">Bar and plates drawn on the set screen</span></span></button></div>'+
+   '<div class="mt2"><p class="eyebrow">You</p>'+youPageHtml()+'</div>'+
    '<div class="mt2"><p class="eyebrow">Account &amp; sync</p>'+accountSection()+
      '<div style="border-top:1px solid var(--line);margin-top:16px;padding-top:14px"><p class="mono" style="color:var(--faint);font-size:9.5px;letter-spacing:.07em">PROFILE &amp; GOALS</p>'+
      (S.prof&&S.prof.goal?'<p style="font-size:14px;font-weight:600;margin-top:8px">'+esc(S.prof.name||'You')+'</p>'+
@@ -13621,6 +13622,22 @@ function notifPageHtml(){
       '<span style="color:var(--faint);font-size:11px">'+k[2]+'</span></span>'+
       '<button data-a="notifKind" data-v="'+k[0]+'" class="pill'+(NP[k[0]]?' on':'')+'" style="width:56px;padding:8px 0;font-size:11px">'+(NP[k[0]]?'On':'Off')+'</button></div>').join(''):'')+
     '<p style="color:var(--faint);font-size:11px;line-height:1.5;margin-top:10px">Every notification carries a real fact tied to a real date. There is no “we miss you” — by design, there never will be.</p></div>'}
+function youPageHtml(){
+  /* who the model is calibrated to — age and sex shape the strength
+     and running standards in Where you stand; the name is the welcome
+     line. Saved as you type. */
+  const pr=S.prof||{};
+  const sexPill=(v,l)=>'<button data-a="meSex" data-v="'+v+'" class="pill" style="flex:1'+((pr.sex||'')===v?';background:var(--text);color:var(--bg);border-color:var(--text);font-weight:600':'')+'">'+l+'</button>';
+  return '<p style="color:var(--dim);font-size:12.5px;line-height:1.55;margin-top:6px">Age and sex calibrate the strength and running standards in Where you stand. The name is just your welcome line. Saved as you type — nothing here leaves the phone.</p>'+
+    '<p class="eyebrow" style="margin-top:14px">Name</p>'+
+    '<input data-in="prof.name" value="'+esc(pr.name||'')+'" autocomplete="off" style="width:100%;margin-top:8px;background:var(--surface);border:1px solid var(--line);border-radius:10px;color:var(--text);padding:12px;font-size:15px;outline:none">'+
+    '<p class="eyebrow" style="margin-top:14px">Age</p>'+
+    '<input data-in="prof.age" value="'+esc(pr.age!=null?pr.age:'')+'" inputmode="numeric" style="width:100%;margin-top:8px;background:var(--surface);border:1px solid var(--line);border-radius:10px;color:var(--text);padding:12px;font-size:15px;outline:none">'+
+    '<p class="eyebrow" style="margin-top:14px">Sex</p>'+
+    '<div class="row" style="margin-top:8px;gap:8px">'+sexPill('female','Female')+sexPill('male','Male')+sexPill('na','Prefer not to say')+'</div>'+
+    '<div style="margin-top:18px;border-top:1px solid var(--line);padding-top:4px">'+
+    navRow(SET_ICONS.gear,'Account & sync',(function(){try{const a=acct();return (a&&a.refresh)?'Signed in':'Not signed in'}catch(e){return ''}})(),'dsetOpen','Account & sync')+'</div>'+
+    '<p style="color:var(--faint);font-size:11px;line-height:1.55;margin-top:8px">The account is a different thing: it is your identity ACROSS devices — it unlocks the coach without any key, backs up your score card, and is how a new phone (or the TestFlight app) picks up where this one left off.</p>'}
 function reportPageHtml(){
   return '<p style="color:var(--dim);font-size:13px;line-height:1.6;margin-top:8px">Something broken, confusing, or just not right? One tap opens an email to the developer — Allena fills in what build you are on so you do not have to.</p>'+
     '<button data-a="reportEmail" class="big disp mt" style="background:var(--amber);color:var(--bg);font-size:15px">Email the developer</button>'+
@@ -15359,6 +15376,43 @@ setInterval(function(){try{
   document.addEventListener('mouseup',()=>{active=false;setTimeout(clear,1400)});
 })();
 
+/* drag any bottom sheet down to close it (owner call, Sep 2026):
+   once the sheet's own scroll is at the top it follows the finger,
+   the scrim fades with it, and past the threshold it slides out —
+   under it, it springs back. Inputs, selects and drag-lists exempt. */
+(function(){let y0=null,sh=null,bg=null,dragging=false;
+  document.addEventListener('touchstart',e=>{
+    sh=null;bg=null;y0=null;dragging=false;
+    const s9=e.target.closest&&e.target.closest('.sheet');if(!s9)return;
+    if(e.target.closest('input,textarea,select,.rpe,.step,[data-draglist]'))return;
+    if(s9.scrollTop>2)return;
+    y0=e.touches[0].clientY;sh=s9;bg=s9.parentElement},{passive:true});
+  document.addEventListener('touchmove',e=>{
+    if(y0==null||!sh)return;
+    const dy=e.touches[0].clientY-y0;
+    if(dy<=0){if(!dragging){y0=null;sh=null}return}
+    if(!dragging){if(dy<12)return;dragging=true;sh.style.transition='none';if(bg)bg.style.transition='none'}
+    const d=Math.min(dy,620);
+    sh.style.transform='translateY('+d+'px)';
+    if(bg)bg.style.background='rgba(0,0,0,'+Math.max(0,0.55-d/900).toFixed(3)+')';
+    if(e.cancelable)e.preventDefault()},{passive:false});
+  document.addEventListener('touchend',()=>{
+    if(!dragging||!sh){y0=null;sh=null;dragging=false;return}
+    const m9=/translateY\((\d+\.?\d*)px\)/.exec(sh.style.transform||'');
+    const d=m9?+m9[1]:0;
+    const s9=sh,b9=bg;sh=null;bg=null;y0=null;dragging=false;
+    if(d>110){
+      s9.style.transition='transform .24s cubic-bezier(.4,0,.2,1)';
+      s9.style.transform='translateY(105%)';
+      if(b9){b9.style.transition='background .2s ease';b9.style.background='rgba(0,0,0,0)'}
+      try{vib(8)}catch(e2){}
+      setTimeout(function(){runAction('closeSheet')},200)}
+    else{
+      s9.style.transition='transform .26s cubic-bezier(.34,1.4,.64,1)';
+      s9.style.transform='';
+      setTimeout(function(){try{s9.style.transition=''}catch(e2){}},280)}},{passive:true});
+})();
+
 /* swipe down anywhere on the session screen minimizes it into the
    live pill, sheet-style (owner call, Sep 2026): the screen follows
    the finger, rounds its corners, and past the threshold slides away
@@ -15588,6 +15642,10 @@ document.addEventListener('input',e=>{const d=e.target.dataset;
     e.target.style.height='auto';
     e.target.style.height=Math.min(120,e.target.scrollHeight)+'px'}catch(_){}return}
   if(k==='gform.am'||k==='gform.pre'||k==='gform.post')S.needRender=1;
+  if(k==='prof.name'||k==='prof.age'){try{
+    if(k==='prof.age'){const a9=parseInt(String(e.target.value).replace(/\D/g,''),10);
+      if(a9>=10&&a9<=100)S.prof.age=a9}
+    lset(K_PROF,S.prof)}catch(_){}return}
   if(k==='acctCode'){const c9=String(e.target.value).replace(/\D/g,'').slice(0,10);
     S.acctCode=c9;
     /* the server sends 8-digit codes — auto-submit only on a full one
@@ -17167,7 +17225,10 @@ function runAction(a,v,t,e){
     case 'muscleOpen':S.sheet={t:'muscle',m:v};render();break;
     case 'hkDone':S.hkRes=null;S.sheet=null;render();break;
     case 'betaCopy':{try{navigator.clipboard.writeText(decodeURIComponent(v)).then(()=>flash('Copied \u2014 paste it to Sathya with a screenshot.')).catch(()=>flash('Long-press the text to copy it.'))}catch(e){flash('Long-press the text to copy it.')}break}
+    case 'meOpen':{S.prof=S.prof||{};lset(K_PROF,S.prof);S.sheet={t:'dset',k:'You'};render();break}
+    case 'meSex':{S.prof=S.prof||{};S.prof.sex=v;lset(K_PROF,S.prof);vib(8);render();break}
     case 'dsetOpen':{if(v==='__beta'){S.betaFrom=S.view;S.sheet={t:'beta'};render();break}
+      if(v==='__report')v='Report a problem';   // the rows pass a token; the chunk key is the title
       S.sheet={t:'dset',k:v};render();break}
     case 'acctSync':acctSync(true);break;
     case 'acctOut':lset(K_ACCT,null);S.acctPending=false;render();
