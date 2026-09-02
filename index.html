@@ -422,7 +422,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='dd2995';  // stamped by tools/build.py with the content hash
+const BUILD_ID='0e8267';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -5510,6 +5510,7 @@ function viewPoints(){
        '<span style="color:var(--faint);font-size:11px;line-height:1.4">'+(e9[4]?'done today':e9[3])+'</span></span>'+
        '<span class="mono" style="color:var(--faint);font-size:13px;flex:none">\u203a</span></button>').join('')+'</div>':'')+
      '</div>';}
+  h+=(typeof learnedCard==='function'?learnedCard():'');
   h+='<p class="eyebrow mt2">Why yours looks like that</p>'+
     '<div class="card mt" style="padding:6px 16px">'+
     [['Trunk',tr.sessions+' sessions'],
@@ -6545,6 +6546,32 @@ function hkParseFile(file,done){
    comes in as load, running is coached, everything else is
    ingested-never-coached. The wrapper announces itself with a
    webkit message handler named "allena". */
+function healthFlowing(){
+  /* is data actually arriving from Health? true once any workout,
+     daily signal or nutrition row has landed via the bridge */
+  try{
+    if((S.runs||[]).some(r=>/via (Apple Health|Strava)/i.test(String(r.note||''))))return true;
+    if(Object.keys((hkDailyStore().days)||{}).length>0)return true;
+    if((S.history||[]).some(h=>h.watch))return true;
+    return false}catch(e){return false}}
+function healthConnectCard(){
+  /* THE first-run priority (owner call, 3 Sep): Allena is transformed
+     by Health — say it loudly, and keep saying it until connected.
+     Only in the wrapper (Safari can't reach HealthKit). */
+  try{
+    if(!inWrapper()||healthFlowing())return '';
+    const P=notifPrefs();
+    const dismissed=P.hcDismissed;
+    return '<div class="card an-hero an-glow" style="padding:18px;border-radius:22px;margin-top:14px;border-color:var(--amber)">'+
+      '<div style="display:flex;align-items:center;gap:9px">'+
+      '<span style="font-size:16px">\u2764\ufe0f</span>'+
+      '<p class="mono" style="flex:1;font-size:9.5px;color:var(--amber);letter-spacing:.06em">CONNECT APPLE HEALTH</p></div>'+
+      '<p class="disp gradhead" style="font-size:22px;line-height:1.15;margin-top:9px">Allena is a different app once your data flows in</p>'+
+      '<p style="color:var(--dim);font-size:13px;line-height:1.6;margin-top:6px">Your runs, sleep, heart rate and steps turn on the finds nothing else can make \u2014 how your sleep moves your lifts, what your heart says about recovery. If your Garmin, Apple Watch, Strava or MyFitnessPal already sync to Apple Health, Allena reads it all. Two taps.</p>'+
+      '<button data-a="healthConnectGo" class="big disp mt" style="background:var(--amber);color:#1F1E1D;font-size:15px">Connect Apple Health</button>'+
+      (dismissed?'':'<button data-a="healthConnectLater" class="btn" style="margin-top:8px;color:var(--faint);font-size:12px">I\u2019ll do it later</button>')+
+      '</div>'
+  }catch(e){return ''}}
 function inWrapper(){
   try{return !!(window.webkit&&window.webkit.messageHandlers&&window.webkit.messageHandlers.allena)}catch(e){return false}}
 /* the type label can lie — Apple Watch walks are often typed as
@@ -7230,6 +7257,13 @@ function notifPlan(){
       if(at>Date.now()+60000)
         items.push({id:'nf'+today(),ts:Math.round(at/1000),title:'Allena',
           body:'One session from unlocking \u201c'+String(near.t).slice(0,50)+'\u201d \u2014 today\u2019s the day.'})}}catch(e){}}
+  /* the persistent Health nudge (owner call): if the wrapper is
+     installed but nothing flows, remind every few days — this is the
+     one that unlocks everything, so it earns the reminder */
+  if(P.on&&typeof inWrapper==='function'&&inWrapper()&&typeof healthFlowing==='function'&&!healthFlowing()){
+    const at=new Date(dayKey(new Date(Date.now()+2*864e5))+'T10:00:00').getTime();
+    items.push({id:'hc'+dayKey(new Date(Date.now()+2*864e5)),ts:Math.round(at/1000),title:'Allena',
+      body:'Allena is still waiting on Apple Health — connect it and the finds no other app can make switch on.'})}
   if(P.quest){const d=new Date();const dow=(d.getDay()+6)%7;
     const mon=dayKey(new Date(Date.now()+(7-dow)*864e5));
     items.push({id:'q'+mon,ts:at(mon,9,0),title:'Allena',body:'A new quest is up for the week.'})}
@@ -8098,6 +8132,57 @@ function signalRevealHtml(){
     '<p class="sig-body" style="color:var(--dim);font-size:13.5px;line-height:1.6;margin-top:12px;max-width:34ch">'+esc(sg.d)+'</p>'+
     '<p class="mono sig-tap" style="color:var(--faint);font-size:10.5px;letter-spacing:.06em;margin-top:26px">TAP TO KEEP IT</p>'+
     '</div></div>'}
+
+/* ── what Allena has learned (owner call, 3 Sep) ─────────────
+   Makes the invisible learning visible: no LLM here, yet Allena
+   moulds to the user through statistics — moving baselines,
+   discovered correlations, per-lift adaptation. This surface
+   proves it, which is both the honest answer to 'do we need AI'
+   and a dopaminergic 'it knows me' moment. */
+function learnedProfile(){
+  const rows=[];
+  try{
+    const H=(S.history||[]).filter(h=>h.complete&&!h.run);
+    // resting-HR baseline
+    try{const r=hkdSeries('rhr',30);if(r.length>=7)
+      rows.push({k:'Your resting heart rate sits around',v:Math.round(hkdMed(r.map(x=>x.v)))+' bpm',
+        s:'learned from '+r.length+' mornings'})}catch(e){}
+    // readiness baseline
+    try{const b=bbBaseline();if(b!=null)rows.push({k:'Your readiness baseline is',v:Math.round(b),
+      s:'what a low day is measured against'})}catch(e){}
+    // sleep normal
+    try{const sl=hkdSeries('sleep',30);if(sl.length>=7){const m=hkdMed(sl.map(x=>x.v));
+      rows.push({k:'You normally sleep',v:Math.floor(m/60)+'h '+String(Math.round(m%60)).padStart(2,'0')+'m',
+        s:'your own average across '+sl.length+' nights'})}}catch(e){}
+    // best training day
+    try{const byDow={};H.forEach(h=>{const r=(h.log||[]).filter(l=>l.rpe!=null).map(l=>l.rpe);
+      if(r.length)(byDow[new Date(h.date).getDay()]=byDow[new Date(h.date).getDay()]||[]).push(r.reduce((a,b)=>a+b,0)/r.length)});
+      const names=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+      const rk=Object.keys(byDow).filter(k=>byDow[k].length>=3).map(k=>({k:k,v:byDow[k].reduce((a,b)=>a+b,0)/byDow[k].length}));
+      if(rk.length>=2){rk.sort((a,b)=>a.v-b.v);rows.push({k:'Your strongest day tends to be',v:names[rk[0].k],
+        s:'the same work costs less effort then'})}}catch(e){}
+    // discovered correlations — the deepest learning
+    try{correlations().forEach(c=>{const p=corrPhrase(c);
+      rows.push({k:'A pattern only in you:',v:p.title,s:'correlation '+(Math.round(c.rho*100)/100)+' across '+c.n+' days'})})}catch(e){}
+    // per-lift adaptation state
+    try{const lifts={};H.forEach(h=>h.log.forEach(l=>{if(l.w>0&&l.r>0)lifts[gBase(l.ex)]=(lifts[gBase(l.ex)]||0)+1}));
+      const trained=Object.keys(lifts).filter(k=>lifts[k]>=6).length;
+      if(trained)rows.push({k:'Allena is tuning the load on',v:trained+' lift'+(trained===1?'':'s'),
+        s:'the increment adapts to how each one answers'})}catch(e){}
+  }catch(e){}
+  return rows}
+function learnedCard(){
+  const rows=learnedProfile();
+  if(rows.length<2)return '';
+  return '<div class="card mt" style="padding:16px;border-radius:20px">'+
+    '<div style="display:flex;align-items:center;gap:9px"><img src="'+MARK+'" alt="" style="width:16px;height:16px;object-fit:contain">'+
+    '<p class="eyebrow" style="margin:0;flex:1">What Allena has learned about you</p>'+
+    '<span class="mono" style="color:var(--faint);font-size:9px">'+rows.length+' THINGS</span></div>'+
+    '<div style="margin-top:12px;display:flex;flex-direction:column;gap:11px">'+
+    rows.slice(0,7).map(r=>'<div style="border-left:2px solid var(--line);padding-left:11px">'+
+      '<p style="font-size:12px;color:var(--dim);line-height:1.4">'+esc(r.k)+' <b style="color:var(--text)">'+esc(r.v)+'</b></p>'+
+      '<p class="mono" style="font-size:9px;color:var(--faint);margin-top:1px">'+esc(r.s)+'</p></div>').join('')+'</div>'+
+    '<p class="mono" style="color:var(--faint);font-size:9px;line-height:1.5;margin-top:12px">EVERY LINE IS STATISTICS ON YOUR OWN NUMBERS — NO GUESSWORK, NOTHING INVENTED. IT GROWS AS YOU DO.</p></div>'}
 function treeSeason(d){
   const m=(d?new Date(d):new Date()).getMonth()+1;
   if(m>=9&&m<=11)return{name:'Spring — fresh leaves',leaf:'#8FBF6E'};
@@ -11754,6 +11839,7 @@ function todayOrder(){
   // the comeback's offer is an emotional moment — it goes high on arrival
   try{const cb=cbState();add(comebackCard(),cb&&cb.state==='offered'?88:55)}catch(e){add(comebackCard(),55)}
 
+  add((typeof healthConnectCard==='function'?healthConnectCard():''),90);
   add((typeof notifAskCard==='function'?notifAskCard():''),86);
   add(apptCard(),85);                                    // renders only day-before / day-of
   add(garCard(),hr<12?82:50);                            // the morning ask fades after noon
@@ -15949,6 +16035,10 @@ function runAction(a,v,t,e){
     case 'svGo':svConnect();break;
     case 'suGateGo':if(S.setup)S.setup.gate=false;render();break;
     case 'suGateBack':if(S.setup)S.setup.gate=true;render();break;
+    case 'healthConnectGo':{try{if(window.webkit&&window.webkit.messageHandlers&&window.webkit.messageHandlers.allena)window.webkit.messageHandlers.allena.postMessage('sync')}catch(e){}
+      flash('Allow everything on the Health sheet — Allena reads, never writes.');break}
+    case 'healthConnectLater':{const P=notifPrefs();P.hcDismissed=1;notifSave();render();
+      flash('No rush — the reminder will nudge you. It is the one thing that changes everything.');break}
     case 'signalOpen':{const sg=signalDue();if(sg){S.signalReveal=sg;render()}break}
     case 'signalKeep':{const sg=S.signalReveal;
       if(sg){const bank=discBank();if(!bank[sg.id]){bank[sg.id]={t:sg.t,d:sg.d,rar:sg.rar,tag:'signal',found:today()};bankSave()}}
