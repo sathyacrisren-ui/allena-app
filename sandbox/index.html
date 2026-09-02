@@ -515,7 +515,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='751075';  // stamped by tools/build.py with the content hash
+const BUILD_ID='0708d1';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -7863,6 +7863,7 @@ function discoveries(){
   }catch(e){}
   try{if(typeof healthDiscoveries==='function')healthDiscoveries().forEach(d9=>D.push(d9))}catch(e){}
   try{if(typeof correlationDiscoveries==='function')correlationDiscoveries().forEach(d9=>D.push(d9))}catch(e){}
+  try{if(typeof standingDiscoveries==='function')standingDiscoveries().forEach(d9=>D.push(d9))}catch(e){}
   return D}
 function discoverySeen(){return S.discSeen||(S.discSeen=lget('training-disc-v1',{}))}
 function markDiscoveries(){
@@ -8377,6 +8378,191 @@ function learnedCard(){
       '<p style="font-size:12px;color:var(--dim);line-height:1.4">'+esc(r.k)+' <b style="color:var(--text)">'+esc(r.v)+'</b></p>'+
       '<p class="mono" style="font-size:9px;color:var(--faint);margin-top:1px">'+esc(r.s)+'</p></div>').join('')+'</div>'+
     '<p class="mono" style="color:var(--faint);font-size:9px;line-height:1.5;margin-top:12px">EVERY LINE IS STATISTICS ON YOUR OWN NUMBERS — NO GUESSWORK, NOTHING INVENTED. IT GROWS AS YOU DO.</p></div>'}
+
+/* ══ where you stand (Sep 2026) ══════════════════════════════
+   Cross-domain rarity — the honest version of the viral
+   "bench 225 = sub-19 5K" reels. Percentiles are computed vs
+   REAL, NAMED datasets, never "all humans":
+   - Lifts: raw verified competition entries on OpenPowerlifting
+     (~810k; van den Hoek et al. 2024 normative study + published
+     class percentiles). Anchors are mid-class p50/p90 bodyweight-
+     multiples (83 kg men / 63 kg women), allometrically adjusted
+     to the user's bodyweight ((bw/anchor)^-0.33 — checked against
+     the published 66/120 kg class medians), normal model between
+     anchors, age-adjusted past 35 (~0.8%/yr, from the study's
+     80+ percentiles).
+   - 5K: parkrun-scale adult finisher distribution, lognormal fit
+     that reproduces the commonly cited anchors (sub-20 ≈ top ~5%
+     of men; sub-30 ≈ top ~25% of women).
+   Every surface names its reference population. The equivalence
+   line — "a 21:10 5K would match your bench's rarity" — is the
+   thing only an app holding both sides of the data can say.
+   ══════════════════════════════════════════════════════════ */
+const STAND_LIFTS={
+  male:{anchor:83,bench:{p50:1.51,p90:1.90},squat:{p50:2.23,p90:2.80},deadlift:{p50:2.62,p90:3.19}},
+  female:{anchor:63,bench:{p50:0.95,p90:1.31},squat:{p50:1.71,p90:2.22},deadlift:{p50:2.10,p90:2.62}}};
+const STAND_5K={male:{med:29.0,sig:0.225},female:{med:34.5,sig:0.21}};
+function standPhi(x){
+  const z=Math.abs(x)/Math.SQRT2,t=1/(1+0.3275911*z);
+  const erf=1-((((1.061405429*t-1.453152027)*t+1.421413741)*t-0.284496736)*t+0.254829592)*t*Math.exp(-z*z);
+  return x>=0?0.5*(1+erf):0.5*(1-erf)}
+function standPhiInv(p){let lo=-4,hi=4;
+  for(let i=0;i<60;i++){const m2=(lo+hi)/2;if(standPhi(m2)<p)lo=m2;else hi=m2}
+  return (lo+hi)/2}
+function standBw(){
+  try{
+    const dd=(S.daily&&S.daily.days)||{};
+    const ks=Object.keys(dd).filter(x=>dd[x].bw!=null).sort();
+    if(ks.length)return dd[ks[ks.length-1]].bw;
+    const sc=(S.scans||[]).slice().sort((a,b)=>String(a.date||'').localeCompare(String(b.date||'')));
+    if(sc.length&&+sc[sc.length-1].w>0)return +sc[sc.length-1].w;
+  }catch(e){}
+  return null}
+function standLiftAnchors(k,sexKey,bw,age){
+  const T=STAND_LIFTS[sexKey],base=T[k];
+  const cls=Math.pow(bw/T.anchor,-0.33);
+  const f=age>35?Math.max(0.62,1-0.008*(age-35)):1;
+  const p50=base.p50*cls*f,p90=base.p90*cls*f;
+  return{p50:p50,sig:(p90-p50)/1.2816}}
+function standLiftPct(mult,k,bw,age){
+  const sex=(S.prof&&S.prof.sex)||null;
+  const one=sk=>{const a=standLiftAnchors(k,sk,bw,age);return standPhi((mult-a.p50)/a.sig)*100};
+  if(sex==='male'||sex==='female')return one(sex);
+  return (one('male')+one('female'))/2}          // no sex recorded: mixed reference
+function standRunPct(mins,age){
+  const sex=(S.prof&&S.prof.sex)||null;
+  const g=age>35?1+0.008*(age-35):1,adj=mins/g;
+  const one=sk=>{const d=STAND_5K[sk];return (1-standPhi(Math.log(adj/d.med)/d.sig))*100};
+  if(sex==='male'||sex==='female')return one(sex);
+  return (one('male')+one('female'))/2}
+function standRunTimeAtPct(p,age){
+  const sex=(S.prof&&S.prof.sex)||null,g=age>35?1+0.008*(age-35):1;
+  const one=sk=>{const d=STAND_5K[sk];return d.med*Math.exp(d.sig*standPhiInv(1-p/100))};
+  const t=(sex==='male'||sex==='female')?one(sex):(one('male')+one('female'))/2;
+  return t*g}
+const STAND_MATCH={
+  bench:{re:/(^|\s)bench/,not:/dip|dumbbell|\bdb\b|incline|decline|close|floor|smith|machine/},
+  squat:{re:/squat/,not:/front|split|bulg|goblet|hack|sissy|pistol|box|jump|overhead|zercher|belt|air|wall/},
+  deadlift:{re:/deadlift|(^|\s)dl(\s|$)/,not:/romanian|\brdl\b|stiff|straight|single|kick/}};
+function standBestLifts(){
+  const cut=Date.now()-365*864e5,best={};
+  (S.history||[]).forEach(h=>{
+    if(!h.complete||h.run)return;
+    if(new Date(h.date).getTime()<cut)return;
+    (h.log||[]).forEach(l=>{
+      if(!(l.w>0&&l.r>0&&l.r<=10))return;
+      const b=gBase(l.ex).toLowerCase();
+      Object.keys(STAND_MATCH).forEach(k=>{
+        const m2=STAND_MATCH[k];
+        if(!m2.re.test(b)||m2.not.test(b))return;
+        const e=e1rm(l.w,l.r);
+        if(!best[k]||e>best[k].e1)best[k]={e1:e,w:l.w,r:l.r,date:h.date}})})});
+  return best}
+function standBest5k(){
+  const cut=Date.now()-365*864e5;let best=null;
+  try{(typeof runs==='function'?runs():[]).forEach(r=>{
+    if(!isRunType(r.type)||!(r.km>0)||!(r.mins>0))return;
+    if(new Date(r.date).getTime()<cut)return;
+    if(r.km<3||r.km>15)return;
+    const t5=r.mins*Math.pow(5/r.km,1.06);          // Riegel to 5K-equivalent
+    if(!best||t5<best.t5)best={t5:t5,km:r.km,mins:r.mins,date:r.date}})}catch(e){}
+  return best}
+function standingData(){
+ try{
+  const bw=standBw(),age=(S.prof&&+S.prof.age)||30;
+  const sex=(S.prof&&S.prof.sex)||null;
+  const out={rows:[],run:null,eq:null,bw:bw,mixed:!(sex==='male'||sex==='female'),needs:[]};
+  const lifts=standBestLifts();
+  if(!bw&&Object.keys(lifts).length)out.needs.push('bodyweight');
+  if(bw)[['bench','Bench'],['squat','Squat'],['deadlift','Deadlift']].forEach(x=>{
+    const b=lifts[x[0]];if(!b)return;
+    const mult=b.e1/bw;
+    const pct=Math.max(0.5,Math.min(99.5,standLiftPct(mult,x[0],bw,age)));
+    // the action line for the sub-median: the median itself, in kg
+    const medMult=(function(){
+      if(sex==='male'||sex==='female')return standLiftAnchors(x[0],sex,bw,age).p50;
+      return (standLiftAnchors(x[0],'male',bw,age).p50+standLiftAnchors(x[0],'female',bw,age).p50)/2})();
+    out.rows.push({k:x[0],label:x[1],e1:b.e1,set:b,mult:mult,pct:pct,medKg:medMult*bw})});
+  const r5=standBest5k();
+  if(r5)out.run={t5:r5.t5,pct:Math.max(0.5,Math.min(99.5,standRunPct(r5.t5,age))),
+    approx:Math.abs(r5.km-5)>0.3,km:r5.km,date:r5.date};
+  if(out.rows.length&&out.run){
+    const top=out.rows.slice().sort((a,b)=>b.pct-a.pct)[0];
+    out.eq={lift:top,time:standRunTimeAtPct(top.pct,age)}}
+  return out}catch(e){return null}}
+function standMmss(mins){
+  const s=Math.round(mins*60),m2=Math.floor(s/60);
+  return m2+':'+String(s%60).padStart(2,'0')}
+function standingCard(){
+ try{
+  const d=standingData();
+  if(!d||(!d.rows.length&&!d.run))return '';
+  const bar=(pct,col)=>'<div style="height:5px;border-radius:5px;background:var(--line);margin-top:7px;overflow:hidden">'+
+    '<div style="height:100%;width:'+Math.round(pct)+'%;border-radius:5px;background:'+col+'"></div></div>';
+  let h='<div class="card mt2" id="sec-standing" style="padding:16px">'+
+    '<p class="eyebrow">Where you stand</p>';
+  d.rows.forEach(r=>{
+    const top=Math.round(100-r.pct);
+    const col=r.pct>=90?'#FFFFFF':r.pct>=75?'var(--green)':r.pct>=50?'#8FBF8A':'var(--dim)';
+    h+='<div style="margin-top:13px">'+
+      '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px">'+
+      '<span style="font-size:13.5px;font-weight:600">'+r.label+'</span>'+
+      '<span class="mono" style="font-size:11px;color:'+col+'">'+
+      (r.pct>=50?'TOP '+Math.max(1,top)+'%':Math.round(r.pct)+'TH PCTL')+'</span></div>'+
+      bar(r.pct,col)+
+      '<p style="color:var(--faint);font-size:11px;line-height:1.5;margin-top:5px">'+
+      uwNum(Math.round(r.e1))+' '+uwUnit()+' est 1RM · '+r.mult.toFixed(2)+'× bodyweight'+
+      (r.pct<50?' — the median tested competitor at your weight lifts '+uwNum(Math.round(r.medKg))+' '+uwUnit()+'; '+uwNum(Math.round(r.medKg-r.e1))+' '+uwUnit()+' to go':'')+
+      '</p></div>'});
+  if(d.run){
+    const top=Math.round(100-d.run.pct);
+    const col=d.run.pct>=90?'#FFFFFF':d.run.pct>=75?'var(--green)':d.run.pct>=50?'#8FBF8A':'var(--dim)';
+    h+='<div style="margin-top:13px">'+
+      '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px">'+
+      '<span style="font-size:13.5px;font-weight:600">5K'+(d.run.approx?' <span class="mono" style="font-size:9px;color:var(--faint)">~EQUIV</span>':'')+'</span>'+
+      '<span class="mono" style="font-size:11px;color:'+col+'">'+
+      (d.run.pct>=50?'TOP '+Math.max(1,top)+'%':Math.round(d.run.pct)+'TH PCTL')+'</span></div>'+
+      bar(d.run.pct,col)+
+      '<p style="color:var(--faint);font-size:11px;line-height:1.5;margin-top:5px">'+standMmss(d.run.t5)+
+      (d.run.approx?' converted from a '+d.run.km.toFixed(1)+' km run':' best this year')+'</p></div>'}
+  if(d.eq){
+    const gap=d.eq.lift.pct-(d.run?d.run.pct:0);
+    h+='<p style="color:var(--dim);font-size:12.5px;line-height:1.6;margin-top:14px;padding-top:12px;border-top:1px solid var(--line)">'+
+      'Your '+d.eq.lift.label.toLowerCase()+' sits with the rarest '+Math.max(1,Math.round(100-d.eq.lift.pct))+'% of lifters. '+
+      'A <b style="color:var(--text)">'+standMmss(d.eq.time)+'</b> 5K would match that rarity'+
+      (d.run?(gap>8?' — the engine is '+Math.round(gap)+' points behind the chassis.':gap<-8?' — you are the rarer runner; the bar has catching up to do.':' — and you are nearly there on both sides.'):'.')+'</p>'}
+  if(d.needs.length)h+='<p style="color:var(--faint);font-size:11px;line-height:1.5;margin-top:10px">Log a bodyweight (morning check-in or a scan) to place your lifts.</p>';
+  h+='<p class="mono" style="color:var(--faint);font-size:8.5px;letter-spacing:.05em;margin-top:12px;line-height:1.6">VS TESTED COMPETITION LIFTERS (OPENPOWERLIFTING, ~810K ENTRIES) · 5K VS PARKRUN-SCALE FINISHERS'+
+    (d.mixed?' · MIXED REFERENCE — ADD YOUR SEX IN PROFILE TO SHARPEN IT':'')+' · AGE-ADJUSTED</p>';
+  return h+'</div>'}catch(e){return ''}}
+function standingDiscoveries(){
+  const D=[];
+  const add=(rar,t,d2,tag)=>D.push({rar:rar,t:t,d:d2,tag:tag||'ratio',id:t});
+  try{
+    const d=standingData();
+    if(!d)return D;
+    d.rows.forEach(r=>{
+      // stable titles (id = title): thresholds, never live numbers
+      if(r.pct>=90)add('epic','Meet-floor strength: '+r.label.toLowerCase(),
+        'Your '+r.label.toLowerCase()+' e1RM stands above 90% of tested competition lifters at your bodyweight — not gym-goers, meet lifters. '+
+        Math.round(r.e1)+' kg at '+Math.round(d.bw)+' kg bodyweight.');
+      else if(r.pct>=75)add('rare',r.label+' in the top quarter',
+        'Your '+r.label.toLowerCase()+' e1RM beats 75% of tested competition lifters at your bodyweight ('+Math.round(r.e1)+' kg at '+Math.round(d.bw)+' kg).');
+      else if(r.pct>=50)add('uncommon',r.label+' past the competition median',
+        'Your '+r.label.toLowerCase()+' e1RM is past the median of tested competition lifters at your bodyweight — walk into a meet and you are in the top half.')});
+    if(d.run&&d.run.pct>=75)add('rare','A top-quarter 5K',
+      'Your best 5K'+(d.run.approx?'-equivalent':'')+' this year ('+standMmss(d.run.t5)+') beats 75% of parkrun-scale finishers.');
+    if(d.rows.length&&d.run){
+      const top=d.rows.slice().sort((a,b)=>b.pct-a.pct)[0];
+      if(Math.abs(top.pct-d.run.pct)<=8&&top.pct>=40)add('rare','The hybrid',
+        'Your '+top.label.toLowerCase()+' and your 5K sit at almost the same rarity in their own worlds ('+
+        Math.round(top.pct)+' vs '+Math.round(d.run.pct)+'). Most people pick a side — you did not.','cross');
+      else if(top.pct-d.run.pct>=30)add('uncommon','Rarer lifter than runner',
+        'Your '+top.label.toLowerCase()+' outranks your running by '+Math.round(top.pct-d.run.pct)+' percentile points. One easy run a week starts closing it — the lifting will not go anywhere.','cross');
+      else if(d.run.pct-top.pct>=30)add('uncommon','Rarer runner than lifter',
+        'Your 5K outranks your best lift by '+Math.round(d.run.pct-top.pct)+' percentile points. The bar is the cheap half — two focused sessions a week move it.','cross')}
+  }catch(e){}
+  return D}
 function treeSeason(d){
   const m=(d?new Date(d):new Date()).getMonth()+1;
   if(m>=9&&m<=11)return{name:'Spring — fresh leaves',leaf:'#8FBF6E'};
@@ -10720,7 +10906,7 @@ function statBox(v,l){return '<div class="card" style="flex:1;padding:10px 8px;t
   '<p style="color:var(--faint);font-size:10px;letter-spacing:.06em;text-transform:uppercase;margin-top:2px">'+l+'</p></div>'}
 const DAYCOLS=['#E8E5DC','#8A9A7B','#C2A878','#A98467','#9E8FB2','#7F9E9A'];
 function dayCol(i){return DAYCOLS[i%DAYCOLS.length]}
-const PSECTION_LABELS={patterns:'Patterns across your data',balance:'Muscle balance',goals:'Goal lifts',trends:'Lift trends',tonnage:'Weekly tonnage',lifetime:'Lifetime totals',bb:'Body Battery',scan:'Body composition',recovery:'Muscle recovery',bw:'Bodyweight',bests:'Best per exercise'};
+const PSECTION_LABELS={patterns:'Patterns across your data',balance:'Muscle balance',goals:'Goal lifts',trends:'Lift trends',tonnage:'Weekly tonnage',lifetime:'Lifetime totals',standing:'Where you stand',bb:'Body Battery',scan:'Body composition',recovery:'Muscle recovery',bw:'Bodyweight',bests:'Best per exercise'};
 const SECTION_LABELS={rec:'Today\u2019s recommendation',stats:'Stat strip',program:'Program & weeks',sessions:'This week\u2019s sessions',goals:'Lift goals',habits:'Daily habits',support:'Mobility & support'};
 function isSupport(p){return (p.weeks===1&&p.kind!=='rehab')||p.kind==='posture'}
 function mainProgs(){return S.lib.programs.filter(p=>!isSupport(p)&&!p.acl&&!p.rehabProto&&!p.archived)}
@@ -13026,6 +13212,7 @@ function viewProgress(){
       waiting.slice(0,10).map(esc).join(', ')+'</p></div>';
     if(!inner)return '';
     return collapser('trends','Lift trends',charted.length+' lift'+(charted.length===1?'':'s')+' charted'+(waiting.length?' · '+waiting.length+' waiting':''),inner)};
+  SECREF.standing=SEC.standing=()=>{try{return standingCard()}catch(e){return ''}};
   SECREF.tonnage=SEC.tonnage=()=>{const wks=Object.keys(weekVol).sort().slice(-8);
     if(wks.length<2)return '';
     const mx=Math.max.apply(null,wks.map(k=>weekVol[k]));
@@ -13085,7 +13272,10 @@ function viewProgress(){
   if(tabRehab){h+='<div class="row" style="margin-top:14px">'+
     [['train','Training'],['rehab','Rehab']].map(x=>'<button data-a="progTab" data-v="'+x[0]+'" class="pill" style="flex:1;padding:11px 0'+((S.progTab||'train')===x[0]?';background:var(--text);color:var(--bg);border-color:var(--text);font-weight:600':'')+'">'+x[1]+'</button>').join('')+'</div>';
     if((S.progTab||'train')==='rehab')return h+rehabProgress()+'</div>'}
-  (S.lay.porder||['goals','trends','tonnage','lifetime','bb','scan','recovery','bw','bests']).forEach(k=>{
+  const po=(S.lay.porder||['goals','trends','tonnage','lifetime','bb','scan','recovery','bw','bests']).slice();
+  /* standing joined after layouts were saved — append when absent */
+  if(po.indexOf('standing')<0)po.splice(po.indexOf('lifetime')>=0?po.indexOf('lifetime')+1:po.length,0,'standing');
+  po.forEach(k=>{
     if(k==='patterns')return;    // patterns live on Today now
     if(S.lay.phide&&S.lay.phide[k])return;const f=SEC[k];if(!f)return;
     const out=f()||'';
