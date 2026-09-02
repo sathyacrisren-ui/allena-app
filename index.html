@@ -522,7 +522,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='8567d4';  // stamped by tools/build.py with the content hash
+const BUILD_ID='473bd2';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -8199,6 +8199,56 @@ function healthNoticed(){
       'A huge movement day outside training. It is in your recovery picture — legs know, even when the log does not.');
   }catch(e){}
   return out}
+
+/* ══ the body signals page (owner call, Sep 2026) ═══════════
+   Everything Health feeds into Allena, visible and scrubbable —
+   the macros included. Read-only truth: what the engine sees is
+   what the user sees. */
+function sigSeries(kind){
+  if(kind.hk)return hkdSeries(kind.hk,90).map(p=>({t:new Date(p.date+'T12:00').getTime(),v:kind.f?kind.f(p.v):p.v}));
+  const dd=(S.daily&&S.daily.days)||{};
+  const cut=dayKey(new Date(Date.now()-90*864e5));
+  return Object.keys(dd).filter(k=>k>=cut&&dd[k][kind.d]!=null&&dd[k][kind.d]!=='')
+    .sort().map(k=>({t:new Date(k+'T12:00').getTime(),v:+dd[k][kind.d]}))}
+const SIG_KINDS=[
+  {k:'Sleep',hk:'sleep',f:v=>Math.round(v/6)/10,u:'h',src:'Apple Health'},
+  {k:'Resting heart rate',hk:'rhr',u:' bpm',src:'Apple Health'},
+  {k:'HRV',hk:'hrv',u:' ms',src:'Apple Health'},
+  {k:'VO2 max',hk:'vo2',u:'',src:'Apple Health'},
+  {k:'Steps',hk:'steps',u:'',src:'Apple Health'},
+  {k:'Calories',d:'kcal',u:' kcal',src:'Health nutrition'},
+  {k:'Protein',d:'pr',u:' g',src:'Health nutrition or hand-logged'},
+  {k:'Carbs',d:'carb',u:' g',src:'Health nutrition'},
+  {k:'Fat',d:'fat',u:' g',src:'Health nutrition'},
+  {k:'Bodyweight',d:'bw',u:' kg',src:'check-ins and scans'}];
+function viewSignals(){
+  let h='<div class="view pad modalrise" style="padding-top:20px">'+
+    '<button data-a="back" class="btn" style="width:auto;padding:8px 14px;color:var(--dim);font-size:12.5px;margin-bottom:14px">\u2039 Back</button>'+
+    '<h1 class="disp" style="font-size:25px;font-weight:600">Body signals</h1>'+
+    '<p style="color:var(--dim);font-size:13px;line-height:1.65;margin-top:8px">Everything Health feeds into Allena, exactly as the engine sees it \u2014 sleep, heart, engine size, fuel. Ninety days, scrub any chart. These are the raw ingredients behind the correlations and finds.</p>';
+  const dry=[];let any=false;
+  SIG_KINDS.forEach(kind=>{
+    const pts=sigSeries(kind);
+    if(pts.length<2){dry.push(kind);return}
+    any=true;
+    const vs=pts.map(p=>p.v),lo=Math.min.apply(null,vs),hi=Math.max.apply(null,vs);
+    const pad=Math.max((hi-lo)*0.15,hi*0.02||1);
+    const last=pts[pts.length-1];
+    h+='<div class="card mt" style="padding:14px 16px">'+
+      '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px">'+
+      '<span style="font-size:14px;font-weight:600">'+kind.k+'</span>'+
+      '<span class="mono" style="font-size:12px;color:var(--text)">'+
+      (kind.k==='Steps'||kind.k==='Calories'?Math.round(last.v).toLocaleString():last.v)+esc(kind.u)+'</span></div>'+
+      lineChart(pts,{min:Math.max(0,lo-pad),max:hi+pad,suffix:kind.u.trim(),color:'#1E9BFF',
+        marks:[Math.round(lo),Math.round(hi)]})+
+      '<p class="mono" style="color:var(--faint);font-size:9px;letter-spacing:.05em;margin-top:6px">'+pts.length+' DAYS \u00b7 '+esc(kind.src.toUpperCase())+'</p></div>'});
+  if(dry.length)h+='<div class="card mt2" style="padding:14px 16px"><p class="eyebrow">Not flowing yet</p>'+
+    '<p style="color:var(--dim);font-size:12px;line-height:1.7;margin-top:7px">'+
+    dry.map(k=>k.k).join(' \u00b7 ')+'</p>'+
+    '<p style="color:var(--faint);font-size:11px;line-height:1.55;margin-top:8px">'+
+    (any?'These arrive the moment their apps write into Apple Health \u2014 macros need a food app (MyFitnessPal and friends) syncing to Health.'
+        :'Connect Apple Health from Today and these fill in on their own \u2014 watch data, sleep, and any food app that writes into Health.')+'</p></div>';
+  return h+'</div>'}
 /* ══ the correlation discoverer (owner call, 3 Sep) ══════════
    The crank. Instead of hand-writing every relationship, this
    pairs EVERY daily signal against EVERY training outcome at
@@ -15282,6 +15332,7 @@ function render(){
   else if(S.view==='report')body=viewReport();
   else if(S.view==='standing')body=viewStanding();
   else if(S.view==='you')body=viewYou();
+  else if(S.view==='signals')body=viewSignals();
   else if(S.view==='chart')body=viewChart();
   else if(S.view==='own')body=viewOwn();
   else if(S.view==='ownreview')body=viewOwnReview();
@@ -15314,6 +15365,7 @@ function render(){
       drow('findings','Patterns in your data',I2.spark)+
       drow('collection','The collection',I2.star)+
       drow('standing','Where you stand',I2.trend)+
+      drow('signals','Body signals',I2.heart)+
       drow('history','History',I2.save)+
       drow('history','Import your data',I2.load,'intakeOpen')+
       drow('data','Report a problem',I2.bug,'drawerReport','');
