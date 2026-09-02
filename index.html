@@ -551,7 +551,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='f5110f';  // stamped by tools/build.py with the content hash
+const BUILD_ID='15e4ed';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -2089,6 +2089,43 @@ function viewSetup(){
      history → view='setup') lands without startSetup, and an erased
      phone was skipping the front door (owner-caught, Sep 2026) */
   const st=S.setup||(S.setup={step:0,name:'',sex:null,age:30,exp:null,years:1,days:3,mins:60,eq:'full',eqx:{},goal:null,focus:{},style:'mixed',weeks:6,restr:{},notes:'',gate:true});
+  /* ── the welcome track (owner call, 3 Sep): before the front door,
+     a beta user meets four pages — why they're in early, the
+     notification ask, the Health link, and the account — in that
+     order, because the data hookup IS the onboarding for an app
+     that runs on data. Steps that can't apply (web build, cloud
+     not wired) are skipped by wNext, never shown broken. */
+  if(st.gate&&!SANDBOX&&!lget('training-welcome-v1',null)){
+    const wi=st.wi||0;
+    const wrapOn=(typeof inWrapper==='function')&&inWrapper();
+    const steps=1+(wrapOn?2:0)+((typeof acctReady==='function'&&acctReady())?1:0);
+    const shown=wi===0?1:wi===1?2:wi===2?3:steps;
+    const wpage=(title,body,foot)=>'<div class="view pad stg" style="padding-top:56px">'+
+      '<p class="mono" style="color:var(--amber);font-size:10px;letter-spacing:.14em">EARLY ACCESS</p>'+
+      '<h1 class="disp" style="font-size:26px;font-weight:600;margin-top:6px;line-height:1.15">'+title+'</h1>'+body+
+      '<div style="margin-top:24px;display:flex;flex-direction:column;gap:10px">'+foot+'</div>'+
+      (steps>1?'<p class="mono" style="color:var(--faint);font-size:9px;letter-spacing:.1em;margin-top:18px;text-align:center">'+Math.min(shown,steps)+' OF '+steps+'</p>':'')+'</div>';
+    if(wi===0)return wpage('You\u2019re in early',
+      '<p style="color:var(--dim);font-size:14px;line-height:1.7;margin-top:10px">Allena is in closed beta, and you\u2019re in it because you already carry what it runs on: <b style="color:var(--text)">real training data</b> \u2014 a watch on the wrist, sessions in a log, runs on the road.</p>'+
+      '<p style="color:var(--dim);font-size:14px;line-height:1.7;margin-top:12px">One engine reads your lifting, running and recovery together and finds what single-purpose apps cannot see. Everything is computed on this phone. Nothing is sold, and nothing is invented.</p>'+
+      '<p style="color:var(--dim);font-size:14px;line-height:1.7;margin-top:12px">Two asks: train like you normally do, and when something feels wrong, hit <b style="color:var(--text)">Report a problem</b> in the menu. Your feedback is why you are here first.</p>',
+      '<button data-a="wNext" class="big disp" style="background:var(--amber);color:var(--bg);font-size:16px">Set me up</button>');
+    if(wi===1)return wpage('Allena can speak up',
+      '<p style="color:var(--dim);font-size:14px;line-height:1.7;margin-top:10px">Turn on notifications and you get told the moment new discoveries are made \u2014 plus your morning call, physio reminders and the monthly wrap.</p>'+
+      '<p style="color:var(--dim);font-size:14px;line-height:1.7;margin-top:12px">Every one carries a real fact. There is no \u201cwe miss you\u201d, ever, and each kind switches off individually.</p>',
+      '<button data-a="wNotifYes" class="big disp" style="background:var(--amber);color:var(--bg);font-size:16px">Turn them on</button>'+
+      '<button data-a="wNotifNo" class="btn" style="color:var(--dim)">Not now</button>');
+    if(wi===2)return wpage('Link Apple Health',
+      '<p style="color:var(--dim);font-size:14px;line-height:1.7;margin-top:10px">This is the one that unlocks everything. Your watch \u2014 Garmin, Apple Watch, whatever you wear \u2014 already syncs workouts, sleep, heart rate and more into Apple Health.</p>'+
+      '<p style="color:var(--dim);font-size:14px;line-height:1.7;margin-top:12px">Link it once and Allena ingests it automatically, forever: every workout lands moments after you finish, and the finds no single-purpose app can make switch on.</p>',
+      '<button data-a="wHealth" class="big disp" style="background:var(--amber);color:var(--bg);font-size:16px">Link Health</button>'+
+      '<button data-a="wNext" class="btn" style="color:var(--dim)">Later</button>');
+    if(wi===3)return wpage('One account, every device',
+      '<p style="color:var(--dim);font-size:14px;line-height:1.7;margin-top:10px">Sign in with just your email \u2014 a code, no password. It backs up your score card and is how a new phone picks up where this one left off. Training data itself never leaves this phone.</p>'+
+      '<div class="mt2">'+accountSection()+'</div>',
+      ((typeof acct==='function'&&acct()&&acct().refresh)
+        ?'<button data-a="wDone" class="big disp" style="background:var(--amber);color:var(--bg);font-size:16px">Done \u2014 let\u2019s build</button>'
+        :'<button data-a="wDone" class="btn" style="color:var(--dim)">Skip for now</button>'))}
   if(st.gate){
     const door=(a,label,sub,primary)=>'<button data-a="'+a+'" class="card" style="width:100%;text-align:left;padding:15px 16px;margin-top:10px'+(primary?';border-color:var(--amber)':'')+'">'+
       '<span style="display:flex;align-items:center;gap:11px"><span style="flex:1;min-width:0">'+
@@ -17560,6 +17597,18 @@ function runAction(a,v,t,e){
     case 'muscleOpen':S.sheet={t:'muscle',m:v};render();break;
     case 'hkDone':S.hkRes=null;S.sheet=null;render();break;
     case 'betaCopy':{try{navigator.clipboard.writeText(decodeURIComponent(v)).then(()=>flash('Copied \u2014 paste it to Sathya with a screenshot.')).catch(()=>flash('Long-press the text to copy it.'))}catch(e){flash('Long-press the text to copy it.')}break}
+    case 'wNext':{const st9=S.setup||(S.setup={gate:true});let wi=(st9.wi||0)+1;
+      const wr9=(typeof inWrapper==='function')&&inWrapper();
+      if(!wr9&&(wi===1||wi===2))wi=3;
+      if(wi===3&&!(typeof acctReady==='function'&&acctReady()))wi=4;
+      if(wi>=4){lset('training-welcome-v1',1);delete st9.wi}else st9.wi=wi;
+      render();break}
+    case 'wDone':{lset('training-welcome-v1',1);if(S.setup)delete S.setup.wi;render();break}
+    case 'wNotifYes':{const P=notifPrefs();P.asked=1;P.on=true;notifSave();notifSync();runAction('wNext');break}
+    case 'wNotifNo':{const P=notifPrefs();P.asked=1;P.on=false;notifSave();runAction('wNext');break}
+    case 'wHealth':{try{if(window.webkit&&window.webkit.messageHandlers&&window.webkit.messageHandlers.allena)
+        window.webkit.messageHandlers.allena.postMessage('sync')}catch(e){}
+      runAction('wNext');break}
     case 'meOpen':{S.prof=S.prof||{};lset(K_PROF,S.prof);S.backTo=S.view;S._navQuiet=1;S.view='you';render();break}
     case 'meSex':{S.prof=S.prof||{};S.prof.sex=v;lset(K_PROF,S.prof);vib(8);render();break}
     case 'dsetOpen':{if(v==='__beta'){S.betaFrom=S.view;S.sheet={t:'beta'};render();break}
