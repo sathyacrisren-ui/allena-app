@@ -393,7 +393,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='b5b303';  // stamped by tools/build.py with the content hash
+const BUILD_ID='07ef82';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -1307,6 +1307,15 @@ A.preview=(di,pid)=>{const p=pid?S.lib.programs.find(x=>x.id===pid):activeProgSa
     no++;
     ex.push({no:no,name:c.ex,sets:src.length?src:Array.from({length:c.sets||1},()=>({ex:c.ex,rest:60})),
       keep:false,cut:true})});
+  /* the double-dose default (owner call, 2 Sep — 'Legs/ACL is NOT from
+     my physio'): when rehab loaded these muscles in the last 24h, the
+     overlapping lifts arrive UNTICKED. Keeping one is deliberate, and
+     S.allow remembers a physio's clearance permanently. Never a lock. */
+  try{const dm=rehabDoseMuscles(p,+di);
+    if(dm)ex.forEach(e=>{
+      if(e.cut||isAllowed(e.name))return;
+      const hits=muscleHits(e.name);
+      if(dm.ms.some(m=>(hits[m]||0)>=1)){e.keep=false;e.doseHeld=true}})}catch(e2){}
   S.prev={pid:p.id,di:+di,wk:wk,ex:ex,mode:(cutHere.length?null:'full')};S.sheet={t:'preview'};render()};
 A.start=di=>{
   /* one live session at a time (owner call, Sep 2026): starting another
@@ -10164,13 +10173,10 @@ function hoursSinceMuscle(m){
       const hrs=(Date.now()-t)/36e5;if(best==null||hrs<best)best=hrs})});
   return best}
 function listWords(a){return a.length<2?(a[0]||''):a.slice(0,-1).join(', ')+' and '+a[a.length-1]}
-function rehabDoseGuard(prog,di){
-  /* the authority question, asked at the right moment (owner call,
-     2 Sep): when a program day's muscles already took rehab work in
-     the last 24h, say so and point at the physio — never lock. Work
-     done live still earns full live points either way. */
+function rehabDoseMuscles(prog,di){
+  /* which of this day's prime muscles took rehab work in the last 24h */
   try{
-    if(!((S.acl&&S.acl.on)||activeProtocols().length))return '';
+    if(!((S.acl&&S.acl.on)||activeProtocols().length))return null;
     const primes=dayMuscles(prog,di,S.week)||{};
     const rp=S.lib.programs.filter(p2=>p2.acl||p2.rehabProto).map(p2=>p2.id);
     const cut=Date.now()-24*36e5;
@@ -10181,15 +10187,22 @@ function rehabDoseGuard(prog,di){
       (h.log||[]).forEach(l=>{const hits=muscleHits(l.ex);
         Object.keys(hits).forEach(m=>{if((primes[m]||0)>=2){hit[m]=1;sets++}})})});
     const ms=Object.keys(hit);
-    if(!ms.length)return '';
+    return ms.length?{ms:ms,sets:sets}:null}catch(e){return null}}
+function rehabDoseGuard(prog,di){
+  /* the authority question, asked at the right moment (owner call,
+     2 Sep): when a program day's muscles already took rehab work in
+     the last 24h, say so and point at the physio — never lock. Work
+     done live still earns full live points either way. */
+  try{
+    const dm=rehabDoseMuscles(prog,di);
+    if(!dm)return '';
     const physio=activeProtocols().some(p2=>p2.ev==='physio');
     return '<div class="card mt" style="padding:12px 15px;border-color:var(--amber)">'+
-      '<p class="mono" style="font-size:9px;color:var(--amber);letter-spacing:.06em">REHAB ALREADY LOADED '+esc(ms.map(m=>m.toUpperCase()).join(' + '))+'</p>'+
+      '<p class="mono" style="font-size:9px;color:var(--amber);letter-spacing:.06em">REHAB ALREADY LOADED '+esc(dm.ms.map(m=>m.toUpperCase()).join(' + '))+'</p>'+
       '<p style="color:var(--dim);font-size:12.5px;line-height:1.55;margin-top:4px">'+
-      sets+' rehab set'+(sets===1?'':'s')+' went through '+esc(listWords(ms.map(m=>m.toLowerCase())))+' in the last 24 hours — this session adds a second dose. '+
-      (physio?'If your physio hasn\u2019t cleared gym leg work alongside their plan, uncheck it here and ask at the next appointment.'
-        :'If that\u2019s not the plan, uncheck the overlap here — it stays visible, never lost.')+
-      ' Whatever you decide, work you do live still counts in full.</p></div>'
+      dm.sets+' rehab set'+(dm.sets===1?'':'s')+' went through '+esc(listWords(dm.ms.map(m=>m.toLowerCase())))+' in the last 24 hours, so the overlapping lifts come UNTICKED — doing them anyway is a choice, not a default. '+
+      (physio?'Ask your physio whether gym work on the same area belongs alongside their plan; ':'')+
+      'ticking one back on remembers it as cleared. Work you do live still counts in full.</p></div>'
   }catch(e){return ''}}
 function rehabVolume(days){ // rehab sets per muscle over a window — same units the lifting side uses
   const rp=rehabProg();if(!rp)return {};
@@ -15247,7 +15260,13 @@ function runAction(a,v,t,e){
         const p6=S.lib.programs.find(x=>x.id===S.prev.pid)||activeProgSafe(),ck=offloadKey(p6);
         S.cut[ck]=(S.cut[ck]||[]).filter(c=>!(c.day===S.prev.di&&c.ex===e.name));lset(K_CUT,S.cut);
         A.preview(S.prev.di,p6.id);flash(String(e.name).replace(/ — .*/,'')+' is back in today.');break}
-      e.keep=!e.keep;S.prev.preset=null;render();break}
+      e.keep=!e.keep;S.prev.preset=null;
+      /* re-ticking a dose-held lift records the physio's clearance —
+         asked once, remembered forever (S.allow, the 'Keep it' store) */
+      if(e.keep&&e.doseHeld){S.allow=S.allow||{};
+        if(!S.allow[e.name]){S.allow[e.name]=1;lset(K_ALLOW,S.allow);
+          flash(String(e.name).replace(/ \u2014 .*/,'')+' remembered as cleared \u2014 it will not be held again.')}}
+      render();break}
     case 'prevSets':{const [i,d]=t.dataset.v.split(':').map(Number);const e=S.prev.ex[i];
       const live=e.sets.filter(s2=>!s2.cut);
       if(d<0&&live.length>1)e.sets.filter(s2=>!s2.cut).slice(-1)[0].cut=true;
