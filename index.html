@@ -522,7 +522,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='2dae0d';  // stamped by tools/build.py with the content hash
+const BUILD_ID='05d26d';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -12051,17 +12051,23 @@ function deepParse(txt){
       rar:x.rar==='epic'?'epic':'rare'}))}catch(e){return []}}
 function deepAnimHtml(){
   const da=S.deepAnim;if(!da)return '';
-  const N=da.nodes;const cx=150,cy=150,R=108;
-  const pos=i=>{const ang=-Math.PI/2+i*(2*Math.PI/N.length);
-    return [cx+R*Math.cos(ang),cy+R*Math.sin(ang)]};
+  const N=da.nodes;const cx=150,cy=150;
+  /* a star chart, not sacred geometry: six evenly spaced nodes with
+     straight cross-links draw a hexagram (owner-caught, twice — the
+     icon had the same disease). Positions are deliberately irregular
+     and the pattern links are bowed arcs between chosen pairs. */
+  const PTS=[[150,46],[247,105],[232,218],[128,252],[48,196],[62,84]];
+  const pos=i=>PTS[i%PTS.length];
   let svg='<svg viewBox="0 0 300 300" style="width:min(78vw,300px);height:min(78vw,300px)">';
   // spokes: centre reaching out to every source
   N.forEach((n,i)=>{const [x,y]=pos(i);const len=Math.hypot(x-cx,y-cy);
     svg+='<line x1="'+cx+'" y1="'+cy+'" x2="'+x.toFixed(1)+'" y2="'+y.toFixed(1)+'" stroke="var(--line)" stroke-width="1" class="dline" style="stroke-dasharray:'+len.toFixed(0)+';stroke-dashoffset:'+len.toFixed(0)+';animation-delay:'+(0.4+i*0.5)+'s"/>'});
-  // the pattern pass: links BETWEEN sources, drawn later, in blue
-  N.forEach((n,i)=>{const j=(i+2)%N.length;const [x1,y1]=pos(i),[x2,y2]=pos(j);
-    const len=Math.hypot(x2-x1,y2-y1);
-    svg+='<line x1="'+x1.toFixed(1)+'" y1="'+y1.toFixed(1)+'" x2="'+x2.toFixed(1)+'" y2="'+y2.toFixed(1)+'" stroke="var(--blue)" stroke-width="1" opacity=".55" class="dline" style="stroke-dasharray:'+len.toFixed(0)+';stroke-dashoffset:'+len.toFixed(0)+';animation-delay:'+(3.2+i*0.35)+'s"/>'});
+  // the pattern pass: bowed arcs between chosen source pairs, in blue
+  [[5,1],[0,3],[1,4],[2,5]].forEach((pr,i)=>{
+    const [x1,y1]=pos(pr[0]),[x2,y2]=pos(pr[1]);
+    const mx=(x1+x2)/2,my=(y1+y2)/2,dx=x2-x1,dy=y2-y1,len=Math.hypot(dx,dy);
+    const k=(i%2?-1:1)*22,qx=mx-dy/len*k,qy=my+dx/len*k;
+    svg+='<path d="M'+x1.toFixed(1)+' '+y1.toFixed(1)+' Q'+qx.toFixed(1)+' '+qy.toFixed(1)+' '+x2.toFixed(1)+' '+y2.toFixed(1)+'" fill="none" stroke="var(--blue)" stroke-width="1" opacity=".55" class="dline" style="stroke-dasharray:'+(len*1.06).toFixed(0)+';stroke-dashoffset:'+(len*1.06).toFixed(0)+';animation-delay:'+(3.2+i*0.35)+'s"/>'});
   // the sources themselves, counted honestly
   N.forEach((n,i)=>{const [x,y]=pos(i);
     svg+='<g class="dnode" style="animation-delay:'+(0.3+i*0.5)+'s">'+
