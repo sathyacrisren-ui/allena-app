@@ -551,7 +551,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='fe0df1';  // stamped by tools/build.py with the content hash
+const BUILD_ID='b2d31b';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -7527,7 +7527,7 @@ function notifPlan(){
      holds — it gets the 11:00 slot. Real threshold, filled by
      logging, never by waiting. */
   if(P.reveal){try{
-    const W9=(typeof watchList==='function')?watchList():[];
+    const W9=((typeof watchList==='function')?watchList():[]).filter(w=>!w.gated);
     const nr=W9.slice().sort((a,b)=>(a.need-a.have)-(b.need-b.have)||b.pct-a.pct)[0];
     if(nr&&nr.need-nr.have===1){
       const at11=new Date(today()+'T11:00:00').getTime();
@@ -9970,13 +9970,17 @@ function fuseCard(){
   try{
     const W=watchList();
     if(!W.length)return '';
-    const near=W.slice().sort((a,b)=>(a.need-a.have)-(b.need-b.have)||b.pct-a.pct)[0];
+    /* a rehab-gated item is never promoted as today's chase — telling
+       a phase-2 knee it is 'one run away' is exactly the coaching
+       error this app exists to not make (owner-caught, 3 Sep) */
+    const chase=W.filter(w=>!w.gated);
+    const near=chase.slice().sort((a,b)=>(a.need-a.have)-(b.need-b.have)||b.pct-a.pct)[0];
     if(!near)return '';
     const gap=near.need-near.have;
     if(gap>1&&near.pct<75)return '';
     const one=gap===1;
-    const next=W.filter(w=>w!==near).sort((a,b)=>b.pct-a.pct)[0];
-    return '<div class="card mt an-glow" style="padding:18px;border-radius:22px;border-color:'+(one?'var(--amber)':'color-mix(in srgb, var(--text) 45%, transparent)')+'">'+
+    const next=chase.filter(w=>w!==near).sort((a,b)=>b.pct-a.pct)[0];
+    return '<button data-a="fusesOpen" class="card mt an-glow" style="width:100%;text-align:left;padding:18px;border-radius:22px;display:block;border-color:'+(one?'var(--amber)':'color-mix(in srgb, var(--text) 45%, transparent)')+'">'+
       '<p class="mono" style="font-size:10px;letter-spacing:.14em;color:var(--amber)">\u2726 '+(one?'ONE AWAY':'ALMOST THERE')+'</p>'+
       '<div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-top:8px">'+
       '<p class="disp" style="font-size:21px;font-weight:650;line-height:1.2;flex:1;min-width:0">'+esc(near.t)+'</p>'+
@@ -9984,8 +9988,8 @@ function fuseCard(){
       '<div style="height:8px;border-radius:8px;background:var(--line);overflow:hidden;margin-top:12px">'+
       '<div class="an-bar" style="height:8px;border-radius:8px;width:'+near.pct+'%;background:var(--amber)"></div></div>'+
       '<p style="color:var(--dim);font-size:12.5px;line-height:1.6;margin-top:10px">'+esc(near.d)+'</p>'+
-      (next?'<p class="mono" style="color:var(--faint);font-size:9.5px;letter-spacing:.05em;margin-top:10px">THEN: '+esc(String(next.t).toUpperCase())+' \u00b7 '+next.have+'/'+next.need+'</p>':'')+
-      '</div>'}catch(e){return ''}}
+      (next?'<p class="mono" style="color:var(--faint);font-size:9.5px;letter-spacing:.05em;margin-top:10px">THEN: '+esc(String(next.t).toUpperCase())+' \u00b7 '+next.have+'/'+next.need+' \u00b7 TAP FOR ALL</p>':'')+
+      '</button>'}catch(e){return ''}}
 function unlockCard(){
   /* the watchlist, worn as the game it honestly is: every analysis is
      locked by DATA it genuinely needs — never by withheld findings.
@@ -10025,9 +10029,10 @@ function watchList(){
   const W=[];
   const H=(S.history||[]).filter(h=>h.complete&&!h.run);
   const R=(S.runs||[]);
-  const add=(t,have,need,d,got)=>{
+  const runGated=!!(S.acl&&S.acl.on&&S.acl.phase<3);   // running waits for the knee
+  const add=(t,have,need,d,got,opts)=>{
     if(have>=need){W.met=(W.met||0)+1;return}        // unlocked: it has answered or is about to
-    W.push({t:t,have:have,need:need,d:d,pct:Math.round(Math.min(1,have/need)*100)})};
+    W.push(Object.assign({t:t,have:have,need:need,d:d,pct:Math.round(Math.min(1,have/need)*100)},opts||{}))};
   /* the cold-start ladder (Sep 2026): short thresholds FIRST, so a
      week-one account watches bars move every single day. The list is
      the roadmap of what is coming — anticipation is the honest half
@@ -10053,7 +10058,8 @@ function watchList(){
         'Fourteen mornings of resting HR and a high day means something — your normal, not the population\u2019s.',rdays>=14)}}}catch(e){}
   if(S.runOn){const hrRuns=R.filter(r=>r.hr>0&&r.km>=3).length;
    add('The engine number',Math.min(6,hrRuns),6,
-     'Six runs with heart rate and Allena can measure your aerobic engine itself — speed per heartbeat, not just pace.',hrRuns>=6)}
+     'Six runs with heart rate and Allena can measure your aerobic engine itself — speed per heartbeat, not just pace.',hrRuns>=6,
+     runGated?{gated:'waits for rehab clearance — running comes after the knee\u2019s criteria, not before'}:null)}
   /* the refill: a deep read ages, and new training re-arms the next one */
   try{const ins=bankList().filter(d=>d.tag==='insight').map(d=>d.found).sort().pop();
    if(ins){const since=H.filter(h=>h.date>ins).length;
@@ -10097,9 +10103,11 @@ function watchList(){
   if(S.runOn){
     const withZ=R.filter(r=>zoneMins(r)).length;
     add('Whether your easy runs are easy',withZ,5,
-      'Five runs with time in zones. It is the one thing self-reported effort consistently gets wrong.',withZ>=5);
+      'Five runs with time in zones. It is the one thing self-reported effort consistently gets wrong.',withZ>=5,
+      runGated?{gated:'waits for rehab clearance — running comes after the knee\u2019s criteria, not before'}:null);
     add('Your running load pattern',R.length,8,
-      'Eight runs across a few weeks, so this week can be read against an average rather than against nothing.',R.length>=8)}
+      'Eight runs across a few weeks, so this week can be read against an average rather than against nothing.',R.length>=8,
+      runGated?{gated:'waits for rehab clearance — running comes after the knee\u2019s criteria, not before'}:null)}
   /* rehab */
   if(S.acl&&S.acl.on){
     const ch=((S.acl.checks)||[]).length;
@@ -12645,7 +12653,7 @@ function todayOrder(){
     add(ghostCard(),gs)}catch(e){add(ghostCard(),40)}
 
   // the next unlock rides HIGH — one-away outranks nearly everything
-  try{const W9=watchList();
+  try{const W9=watchList().filter(w=>!w.gated);
     const nr=W9.slice().sort((a,b)=>(a.need-a.have)-(b.need-b.have)||b.pct-a.pct)[0];
     add((typeof fuseCard==='function'?fuseCard():''),nr&&nr.need-nr.have===1?87:70)}catch(e){}
   add(newFindsCard(),68);                                // renders only while genuinely new
@@ -14079,6 +14087,20 @@ function sheetHtml(){
       '<span style="color:var(--faint);font-size:11.5px">Unfinished sessions stay in your log but are left out of adherence</span></span></button>'+
       '<button data-a="histSave" class="big disp mt2" style="background:var(--amber);color:var(--bg);font-size:15px">Save changes</button>'+
       '<button data-a="delHist" data-v="'+esc(r.id)+'" class="btn mt" style="color:var(--red)">Delete this session</button>')}
+  if(S.sheet.t==='fuses'){
+    const W=watchList(),met=W.met||0;
+    return wrapSheet('Still working it out',
+      '<p style="color:var(--dim);font-size:13px;line-height:1.6">Everything Allena is still gathering evidence for — each bar is a real threshold, filled by logging, never by waiting. '+met+' already unlocked.</p>'+
+      '<div style="margin-top:14px;display:flex;flex-direction:column;gap:14px">'+
+      W.slice().sort((a,b)=>(a.gated?1:0)-(b.gated?1:0)||b.pct-a.pct).map(w=>'<div>'+
+        '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px">'+
+        '<span style="flex:1;min-width:0;font-size:13.5px;font-weight:600;color:'+(w.gated?'var(--faint)':w.pct>=75?'var(--text)':'var(--dim)')+'">'+esc(w.t)+'</span>'+
+        '<span class="mono" style="color:'+(w.gated?'var(--faint)':w.need-w.have===1?'var(--amber)':'var(--faint)')+';font-size:10px;flex:none">'+(w.gated?'GATED':w.need-w.have===1?'ONE AWAY \u00b7 ':'')+w.have+'/'+w.need+'</span></div>'+
+        '<div style="height:5px;border-radius:3px;background:var(--line);overflow:hidden;margin-top:6px">'+
+        '<div style="height:5px;width:'+w.pct+'%;background:'+(w.gated?'var(--line)':w.need-w.have===1?'var(--amber)':'var(--dim)')+'"></div></div>'+
+        '<p style="color:var(--faint);font-size:11.5px;line-height:1.5;margin-top:5px">'+esc(w.d)+'</p>'+
+        (w.gated?'<p class="mono" style="color:var(--amber);font-size:9px;letter-spacing:.05em;margin-top:4px">'+esc(String(w.gated).toUpperCase())+'</p>':'')+
+        '</div>').join('')+'</div>')}
   if(S.sheet.t==='weekgate'){
     const p9=activeProgSafe(),pw=S.week-1;
     const ws9=p9?weekState(p9,pw):{n:0,total:0};
@@ -16466,6 +16488,7 @@ function runAction(a,v,t,e){
     case 'swapSide':{const cur2=S.sess.sets[S.sess.idx];S.holdWait=false;S.holdSide=2;
       S.holdEnd=Date.now()+cur2.secs*1000;render();break}
     case 'wuTick':{S.sess.wu=S.sess.wu||{};S.sess.wu[v]=!S.sess.wu[v];persistActive();render();break}
+    case 'fusesOpen':S.sheet={t:'fuses'};render();break;
     case 'weekGateOpen':S.sheet={t:'weekgate'};render();break;
     case 'weekGateClose':{const p9=activeProgSafe();if(!p9)break;
       setWeek(Math.max(1,S.week-1),p9.id);S.sheet=null;runAction('weekClose');break}
