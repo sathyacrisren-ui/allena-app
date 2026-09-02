@@ -393,7 +393,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='cf558f';  // stamped by tools/build.py with the content hash
+const BUILD_ID='8b04c8';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -4288,7 +4288,10 @@ function rehabWeekSessions(){
     h.date.slice(0,10)>=wk&&h.date.slice(0,10)<end).length}
 function rehabWeekTarget(){
   let t=0;
-  if(S.acl&&S.acl.on)t+=(S.acl.phase===1?7:2);
+  const physioLeads=activeProtocols().some(p=>p.ev==='physio');
+  /* when the physio's plan leads, the pathway's exercise dose steps
+     back — one prescription, not two stacked ones */
+  if(S.acl&&S.acl.on&&!physioLeads)t+=(S.acl.phase===1?7:2);
   activeProtocols().forEach(p=>{t+=(p.mode==='manage'?3:2)});
   return Math.max(2,Math.min(7,t))}
 function rehabBankMoments(){
@@ -4431,11 +4434,21 @@ function viewRehabHub(){
   h+=apptBanner();
   h+=rehabHero();
   const cards=[];
-  if(S.acl&&S.acl.on)cards.push({k:'acl',n:'ACL pathway',sub:'Phase '+S.acl.phase+' of 5 · criteria-gated',mode:'staged',ev:'strong'});
-  protos.forEach(p=>{const st=rehabState(p.k);
+  /* the medical hierarchy, automatic (owner call, 2 Sep): a real
+     physio's prescription outranks the built-in pathway the moment it
+     exists — no override button to find. The pathway's EXERCISES step
+     back; its MEASUREMENT (phases, gates, symmetry, check-ins) keeps
+     score for both of you. */
+  const physioLeads=protos.some(p=>p.ev==='physio');
+  protos.filter(p=>p.ev==='physio').forEach(p=>{
     cards.push({k:p.k,n:p.n,mode:p.mode,ev:p.ev,
-      sub:p.ev==='physio'?(p.by?'Written with '+p.by:'Your physio\u2019s plan')
-         :p.mode==='staged'?('Stage '+st.stage+' of '+p.stages.length):'Ongoing management'})});
+      sub:(p.by?'Written with '+p.by:'Your physio\u2019s plan')+' · leads the work'})});
+  protos.filter(p=>p.ev!=='physio').forEach(p=>{const st=rehabState(p.k);
+    cards.push({k:p.k,n:p.n,mode:p.mode,ev:p.ev,
+      sub:p.mode==='staged'?('Stage '+st.stage+' of '+p.stages.length):'Ongoing management'})});
+  if(S.acl&&S.acl.on)cards.push({k:'acl',n:'ACL pathway',mode:'staged',ev:'strong',
+    sub:physioLeads?'Keeping score — phases, gates and symmetry; your physio\u2019s plan leads the work'
+      :'Phase '+S.acl.phase+' of 5 · criteria-gated'});
   {const I=SET_ICONS;
    /* the work wears session-card clothes now (Sep 2026 rebuild) —
       these are the primary actions of the page, not settings rows */
@@ -4451,7 +4464,7 @@ function viewRehabHub(){
        '<span class="mono" style="color:var(--amber);font-size:14px;flex:none">›</span></div></button>'}).join('');
    h+='<button data-a="pplanOpen" class="card mt" style="width:100%;text-align:left;padding:13px 16px;display:flex;align-items:center;gap:10px;border-style:dashed">'+
      '<span style="flex:1;min-width:0"><span style="font-size:13.5px;font-weight:600;display:block">A plan from your physio</span>'+
-     '<span style="color:var(--faint);font-size:11.5px">Hand them the phone at your appointment, or type it in</span></span>'+
+     '<span style="color:var(--faint);font-size:11.5px">'+((S.acl&&S.acl.on&&!physioLeads)?'Given different work than the pathway shows? Theirs leads — bring it in':'Hand them the phone at your appointment, or type it in')+'</span></span>'+
      '<span class="mono" style="color:var(--amber);font-size:13px;flex:none">›</span></button>';
    const nx=apptNext();
    h+=setGroup('Your physio',[
@@ -5546,6 +5559,10 @@ function viewAcl(){
    '<button data-a="nav" data-v="acl" class="btn" style="width:auto;padding:8px 14px;color:var(--dim);font-size:12.5px;margin-bottom:14px">‹ Back to Rehab</button>'+
    '<div style="display:flex;justify-content:space-between;align-items:center;gap:12px">'+
    '<h1 class="disp" style="font-size:25px;font-weight:600;flex:1;min-width:0">The pathway</h1>'+headBtns()+'</div>';
+  try{if(a.on&&activeProtocols().some(p2=>p2.ev==='physio'))
+    h+='<div class="card mt" style="padding:12px 15px;border-color:var(--greensoft)">'+
+      '<p class="mono" style="font-size:9px;color:var(--green);letter-spacing:.06em">YOUR PHYSIO LEADS</p>'+
+      '<p style="color:var(--dim);font-size:12.5px;line-height:1.55;margin-top:4px">Their plan carries the work now. This pathway keeps score — phases, gates and symmetry — and those numbers are exactly what to bring to your next appointment.</p></div>'}catch(e){}
   if(!a.on){
     h+='<p style="color:var(--dim);font-size:13.5px;line-height:1.6;margin-top:10px">A criteria-gated return-to-sport pathway. You move up a phase by meeting objective standards, not by reaching a date — the evidence for that is unusually clear: passing return-to-sport criteria cut second-injury rates from 38% to 6% in the Delaware-Oslo cohort, and failing six discharge criteria carried four times the graft-rupture risk in Kyritsis\' study of professional athletes.</p>'+
      '<div class="card mt2" style="padding:14px 16px;border-color:var(--amber)">'+
