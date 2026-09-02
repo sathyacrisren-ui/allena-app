@@ -522,7 +522,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='ccee77';  // stamped by tools/build.py with the content hash
+const BUILD_ID='b32b9b';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -3711,10 +3711,16 @@ function dataPoints(){
     let sets=0,effort=0,notes=0,sess=0;
     if(h.complete)sess=1;
     (h.log||[]).forEach(l=>{
-      if(l.w!=null)sets+=1;
-      if(l.r!=null)sets+=1;
-      if(l.secs!=null)sets+=1;
-      if(l.rpe!=null)effort+=1;
+      /* precision (owner call, Sep 2026): each point still costs one
+         honest number, but the number itself rides underneath as a
+         fraction (always < 0.3/entry, deterministic, never random) —
+         so two records only ever tie if the training itself is
+         identical. Not performance pay: a fraction of a point can
+         never outweigh logging one more real thing. */
+      if(l.w!=null){sets+=1+Math.min(0.25,Math.abs(+l.w||0)/1000)}
+      if(l.r!=null){sets+=1+Math.min(0.06,Math.abs(+l.r||0)/500)}
+      if(l.secs!=null){sets+=1+Math.min(0.12,Math.abs(+l.secs||0)/1000)}
+      if(l.rpe!=null){effort+=1+Math.min(0.05,Math.abs(+l.rpe||0)/200)}
       if(l.note)notes+=1});
     if(h.note&&Object.keys(h.note).length)notes+=Object.keys(h.note).length;
     let earned=sets+effort+notes+sess;
@@ -3722,8 +3728,8 @@ function dataPoints(){
     const used=byDay[day]||0,room=Math.max(0,dpDayCap()-used);
     if(earned>room){                                  // scale the parts down together
       const f=room/earned;
-      sets=Math.floor(sets*f);effort=Math.floor(effort*f);
-      notes=Math.floor(notes*f);sess=room>0?sess:0;
+      sets=sets*f;effort=effort*f;
+      notes=notes*f;sess=room>0?sess:0;
       earned=sets+effort+notes+sess}
     byDay[day]=used+earned;
     if(sessionLive(h))live+=earned;
@@ -3732,22 +3738,25 @@ function dataPoints(){
     /* cardio spends from the same day budget as sessions — typed runs
        were the one uncapped seam — and a zone breakdown only pays when
        a heart rate stands behind it */
-    let earn=2;                                  // distance and time
-    if(r.hr)earn+=1;if(r.elev)earn+=1;if(r.rpe)earn+=1;
+    let earn=2+Math.min(0.5,(+r.km||0)/50);      // distance and time — the km ride under
+    if(r.hr)earn+=1+Math.min(0.1,(+r.hr||0)/2000);
+    if(r.elev)earn+=1;if(r.rpe)earn+=1;
     if(r.note)B.notes+=1;
     let zearn=(zoneMins(r)&&r.hr)?5:0;
     const day=(r.date||'').slice(0,10);
     const used=byDay[day]||0,room=Math.max(0,dpDayCap()-used);
-    if(earn+zearn>room){const f=room/(earn+zearn||1);earn=Math.floor(earn*f);zearn=Math.floor(zearn*f)}
+    if(earn+zearn>room){const f=room/(earn+zearn||1);earn=earn*f;zearn=zearn*f}
     byDay[day]=(byDay[day]||0)+earn+zearn;
     B.runs+=earn;B.zones+=zearn});
   const g=(S.gar&&S.gar.days)||{};
   Object.keys(g).forEach(k=>{const d=g[k]||{};
-    if(d.am!=null)B.readiness+=1;if(d.pre!=null)B.readiness+=1;
+    if(d.am!=null)B.readiness+=1+Math.min(0.05,Math.abs(+d.am||0)/2000);
+    if(d.pre!=null)B.readiness+=1;
     if(d.post!=null)B.readiness+=1;if(d.day!=null)B.readiness+=1});
   const dd=(S.daily&&S.daily.days)||{};
   Object.keys(dd).forEach(k=>{const d=dd[k]||{};
-    if(d.bw!=null)B.bodyweight+=1;if(d.supp)B.notes+=1});
+    if(d.bw!=null)B.bodyweight+=1+Math.min(0.2,Math.abs(+d.bw||0)/1000);
+    if(d.supp)B.notes+=1});
   (S.scans||[]).forEach(x=>{['w','bf','smm','vf','bmr','tee'].forEach(f=>{if(x[f]!=null&&x[f]!=='')B.scans+=1})});
   const a=S.acl||{};
   (a.checks||[]).forEach(c=>{['pain','swell','stiff','conf'].forEach(f=>{if(c[f]!=null)B.rehab+=1});if(c.note)B.notes+=1});
@@ -3756,10 +3765,11 @@ function dataPoints(){
   (a.flares||[]).forEach(()=>{B.rehab+=1});
   Object.keys(a.gates||{}).forEach(()=>{B.rehab+=1});
   (S.goals||[]).forEach(()=>{B.notes+=2});
-  const total=Object.keys(B).reduce((x,k)=>x+B[k],0);
-  const todayEarned=byDay[today()]||0;
-  return{total:total,by:B,live:Math.min(live,total),
-    today:todayEarned,room:Math.max(0,dpDayCap()-todayEarned),
+  Object.keys(B).forEach(k=>{B[k]=Math.round(B[k]*10)/10});
+  const total=Math.round(Object.keys(B).reduce((x,k)=>x+B[k],0)*10)/10;
+  const todayEarned=Math.round((byDay[today()]||0)*10)/10;
+  return{total:total,by:B,live:Math.round(Math.min(live,total)*10)/10,
+    today:todayEarned,room:Math.max(0,Math.round((dpDayCap()-todayEarned)*10)/10),
     livePct:total?Math.round(Math.min(live,total)/total*100):0}}
 /* the two clocks of motivation: LEVELS are the small wins — the first
    costs one honest session, each next ~12% more, capped so a level is
