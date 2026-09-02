@@ -337,14 +337,23 @@ function hapticRun(name){const seq=HAPTIC_SEQ[name];if(!seq)return haptic(name);
   const now=Date.now();if(now<_hapUntil)return false;
   _hapUntil=now+seq[seq.length-1][1]+250;
   seq.forEach(st=>setTimeout(function(){haptic(st[0])},st[1]));return true}
-/* island probe: measures the real top inset (env() is not readable
-   from JS directly) — >=55px means a Dynamic Island phone, and the
-   live pill docks to the island itself */
-try{const _ip=document.createElement('div');
+/* island probe: the live pill floats free (no reserved space) only on
+   Dynamic Island phones. Two independent signals, either wins:
+   1. measured top inset >= 55px (env() read via a probe element)
+   2. the logical screen size of a known island model — the inset
+      probe can read 0 in the wrapper before first layout, and this
+      one never lies (owner-caught: pill was pushing content down) */
+try{
+  const _dims={'393x852':1,'402x874':1,'430x932':1,'440x956':1};
+  const _byDims=!!_dims[Math.min(screen.width,screen.height)+'x'+Math.max(screen.width,screen.height)];
+  const _ip=document.createElement('div');
   _ip.style.cssText='position:fixed;top:0;height:env(safe-area-inset-top);width:1px;visibility:hidden;pointer-events:none';
   document.body.appendChild(_ip);
-  const _is=function(){try{document.body.classList.toggle('island',_ip.offsetHeight>=55)}catch(e){}};
-  _is();setTimeout(_is,400);setTimeout(function(){_is();try{_ip.remove()}catch(e){}},1500);
+  const _is=function(){try{
+    document.body.classList.toggle('island',_byDims||_ip.offsetHeight>=55)}catch(e){}};
+  _is();setTimeout(_is,400);setTimeout(_is,1500);
+  window.addEventListener('pageshow',_is);
+  document.addEventListener('visibilitychange',_is);
 }catch(e){}
 const K_THEME='training-theme-v1';
 function applyTheme(){try{
@@ -516,7 +525,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='d528a7';  // stamped by tools/build.py with the content hash
+const BUILD_ID='f9fa97';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
