@@ -551,7 +551,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='64d986';  // stamped by tools/build.py with the content hash
+const BUILD_ID='c4517b';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -9911,6 +9911,33 @@ function sessionCard(){
     '<p style="color:var(--dim);font-size:12px;line-height:1.5;margin-top:3px">'+esc(v.d)+'</p></div>'+
     (v.cta?'<button data-a="'+v.cta.a+'" data-v="'+v.cta.v+'" class="disp" style="flex:none;background:var(--amber);color:var(--bg);padding:11px 17px;border-radius:12px;font-size:12px;font-weight:600;letter-spacing:.14em">START</button>':'')+
     '</div></div>'}
+function fuseCard(){
+  /* THE NEXT UNLOCK, made unmissable (owner ruling, 3 Sep, in caps:
+     "make the next cool thing LARGE AND OUTSTANDING"): when an
+     analysis is one unit away — or burning close — it is a HERO on
+     Today, not a quiet bar in a list a screenshot misses. Big
+     fraction, thick bar, the payoff named, and what comes after it
+     so the pipeline is visible. Still the honest mechanic: real
+     thresholds, filled by logging, never by waiting. */
+  try{
+    const W=watchList();
+    if(!W.length)return '';
+    const near=W.slice().sort((a,b)=>(a.need-a.have)-(b.need-b.have)||b.pct-a.pct)[0];
+    if(!near)return '';
+    const gap=near.need-near.have;
+    if(gap>1&&near.pct<75)return '';
+    const one=gap===1;
+    const next=W.filter(w=>w!==near).sort((a,b)=>b.pct-a.pct)[0];
+    return '<div class="card mt an-glow" style="padding:18px;border-radius:22px;border-color:'+(one?'var(--amber)':'color-mix(in srgb, var(--text) 45%, transparent)')+'">'+
+      '<p class="mono" style="font-size:10px;letter-spacing:.14em;color:var(--amber)">\u2726 '+(one?'ONE AWAY':'ALMOST THERE')+'</p>'+
+      '<div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-top:8px">'+
+      '<p class="disp" style="font-size:21px;font-weight:650;line-height:1.2;flex:1;min-width:0">'+esc(near.t)+'</p>'+
+      '<p class="mono disp grad" style="font-size:32px;font-weight:800;flex:none">'+near.have+'<span style="font-size:16px;color:var(--faint)">/'+near.need+'</span></p></div>'+
+      '<div style="height:8px;border-radius:8px;background:var(--line);overflow:hidden;margin-top:12px">'+
+      '<div class="an-bar" style="height:8px;border-radius:8px;width:'+near.pct+'%;background:var(--amber)"></div></div>'+
+      '<p style="color:var(--dim);font-size:12.5px;line-height:1.6;margin-top:10px">'+esc(near.d)+'</p>'+
+      (next?'<p class="mono" style="color:var(--faint);font-size:9.5px;letter-spacing:.05em;margin-top:10px">THEN: '+esc(String(next.t).toUpperCase())+' \u00b7 '+next.have+'/'+next.need+'</p>':'')+
+      '</div>'}catch(e){return ''}}
 function unlockCard(){
   /* the watchlist, worn as the game it honestly is: every analysis is
      locked by DATA it genuinely needs — never by withheld findings.
@@ -12524,6 +12551,10 @@ function todayOrder(){
     else if(g&&g.best>=2&&g.best-g.now<=1)gs=64;
     add(ghostCard(),gs)}catch(e){add(ghostCard(),40)}
 
+  // the next unlock rides HIGH — one-away outranks nearly everything
+  try{const W9=watchList();
+    const nr=W9.slice().sort((a,b)=>(a.need-a.have)-(b.need-b.have)||b.pct-a.pct)[0];
+    add((typeof fuseCard==='function'?fuseCard():''),nr&&nr.need-nr.have===1?87:70)}catch(e){}
   add(newFindsCard(),68);                                // renders only while genuinely new
 
   // the session pill: the day's work when still owed, quiet once banked
@@ -12531,9 +12562,7 @@ function todayOrder(){
     add(sessionCard(),trained?30:65)}catch(e){add(sessionCard(),65)}
 
   // the unlock ladder gets loud only when something is nearly there
-  try{const W=watchList();
-    const near=W.some(w=>w.pct>=80);
-    add(unlockCard(),near?58:35)}catch(e){add(unlockCard(),35)}
+  add(unlockCard(),32);                                  // the full list stays, quiet — the fuse carries the heat
 
   add('<div class="row mt" style="gap:10px">'+dashTiles()+'</div>',28);
   add(calCard(),25);
