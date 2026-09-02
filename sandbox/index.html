@@ -515,7 +515,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='5917cc';  // stamped by tools/build.py with the content hash
+const BUILD_ID='bbea9a';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -1275,7 +1275,7 @@ async function acctSend(email){
     const r=await fetch(CLOUD.url+'/auth/v1/otp?redirect_to='+encodeURIComponent(CLOUD.site),{method:'POST',
       headers:{'content-type':'application/json',apikey:CLOUD.anon},
       body:JSON.stringify({email:email,create_user:true,gotrue_meta_security:{}})});
-    if(r.ok)flash('Code sent — open your email and type the 6-digit code here.');
+    if(r.ok)flash('Code sent — open your email and type the 8-digit code here.');
     else{S.acctPending=false;const d=await r.json().catch(()=>({}));
       flash(d.msg||d.error_description||'Could not send the code — try again in a minute.')}
   }catch(e){S.acctPending=false;flash('No connection.')}
@@ -1336,13 +1336,13 @@ function accountSection(){
     '<button data-a="acctSync" class="btn mt" style="color:var(--amber)">Sync now</button>'+
     '<button data-a="acctOut" class="btn mt" style="color:var(--dim)">Sign out</button>';
   if(S.acctPending||(a&&a.pendingEmail&&!a.refresh))return '<p style="color:var(--amber);font-size:13px;line-height:1.55;margin-top:8px">'+
-      'Type the 6-digit code from the email here. If the email shows a button instead of a code, ignore the button — it opens the browser, not this app. The code is the way in.</p>'+
-    '<input data-in="acctCode" value="'+esc(S.acctCode||'')+'" placeholder="6-digit code" inputmode="numeric" autocomplete="one-time-code" class="mono" style="width:100%;margin-top:10px;background:var(--surface);border:1px solid var(--line);border-radius:10px;color:var(--text);padding:12px;font-size:16px;letter-spacing:.2em;text-align:center;outline:none">'+
+      'Type the 8-digit code from the email here. If the email shows a button instead of a code, ignore the button — it opens the browser, not this app. The code is the way in.</p>'+
+    '<input data-in="acctCode" value="'+esc(S.acctCode||'')+'" placeholder="8-digit code" inputmode="numeric" autocomplete="one-time-code" class="mono" style="width:100%;margin-top:10px;background:var(--surface);border:1px solid var(--line);border-radius:10px;color:var(--text);padding:12px;font-size:16px;letter-spacing:.2em;text-align:center;outline:none">'+
     '<button data-a="acctVerify" class="btn mt" style="color:var(--amber)">Sign in with the code</button>'+
     '<button data-a="acctSend2" class="btn mt" style="color:var(--dim)">Send a fresh code</button>'+
     '<button data-a="acctReset" class="btn mt" style="color:var(--faint);font-size:11px">Different email</button>';
   return '<p style="color:var(--dim);font-size:13px;line-height:1.55;margin-top:8px">'+
-      'Sign in with just your email — a 6-digit code, no password. It unlocks the coach chat without any API key, and backs up your score card (points, tier, tree, counts). Training data itself never leaves this phone.</p>'+
+      'Sign in with just your email — an emailed code, no password. It unlocks the coach chat without any API key, and backs up your score card (points, tier, tree, counts). Training data itself never leaves this phone.</p>'+
     '<input data-in="acctEmail" value="'+esc(S.acctEmail||'')+'" placeholder="you@email.com" autocomplete="email" inputmode="email" class="mono" style="width:100%;margin-top:10px;background:var(--surface);border:1px solid var(--line);border-radius:10px;color:var(--text);padding:12px;font-size:13px;outline:none">'+
     '<button data-a="acctSend" class="btn mt" style="color:var(--amber)">Email me a sign-in code</button>'}
 const A={};
@@ -15585,8 +15585,11 @@ document.addEventListener('input',e=>{const d=e.target.dataset;
     e.target.style.height='auto';
     e.target.style.height=Math.min(120,e.target.scrollHeight)+'px'}catch(_){}return}
   if(k==='gform.am'||k==='gform.pre'||k==='gform.post')S.needRender=1;
-  if(k==='acctCode'){const c9=String(e.target.value).replace(/\D/g,'');
-    if(c9.length>=6){S.acctCode=c9.slice(0,6);acctVerify(S.acctCode)}}});
+  if(k==='acctCode'){const c9=String(e.target.value).replace(/\D/g,'').slice(0,10);
+    S.acctCode=c9;
+    /* the server sends 8-digit codes — auto-submit only on a full one
+       (the old 6-digit auto-fire made digits 7 and 8 untypeable) */
+    if(c9.length===8)acctVerify(c9)}});
 document.addEventListener('blur',e=>{if(S.needRender&&e.target&&e.target.dataset&&e.target.dataset.in){S.needRender=0;render()}},true);
 document.addEventListener('change',e=>{const d=e.target.dataset;
   if(d.in&&e.target.tagName==='SELECT'){
