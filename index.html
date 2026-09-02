@@ -38,7 +38,7 @@
   --text:#232019; --dim:#67635B; --faint:#9A968B;
   --amber:#B0592B; --blue:#0A6DD0; --green:#1E9E45; --greensoft:rgba(30,158,69,.32); --red:#D93A2E;
   --teal:#3E8A82; --violet:#7B6AA8; --gold:#B07A2C;
-  --cardline:rgba(0,0,0,.07); --halo:rgba(176,89,43,.05);
+  --cardline:rgba(0,0,0,.07); --halo:rgba(176,89,43,.05); --mkfilter:invert(1) brightness(.35);
 }
 @media (prefers-color-scheme:light){
   :root:not([data-theme="dark"]){
@@ -46,7 +46,7 @@
     --text:#232019; --dim:#67635B; --faint:#9A968B;
     --amber:#B0592B; --blue:#0A6DD0; --green:#1E9E45; --greensoft:rgba(30,158,69,.32); --red:#D93A2E;
     --teal:#3E8A82; --violet:#7B6AA8; --gold:#B07A2C;
-    --cardline:rgba(0,0,0,.07); --halo:rgba(176,89,43,.05);
+    --cardline:rgba(0,0,0,.07); --halo:rgba(176,89,43,.05); --mkfilter:invert(1) brightness(.35);
   }
 }
 @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap');
@@ -195,6 +195,9 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
 .scroller{display:flex;gap:8px;overflow-x:auto;overflow-y:hidden;padding-bottom:2px;scrollbar-width:none;-webkit-overflow-scrolling:touch}
 .scroller::-webkit-scrollbar{display:none}
 @keyframes spin{to{transform:rotate(360deg)}}
+/* the A-mark is a white asset — light mode inks it via the token
+   (owner-caught: invisible on cream) */
+.mk{filter:var(--mkfilter,none)}
 #hkPulse{position:fixed;top:calc(env(safe-area-inset-top) + 6px);left:50%;transform:translateX(-50%);
   z-index:94;display:flex;align-items:center;gap:7px;padding:4px 13px;background:var(--raised);
   border:1.5px solid rgba(240,238,230,.65);border-radius:999px;box-shadow:0 5px 18px rgba(0,0,0,.45);
@@ -551,7 +554,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='b2d31b';  // stamped by tools/build.py with the content hash
+const BUILD_ID='55cc83';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -2699,7 +2702,7 @@ function viewCoach(){
   const th=S.coach.thread,foc=S.coach.focus?S.history.find(h=>h.id===S.coach.focus):null;
   let h='<div class="chatwrap">';
   h+='<div class="chathead"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:12px 18px">'+
-   '<div style="min-width:0;display:flex;align-items:center;gap:8px"><img src="'+MARK+'" alt="" style="width:22px;height:22px;object-fit:contain">'+
+   '<div style="min-width:0;display:flex;align-items:center;gap:8px"><img class="mk" src="'+MARK+'" alt="" style="width:22px;height:22px;object-fit:contain">'+
    '<span class="disp brand" style="font-size:19px;font-weight:600">Allena</span>'+
    '<span class="mono" style="color:var(--faint);font-size:9px;letter-spacing:.06em;text-transform:uppercase">'+(aiReady()?((S.ai.proxy||'').trim()?'Allena cloud':(S.ai.model.indexOf('haiku')>=0?'Haiku':'Sonnet')):'Claude app')+'</span></div>'+
    '<div style="display:flex;gap:6px;flex:none">'+
@@ -4585,7 +4588,7 @@ function pointsChip(){
   return '<button data-a="drawerNav" data-v="points" style="display:flex;align-items:center;gap:9px;padding:6px 13px 6px 7px;border-radius:999px;'+
     'background:var(--raised);border:1px solid var(--line);flex:none">'+
     '<span style="position:relative;width:30px;height:30px;flex:none;display:block">'+
-    '<img src="'+MARK+'" alt="" style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:14px;height:14px;object-fit:contain;opacity:.9">'+
+    '<img class="mk" src="'+MARK+'" alt="" style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:14px;height:14px;object-fit:contain;opacity:.9">'+
     '<svg viewBox="0 0 30 30" style="width:30px;height:30px;transform:rotate(-90deg);display:block">'+
     '<circle cx="15" cy="15" r="13" fill="none" stroke="var(--line)" stroke-width="2.5"/>'+
     '<circle cx="15" cy="15" r="13" fill="none" stroke="var(--green)" stroke-width="2.5" stroke-linecap="round" '+
@@ -4695,7 +4698,7 @@ function rehabHero(){
       :'Loading the tissue well and watching how it answers.';
     let h='<div class="card an-hero" style="padding:18px;border-radius:22px;margin-top:14px;border-color:'+(c?'var(--greensoft)':'var(--line)')+'">';
     h+='<div style="display:flex;align-items:center;gap:9px">'+
-      '<img src="'+MARK+'" alt="" style="width:17px;height:17px;object-fit:contain">'+
+      '<img class="mk" src="'+MARK+'" alt="" style="width:17px;height:17px;object-fit:contain">'+
       '<p class="eyebrow" style="flex:1;margin:0;color:'+(c?'var(--green)':'var(--amber)')+'">The climb</p>'+
       (st.n>1?'<p class="mono" style="color:var(--faint);font-size:9.5px">'+st.n+' DAYS RUNNING</p>':'')+'</div>';
     h+='<p class="disp gradhead" style="font-size:24px;line-height:1.18;margin-top:10px">'+esc(head)+'</p>'+
@@ -7690,12 +7693,42 @@ function hrWitnessAsk(h){
 function hrWitnessBackfill(){
   try{
     if(!inWrapper())return;
-    const cut=Date.now()-7*864e5;
+    const cut=Date.now()-7*864e5,cutK=dayKey(new Date(cut));
     (S.history||[]).filter(h=>h.complete&&!h.run&&!h.hr&&h.startedAt&&h.startedAt>cut)
-      .slice(-4).forEach(hrWitnessAsk)
+      .slice(-4).forEach(hrWitnessAsk);
+    /* the after-the-fact witness (owner ruling, 3 Sep: 'recorded live'
+       is defined by the witnesses, not the typing): a session typed
+       later has no clock to window, so the day is scanned in 3-hour
+       blocks — a sustained working-heart-rate block that day, with no
+       run or watch workout to claim it, verifies the session. */
+    (S.history||[]).filter(h=>h.complete&&!h.run&&!h.hr&&!h.startedAt&&
+        String(h.date).slice(0,10)>=cutK)
+      .filter(h=>{const dk=String(h.date).slice(0,10);
+        if((S.runs||[]).some(r=>String(r.date).slice(0,10)===dk))return false;
+        if((typeof watchGym==='function'?watchGym():[]).some(w=>w.date===dk))return false;
+        return true})
+      .slice(-2).forEach(h=>{const dk=String(h.date).slice(0,10);
+        for(let b=0;b<6;b++){const st=new Date(dk+'T05:00').getTime()+b*3*3600e3;
+          try{window.webkit.messageHandlers.allena.postMessage(JSON.stringify(
+            {type:'hr',id:'DAY:'+h.id+':'+b,start:Math.round(st/1000),end:Math.round((st+3*3600e3)/1000)}))}catch(e2){}}})
   }catch(e){}}
 function hkHR(id,res){
   try{
+    if(String(id).indexOf('DAY:')===0){
+      const q=String(id).split(':'),hid=q[1];
+      const P=S._hrDay||(S._hrDay={});
+      const rec=(P[hid]=P[hid]||{best:null,got:0});
+      rec.got++;
+      if(res&&res.n>=10&&res.avg&&(!rec.best||res.avg>rec.best.avg))rec.best=res;
+      if(rec.got>=6){const b=rec.best;delete P[hid];
+        if(b&&b.avg>=95){
+          const h=(S.history||[]).find(x=>String(x.id)===String(hid));
+          if(h&&!h.hr){h.hr={avg:Math.round(b.avg),max:Math.round(b.max),n:b.n,day:1};
+            saveHistory();
+            try{flash('Your watch carried a working-heart-rate block that day \u2014 avg '+h.hr.avg+'. The typed session checks out. Recorded live.');
+              haptic('success')}catch(e9){}
+            render()}}}
+      return}
     if(!res||!(res.n>0))return;
     const h=(S.history||[]).find(x=>String(x.id)===String(id));
     if(!h||h.hr)return;
@@ -8069,7 +8102,7 @@ function bootHtml(step){
     '<circle cx="48" cy="48" r="27" fill="none" stroke="var(--line)" stroke-width="1.5"/>'+
     '<circle class="boot-ring" cx="48" cy="48" r="27" fill="none" stroke="var(--amber)" stroke-width="1.5" stroke-linecap="round"/>'+
     '<circle class="an-ring" cx="48" cy="48" r="38" fill="none" stroke="var(--amber)" stroke-width="1" stroke-linecap="round" stroke-dasharray="24 216" opacity=".45"/></svg>'+
-    '<img src="'+MARK+'" alt="" class="an-mark" style="position:absolute;inset:0;margin:auto;width:30px;height:30px;object-fit:contain"></div>'+
+    '<img class="mk" src="'+MARK+'" alt="" class="mk an-mark" style="position:absolute;inset:0;margin:auto;width:30px;height:30px;object-fit:contain"></div>'+
     '<h1 class="disp brand" style="font-size:30px;font-weight:600;margin-top:20px">Allena</h1>'+
     '<div style="position:relative;height:2px;width:150px;border-radius:2px;background:var(--line);overflow:hidden;margin-top:16px">'+
     '<div class="boot-sweep"></div></div>'+
@@ -8601,7 +8634,7 @@ function learnedCard(){
   const rows=learnedProfile();
   if(rows.length<2)return '';
   return '<div class="card mt" style="padding:16px;border-radius:20px">'+
-    '<div style="display:flex;align-items:center;gap:9px"><img src="'+MARK+'" alt="" style="width:16px;height:16px;object-fit:contain">'+
+    '<div style="display:flex;align-items:center;gap:9px"><img class="mk" src="'+MARK+'" alt="" style="width:16px;height:16px;object-fit:contain">'+
     '<p class="eyebrow" style="margin:0;flex:1">What Allena has learned about you</p>'+
     '<span class="mono" style="color:var(--faint);font-size:9px">'+rows.length+' THINGS</span></div>'+
     '<div style="margin-top:12px;display:flex;flex-direction:column;gap:11px">'+
@@ -9726,7 +9759,7 @@ function verdictCard(){
   if((!p0||p0.empty)&&!(S.history||[]).length&&!pr.tasks.length)
     return '<div class="card an-hero" style="padding:18px;border-radius:22px;margin-top:16px">'+
       '<div style="display:flex;align-items:center;gap:9px">'+
-      '<img src="'+MARK+'" alt="" style="width:17px;height:17px;object-fit:contain">'+
+      '<img class="mk" src="'+MARK+'" alt="" style="width:17px;height:17px;object-fit:contain">'+
       '<p class="mono" style="flex:1;font-size:9.5px;color:var(--amber);letter-spacing:.06em">GETTING STARTED</p></div>'+
       '<p class="disp gradhead" style="font-size:24px;line-height:1.18;margin-top:10px">Where do you want to begin?</p>'+
       '<p style="color:var(--dim);font-size:13.5px;line-height:1.6;margin-top:5px">Answer a few questions and Allena builds a block around you — or bring the training you already have and it reads the evidence.</p>'+
@@ -9736,7 +9769,7 @@ function verdictCard(){
       '<button data-a="suRestore" class="btn" style="flex:1;font-size:12.5px">Restore a backup</button></div></div>';
   const done=pr.complete;
   let inner='<div style="display:flex;align-items:center;gap:9px">'+
-    '<img src="'+MARK+'" alt="" style="width:17px;height:17px;object-fit:contain">'+
+    '<img class="mk" src="'+MARK+'" alt="" style="width:17px;height:17px;object-fit:contain">'+
     '<p class="mono" style="flex:1;font-size:9.5px;color:'+(done?'var(--green)':'var(--amber)')+';letter-spacing:.06em">TODAY</p>'+
     (st>1?'<p class="mono" style="color:var(--faint);font-size:9.5px">'+st+' DAY'+(st===1?'':'S')+' RUNNING</p>':'')+'</div>';
   const dots='<span style="display:flex;gap:5px">'+
@@ -10249,7 +10282,7 @@ function viewCollection(){
   if(st.total<12){
     const missing=DISC_CATALOG.filter(c=>!st.by[c[0]]).slice(0,3);
     if(missing.length)h+='<div class="card mt2 an-hero" style="padding:15px 16px">'+
-      '<div style="display:flex;align-items:center;gap:9px"><img src="'+MARK+'" alt="" style="width:17px;height:17px;object-fit:contain">'+
+      '<div style="display:flex;align-items:center;gap:9px"><img class="mk" src="'+MARK+'" alt="" style="width:17px;height:17px;object-fit:contain">'+
       '<p class="mono" style="font-size:9.5px;color:var(--amber);letter-spacing:.06em">STILL TO FIND</p></div>'+
       missing.map(c=>'<p style="color:var(--dim);font-size:12.5px;line-height:1.55;margin-top:7px">'+
         '<b style="color:var(--text)">'+esc(c[1])+'</b> — '+esc(c[3])+'</p>').join('')+
@@ -10337,7 +10370,7 @@ function thinkPanel(title){
     '<svg viewBox="0 0 42 42" style="position:absolute;inset:0;width:42px;height:42px">'+
     '<circle class="an-ring" cx="21" cy="21" r="18" fill="none" stroke="var(--amber)" stroke-width="1.4" stroke-linecap="round" stroke-dasharray="27 86" opacity=".85"/>'+
     '<circle class="an-ring2" cx="21" cy="21" r="12.5" fill="none" stroke="var(--amber)" stroke-width="1" stroke-linecap="round" stroke-dasharray="12 66" opacity=".5"/></svg>'+
-    '<img src="'+MARK+'" alt="" class="an-mark" style="position:absolute;inset:0;margin:auto;width:18px;height:18px;object-fit:contain">'+
+    '<img class="mk" src="'+MARK+'" alt="" class="mk an-mark" style="position:absolute;inset:0;margin:auto;width:18px;height:18px;object-fit:contain">'+
     '</div><div style="flex:1;min-width:0">'+
     '<p class="disp" style="font-size:15.5px;font-weight:600;line-height:1.25">'+esc(title)+'</p>'+
     '<p class="mono" style="color:var(--amber);font-size:11px;margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(t.steps[step][0])+'…</p>'+
@@ -10784,7 +10817,7 @@ function analyseCard(){
       '<svg viewBox="0 0 46 46" style="position:absolute;inset:0;width:46px;height:46px">'+
       '<circle class="an-ring" cx="23" cy="23" r="20" fill="none" stroke="var(--amber)" stroke-width="1.5" stroke-linecap="round" stroke-dasharray="30 96" opacity=".85"/>'+
       '<circle class="an-ring2" cx="23" cy="23" r="14" fill="none" stroke="var(--amber)" stroke-width="1" stroke-linecap="round" stroke-dasharray="14 74" opacity=".5"/></svg>'+
-      '<img src="'+MARK+'" alt="" class="an-mark" style="position:absolute;inset:0;margin:auto;width:26px;height:26px;object-fit:contain">'+
+      '<img class="mk" src="'+MARK+'" alt="" class="mk an-mark" style="position:absolute;inset:0;margin:auto;width:26px;height:26px;object-fit:contain">'+
       '</div>'+
       '<div style="flex:1;min-width:0">'+
       '<p class="disp" style="font-size:16px;font-weight:600;line-height:1.25">Allena is looking for patterns</p>'+
@@ -10808,7 +10841,7 @@ function analyseCard(){
       .sort((a,b)=>((fresh.indexOf(b)>=0?1:0)-(fresh.indexOf(a)>=0?1:0))||order[a.rar]-order[b.rar]);
     return '<div class="card mt2 an-hero an-rise" style="padding:20px;border-radius:22px">'+
       '<div style="display:flex;align-items:center;gap:12px">'+
-      '<img src="'+MARK+'" alt="" style="width:24px;height:24px;object-fit:contain;flex:none">'+
+      '<img class="mk" src="'+MARK+'" alt="" style="width:24px;height:24px;object-fit:contain;flex:none">'+
       '<div style="flex:1"><p class="disp gradhead" style="font-size:17px">'+
         ((P.length+shown.length)?(P.length+shown.length)+' found':'Nothing worth flagging')+'</p>'+
       '<p class="mono" style="color:var(--faint);font-size:10.5px;margin-top:2px">'+
@@ -10915,7 +10948,7 @@ function patDetail(title){
     '<p style="color:var(--dim);font-size:14px;line-height:1.65;margin-top:12px">'+esc(p.d)+'</p>';
   const act=patAction(p);
   if(act)h+='<div class="card mt2" style="padding:15px 16px;border-color:var(--amber)">'+
-    '<div style="display:flex;align-items:center;gap:9px"><img src="'+MARK+'" alt="" style="width:26px;height:26px;object-fit:contain;flex:none">'+
+    '<div style="display:flex;align-items:center;gap:9px"><img class="mk" src="'+MARK+'" alt="" style="width:26px;height:26px;object-fit:contain;flex:none">'+
     '<p class="mono" style="font-size:10px;color:var(--amber);letter-spacing:.06em">WHAT TO DO</p></div>'+
     '<p style="color:var(--text);font-size:13.5px;line-height:1.65;margin-top:7px">'+esc(act)+'</p></div>';
   if((p.src||[]).length)h+='<p class="eyebrow mt2">Where this came from</p>'+
@@ -12150,7 +12183,7 @@ function newFindsCard(){
   if(p)bits.push(p+' new pattern'+(p===1?'':'s'));
   return '<button data-a="findingsGo" class="card an-glow mt" style="width:100%;text-align:left;padding:16px;border-radius:18px;border-color:color-mix(in srgb, var(--text) 55%, transparent);display:block">'+
     '<div style="display:flex;align-items:center;gap:11px">'+
-    '<img src="'+MARK+'" alt="" style="width:22px;height:22px;object-fit:contain;flex:none">'+
+    '<img class="mk" src="'+MARK+'" alt="" style="width:22px;height:22px;object-fit:contain;flex:none">'+
     '<div style="flex:1;min-width:0">'+
     '<p class="disp" style="font-size:16px;font-weight:600;line-height:1.2">'+bits.join(' and ')+'</p>'+
     '<p style="color:var(--dim);font-size:12px;margin-top:3px">Found since you last looked. Tap to reveal.</p></div>'+
@@ -12369,7 +12402,7 @@ function deepAnimHtml(){
   svg+='<circle cx="150" cy="150" r="24" fill="var(--bg)" stroke="var(--line)"/>'+
     '<circle class="an-ring" cx="150" cy="150" r="24" fill="none" stroke="var(--amber)" stroke-width="1.4" stroke-linecap="round" stroke-dasharray="36 115" opacity=".85"/></svg>';
   return '<div id="deepanim"><div style="position:relative;display:inline-block">'+svg+
-    '<img src="'+MARK+'" alt="" style="position:absolute;width:22px;height:22px;object-fit:contain;top:calc(50% - 11px);left:calc(50% - 11px)"></div>'+
+    '<img class="mk" src="'+MARK+'" alt="" style="position:absolute;width:22px;height:22px;object-fit:contain;top:calc(50% - 11px);left:calc(50% - 11px)"></div>'+
     '<p class="disp" style="font-size:16px;font-weight:600;margin-top:22px">The deep read</p>'+
     '<p class="mono" style="color:var(--amber);font-size:11px;margin-top:8px;min-height:16px">'+esc((da.steps[Math.min(da.i,da.steps.length-1)]||[''])[0])+'\u2026</p>'+
     '<p class="mono" style="color:var(--faint);font-size:9px;margin-top:4px;min-height:12px">'+esc((da.steps[Math.min(da.i,da.steps.length-1)]||['',''])[1]||'')+'</p></div>'}
@@ -12822,7 +12855,7 @@ function viewSession(){
       if(big9)try{hapticRun('find')}catch(e){}
       h+='<div class="card mt2 an-hero an-glow an-pop'+(big9?' an-ceremony':'')+(rev.show.rar==='epic'?' an-shine':'')+'" style="padding:17px;border-radius:20px;border-color:'+r[1]+';position:relative;overflow:hidden">'+
         '<div style="display:flex;align-items:center;gap:9px">'+
-        '<img src="'+MARK+'" alt="" class="an-mark" style="width:19px;height:19px;object-fit:contain">'+
+        '<img class="mk" src="'+MARK+'" alt="" class="mk an-mark" style="width:19px;height:19px;object-fit:contain">'+
         '<p class="mono" style="font-size:9.5px;color:'+r[1]+';letter-spacing:.06em">'+esc(r[2].toUpperCase())+' \u00b7 UNLOCKED</p></div>'+
         '<p style="font-size:15px;font-weight:600;margin-top:8px">'+esc(rev.show.t)+'</p>'+
         '<p style="color:var(--dim);font-size:12.5px;line-height:1.6;margin-top:4px">'+esc(rev.show.d)+'</p>'+
@@ -12830,7 +12863,7 @@ function viewSession(){
         '<button data-a="collOpen" class="btn mt" style="border-color:'+r[1]+';color:'+r[1]+';font-size:12.5px">See everything found \u203a</button>'+
         '</div>'}}
     if(prs.length)h+='<div class="card mt2 an-hero an-glow" style="padding:16px;border-radius:18px">'+
-      '<div style="display:flex;align-items:center;gap:10px"><img src="'+MARK+'" alt="" class="an-mark" style="width:20px;height:20px;object-fit:contain">'+
+      '<div style="display:flex;align-items:center;gap:10px"><img class="mk" src="'+MARK+'" alt="" class="mk an-mark" style="width:20px;height:20px;object-fit:contain">'+
       '<p class="mono" style="font-size:10.5px;color:var(--amber);letter-spacing:.06em">'+(prs.length===1?'A NEW BEST':prs.length+' NEW BESTS')+'</p></div>'+
       prs.map(p=>'<p style="font-size:14px;line-height:1.5;margin-top:7px"><b>'+esc(p.ex)+'</b> '+
         '<span class="mono" style="color:var(--faint);font-size:12px">'+uwNum(p.prev)+' → </span>'+
@@ -12857,7 +12890,7 @@ function viewSession(){
    '<p class="disp" style="font-size:16px;font-weight:600;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(s.dayName)+'</p></div>'+
    '<div style="display:flex;gap:8px;flex:none;align-items:center">'+
    (S.lastAdj?'<button data-a="undoAdj" style="padding:9px 10px;border-radius:11px;background:var(--raised);border:1px solid var(--amber);color:var(--amber);font-size:12px;white-space:nowrap">Undo '+(S.lastAdj.delta>0?'+':'')+S.lastAdj.delta+'</button>':'')+
-   '<button data-a="coachOpen" style="width:40px;height:40px;border-radius:13px;background:var(--raised);border:1px solid var(--amber);display:flex;align-items:center;justify-content:center;padding:0"><img src="'+MARK+'" alt="Allena" style="width:25px;height:25px;object-fit:contain"></button>'+
+   '<button data-a="coachOpen" style="width:40px;height:40px;border-radius:13px;background:var(--raised);border:1px solid var(--amber);display:flex;align-items:center;justify-content:center;padding:0"><img class="mk" src="'+MARK+'" alt="Allena" style="width:25px;height:25px;object-fit:contain"></button>'+
    '</div></div>'+
    '<div style="height:3px;background:var(--line)"><div style="height:3px;width:'+pct+'%;background:'+acc+';transition:width .3s"></div></div></div>';
 
@@ -13450,7 +13483,7 @@ function viewChart(){
    if(draw)h+='<div style="margin-top:14px">'+draw+'</div>'}
   {const tip=chartTip(c.kind,c.ex);
    if(tip)h+='<div class="card mt2" style="padding:14px 16px;border-color:var(--amber)">'+
-     '<div style="display:flex;align-items:center;gap:9px"><img src="'+MARK+'" alt="" style="width:18px;height:18px;object-fit:contain;flex:none">'+
+     '<div style="display:flex;align-items:center;gap:9px"><img class="mk" src="'+MARK+'" alt="" style="width:18px;height:18px;object-fit:contain;flex:none">'+
      '<p class="mono" style="font-size:10px;color:var(--amber);letter-spacing:.06em">ALLENA SAYS</p></div>'+
      '<p style="color:var(--text);font-size:13.5px;line-height:1.6;margin-top:6px">'+esc(tip)+'</p></div>'}
   {const F=chartFindings(c.kind,c.ex);
@@ -13754,7 +13787,7 @@ function navRow(icon,label,value,a,v,opts){
   /* the settings-row language, app-wide: icon · label · value · chevron */
   opts=opts||{};
   const iconHtml=icon==='logo'
-    ?'<img src="'+MARK+'" alt="" style="width:18px;height:18px;object-fit:contain;flex:none'+((typeof lget==='function'&&lget('training-theme-v1','system')==='light')?';filter:invert(1) brightness(.4)':'')+'">'
+    ?'<img class="mk" src="'+MARK+'" alt="" style="width:18px;height:18px;object-fit:contain;flex:none">'
     :'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px;color:'+(opts.tint||'var(--dim)')+';flex:none">'+icon+'</svg>';
   return '<button data-a="'+a+'"'+(v!=null?' data-v="'+esc(String(v))+'"':'')+' style="width:100%;text-align:left;padding:13px 16px;display:flex;align-items:center;gap:12px;border-top:1px solid var(--line)">'+
     iconHtml+
