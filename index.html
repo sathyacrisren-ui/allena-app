@@ -393,7 +393,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='136c0c';  // stamped by tools/build.py with the content hash
+const BUILD_ID='34855e';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -1734,6 +1734,15 @@ const NOTE_HINTS=[
 function scanNotes(txt){const found=[];
   NOTE_HINTS.forEach(h=>{if(h[0].test(String(txt||''))&&found.indexOf(h[1])<0)found.push(h[1])});
   return found}
+function restrEff(){
+  /* the effective restrictions: what the wizard was told PLUS what the
+     app already knows — an active ACL pathway IS an ACL restriction,
+     whether or not the wizard heard about it (owner-caught: their
+     wizard-skipped profile had restr:{} while rehabbing a knee, so
+     lifting screening was blind to it). */
+  const r=Object.assign({},(S.prof&&S.prof.restr)||{});
+  if(S.acl&&S.acl.on)r.acl=1;
+  return r}
 function exclFor(r){const x=new Set();r=r||{};
   INJURIES.forEach(i=>{if(r[i.k])i.x.forEach(t=>x.add(t))});
   if(r.disc){x.add('flex');x.add('axial')}
@@ -2648,7 +2657,7 @@ async function impParse(){
   f.busy=false;if(S.think&&S.think.key==='impread')S.think=null;render()}
 function assessProgram(p){
   // local, deterministic: weekly sets per muscle from the written program
-  const excl=exclFor((S.prof&&S.prof.restr)||{});
+  const excl=exclFor(restrEff());
   const per={},days=p.days||[];
   days.forEach(d=>(d.exercises||[]).forEach(e=>{
     const n=((e.sets&&(e.sets['default']||e.sets[1]))||[]).length||0;
@@ -2832,7 +2841,7 @@ function ownAutoFix(goal){
     'Hamstrings':[['Romanian deadlift','bb'],['Dumbbell RDL','db'],['Leg curl','mc'],['Nordic curl',null]],
     'Glutes':[['Hip thrust','bb'],['Dumbbell hip thrust','db'],['Glute bridge',null]],
     'Side delts':[['Lateral raise','db'],['Cable lateral raise','cb'],['Band lateral raise','band']]};
-  const excl9=exclFor((S.prof&&S.prof.restr)||{});
+  const excl9=exclFor(restrEff());
   ['Chest','Lats','Quads','Hamstrings','Glutes','Side delts'].forEach(m=>{
     if(per[m])return;
     const cand=(GAP_EX[m]||[]).find(c=>c[1]==null||has(c[1]));
@@ -3889,7 +3898,7 @@ function suggestFor(kind,name){
       (d.exercises||[]).forEach(e=>{if(out.length<3&&e.name!==base&&!out.some(o=>o.n===e.name))
         out.push({n:e.name,why:'from this phase'})}))}catch(e){}
     return out}
-  const excl=exclFor((S.prof&&S.prof.restr)||{});
+  const excl=exclFor(restrEff());
   const base=name||((S.sess&&S.sess.sets[S.sess.idx])||{}).ex||'';
   const mine=MUSCLE_RULES.filter(r=>r[1].test(base)).map(r=>r[0]);
   const out=[];
@@ -5402,7 +5411,9 @@ function viewPoints(){
    const doneFinds=(function(){try{return unseenPatterns()===0&&!bankDiscoveries().length}catch(e){return false}})();
    const earn=[
      ['nav','home','Log a session live','the biggest earner — every set, rep and effort counts, witnessed',doneSess],
-     ['runLog','','Log a run','distance, time, heart rate and zones all count',doneRun],
+     ((S.acl&&S.acl.on&&S.acl.phase<3)
+       ?['runLog','','Log a walk','the knee\u2019s cardio \u2014 distance, time and heart rate count; running opens at phase 3',doneRun]
+       :['runLog','','Log a run','distance, time, heart rate and zones all count',doneRun]),
      ['todayOpen','','The daily check-ins','readiness, weight, check-in — small, but they compound',doneChecks],
      ['drawerNav','findings','Visit your findings','new discoveries bank into the collection when seen',doneFinds]];
    h+='<div class="card mt2" style="padding:15px 16px">'+
@@ -8416,7 +8427,9 @@ function dailyBrief(){
       if(dd>=0&&dd<=3)out.push({tag:'LIFT',hold:true,a:'nav',v:'home',
         line:'Race in '+dd+' day'+(dd===1?'':'s')+' \u2014 legs stay out of the gym, upper stays light. Fitness is banked; freshness is the job now'})}
     // running, resolved against the legs and the load band
-    if(S.runOn&&(runs().length>=3||rp)){
+    const realRuns=runs().filter(r=>isRunType(r.type)).length;
+    const runGated=S.acl&&S.acl.on&&S.acl.phase<3;
+    if(S.runOn&&!runGated&&(realRuns>=3||rp)){
       const a2=(typeof acwr==='function')?acwr():null;
       if(leg<60){
         const pr9=(S.prof&&S.prof.prio)||null;
@@ -12933,7 +12946,7 @@ function sheetHtml(){
       '<button data-a="rskipCancel" class="btn mt2" style="color:var(--dim)">Never mind</button>')}
   if(S.sheet.t==='keyswap'){
     const sw=S.swapFor;if(!sw)return '';
-    const excl=exclFor((S.prof&&S.prof.restr)||{});
+    const excl=exclFor(restrEff());
     const base=gBase(sw.name);
     const lower=base.toLowerCase();
     const key=Object.keys(SUBS).find(k=>lower.indexOf(k.toLowerCase())>=0)
@@ -12957,7 +12970,7 @@ function sheetHtml(){
   if(S.sheet.t==='ownpick'){
     const f=S.axf,onS='background:var(--text);color:#1F1E1D;border-color:var(--text);font-weight:600';
     const cats=[['pushH','Chest'],['pullH','Rows'],['pullV','Pulldowns'],['pushV','Shoulders'],['side','Laterals'],['rear','Rear delts'],['bi','Biceps'],['tri','Triceps'],['squat','Squat'],['hinge','Hinge'],['glute','Glutes'],['abd','Abduction'],['ham','Hamstrings'],['quad','Quads'],['calf','Calves'],['core','Core']];
-    const excl=exclFor((S.prof&&S.prof.restr)||{});
+    const excl=exclFor(restrEff());
     return wrapSheet('Add from the library',
       '<div class="scroller">'+cats.map(c=>'<button data-a="axCat" data-v="'+c[0]+'" class="pill" style="'+(f.cat===c[0]?onS:'')+'">'+c[1]+'</button>').join('')+'</div>'+
       '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:16px">'+
@@ -13553,7 +13566,7 @@ function sheetHtml(){
     return wrapSheet(f.id?'Edit this run':'Log a run',
       '<p class="eyebrow">What kind of run?</p>'+
       '<select data-in="rform.type" style="width:100%;margin-top:8px;padding:14px 14px;font-size:15px;background:var(--raised);border:1px solid var(--line);border-radius:12px;color:var(--text);-webkit-appearance:none;appearance:none">'+
-        RUN_TYPES.map(t2=>'<option value="'+t2[0]+'"'+(f.type===t2[0]?' selected':'')+'>'+t2[1]+'</option>').join('')+'</select>'+
+        RUN_TYPES.concat([['walk','Walk','Easy on the knee \u2014 counts as load in your recovery picture, never coached as running.']]).map(t2=>'<option value="'+t2[0]+'"'+(f.type===t2[0]?' selected':'')+'>'+t2[1]+'</option>').join('')+'</select>'+
       '<p style="color:var(--faint);font-size:11.5px;line-height:1.45;margin-top:7px">'+
         esc((RUN_TYPES.find(t2=>t2[0]===f.type)||['','',''])[2])+'</p>'+
       '<div class="row mt2" style="gap:10px">'+
