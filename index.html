@@ -554,7 +554,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='55910b';  // stamped by tools/build.py with the content hash
+const BUILD_ID='625723';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -584,7 +584,10 @@ function saveHistory(){return lset(K_H,S.history)}
 function record(complete){const s=S.sess;return{id:String(s.startedAt),date:new Date(s.startedAt).toISOString(),
   block:s.block,progId:s.progId,dayIdx:s.dayIdx,dayTitle:s.dayName,week:s.week,
   minutes:Math.max(1,Math.round((Date.now()-s.startedAt)/60000)),
-  log:s.log,note:S.note,complete:!!complete,planned:s.sets.length}}
+  log:s.log,note:S.note,complete:!!complete,planned:s.sets.length,
+  motion:(function(){try{const m=s.motion||{};
+    const moved=Object.keys(m).filter(k=>m[k]>=3).length;
+    return moved?{m:moved,of:s.sets.length}:null}catch(e){return null}})()}}
 function upsert(rec){const i=S.history.findIndex(h=>h.id===rec.id);
   if(i>=0)S.history[i]=rec;else S.history.push(rec);return saveHistory()}
 function setWeek(w,pid){
@@ -592,7 +595,8 @@ function setWeek(w,pid){
   S.week=Math.max(1,+w||1);
   if(p){S.weekMap=S.weekMap||{};S.weekMap[p]=S.week;lset(K_WEEKS,S.weekMap)}}
 function weekFor(pid){return (S.weekMap&&S.weekMap[pid])||1}
-function persistActive(){if(S.sess)lset(K_A,Object.assign({},S.sess,{note:S.note}))}
+function persistActive(){if(S.sess)lset(K_A,Object.assign({},S.sess,{note:S.note}));
+  try{if(typeof restNotifSync==='function')restNotifSync()}catch(e){}}
 function isPR(e){
   let best=0;
   S.history.forEach(h=>h.log.forEach(l=>{if(l===e)return;
@@ -7607,6 +7611,23 @@ function notifAskCard(){
       '<button data-a="notifAskYes" class="big disp" style="flex:2;background:var(--amber);color:var(--bg);font-size:14.5px">Turn them on</button>'+
       '<button data-a="notifAskNo" class="btn" style="flex:1;color:var(--dim)">Not now</button></div></div>'
   }catch(e){return ''}}
+function restNotifSync(){
+  /* the rest timer follows you out of the app (owner call, 3 Sep):
+     a pending local notification fires at rest-end whether the
+     screen is locked, the phone is pocketed, or another app is up.
+     In the foreground the in-app beep handles it (no delegate =
+     no double banner). Rides the same plan replacement. */
+  try{
+    if(!inWrapper())return;
+    const P=notifPrefs();if(!P.asked||!P.on)return;
+    const items=notifPlan();
+    if(S.restEnd&&S.restEnd>Date.now()+3000&&S.sess){
+      const s9=S.sess,nx=s9.sets[s9.idx+1];
+      items.push({id:'restend',ts:Math.round(S.restEnd/1000),title:'Allena',
+        body:'Rest done'+(nx?' \u2014 '+String(nx.ex).replace(/ \u2014 .*/,'')+', set '+nx.setNo:'')+'. Back to it.'})}
+    window.webkit.messageHandlers.allena.postMessage(JSON.stringify(
+      {type:'notif',on:!!P.on,items:items,badge:(typeof unseenFindings==='function')?unseenFindings():0}))
+  }catch(e){}}
 function notifSync(){
   try{
     if(!inWrapper())return;
@@ -12838,7 +12859,8 @@ function viewSession(){
             minutes:Math.max(1,Math.round((Date.now()-s.startedAt)/60000)),log:s.log});
           const rec9=(S.history||[]).find(x=>String(x.id)===String(s.startedAt))||null;
           h+='<p class="mono" style="font-size:9px;letter-spacing:.06em;margin-top:7px;line-height:1.5;color:'+(lw.live?'var(--green)':'var(--faint)')+'">'+
-            (lw.live?(heartWitnessed(rec9)?'HEART-WITNESSED ♥ · THE WRIST AGREES WITH THE CLOCK':'WITNESSED LIVE ✓')
+            (lw.live?(heartWitnessed(rec9)?'HEART-WITNESSED ♥ · THE WRIST AGREES WITH THE CLOCK':'WITNESSED LIVE ✓')+
+              (rec9&&rec9.motion&&rec9.motion.m>=3?' · CARRIED BETWEEN STATIONS':'')
               :'NOT WITNESSED · '+esc(lw.why.toUpperCase()))+'</p>'}catch(e){}
         if(rows.length)h+='<div style="margin-top:11px;display:flex;flex-direction:column;gap:7px">'+
           rows.map((r9,i9)=>'<div style="display:flex;align-items:center;gap:8px">'+
@@ -15965,6 +15987,60 @@ setInterval(function(){try{
   ['touchend','touchcancel'].forEach(ev=>document.addEventListener(ev,clear,{passive:true}));
 })();
 
+/* the phone-carried witness (owner call, 3 Sep): during a live
+   session, real training moves the phone between stations. Motion
+   energy is bucketed per set and summarised onto the record.
+   POSITIVE evidence only — a still phone is never a penalty. */
+(function(){let last=0;
+  try{window.addEventListener('devicemotion',function(e){
+    const now=Date.now();if(now-last<200)return;last=now;
+    const s=S.sess;if(!s||s.phase==='done')return;
+    let mag=0;
+    const ua=e.userAcceleration;
+    if(ua&&(ua.x||ua.y||ua.z))mag=Math.abs(ua.x||0)+Math.abs(ua.y||0)+Math.abs(ua.z||0);
+    else{const g=e.accelerationIncludingGravity;
+      if(!g)return;
+      mag=Math.abs(Math.sqrt((g.x||0)*(g.x||0)+(g.y||0)*(g.y||0)+(g.z||0)*(g.z||0))-9.81)}
+    if(mag>2.2){const m=(s.motion=s.motion||{});m[s.idx]=(m[s.idx]||0)+1}})}catch(e){}
+})();
+
+/* swipe the drawer back out (owner call, 3 Sep): it slides in from
+   the edge, so a leftward drag anywhere on it slides it away — the
+   panel follows the finger, the scrim fades with it. */
+(function(){let x0=null,y0=null,panel=null,scrim=null,drag=false;
+  document.addEventListener('touchstart',e=>{
+    panel=null;x0=null;drag=false;
+    if(!S.drawerOpen)return;
+    const dr=document.getElementById('drawer');if(!dr)return;
+    panel=dr.querySelector('.panel');scrim=dr.querySelector('.scrim');
+    if(!panel)return;
+    x0=e.touches[0].clientX;y0=e.touches[0].clientY},{passive:true});
+  document.addEventListener('touchmove',e=>{
+    if(x0==null||!panel)return;
+    const dx=e.touches[0].clientX-x0,dy=Math.abs(e.touches[0].clientY-y0);
+    if(!drag){
+      if(dy>Math.abs(dx)+8){x0=null;panel=null;return}
+      if(dx>-14)return;
+      drag=true;panel.style.transition='none';if(scrim)scrim.style.transition='none'}
+    const off=Math.min(0,dx);
+    panel.style.transform='translateX('+off+'px)';
+    if(scrim)scrim.style.opacity=String(Math.max(0,1+off/(panel.offsetWidth||300)));
+    if(e.cancelable)e.preventDefault()},{passive:false});
+  document.addEventListener('touchend',e=>{
+    if(!drag||!panel){x0=null;panel=null;drag=false;return}
+    const p9=panel,s9=scrim;panel=null;x0=null;drag=false;
+    const m9=/translateX\((-?\d+\.?\d*)px\)/.exec(p9.style.transform||'');
+    const off=m9?+m9[1]:0;
+    if(off<-70){
+      p9.style.transition='transform .2s ease';p9.style.transform='translateX(-105%)';
+      if(s9){s9.style.transition='opacity .18s ease';s9.style.opacity='0'}
+      try{vib(6)}catch(e2){}
+      setTimeout(function(){S.drawerOpen=false;render()},190)}
+    else{
+      p9.style.transition='transform .22s cubic-bezier(.34,1.4,.64,1)';p9.style.transform='';
+      if(s9){s9.style.transition='opacity .2s ease';s9.style.opacity=''}}},{passive:true});
+})();
+
 /* step swiper (owner call, 3 Sep): drag horizontally through the
    guide's steps — the row follows the finger, snaps with animation,
    then the state catches up. */
@@ -16477,7 +16553,12 @@ function runAction(a,v,t,e){
     case 'start':A.start(v);break;
     case 'resume':S.drawerOpen=false;A.resume();break;  // the pill floats above the drawer — returning must close it
     case 'sessMin':S.view='today';wakeOff();render();break;
-    case 'begin':A.begin();break;
+    case 'begin':{
+      /* first Start of a session is the user gesture iOS wants for
+         motion access — the phone-carried witness (owner call, 3 Sep) */
+      try{if(typeof DeviceMotionEvent!=='undefined'&&DeviceMotionEvent.requestPermission&&!S._dmAsked){
+        S._dmAsked=1;DeviceMotionEvent.requestPermission().catch(function(){})}}catch(e){}
+      A.begin();break}
     case 'finish':A.finish();break;
     case 'commit':A.commit();break;
     case 'sanityKeep':{S.sheet=null;S.sanity=null;A.commit(true);break}
