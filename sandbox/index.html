@@ -469,7 +469,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='b875ec';  // stamped by tools/build.py with the content hash
+const BUILD_ID='69fe82';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -8615,7 +8615,7 @@ function restPool(){
       if(ch.length>=6){const rec=ch.slice(-3),old=ch.slice(-6,-3);
         const av=l=>l.reduce((a,c)=>a+(c.pain||0),0)/l.length;
         const a=av(rec),b=av(old);
-        add('Knee pain has averaged '+(Math.round(a*10)/10)+'/10 across your last three check-ins'+(a<b?', down from '+(Math.round(b*10)/10)+'. Quiet progress is still progress.':'. Keeping the record is what makes the physio visits count.'),'nav','rehab')}}}catch(e){}
+        add('Knee pain has averaged '+(Math.round(a*10)/10)+'/10 across your last three check-ins'+(a<b?', down from '+(Math.round(b*10)/10)+'. Quiet progress is still progress.':'. Keeping the record is what makes the physio visits count.'),'nav','acl')}}}catch(e){}
   return out}
 function restItem(k){
   const pool=restPool();
@@ -9160,7 +9160,7 @@ function dailyBrief(){
     if(typeof activeProtocols==='function'&&(activeProtocols().length||(S.acl&&S.acl.on))
        &&typeof rehabWeekSessions==='function'){
       const done=rehabWeekSessions(),targ=rehabWeekTarget();
-      if(done<targ)out.push({tag:'REHAB',a:'nav',v:'rehab',
+      if(done<targ)out.push({tag:'REHAB',a:'nav',v:'acl',
         line:done+' of '+targ+' rehab sessions this week \u2014 one today keeps the climb honest'})}
   }catch(e){}
   return out.slice(0,3)}
@@ -14901,6 +14901,9 @@ function render(){
   else if(S.view==='own')body=viewOwn();
   else if(S.view==='ownreview')body=viewOwnReview();
   else if(S.view==='review')body=viewReview();
+  /* never a blank dead page: an unknown or renamed view id falls back
+     to Today instead of rendering nothing (owner-caught) */
+  else{S.view='today';body=viewToday()}
   const ICONS={run:'<path d="M13 4.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3z"/><path d="M7 21l2.5-6 3-2.5-1.5-4-3.5 2L6 13"/><path d="M12.5 12.5l3.5 2 1.5 4"/><path d="M11 6.5l3 1.5 2.5-1"/>',
     acl:'<path d="M12 3.2c2 1.7 4.2 2.5 6.6 2.6v5.4c0 4-2.6 7.2-6.6 9-4-1.8-6.6-5-6.6-9V5.8C7.8 5.7 10 4.9 12 3.2z"/><path d="M12 9.4v4.2M9.9 11.5h4.2"/>',
     home:'<path d="M2.6 10v4M21.4 10v4"/><rect x="4.6" y="7.2" width="3.2" height="9.6" rx="1.1"/><rect x="16.2" y="7.2" width="3.2" height="9.6" rx="1.1"/><path d="M7.8 12h8.4"/>',
