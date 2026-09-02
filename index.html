@@ -516,7 +516,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='278ceb';  // stamped by tools/build.py with the content hash
+const BUILD_ID='922e53';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -8572,6 +8572,86 @@ function standingDiscoveries(){
         'Your 5K outranks your best lift by '+Math.round(d.run.pct-top.pct)+' percentile points. The bar is the cheap half — two focused sessions a week move it.','cross')}
   }catch(e){}
   return D}
+
+function standCurveSvg(pct,col,uid){
+  /* the bell curve: the shaded area is everyone you outrank. Drawn on
+     a z-axis (±3.2σ) so every curve is the same honest shape — only
+     your marker moves. */
+  const W=320,H=88,half=W/2-12;
+  const X=z=>W/2+z*half/3.2, Y=z=>H-14-Math.exp(-z*z/2)*(H-30);
+  let line='',fill='M'+X(-3.2).toFixed(1)+' '+(H-14);
+  for(let i=0;i<=64;i++){const z=-3.2+i*0.1;
+    const pt=X(z).toFixed(1)+' '+Y(z).toFixed(1);
+    line+=(i?'L':'M')+pt+' '}
+  const uz=Math.max(-3.05,Math.min(3.05,standPhiInv(Math.min(0.999,Math.max(0.001,pct/100)))));
+  for(let i=0;i<=64;i++){const z=-3.2+i*0.1;if(z>uz)break;
+    fill+='L'+X(z).toFixed(1)+' '+Y(z).toFixed(1)+' '}
+  fill+='L'+X(uz).toFixed(1)+' '+Y(uz).toFixed(1)+' L'+X(uz).toFixed(1)+' '+(H-14)+' Z';
+  const ux=X(uz);
+  const lbl=pct>=50?'TOP '+Math.max(1,Math.round(100-pct))+'%':Math.round(pct)+'TH';
+  const lx=Math.max(34,Math.min(W-34,ux));
+  return '<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;height:auto;display:block;margin-top:10px">'+
+    '<path d="'+fill+'" fill="'+col+'" opacity="0.16"/>'+
+    '<path d="'+line+'" fill="none" stroke="var(--faint)" stroke-width="1.4"/>'+
+    '<line x1="'+(W/2)+'" y1="'+(H-14)+'" x2="'+(W/2)+'" y2="'+Y(0).toFixed(1)+'" stroke="var(--line)" stroke-width="1" stroke-dasharray="3 3"/>'+
+    '<text x="'+(W/2)+'" y="'+(H-3)+'" fill="var(--faint)" font-size="7.5" text-anchor="middle" letter-spacing="1">MEDIAN</text>'+
+    '<line x1="'+ux.toFixed(1)+'" y1="'+(H-14)+'" x2="'+ux.toFixed(1)+'" y2="'+(Y(uz)-3).toFixed(1)+'" stroke="'+col+'" stroke-width="2"/>'+
+    '<circle cx="'+ux.toFixed(1)+'" cy="'+(Y(uz)-3).toFixed(1)+'" r="3.4" fill="'+col+'"/>'+
+    '<text x="'+lx.toFixed(1)+'" y="'+Math.max(9,Y(uz)-10).toFixed(1)+'" fill="'+col+'" font-size="9" font-weight="700" text-anchor="middle" letter-spacing=".5">'+lbl+'</text>'+
+    '</svg>'}
+function standTierCol(pct){return pct>=90?'#FFFFFF':pct>=75?'var(--green)':pct>=50?'#8FBF8A':'var(--dim)'}
+function viewStanding(){
+  const d=standingData();
+  let h='<div class="view pad stg" style="padding-top:24px">'+
+    '<button data-a="back" class="btn" style="width:auto;padding:8px 14px;color:var(--dim);font-size:12.5px;margin-bottom:14px">\u2039 Back</button>'+
+    '<h1 class="disp" style="font-size:25px;font-weight:600">Where you stand</h1>'+
+    '<p style="color:var(--dim);font-size:13px;line-height:1.65;margin-top:8px">Your lifts placed against '+
+    '<b style="color:var(--text)">real competition data</b> \u2014 about 810,000 raw, drug-tested entries on OpenPowerlifting \u2014 '+
+    'and your 5K against parkrun-scale finishers. Adjusted for your bodyweight and age. '+
+    'The shaded part of each curve is everyone you outrank. No invented \u201cglobal\u201d numbers \u2014 every percentile names the crowd it was measured in.</p>';
+  if(!d||(!d.rows.length&&!d.run)){
+    h+='<div class="card mt2" style="padding:16px"><p class="eyebrow">Not placeable yet</p>'+
+      '<p style="color:var(--dim);font-size:12.5px;line-height:1.6;margin-top:8px">Three things put you on these curves:</p>'+
+      '<p style="color:var(--dim);font-size:12.5px;line-height:1.8;margin-top:6px">\u00b7 a logged <b style="color:var(--text)">bench, squat or deadlift</b> set<br>\u00b7 a <b style="color:var(--text)">bodyweight</b> (morning check-in or a scan)<br>\u00b7 for the running curve, any logged run of 3\u201315 km</p>'+
+      '<p style="color:var(--faint);font-size:11.5px;line-height:1.55;margin-top:10px">Age and sex sharpen the standards \u2014 set them from the profile pill in Settings.</p></div>';
+    return h+'</div>'}
+  d.rows.forEach(r=>{
+    const col=standTierCol(r.pct);
+    h+='<div class="card mt" style="padding:15px 16px">'+
+      '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px">'+
+      '<span style="font-size:15px;font-weight:600">'+r.label+'</span>'+
+      '<span class="mono" style="font-size:11.5px;color:'+col+'">'+
+      (r.pct>=50?'TOP '+Math.max(1,Math.round(100-r.pct))+'%':Math.round(r.pct)+'TH PERCENTILE')+'</span></div>'+
+      '<p class="mono" style="color:var(--faint);font-size:11px;margin-top:3px">'+uwNum(Math.round(r.e1))+' '+uwUnit()+' est 1RM \u00b7 '+r.mult.toFixed(2)+'\u00d7 bodyweight</p>'+
+      standCurveSvg(r.pct,col,'l'+r.k)+
+      '<p style="color:var(--faint);font-size:11px;line-height:1.55;margin-top:8px">'+
+      (r.pct>=50?'Past the median of tested competition lifters at your weight \u2014 you would hold your own on a meet floor.'
+        :'The median tested competitor at your weight lifts '+uwNum(Math.round(r.medKg))+' '+uwUnit()+' \u2014 '+uwNum(Math.round(r.medKg-r.e1))+' '+uwUnit()+' between you and the middle of the pack.')+'</p></div>'});
+  if(d.run){
+    const col=standTierCol(d.run.pct);
+    h+='<div class="card mt" style="padding:15px 16px">'+
+      '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px">'+
+      '<span style="font-size:15px;font-weight:600">5K'+(d.run.approx?' <span class="mono" style="font-size:9px;color:var(--faint)">~EQUIVALENT</span>':'')+'</span>'+
+      '<span class="mono" style="font-size:11.5px;color:'+col+'">'+
+      (d.run.pct>=50?'TOP '+Math.max(1,Math.round(100-d.run.pct))+'%':Math.round(d.run.pct)+'TH PERCENTILE')+'</span></div>'+
+      '<p class="mono" style="color:var(--faint);font-size:11px;margin-top:3px">'+standMmss(d.run.t5)+
+      (d.run.approx?' \u00b7 converted from a '+d.run.km.toFixed(1)+' km run':' \u00b7 best this year')+'</p>'+
+      standCurveSvg(d.run.pct,col,'run')+
+      '<p style="color:var(--faint);font-size:11px;line-height:1.55;margin-top:8px">Vs parkrun-scale 5K finishers \u2014 the whole crowd that shows up on a Saturday, not just racers.</p></div>'}
+  if(d.eq){
+    const gap=d.eq.lift.pct-(d.run?d.run.pct:0);
+    h+='<div class="card mt2" style="padding:16px;border-color:rgba(240,238,230,.35)">'+
+      '<p class="eyebrow" style="color:var(--amber)">The equivalence</p>'+
+      '<p class="disp" style="font-size:18px;font-weight:600;line-height:1.4;margin-top:8px">Your '+d.eq.lift.label.toLowerCase()+' = a '+standMmss(d.eq.time)+' 5K.</p>'+
+      '<p style="color:var(--dim);font-size:12.5px;line-height:1.6;margin-top:7px">Same rarity, different world: the share of competition lifters below your '+d.eq.lift.label.toLowerCase()+
+      ' matches the share of 5K finishers a '+standMmss(d.eq.time)+' would beat.'+
+      (d.run?(gap>8?' Right now the engine is '+Math.round(gap)+' points behind the chassis \u2014 the cheap gains are on the road.'
+        :gap<-8?' You are the rarer runner \u2014 the bar has catching up to do.'
+        :' And your real 5K is nearly there \u2014 you are genuinely rare on both sides.'):'')+'</p></div>'}
+  if(d.needs.length)h+='<p style="color:var(--faint);font-size:11.5px;line-height:1.55;margin-top:12px">Log a bodyweight (morning check-in or a scan) to place your lifts.</p>';
+  h+='<p class="mono" style="color:var(--faint);font-size:8.5px;letter-spacing:.05em;margin-top:16px;line-height:1.7">SOURCES: OPENPOWERLIFTING RAW VERIFIED ENTRIES (VAN DEN HOEK 2024) \u00b7 PARKRUN-SCALE 5K DISTRIBUTIONS \u00b7 ALLOMETRIC BW ADJUSTMENT \u00b7 AGE-ADJUSTED PAST 35'+
+    (d.mixed?' \u00b7 MIXED REFERENCE \u2014 ADD YOUR SEX IN SETTINGS \u2192 YOU TO SHARPEN IT':'')+'</p>';
+  return h+'</div>'}
 function treeSeason(d){
   const m=(d?new Date(d):new Date()).getMonth()+1;
   if(m>=9&&m<=11)return{name:'Spring — fresh leaves',leaf:'#8FBF6E'};
@@ -13222,7 +13302,6 @@ function viewProgress(){
       waiting.slice(0,10).map(esc).join(', ')+'</p></div>';
     if(!inner)return '';
     return collapser('trends','Lift trends',charted.length+' lift'+(charted.length===1?'':'s')+' charted'+(waiting.length?' · '+waiting.length+' waiting':''),inner)};
-  SECREF.standing=SEC.standing=()=>{try{return standingCard()}catch(e){return ''}};
   SECREF.tonnage=SEC.tonnage=()=>{const wks=Object.keys(weekVol).sort().slice(-8);
     if(wks.length<2)return '';
     const mx=Math.max.apply(null,wks.map(k=>weekVol[k]));
@@ -13295,12 +13374,11 @@ function viewProgress(){
   h+='<button data-a="playoutOpen" style="width:100%;margin-top:26px;padding:12px;color:var(--faint);font-size:11.5px;letter-spacing:.04em">Rearrange this screen</button>';
   return h+'</div>'}
 function porderNow(){
-  /* the one source of truth for Progress section order — standing
-     joined after layouts were saved, and it LEADS the page (owner
-     call, Sep 2026): where you stand before what you did */
-  const po=(S.lay.porder||['goals','trends','tonnage','lifetime','bb','scan','recovery','bw','bests']).slice();
-  if(po.indexOf('standing')<0)po.unshift('standing');
-  return po}
+  /* the one source of truth for Progress section order. Standing
+     moved to its own page off the drawer (owner call, Sep 2026) —
+     saved layouts that still carry it are filtered here. */
+  return (S.lay.porder||['goals','trends','tonnage','lifetime','bb','scan','recovery','bw','bests'])
+    .filter(k=>k!=='standing')}
 function weekRange(iso){
   const d=new Date(iso);
   if(isNaN(d.getTime())){const t=String(iso);return{start:null,label:t,key:t}}
@@ -15171,6 +15249,7 @@ function render(){
   else if(S.view==='pattern')body=patDetail(S.patView);
   else if(S.view==='rundetail')body=runDetail(S.runView);
   else if(S.view==='report')body=viewReport();
+  else if(S.view==='standing')body=viewStanding();
   else if(S.view==='chart')body=viewChart();
   else if(S.view==='own')body=viewOwn();
   else if(S.view==='ownreview')body=viewOwnReview();
@@ -15202,9 +15281,9 @@ function render(){
       '<div style="height:1px;background:var(--line);margin:10px 13px"></div>'+
       drow('findings','Patterns in your data',I2.spark)+
       drow('collection','The collection',I2.star)+
+      drow('standing','Where you stand',I2.trend)+
       drow('history','History',I2.save)+
       drow('history','Import your data',I2.load,'intakeOpen')+
-      drow('data','Allena \u2014 AI coach',I2.ai,'drawerAi','')+
       drow('data','Report a problem',I2.bug,'drawerReport','');
     const recents=(S.chats||[]).slice(0,6);
     if(recents.length)rows+='<p style="color:var(--faint);font-size:12.5px;margin:16px 13px 4px">Recents</p>'+
