@@ -554,7 +554,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='64b34e';  // stamped by tools/build.py with the content hash
+const BUILD_ID='bb007d';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -6824,8 +6824,16 @@ function healthConnectCard(){
       '<p class="mono" style="flex:1;font-size:9.5px;color:var(--amber);letter-spacing:.06em">CONNECT APPLE HEALTH</p></div>'+
       '<p class="disp gradhead" style="font-size:22px;line-height:1.15;margin-top:9px">Allena is a different app once your data flows in</p>'+
       '<p style="color:var(--dim);font-size:13px;line-height:1.6;margin-top:6px">Your runs, sleep, heart rate and steps turn on the finds nothing else can make \u2014 how your sleep moves your lifts, what your heart says about recovery. If your Garmin, Apple Watch, Strava or MyFitnessPal already sync to Apple Health, Allena reads it all. Two taps.</p>'+
-      '<button data-a="healthConnectGo" class="big disp mt" style="background:var(--amber);color:var(--bg);font-size:15px">Connect Apple Health</button>'+
-      (dismissed?'':'<button data-a="healthConnectLater" class="btn" style="margin-top:8px;color:var(--faint);font-size:12px">I\u2019ll do it later</button>')+
+      (S.hcChecking
+        ?'<div class="big disp mt" style="background:var(--raised);color:var(--dim);font-size:14px;display:flex;align-items:center;justify-content:center;gap:9px">'+
+         '<span style="width:13px;height:13px;border-radius:13px;border:2px solid var(--line);border-top-color:var(--amber);display:inline-block;animation:spin .7s linear infinite"></span>Listening for Health\u2026</div>'
+        :'<button data-a="healthConnectGo" class="big disp mt" style="background:var(--amber);color:var(--bg);font-size:15px">Connect Apple Health</button>')+
+      (S.hcStuck?'<div class="card mt" style="padding:12px 14px;border-color:var(--amber)">'+
+        '<p style="color:var(--dim);font-size:12.5px;line-height:1.6">Nothing arrived \u2014 iOS only shows the Health permission sheet once, ever. If it was missed or denied:</p>'+
+        '<p style="color:var(--dim);font-size:12.5px;line-height:1.8;margin-top:6px">1. Open the <b style="color:var(--text)">Settings</b> app<br>2. <b style="color:var(--text)">Apps \u2192 Health \u2192 Data Access &amp; Devices \u2192 Allena</b><br>3. <b style="color:var(--text)">Turn All Categories On</b>, then reopen Allena</p>'+
+        '<p style="color:var(--faint);font-size:11px;line-height:1.55;margin-top:8px">Also worth checking: your watch\u2019s app (Garmin Connect etc.) is actually writing into Apple Health \u2014 open Health and look for recent workouts.</p>'+
+        '<button data-a="hcStuckHide" class="btn mt" style="color:var(--faint);font-size:11.5px">Got it</button></div>'
+       :dismissed?'':'<button data-a="healthConnectLater" class="btn" style="margin-top:8px;color:var(--faint);font-size:12px">I\u2019ll do it later</button>')+
       '</div>'
   }catch(e){return ''}}
 function inWrapper(){
@@ -17320,7 +17328,17 @@ function runAction(a,v,t,e){
     case 'suGateGo':if(S.setup)S.setup.gate=false;render();break;
     case 'suGateBack':if(S.setup)S.setup.gate=true;render();break;
     case 'healthConnectGo':{try{if(window.webkit&&window.webkit.messageHandlers&&window.webkit.messageHandlers.allena)window.webkit.messageHandlers.allena.postMessage('sync')}catch(e){}
-      flash('Allow everything on the Health sheet — Allena reads, never writes.');break}
+      /* iOS shows the Health sheet exactly ONCE, ever — if it was
+         already answered (or denied) this tap syncs silently. Check
+         what actually arrives and be honest when nothing does. */
+      S.hcChecking=Date.now();render();
+      flash('If a Health sheet appears, allow everything — Allena reads, never writes.');
+      setTimeout(function(){try{
+        S.hcChecking=null;
+        if(!healthFlowing())S.hcStuck=1;
+        render()}catch(e2){}},7000);
+      break}
+    case 'hcStuckHide':{S.hcStuck=0;const P=notifPrefs();P.hcDismissed=1;notifSave();render();break}
     case 'healthConnectLater':{const P=notifPrefs();P.hcDismissed=1;notifSave();render();
       flash('No rush — the reminder will nudge you. It is the one thing that changes everything.');break}
     case 'signalOpen':{const sg=signalDue();if(sg){S.signalReveal=sg;render()}break}
