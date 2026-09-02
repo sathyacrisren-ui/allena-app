@@ -554,7 +554,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='bb007d';  // stamped by tools/build.py with the content hash
+const BUILD_ID='419b07';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -13861,6 +13861,7 @@ function viewData(){
   const progCount=(S.lib.programs||[]).filter(p=>!p.acl&&!p.rehabProto).length;
   h+=setGroup('Program',[
     setRow(I.prog,'Program library',progCount+' program'+(progCount===1?'':'s'),'Program library'),
+    setRow(I.target,'Personalised program',(S.prof&&S.prof.goal)?'rebuild from new answers':'Allena builds it with you','__setup'),
     setRow(I.own,'Your own block','','Your own block')]);
   {const dc=((S.gar&&S.gar.on)||(S.daily&&S.daily.on)||(S.supp&&S.supp.on));
    h+=setGroup('Tracking',[
@@ -13936,7 +13937,7 @@ function dataRaw(){
      '<p class="mono" style="color:var(--faint);font-size:11.5px;margin-top:4px">'+esc(S.prof.goal+' · '+S.prof.days+' days/wk · '+S.prof.eq)+(restrList(S.prof)?' · '+esc(restrList(S.prof)):'')+'</p></div>'
      :'<p style="color:var(--dim);font-size:13px;margin-top:8px">No profile yet - the app can build a personalised program from a few questions.</p>')+
    ((!S.prof||!S.prof.name)?'<div class="row mt" style="gap:8px"><input data-in="pname" value="" placeholder="Your name (for the welcome line)" autocomplete="off" style="flex:1;min-width:0;background:var(--surface);border:1px solid var(--line);border-radius:10px;color:var(--text);padding:11px;font-size:14px;outline:none"><button data-a="pnameSave" class="pill" style="flex:none">Save</button></div>':'')+
-   '<button data-a="setupOpen" class="btn mt">'+(S.prof&&S.prof.goal?'Edit profile & generate a new block':'Set up a personalised program')+'</button></div>'+
+   '<p style="color:var(--faint);font-size:11.5px;line-height:1.5;margin-top:8px">Building a program from these answers lives under Program \u2192 Personalised program.</p></div>'+
    '<div class="mt2"><p class="eyebrow">Rehab pathway</p>'+
    '<p style="color:var(--faint);font-size:12px;line-height:1.55;margin-top:8px">Turn on anything you are rehabbing. Staged pathways gate progression on criteria; managed protocols have no healing clock and are about loading the tissue well. The Rehab tab appears while at least one is on and disappears when they are all off — nothing is deleted either way.</p>'+
    (function(){
@@ -14078,9 +14079,12 @@ function youPageHtml(){
     '<input data-in="prof.age" value="'+esc(pr.age!=null?pr.age:'')+'" inputmode="numeric" style="width:100%;margin-top:8px;background:var(--surface);border:1px solid var(--line);border-radius:10px;color:var(--text);padding:12px;font-size:15px;outline:none">'+
     '<p class="eyebrow" style="margin-top:14px">Sex</p>'+
     '<div class="row" style="margin-top:8px;gap:8px">'+sexPill('female','Female')+sexPill('male','Male')+sexPill('na','Prefer not to say')+'</div>'+
-    '<div style="margin-top:18px;border-top:1px solid var(--line);padding-top:4px">'+
-    navRow(SET_ICONS.gear,'Account & sync',(function(){try{const a=acct();return (a&&a.refresh)?'Signed in':'Not signed in'}catch(e){return ''}})(),'dsetOpen','Account & sync')+'</div>'+
-    '<p style="color:var(--faint);font-size:11px;line-height:1.55;margin-top:8px">The account is a different thing: it is your identity ACROSS devices — it unlocks the coach without any key, backs up your score card, and is how a new phone (or the TestFlight app) picks up where this one left off.</p>'}
+    (function(){let signed=false,em='';try{const a=acct();signed=!!(a&&a.refresh);em=a&&a.email||''}catch(e){}
+      return '<button data-a="acctOpen" class="card" style="width:100%;text-align:left;padding:15px 16px;margin-top:20px;display:flex;align-items:center;gap:12px;border-color:'+(signed?'var(--greensoft)':'var(--amber)')+'">'+
+      '<span style="flex:1;min-width:0"><span style="display:block;font-size:14.5px;font-weight:600">Account &amp; sync</span>'+
+      '<span class="mono" style="color:'+(signed?'var(--green)':'var(--faint)')+';font-size:10.5px">'+(signed?esc(em||'signed in'):'Not signed in \u2014 tap to set up')+'</span></span>'+
+      '<span class="mono" style="color:var(--faint);font-size:14px;flex:none">\u203a</span></button>'})()+
+    '<p style="color:var(--faint);font-size:11px;line-height:1.55;margin-top:8px">The account is your identity ACROSS devices \u2014 it unlocks the coach without any key, backs up your score card, and is how a new phone picks up where this one left off.</p>'}
 function viewYou(){
   return '<div class="view pad modalrise" style="padding-top:20px">'+
    '<div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">'+
@@ -14088,6 +14092,13 @@ function viewYou(){
    '<h1 class="disp" style="font-size:19px;font-weight:600;flex:1;text-align:center;margin:0">You</h1>'+
    '<span style="width:42px;flex:none"></span></div>'+
    youPageHtml()+'</div>'}
+function viewAcct(){
+  return '<div class="view pad modalrise" style="padding-top:20px">'+
+   '<div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">'+
+   '<button data-a="nav" data-v="you" style="width:42px;height:42px;border-radius:42px;background:var(--surface);border:1px solid var(--line);color:var(--dim);display:flex;align-items:center;justify-content:center;flex:none;font-size:16px">\u2039</button>'+
+   '<h1 class="disp" style="font-size:19px;font-weight:600;flex:1;text-align:center;margin:0">Account &amp; sync</h1>'+
+   '<span style="width:42px;flex:none"></span></div>'+
+   accountSection()+'</div>'}
 function reportPageHtml(){
   return '<p style="color:var(--dim);font-size:13px;line-height:1.6;margin-top:8px">Something broken, confusing, or just not right? One tap opens an email to the developer — Allena fills in what build you are on so you do not have to.</p>'+
     '<button data-a="reportEmail" class="big disp mt" style="background:var(--amber);color:var(--bg);font-size:15px">Email the developer</button>'+
@@ -14887,6 +14898,12 @@ function sheetHtml(){
     if(body==null)return '';
     return wrapSheet(S.sheet.k,'<div style="margin-top:-6px">'+body+'</div>')}
   if(S.sheet.t==='dailyfind'){
+    if(S.dfExtra){const x=S.dfExtra,r=rarityOf(x.rar);
+      return wrapSheet('Allena found another',
+        '<p class="mono" style="font-size:9.5px;color:'+r[1]+';letter-spacing:.08em">\u2726 '+esc(r[2].toUpperCase())+' \u00b7 SURFACED JUST NOW</p>'+
+        '<p class="disp" style="font-size:21px;font-weight:600;line-height:1.25;margin-top:8px">'+esc(x.t)+'</p>'+
+        '<p style="color:var(--dim);font-size:13.5px;line-height:1.6;margin-top:7px">'+esc(x.d)+'</p>'+
+        '<p style="color:var(--faint);font-size:11px;line-height:1.55;margin-top:14px">Banked in the collection. The day keeps looking \u2014 up to five of these when the data genuinely produces them.</p>')}
     const pr=todayProgress(),n=noticedToday(),t=todayState();
     if(S.think&&S.think.key==='df'&&!S.think.done)
       return wrapSheet('Allena found something',thinkPanel('Reading today back'));
@@ -15651,6 +15668,7 @@ function render(){
   else if(S.view==='you')body=viewYou();
   else if(S.view==='signals')body=viewSignals();
   else if(S.view==='guide')body=viewGuide();
+  else if(S.view==='acct')body=viewAcct();
   else if(S.view==='chart')body=viewChart();
   else if(S.view==='own')body=viewOwn();
   else if(S.view==='ownreview')body=viewOwnReview();
@@ -16523,6 +16541,7 @@ function runAction(a,v,t,e){
          underneath (owner-reported, Sep 2026) */
       if(S.sheet&&S.sheet.t==='cutplan'&&S.prev){
         S.cutPlan=null;S.sheet={t:'preview'};render();sheetScrollBack();break}
+      if(S.sheet&&S.sheet.t==='dailyfind')S.dfExtra=null;
       S.sheet=null;render();break}
     case 'exportXlsx':A.exportXlsx();break;
     case 'backup':A.backup();break;
@@ -17911,10 +17930,12 @@ function runAction(a,v,t,e){
     case 'wHealth':{try{if(window.webkit&&window.webkit.messageHandlers&&window.webkit.messageHandlers.allena)
         window.webkit.messageHandlers.allena.postMessage('sync')}catch(e){}
       runAction('wNext');break}
+    case 'acctOpen':{S._navQuiet=1;S.view='acct';render();break}
     case 'meOpen':{S.prof=S.prof||{};lset(K_PROF,S.prof);S.backTo=S.view;S._navQuiet=1;S.view='you';render();break}
     case 'meSex':{S.prof=S.prof||{};S.prof.sex=v;lset(K_PROF,S.prof);vib(8);render();break}
     case 'dsetOpen':{if(v==='__beta'){S.betaFrom=S.view;S.sheet={t:'beta'};render();break}
       if(v==='__report')v='Report a problem';   // the rows pass a token; the chunk key is the title
+      if(v==='__setup'){S.sheet=null;runAction('setupOpen');break}
       S.sheet={t:'dset',k:v};render();break}
     case 'acctSync':acctSync(true);break;
     case 'acctOut':lset(K_ACCT,null);S.acctPending=false;render();
@@ -18077,21 +18098,43 @@ try{if(SANDBOX&&!lget('training-sandbox-v1',null)){
    sequence. Never fabricated — a day with nothing real to show
    stays quiet, which is what keeps the real days believable.
    ══════════════════════════════════════════════════════════ */
+function dfRarestUnseen(){
+  try{
+    const seen=discoverySeen();
+    const RANK={epic:0,rare:1,uncommon:2,common:3};
+    return discoveries().filter(d=>!seen[d.id])
+      .sort((a,b)=>(RANK[a.rar]??3)-(RANK[b.rar]??3))[0]||null}catch(e){return null}}
 function dailyFindDue(){
   try{
     if(!(S.history||[]).length&&!(S.runs||[]).length)return false;
     const t=todayState();
-    if(t.dfShown)return false;
-    const n=noticedToday();
-    if(!n)return false;
-    return !todayState().noticedRepeat}catch(e){return false}}
+    if(!t.dfShown){
+      const n=noticedToday();
+      if(!n)return false;
+      return !todayState().noticedRepeat}
+    /* the day keeps finding (owner call, 3 Sep): up to five reveal
+       moments a day — but ONLY when a genuinely unseen discovery
+       exists, spaced at least 2.5 hours apart. Never fabricated,
+       never withheld: this releases what exists more eagerly, it
+       cannot invent what does not. */
+    if((t.dfN||1)>=5)return false;
+    if(t.dfLast&&Date.now()-t.dfLast<2.5*3600e3)return false;
+    return !!dfRarestUnseen()}catch(e){return false}}
 function dailyFindAsk(){try{
   if(!dailyFindDue())return false;
   if(S.boot!=null){S.dfQueued=true;return false}
   if(S.view==='setup'||S.view==='coach'||S.sess)return false;
   if(S.sheet)return false;                 // never stack on another prompt
   if(morningDue())return false;            // readiness goes first; we take the next open
-  const t=todayState();t.dfShown=true;todaySave(t);
+  const t=todayState();
+  if(t.dfShown){
+    const d=dfRarestUnseen();if(!d)return false;
+    S.dfExtra={t:d.t,d:d.d,rar:d.rar};
+    try{const seen=discoverySeen();seen[d.id]=today();lset('training-disc-v1',seen)}catch(e8){}}
+  else S.dfExtra=null;
+  t.dfShown=true;t.dfN=(t.dfN||1)+(t.dfLast?1:0);t.dfLast=Date.now();
+  if(!t.dfN)t.dfN=1;
+  todaySave(t);
   S.sheet={t:'dailyfind'};try{hapticRun('find')}catch(e7){};vib(12);render();return true}catch(e){return false}}
 function lockIcon(sz){
   return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" style="width:'+(sz||11)+'px;height:'+(sz||11)+'px;flex:none"><rect x="5.5" y="10.5" width="13" height="9" rx="2.5"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5"/></svg>'}
