@@ -516,7 +516,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='91b779';  // stamped by tools/build.py with the content hash
+const BUILD_ID='ae5df8';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -14506,8 +14506,9 @@ function sheetHtml(){
           '<input type="file" accept="image/*" data-pplanphoto="1" style="display:none"'+(S.ppBusy?' disabled':'')+'></label>'
         :'')+
       (S.ppErr?'<p style="color:var(--red);font-size:12px;margin-top:6px">'+esc(S.ppErr)+'</p>':'')+
-      (f.ex.length?'<div class="card mt" style="padding:8px 12px">'+
-        f.ex.map((e,i)=>'<div style="display:grid;grid-template-columns:minmax(0,1fr) 42px 66px 26px;gap:7px;align-items:center;padding:6px 0'+(i?';border-top:1px solid var(--line)':'')+'">'+
+      (f.ex.length?'<div class="card mt" data-draglist="pplan" style="padding:8px 12px">'+
+        f.ex.map((e,i)=>'<div data-dragitem="'+i+'" style="display:grid;grid-template-columns:16px minmax(0,1fr) 40px 62px 24px;gap:6px;align-items:center;padding:6px 0'+(i?';border-top:1px solid var(--line)':'')+'">'+
+          '<span class="mono" style="color:var(--faint);font-size:12px;letter-spacing:1px">⋮⋮</span>'+
           '<input data-ppex="'+i+':n" value="'+esc(e.n)+'" style="background:transparent;border:none;color:var(--text);font-size:13px;padding:6px 0;outline:none;min-width:0">'+
           '<input data-ppex="'+i+':s" value="'+esc(e.s)+'" inputmode="numeric" style="background:var(--surface);border:1px solid var(--line);border-radius:8px;color:var(--dim);font-size:12px;padding:6px 4px;text-align:center;outline:none">'+
           '<input data-ppex="'+i+':r" value="'+esc(e.r)+'" style="background:var(--surface);border:1px solid var(--line);border-radius:8px;color:var(--dim);font-size:12px;padding:6px 4px;text-align:center;outline:none">'+
@@ -15877,6 +15878,7 @@ try{
     // — unless the button itself is the row's drag surface (data-dragok)
     const bt=e.target.closest('button');
     if(bt&&!bt.hasAttribute('data-dragok')&&!it.isSameNode(bt))return;
+    if(e.target.closest('input,textarea,select'))return;   // editing never starts a drag
     const lst=it.closest('[data-draglist]');if(!lst)return;
     const t=e.touches[0];startY=t.clientY;
     timer=setTimeout(function(){
@@ -16160,6 +16162,10 @@ function runAction(a,v,t,e){
       if(!S.openSec[v])S.scrollTo='sec-'+v;      // opening: bring it into view
       else S.scrollTo=null;
       S.openSec[v]=!S.openSec[v];render();break;
+    case 'reorderPplan':{const p9=String(v).split(':'),f9=+p9[0],t9=+p9[1];
+      const ex=(S.pform&&S.pform.ex)||[];
+      if(ex[f9]==null||ex[t9]==null||f9===t9)break;
+      ex.splice(t9,0,ex.splice(f9,1)[0]);vib(10);render();break}
     case 'reorderPlayout':{const p9=String(v).split(':'),f9=+p9[0],t9=+p9[1];
       const o=(typeof porderNow==='function'?porderNow():(S.lay.porder||[]).slice());
       if(o[f9]==null||o[t9]==null||f9===t9)break;
