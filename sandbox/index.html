@@ -522,7 +522,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='6974c1';  // stamped by tools/build.py with the content hash
+const BUILD_ID='fb7362';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -8033,7 +8033,14 @@ function hkDaily(rows){
       if(!/^\d{4}-\d{2}-\d{2}$/.test(k))return;
       const d=st.days[k]=st.days[k]||{};
       ['rhr','hrv','vo2','steps','sleep'].forEach(f=>{
-        if(r[f]!=null&&isFinite(+r[f])&&+r[f]>0){if(d[f]!==+r[f])n++;d[f]=+r[f]}})});
+        if(r[f]!=null&&isFinite(+r[f])&&+r[f]>0){if(d[f]!==+r[f])n++;d[f]=+r[f]}});
+      /* smart scales write bodyMass into Health — it lands in the
+         daily record like a check-in, but a hand-logged weight for
+         that day always outranks the scale's */
+      if(r.bw!=null&&isFinite(+r.bw)&&+r.bw>20&&+r.bw<400){
+        try{S.daily=S.daily||{on:true,days:{}};S.daily.days=S.daily.days||{};
+          const dd=S.daily.days[k]=S.daily.days[k]||{};
+          if(dd.bw==null||dd.bw===''){dd.bw=Math.round(+r.bw*10)/10;lset(K_DAILY,S.daily);n++}}catch(e){}}});
     if(!n)return;
     const ks=Object.keys(st.days).sort();
     while(ks.length>180)delete st.days[ks.shift()];
@@ -8220,7 +8227,7 @@ const SIG_KINDS=[
   {k:'Protein',d:'pr',u:' g',src:'Health nutrition or hand-logged'},
   {k:'Carbs',d:'carb',u:' g',src:'Health nutrition'},
   {k:'Fat',d:'fat',u:' g',src:'Health nutrition'},
-  {k:'Bodyweight',d:'bw',u:' kg',src:'check-ins and scans'}];
+  {k:'Bodyweight',d:'bw',u:' kg',src:'smart scale via Health, check-ins, scans'}];
 function viewSignals(){
   let h='<div class="view pad modalrise" style="padding-top:20px">'+
     '<button data-a="back" class="btn" style="width:auto;padding:8px 14px;color:var(--dim);font-size:12.5px;margin-bottom:14px">\u2039 Back</button>'+
