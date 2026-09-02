@@ -522,7 +522,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='45dbf5';  // stamped by tools/build.py with the content hash
+const BUILD_ID='7483d6';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -13732,6 +13732,13 @@ function youPageHtml(){
     '<div style="margin-top:18px;border-top:1px solid var(--line);padding-top:4px">'+
     navRow(SET_ICONS.gear,'Account & sync',(function(){try{const a=acct();return (a&&a.refresh)?'Signed in':'Not signed in'}catch(e){return ''}})(),'dsetOpen','Account & sync')+'</div>'+
     '<p style="color:var(--faint);font-size:11px;line-height:1.55;margin-top:8px">The account is a different thing: it is your identity ACROSS devices — it unlocks the coach without any key, backs up your score card, and is how a new phone (or the TestFlight app) picks up where this one left off.</p>'}
+function viewYou(){
+  return '<div class="view pad modalrise" style="padding-top:20px">'+
+   '<div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">'+
+   '<button data-a="back" style="width:42px;height:42px;border-radius:42px;background:var(--surface);border:1px solid var(--line);color:var(--dim);display:flex;align-items:center;justify-content:center;flex:none;font-size:16px">\u2039</button>'+
+   '<h1 class="disp" style="font-size:19px;font-weight:600;flex:1;text-align:center;margin:0">You</h1>'+
+   '<span style="width:42px;flex:none"></span></div>'+
+   youPageHtml()+'</div>'}
 function reportPageHtml(){
   return '<p style="color:var(--dim);font-size:13px;line-height:1.6;margin-top:8px">Something broken, confusing, or just not right? One tap opens an email to the developer — Allena fills in what build you are on so you do not have to.</p>'+
     '<button data-a="reportEmail" class="big disp mt" style="background:var(--amber);color:var(--bg);font-size:15px">Email the developer</button>'+
@@ -15258,6 +15265,7 @@ function render(){
   else if(S.view==='rundetail')body=runDetail(S.runView);
   else if(S.view==='report')body=viewReport();
   else if(S.view==='standing')body=viewStanding();
+  else if(S.view==='you')body=viewYou();
   else if(S.view==='chart')body=viewChart();
   else if(S.view==='own')body=viewOwn();
   else if(S.view==='ownreview')body=viewOwnReview();
@@ -17350,7 +17358,7 @@ function runAction(a,v,t,e){
     case 'muscleOpen':S.sheet={t:'muscle',m:v};render();break;
     case 'hkDone':S.hkRes=null;S.sheet=null;render();break;
     case 'betaCopy':{try{navigator.clipboard.writeText(decodeURIComponent(v)).then(()=>flash('Copied \u2014 paste it to Sathya with a screenshot.')).catch(()=>flash('Long-press the text to copy it.'))}catch(e){flash('Long-press the text to copy it.')}break}
-    case 'meOpen':{S.prof=S.prof||{};lset(K_PROF,S.prof);S.sheet={t:'dset',k:'You'};render();break}
+    case 'meOpen':{S.prof=S.prof||{};lset(K_PROF,S.prof);S.backTo=S.view;S._navQuiet=1;S.view='you';render();break}
     case 'meSex':{S.prof=S.prof||{};S.prof.sex=v;lset(K_PROF,S.prof);vib(8);render();break}
     case 'dsetOpen':{if(v==='__beta'){S.betaFrom=S.view;S.sheet={t:'beta'};render();break}
       if(v==='__report')v='Report a problem';   // the rows pass a token; the chunk key is the title
