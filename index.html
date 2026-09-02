@@ -393,7 +393,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='39607e';  // stamped by tools/build.py with the content hash
+const BUILD_ID='c666ac';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -11677,6 +11677,7 @@ function viewHistory(){
               statBox(vol?tonStr(vol):'\u2014','volume')+'</div>'+
             (r.log.length?'<div style="margin-top:10px">'+logLines(r.log,'editHist',r.id)+'</div>':'')+
             '<div class="row mt" style="gap:8px;margin-top:12px">'+
+            (r.run?'':'<button data-a="histAdd" data-v="'+r.id+'" class="btn" style="flex:1;color:var(--dim);font-size:12.5px">+ Add a set</button>')+
             (!r.complete&&!r.run?'<button data-a="resumeHist" data-v="'+r.id+'" class="btn" style="flex:1;border-color:var(--green);color:var(--green);font-size:12.5px">Resume</button>':'')+
             '<button data-a="histEdit" data-v="'+r.id+'" class="btn" style="flex:1;border-color:var(--amber);color:var(--amber);font-size:12.5px">Edit details</button>'+
             '<button data-a="delHist" data-v="'+r.id+'" class="btn" style="flex:1;color:var(--red);font-size:12.5px">Delete</button></div>'+
@@ -14078,6 +14079,19 @@ function sheetHtml(){
     }
     if(S.coach.thread.length)inner+='<button data-a="coachClear" style="width:100%;padding:10px;color:var(--faint);font-size:11.5px;margin-top:6px">Start a new conversation</button>';
     return wrapSheet('Allena',inner)}
+  if(S.sheet.t==='edit'&&S.sheet.scope==='histadd'){
+    /* the forgot-to-start case: append sets a session never captured */
+    const h9=S.history.find(x=>x.id===S.sheet.sid);if(!h9)return '';
+    const names=[...new Set((h9.log||[]).map(l=>String(l.ex)))];
+    return wrapSheet('Add a set · '+esc(h9.dayTitle||'session'),
+      '<p style="color:var(--dim);font-size:12.5px;line-height:1.55">For the work that happened before Allena was opened. It lands in this session, stamped as edited.</p>'+
+      '<input data-in="sheet.exn" value="'+esc(S.sheet.exn||'')+'" list="histexn" placeholder="Exercise" style="margin-top:10px">'+
+      '<datalist id="histexn">'+names.map(n=>'<option value="'+esc(n)+'">').join('')+'</datalist>'+
+      '<div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px;margin-top:10px">'+
+      stepper('sheet.w','Weight',S.sheet.w||'',(UNITS.w==='lb'?5:2.5),uwUnit())+stepper('sheet.r','Reps',S.sheet.r||'',1,'')+'</div>'+
+      '<p style="color:var(--dim);font-size:11px;letter-spacing:.1em;text-transform:uppercase;margin:16px 0 8px">RPE</p>'+
+      rpeGrid('sheet.rpe',S.sheet.rpe==null?null:S.sheet.rpe)+
+      '<button data-a="histAddSave" class="big disp mt" style="background:var(--green);color:#1F1E1D;font-size:16px">Add the set</button>')}
   if(S.sheet.t==='edit'){
     const e=S.sheet.scope==='live'?S.sess.log[S.sheet.i]:(S.history.find(h=>h.id===S.sheet.sid)||{log:[]}).log[S.sheet.i];
     if(!e)return '';
@@ -14645,6 +14659,16 @@ function runAction(a,v,t,e){
     case 'bump':if(!holdIval)doBump(t);break;
     case 'rpe':setPath(t.dataset.k,parseFloat(v));render();break;
     case 'editLive':S.sheet={t:'edit',scope:'live',i:+v};render();break;
+    case 'histAdd':S.sheet={t:'edit',scope:'histadd',sid:v,exn:'',w:'',r:'',rpe:null};render();break;
+    case 'histAddSave':{const sh=S.sheet,h=S.history.find(x=>x.id===sh.sid);if(!h)break;
+      const nm=(sh.exn||'').trim();
+      if(!nm){flash('Name the exercise.');break}
+      if(!(+sh.r>0)){flash('Reps are needed — leave weight empty for bodyweight.');break}
+      const no=(h.log||[]).filter(l=>String(l.ex)===nm).length+1;
+      h.log.push({ex:nm,setNo:no,w:Math.round(uwIn(+sh.w||0)*4)/4,r:+sh.r||0,rpe:sh.rpe});
+      h.edited=today();saveHistory();S.patCache=null;
+      S.sheet={t:'edit',scope:'histadd',sid:sh.sid,exn:nm,w:sh.w,r:'',rpe:null};   // same lift, next set — fast repeats
+      render();flash(nm.replace(/ \u2014 .*/,'')+' \u00d7 set '+no+' added.');break}
     case 'editHist':S.sheet={t:'edit',scope:'hist',sid:t.dataset.sid,i:+v};render();break;
     case 'editSave':{const sh=S.sheet;
       /* a set is reps (weight may be empty — bodyweight) or seconds;
@@ -14653,10 +14677,10 @@ function runAction(a,v,t,e){
       if(!sh.timed&&!(+sh.r>0)){flash('Reps are needed — leave weight empty for bodyweight, or delete the set instead.');break}
       const patch=sh.timed?{secs:+sh.secs||0}:{w:Math.round(uwIn(+sh.w||0)*4)/4,r:+sh.r||0,rpe:sh.rpe};
       if(sh.scope==='live'){Object.assign(S.sess.log[sh.i],patch);upsert(record(S.sess.phase==='done'));persistActive()}
-      else{const h=S.history.find(x=>x.id===sh.sid);if(h){Object.assign(h.log[sh.i],patch);saveHistory()}}
+      else{const h=S.history.find(x=>x.id===sh.sid);if(h){Object.assign(h.log[sh.i],patch);h.edited=today();saveHistory()}}
       S.sheet=null;render();break}
     case 'editDelete':{const sh=S.sheet,h=S.history.find(x=>x.id===sh.sid);
-      if(h){h.log.splice(sh.i,1);saveHistory()}S.sheet=null;render();break}
+      if(h){h.log.splice(sh.i,1);h.edited=today();saveHistory()}S.sheet=null;render();break}
     case 'openHist':S.open=S.open===v?null:v;render();break;
     case 'delHist':S.sheet={t:'delsession',id:v};render();break;
     case 'histEdit':{const r=S.history.find(x=>x.id===v);if(!r)break;
