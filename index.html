@@ -407,7 +407,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='fb313d';  // stamped by tools/build.py with the content hash
+const BUILD_ID='3e0c2b';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -7203,6 +7203,17 @@ function notifPlan(){
         items.push({id:'rv'+tk9,ts:Math.round(at730/1000),title:'Allena',
           body:n===1?'One find surfaced today — tonight’s reveal is ready.'
             :n+' finds surfaced today — tonight’s reveal is ready.'})}}catch(e){}}
+  /* the honest reachable-find nudge (owner call, 3 Sep, reframed): NOT
+     'go run to unlock' as blind bait — only when a find is genuinely
+     one action away, and it names the real thing. Fires at most one a
+     day, afternoon. */
+  if(P.reveal){try{
+    const W=(typeof watchList==='function')?watchList():[];
+    const near=W.find(w=>w.need-w.have===1);
+    if(near){const at=new Date(today()+'T15:30:00').getTime();
+      if(at>Date.now()+60000)
+        items.push({id:'nf'+today(),ts:Math.round(at/1000),title:'Allena',
+          body:'One session from unlocking \u201c'+String(near.t).slice(0,50)+'\u201d \u2014 today\u2019s the day.'})}}catch(e){}}
   if(P.quest){const d=new Date();const dow=(d.getDay()+6)%7;
     const mon=dayKey(new Date(Date.now()+(7-dow)*864e5));
     items.push({id:'q'+mon,ts:at(mon,9,0),title:'Allena',body:'A new quest is up for the week.'})}
@@ -9171,6 +9182,17 @@ function bankList(){
   const bank=discBank();
   return Object.keys(bank).map(k=>Object.assign({id:k},bank[k]))
     .sort((a,b)=>(b.found||'').localeCompare(a.found||''))}
+const FIND_PTS={common:5,uncommon:12,rare:30,epic:75};
+function findPoints(){
+  /* the collector's score — rarer finds pay more, so chasing the
+     obscure ones is chasing more data (owner call, 3 Sep). Pure
+     information reward: never buyable, never inflatable. */
+  try{return bankList().reduce((a,d)=>a+(FIND_PTS[d.rar]||5),0)}catch(e){return 0}}
+function findRank(n){
+  const R=[[0,'Curious'],[150,'Collector'],[500,'Archivist'],[1200,'Cartographer'],
+    [2800,'Scholar of your own body'],[6000,'Nothing escapes you']];
+  let cur=R[0],nx=null;R.forEach((x,i)=>{if(n>=x[0]){cur=x;nx=R[i+1]||null}});
+  return{name:cur[1],floor:cur[0],next:nx?nx[0]:null,nextName:nx?nx[1]:null}}
 function bankStats(){
   const l=bankList(),by={};
   l.forEach(d=>{by[d.tag||'record']=(by[d.tag||'record']||0)+1});
@@ -9204,6 +9226,16 @@ function viewCollection(){
    '<button data-a="back" class="btn" style="width:auto;padding:8px 14px;color:var(--dim);font-size:12.5px;margin-bottom:14px">\u2039 Back</button>'+
    '<h1 class="disp" style="font-size:25px;font-weight:600">Everything Allena has found</h1>'+
    '<p style="color:var(--dim);font-size:13px;line-height:1.6;margin-top:8px">Kept with the numbers they had the day they were found. Beating a record does not erase it.</p>'+
+   (function(){const fp=findPoints(),rk=findRank(fp);
+     return '<div class="card mt2" style="padding:15px 16px">'+
+       '<div style="display:flex;align-items:baseline;justify-content:space-between">'+
+       '<span class="disp gradhead" style="font-size:26px">'+fp.toLocaleString()+'</span>'+
+       '<span class="mono" style="font-size:10px;color:var(--amber);letter-spacing:.06em">'+esc(rk.name.toUpperCase())+'</span></div>'+
+       '<p class="mono" style="font-size:9px;color:var(--faint);letter-spacing:.05em;margin-top:2px">DISCOVERY POINTS</p>'+
+       (rk.next?'<div style="height:5px;border-radius:5px;background:var(--line);overflow:hidden;margin-top:10px">'+
+         '<div class="an-bar" style="height:5px;width:'+Math.min(100,Math.round((fp-rk.floor)/(rk.next-rk.floor)*100))+'%;background:var(--amber)"></div></div>'+
+         '<p class="mono" style="font-size:9px;color:var(--faint);margin-top:5px">'+(rk.next-fp)+' to '+esc(rk.nextName)+' \u00b7 epic +75 \u00b7 rare +30 \u00b7 uncommon +12</p>':'')+
+       '</div>'})()+
    '<div class="row mt2" style="gap:12px">'+
      bigNum(st.total,'found')+
      bigNum(st.cats+'/'+st.catTotal,'categories')+
