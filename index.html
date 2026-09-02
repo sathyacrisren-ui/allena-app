@@ -393,7 +393,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='ff79be';  // stamped by tools/build.py with the content hash
+const BUILD_ID='f3ef16';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -3319,6 +3319,7 @@ function noticedPool(){
         const when=new Date(Date.now()+weeksLeft*7*864e5);
         add('Session '+next+' lands around '+when.toLocaleDateString(undefined,{month:'long',year:'numeric'}),
           'You are at '+n+', averaging '+(Math.round(rate*10)/10)+' a week since '+fmtDate(first.date)+'. At your own pace — no deadline, just the shape of the road.')}}}catch(e){}
+  try{if(typeof healthNoticed==='function')healthNoticed().forEach(x=>{if(x.t&&x.d)out.push({t:x.t,d:x.d,tier:1})})}catch(e){}
   return out}
 function noticedToday(){
   const pool=noticedPool();
@@ -7558,6 +7559,7 @@ function discoveries(){
       if(pct>=3)add('uncommon','Momentum on '+b+' · '+monthName(ymNow),
         b+' is moving — the estimated max is up about '+pct+'% on the three weeks before. Whatever this block is doing, it is working.','record')})
   }catch(e){}
+  try{if(typeof healthDiscoveries==='function')healthDiscoveries().forEach(d9=>D.push(d9))}catch(e){}
   return D}
 function discoverySeen(){return S.discSeen||(S.discSeen=lget('training-disc-v1',{}))}
 function markDiscoveries(){
@@ -7683,6 +7685,139 @@ function treeStage(t){
 /* seasonal palette (prompt 4): only the leaves change, and subtly —
    colour still means one thing, so blossom stays amber and the
    trunk keeps the tier colour. Southern-hemisphere months. */
+/* ══ the body-signals engine (owner call, 2 Sep) ═════════════
+   Everything Apple Health can say about the body between
+   sessions — resting HR, HRV, sleep, VO₂max, steps — mined for
+   the finds no single-domain app can make, because only Allena
+   holds these against the training on the other side. Every
+   find cites its numbers; the care-toned lines (an RHR spike)
+   advise rest, never diagnose. */
+const K_HKD='training-hkdaily-v1';
+function hkDailyStore(){return S.hkd||(S.hkd=lget(K_HKD,{days:{}}))}
+function hkDaily(rows){
+  try{
+    if(typeof rows==='string')rows=JSON.parse(rows);
+    if(!Array.isArray(rows))return;
+    const st=hkDailyStore();let n=0;
+    rows.forEach(r=>{
+      const k=String(r.date||'').slice(0,10);
+      if(!/^\d{4}-\d{2}-\d{2}$/.test(k))return;
+      const d=st.days[k]=st.days[k]||{};
+      ['rhr','hrv','vo2','steps','sleep'].forEach(f=>{
+        if(r[f]!=null&&isFinite(+r[f])&&+r[f]>0){if(d[f]!==+r[f])n++;d[f]=+r[f]}})});
+    if(!n)return;
+    const ks=Object.keys(st.days).sort();
+    while(ks.length>180)delete st.days[ks.shift()];
+    lset(K_HKD,st);render()
+  }catch(e){}}
+try{window.hkDaily=hkDaily}catch(e){}
+function hkdSeries(f,days){
+  const st=hkDailyStore(),cut=dayKey(new Date(Date.now()-(days||90)*864e5));
+  return Object.keys(st.days).filter(k=>k>=cut&&st.days[k][f]!=null)
+    .sort().map(k=>({date:k,v:st.days[k][f]}))}
+function hkdMed(a){if(!a.length)return null;const s9=a.slice().sort((x,y)=>x-y);return s9[Math.floor(s9.length/2)]}
+function healthDiscoveries(){
+  const D=[];
+  const add=(rar,t,d,tag)=>D.push({rar:rar,t:t,d:d,tag:tag||'signal',id:t});
+  try{
+    const ym=today().slice(0,7),mn=monthName(ym);
+    /* THE find: sleep × strength — the cross no one else can make */
+    try{
+      const st=hkDailyStore();
+      const good=[],poor=[];
+      (S.history||[]).forEach(h=>{
+        if(!h.complete||h.run)return;
+        const dk=String(h.date).slice(0,10);
+        const night=(st.days[dk]||{}).sleep;
+        if(night==null)return;
+        let best=0;h.log.forEach(l=>{if(l.w>0&&l.r>0)best=Math.max(best,e1rm(l.w,l.r))});
+        if(!best)return;
+        if(night>=420)good.push(best);else if(night<360)poor.push(best);});
+      if(good.length>=4&&poor.length>=4){
+        const avg=a=>a.reduce((x,y)=>x+y,0)/a.length;
+        const pct=Math.round((avg(good)/avg(poor)-1)*100);
+        if(pct>=3)add('epic','You lift about '+pct+'% stronger on sleep',
+          'Across '+good.length+' sessions after 7+ hour nights and '+poor.length+' after short ones, your best sets run '+pct+'% higher rested. '+
+          'That is your own body saying sleep is training.','signal')}}catch(e){}
+    /* sleep streaks — showing up for the pillow */
+    try{
+      const sl=hkdSeries('sleep',40);let run=0,best=0;
+      sl.forEach(x=>{run=x.v>=420?run+1:0;best=Math.max(best,run)});
+      if(best>=5)add(best>=14?'epic':best>=7?'rare':'uncommon',
+        best+' nights of 7+ hours running',
+        'Sleep is the recovery the model cannot see any other way — and '+best+' straight nights of it is rarer than any lifting streak.','signal')}catch(e){}
+    /* resting HR trend — the engine idling cheaper */
+    try{
+      const r=hkdSeries('rhr',60);
+      if(r.length>=21){
+        const now9=hkdMed(r.slice(-7).map(x=>x.v)),before=hkdMed(r.slice(0,-14).map(x=>x.v));
+        if(now9&&before&&before-now9>=3)
+          add('rare','Resting heart rate down '+Math.round(before-now9)+' bpm · '+mn,
+            'This week idles at ~'+Math.round(now9)+' bpm against ~'+Math.round(before)+' earlier — the classic signature of a growing aerobic base.','signal')}}catch(e){}
+    /* HRV × rest days — recovery visible in the nervous system */
+    try{
+      const st=hkDailyStore();
+      const trained={};(S.history||[]).forEach(h=>{if(h.complete)trained[String(h.date).slice(0,10)]=1});
+      const after=[],other=[];
+      Object.keys(st.days).forEach(k=>{
+        const v=st.days[k].hrv;if(v==null)return;
+        const prev=dayKey(new Date(new Date(k+'T12:00')-864e5));
+        (trained[prev]?other:after).push(v)});
+      if(after.length>=5&&other.length>=5){
+        const a9=hkdMed(after),o9=hkdMed(other);
+        if(a9&&o9&&(a9/o9-1)>=0.08)
+          add('rare','HRV runs '+Math.round((a9/o9-1)*100)+'% higher after rest days',
+            'Median '+Math.round(a9)+' ms against '+Math.round(o9)+' ms the morning after training — your nervous system keeps honest books on recovery.','signal')}}catch(e){}
+    /* VO2max — Apple's own engine estimate, moving */
+    try{
+      const v=hkdSeries('vo2',90);
+      if(v.length>=2){
+        const first=v[0].v,last=v[v.length-1].v;
+        if(last-first>=0.5)add('rare','VO₂max up '+(Math.round((last-first)*10)/10)+' · '+mn,
+          'Apple’s estimate has climbed from '+first+' to '+last+' — an estimate, but a moving one, and it moves on real work.','signal')}}catch(e){}
+    /* steps — the quiet volume */
+    try{
+      const sp=hkdSeries('steps',30);let run=0,best=0;
+      sp.forEach(x=>{run=x.v>=10000?run+1:0;best=Math.max(best,run)});
+      if(best>=5)add('uncommon',best+' days over 10,000 steps running',
+        'The training between the training. It shows up in recovery whether or not it shows up anywhere else.','signal')}catch(e){}
+    /* protein consistency (Health-synced macros) */
+    try{
+      const dd=(S.daily&&S.daily.days)||{};
+      const bw=(function(){const ks=Object.keys(dd).filter(k=>dd[k].bw!=null).sort();
+        return ks.length?dd[ks[ks.length-1]].bw:null})();
+      const target=bw?Math.round(bw*1.6):120;
+      const ks=Object.keys(dd).sort().slice(-30);
+      let run=0,best=0;
+      ks.forEach(k=>{const p9=dd[k].pr;run=(p9!=null&&p9>=target)?run+1:0;best=Math.max(best,run)});
+      if(best>=5)add(best>=10?'rare':'uncommon','Protein showed up '+best+' days running',
+        best+' straight days at or over ~'+target+' g'+(bw?' (1.6 g/kg of your logged weight)':'')+'. Muscle is built at the table as much as under the bar.','signal')}catch(e){}
+  }catch(e){}
+  return D}
+function healthNoticed(){
+  /* tier-1 daily-find lines from the signals — fresh, specific, caring */
+  const out=[];
+  const add=(t,d)=>out.push({t:t,d:d,tier:1});
+  try{
+    const st=hkDailyStore(),tk=today();
+    const d0=st.days[tk]||{};
+    const r=hkdSeries('rhr',30).map(x=>x.v);
+    const base=hkdMed(r.slice(0,-1));
+    if(d0.rhr&&base&&d0.rhr>=base+8)
+      add('Your resting heart rate is '+Math.round(d0.rhr-base)+' above your normal',
+        '~'+Math.round(d0.rhr)+' bpm against your usual ~'+Math.round(base)+'. That pattern usually precedes getting run down — an early night is worth more than a session today. Not a diagnosis; just your own baseline talking.');
+    const sl=hkdSeries('sleep',7).map(x=>x.v);
+    const sl30=hkdSeries('sleep',30).map(x=>x.v);
+    if(sl.length>=5&&sl30.length>=15){
+      const w=hkdMed(sl),m=hkdMed(sl30);
+      if(m-w>=45)add('This week is sleeping '+Math.round((m-w))+' minutes under your month',
+        'About '+Math.floor(w/60)+'h'+String(Math.round(w%60)).padStart(2,'0')+' a night against your usual '+Math.floor(m/60)+'h'+String(Math.round(m%60)).padStart(2,'0')+'. Nothing else in your data pays off like closing that gap.')}
+    const yk=dayKey(new Date(Date.now()-864e5));
+    const y=(st.days[yk]||{});
+    if(y.steps&&y.steps>=15000)add(Math.round(y.steps).toLocaleString()+' steps yesterday',
+      'A huge movement day outside training. It is in your recovery picture — legs know, even when the log does not.');
+  }catch(e){}
+  return out}
 function treeSeason(d){
   const m=(d?new Date(d):new Date()).getMonth()+1;
   if(m>=9&&m<=11)return{name:'Spring — fresh leaves',leaf:'#8FBF6E'};
@@ -8822,6 +8957,15 @@ function watchList(){
   {const st9=(typeof predStats==='function')?predStats():{n:0};
    if(st9.n>0||H.length>=3)add('The call ledger',Math.min(5,st9.n),5,
      'Five settled forecasts and the ledger opens — how often Allena is right about you, in the open.',st9.n>=5)}
+  try{if(typeof hkDailyStore==='function'){
+    const st9=hkDailyStore();
+    const nights=Object.keys(st9.days).filter(k=>st9.days[k].sleep!=null).length;
+    const rdays=Object.keys(st9.days).filter(k=>st9.days[k].rhr!=null).length;
+    if(nights>0||rdays>0){
+      add('The sleep–strength read',Math.min(8,nights),8,
+        'Eight nights of sleep beside your sessions and Allena can say what rest is worth to your top sets — in your numbers, not a study\u2019s.',nights>=8);
+      add('A resting-heart baseline',Math.min(14,rdays),14,
+        'Fourteen mornings of resting HR and a high day means something — your normal, not the population\u2019s.',rdays>=14)}}}catch(e){}
   if(S.runOn){const hrRuns=R.filter(r=>r.hr>0&&r.km>=3).length;
    add('The engine number',Math.min(6,hrRuns),6,
      'Six runs with heart rate and Allena can measure your aerobic engine itself — speed per heartbeat, not just pace.',hrRuns>=6)}
@@ -8929,6 +9073,7 @@ const DISC_CATALOG=[
  ['quest','Quests','Weekly challenges taken on and finished.','Accept a weekly quest and see it through.'],
  ['insight','Deep reads','What the model found between your numbers.','Run a deep read from Findings.'],
  ['call','Called shots','Allena\'s forecasts, settled by what you did.','Train on a day Allena has made a call.'],
+ ['signal','Body signals','Heart, sleep, engine — what the body says between sessions.','Sync a watch through Apple Health.'],
  ['timing','Timing','When in the day and week your training goes best.','Log effort across different days and times.'],
  ['block','Blocks','How one block compares with the last.','Finish a block and start another.'],
  ['session','Sessions','The outliers — longest, hardest, biggest.','Train.'],
