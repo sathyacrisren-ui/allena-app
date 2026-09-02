@@ -407,7 +407,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='8297bd';  // stamped by tools/build.py with the content hash
+const BUILD_ID='fb313d';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -7207,10 +7207,27 @@ function notifPlan(){
     const mon=dayKey(new Date(Date.now()+(7-dow)*864e5));
     items.push({id:'q'+mon,ts:at(mon,9,0),title:'Allena',body:'A new quest is up for the week.'})}
   return items.filter(x=>x.ts*1000>Date.now())}
+function notifAskCard(){
+  /* the pre-prompt (owner call, 3 Sep): our card asks first, with the
+     why; the iOS sheet only appears when the user says yes — a cold
+     system prompt converts terribly and can never be re-asked. */
+  try{
+    if(!inWrapper())return '';
+    const P=notifPrefs();
+    if(P.asked)return '';
+    return '<div class="card mt" style="padding:16px;border-radius:20px;border-color:var(--amber)">'+
+      '<p class="mono" style="font-size:9.5px;color:var(--amber);letter-spacing:.08em">ALLENA CAN SPEAK UP</p>'+
+      '<p class="disp" style="font-size:17px;font-weight:600;margin-top:6px">Turn on notifications to get told the moment new discoveries are made</p>'+
+      '<p style="color:var(--dim);font-size:12.5px;line-height:1.55;margin-top:5px">Plus your morning call, physio appointment reminders and the monthly wrap. Every one carries a real fact — there is no \u201cwe miss you\u201d, ever, and each kind switches off individually.</p>'+
+      '<div class="row mt" style="gap:10px">'+
+      '<button data-a="notifAskYes" class="big disp" style="flex:2;background:var(--amber);color:#1F1E1D;font-size:14.5px">Turn them on</button>'+
+      '<button data-a="notifAskNo" class="btn" style="flex:1;color:var(--dim)">Not now</button></div></div>'
+  }catch(e){return ''}}
 function notifSync(){
   try{
     if(!inWrapper())return;
     const P=notifPrefs();
+    if(!P.asked){return}                 // the card asks first — no cold iOS prompt
     const badge=(typeof unseenFindings==='function')?unseenFindings():0;
     window.webkit.messageHandlers.allena.postMessage(JSON.stringify(
       {type:'notif',on:!!P.on,items:notifPlan(),badge:P.on?badge:0}))
@@ -11511,6 +11528,7 @@ function todayOrder(){
   // the comeback's offer is an emotional moment — it goes high on arrival
   try{const cb=cbState();add(comebackCard(),cb&&cb.state==='offered'?88:55)}catch(e){add(comebackCard(),55)}
 
+  add((typeof notifAskCard==='function'?notifAskCard():''),86);
   add(apptCard(),85);                                    // renders only day-before / day-of
   add(garCard(),hr<12?82:50);                            // the morning ask fades after noon
   add((typeof watchGymCard==='function'?watchGymCard():''),80);
@@ -15698,7 +15716,10 @@ function runAction(a,v,t,e){
     case 'svGo':svConnect();break;
     case 'suGateGo':if(S.setup)S.setup.gate=false;render();break;
     case 'suGateBack':if(S.setup)S.setup.gate=true;render();break;
-    case 'notifOn':{const P=notifPrefs();P.on=!P.on;notifSave();notifSync();render();
+    case 'notifAskYes':{const P=notifPrefs();P.asked=1;P.on=true;notifSave();notifSync();render();break}
+    case 'notifAskNo':{const P=notifPrefs();P.asked=1;P.on=false;notifSave();render();
+      flash('Any time — Settings \u2192 Notifications turns them on.');break}
+    case 'notifOn':{const P=notifPrefs();P.on=!P.on;P.asked=1;notifSave();notifSync();render();
       if(P.on)flash('iOS will ask permission once — allow it and Allena can speak up.');break}
     case 'notifKind':{const P=notifPrefs();P[v]=!P[v];notifSave();notifSync();render();break}
     case 'fghostOpen':S.sheet={t:'fghost'};render();break;
