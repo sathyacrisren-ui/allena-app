@@ -195,6 +195,13 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
 .scroller{display:flex;gap:8px;overflow-x:auto;overflow-y:hidden;padding-bottom:2px;scrollbar-width:none;-webkit-overflow-scrolling:touch}
 .scroller::-webkit-scrollbar{display:none}
 @keyframes spin{to{transform:rotate(360deg)}}
+#hkPulse{position:fixed;top:calc(env(safe-area-inset-top) + 6px);left:50%;transform:translateX(-50%);
+  z-index:94;display:flex;align-items:center;gap:7px;padding:4px 13px;background:var(--raised);
+  border:1.5px solid rgba(240,238,230,.65);border-radius:999px;box-shadow:0 5px 18px rgba(0,0,0,.45);
+  transition:opacity .35s ease;pointer-events:none;white-space:nowrap}
+body.island #hkPulse{top:38px}
+body.sesslive #hkPulse{top:calc(env(safe-area-inset-top) + 40px)}
+body.island.sesslive #hkPulse{top:72px}
 @keyframes modalrise{from{transform:translateY(5.5%);opacity:0}to{transform:none;opacity:1}}
 .modalrise{animation:modalrise .32s cubic-bezier(.22,1,.36,1) both}
 @keyframes pillpop{0%{transform:translateX(-50%) scale(.45);opacity:0}60%{transform:translateX(-50%) scale(1.06)}100%{transform:translateX(-50%) scale(1);opacity:1}}
@@ -352,6 +359,28 @@ try{
   window.addEventListener('pageshow',_is);
   document.addEventListener('visibilitychange',_is);
 }catch(e){}
+/* the Health pulse (owner call, Sep 2026; white, live-pill style):
+   a small capsule appears while Apple Health hands data over, then
+   resolves to how much landed. Direct DOM — render never touches it. */
+let _hkPEl=null,_hkPT=null,_hkPN=0;
+function hkPulse(n){
+  try{
+    if(typeof inWrapper==='function'&&!inWrapper())return;
+    if(document.getElementById('bootHost'))return;
+    _hkPN+=(n||0);
+    if(!_hkPEl){_hkPEl=document.createElement('div');_hkPEl.id='hkPulse';
+      _hkPEl.innerHTML='<span style="width:11px;height:11px;border-radius:11px;border:1.5px solid var(--line);border-top-color:var(--text);display:inline-block;animation:spin .7s linear infinite"></span>'+
+        '<span class="mono" style="font-size:11px;font-weight:700;letter-spacing:.06em;color:var(--text)">HEALTH</span>';
+      document.body.appendChild(_hkPEl)}
+    clearTimeout(_hkPT);_hkPT=setTimeout(hkPulseEnd,1500)}catch(e){}}
+function hkPulseEnd(){
+  try{
+    const el=_hkPEl,n=_hkPN;_hkPEl=null;_hkPN=0;
+    if(!el)return;
+    if(n>0){el.innerHTML='<span class="mono" style="font-size:11px;font-weight:700;color:var(--green)">\u2713</span>'+
+      '<span class="mono" style="font-size:11px;font-weight:700;letter-spacing:.06em;color:var(--text)">'+n+' NEW</span>';
+      setTimeout(function(){el.style.opacity='0';setTimeout(function(){try{el.remove()}catch(e){}},400)},1700)}
+    else{el.style.opacity='0';setTimeout(function(){try{el.remove()}catch(e){}},400)}}catch(e){}}
 const K_THEME='training-theme-v1';
 function applyTheme(){try{
   const t=lget(K_THEME,'system');
@@ -522,7 +551,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='56b1a1';  // stamped by tools/build.py with the content hash
+const BUILD_ID='c87539';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -6813,6 +6842,7 @@ function hkNative(list){
   try{
     if(typeof list==='string')list=JSON.parse(list);
     if(!Array.isArray(list))return;
+    try{hkPulse(0)}catch(e9){}
     const out=[];
     list.forEach(w=>{
       const actName=String(w.act||'').replace('HKWorkoutActivityType','');
@@ -6835,6 +6865,7 @@ function hkNative(list){
         id:'hk'+date.replace(/-/g,'')+'t'+time.replace(':','')})});
     if(!out.length)return;
     const res=hkImport({workouts:out,skipped:{}});
+    try{if(res.added)hkPulse(res.added)}catch(e9){}
     if(res.added){flash(res.added+' workout'+(res.added===1?'':'s')+' in from Apple Health.');render()}
   }catch(e){}}
 try{window.hkNative=hkNative}catch(e){}
@@ -7284,6 +7315,7 @@ function hkNutrition(rows){
     if(!Array.isArray(rows)||!rows.length)return;
     S.daily=S.daily||{on:true,days:{}};S.daily.days=S.daily.days||{};
     let n=0;
+    try{hkPulse(0)}catch(e9){}
     rows.forEach(r=>{
       if(!r||!r.date)return;
       const d=S.daily.days[r.date]=S.daily.days[r.date]||{};
@@ -7291,7 +7323,7 @@ function hkNutrition(rows){
       if(r.kcal!=null&&d.kcal==null){d.kcal=Math.round(r.kcal);n++}
       if(r.carb!=null&&d.carb==null){d.carb=Math.round(r.carb);n++}
       if(r.fat!=null&&d.fat==null){d.fat=Math.round(r.fat);n++}});
-    if(n){lset(K_DAILY,S.daily);
+    if(n){lset(K_DAILY,S.daily);try{hkPulse(n)}catch(e9){}
       flash('Nutrition synced from Health — '+rows.length+' days.')}}catch(e){}}
 try{window.hkNutrition=hkNutrition}catch(e){}
 
@@ -8037,6 +8069,7 @@ function hkDaily(rows){
   try{
     if(typeof rows==='string')rows=JSON.parse(rows);
     if(!Array.isArray(rows))return;
+    try{hkPulse(0)}catch(e9){}
     const st=hkDailyStore();let n=0;
     rows.forEach(r=>{
       const k=String(r.date||'').slice(0,10);
@@ -8051,6 +8084,7 @@ function hkDaily(rows){
         try{S.daily=S.daily||{on:true,days:{}};S.daily.days=S.daily.days||{};
           const dd=S.daily.days[k]=S.daily.days[k]||{};
           if(dd.bw==null||dd.bw===''){dd.bw=Math.round(+r.bw*10)/10;lset(K_DAILY,S.daily);n++}}catch(e){}}});
+    try{if(n)hkPulse(n)}catch(e9){}
     if(!n)return;
     const ks=Object.keys(st.days).sort();
     while(ks.length>180)delete st.days[ks.shift()];
@@ -8898,12 +8932,12 @@ function growTree(W,Hh){
      scales with the km behind them. Blossom stays amber everywhere;
      colour still means one thing. */
   const pBlue=(t.runs&&t.km>0)?Math.min(0.5,0.08+t.km/400):0;
-  function branch(x,y,ang,len,wdt,depth,blue){
+  function branch(x,y,ang,len,wdt,depth,blue,si){
     if(depth>maxDepth||len<3||leaves>budget)return;
     if(!blue&&depth===2&&pBlue&&R()<pBlue)blue=true;
     const x2=x+Math.cos(ang)*len,y2=y+Math.sin(ang)*len;
     bd(x2,y2,leafSize+2.6);
-    out+='<line data-tp="'+(depth===0?'trunk':blue?'run':'branch')+'" x1="'+x.toFixed(1)+'" y1="'+y.toFixed(1)+'" x2="'+x2.toFixed(1)+'" y2="'+y2.toFixed(1)+
+    out+='<line data-tp="'+(depth===0?'trunk':blue?'run':'branch')+'"'+(si>=0?' data-si="'+si+'"':'')+' x1="'+x.toFixed(1)+'" y1="'+y.toFixed(1)+'" x2="'+x2.toFixed(1)+'" y2="'+y2.toFixed(1)+
       '" stroke="'+(blue?'#1E9BFF':col)+'" stroke-width="'+Math.max(0.7,wdt).toFixed(2)+'" stroke-linecap="round" opacity="'+
       (0.55+depth*0.06).toFixed(2)+'"/>';
     if(depth>=maxDepth-1||len<leafLen){
@@ -8912,9 +8946,9 @@ function growTree(W,Hh){
         leaves++;
         const isBloom=blossom<t.rare&&R()<0.16;
         if(isBloom){blossom++;
-          out+='<circle data-tp="bloom" cx="'+x2.toFixed(1)+'" cy="'+y2.toFixed(1)+'" r="'+(leafSize+1.4).toFixed(1)+
+          out+='<circle data-tp="bloom" data-bi="'+(blossom-1)+'" cx="'+x2.toFixed(1)+'" cy="'+y2.toFixed(1)+'" r="'+(leafSize+1.4).toFixed(1)+
             '" fill="var(--amber)" opacity=".9"/>'}
-        else out+='<circle data-tp="'+(blue?'leafrun':'leaf')+'" cx="'+x2.toFixed(1)+'" cy="'+y2.toFixed(1)+'" r="'+
+        else out+='<circle data-tp="'+(blue?'leafrun':'leaf')+'" data-li="'+(leaves-1)+'" cx="'+x2.toFixed(1)+'" cy="'+y2.toFixed(1)+'" r="'+
           (leafSize*(0.7+R()*0.6)).toFixed(1)+'" fill="'+(blue?'#7CC4FF':leafCol)+'" opacity="'+(0.45+R()*0.4).toFixed(2)+'"/>'}
       return}
     // how many ways it splits comes from how many lifts you train
@@ -8922,7 +8956,8 @@ function growTree(W,Hh){
     for(let i=0;i<forks;i++){
       const spread=(0.42+R()*0.34);
       const a=ang+(i-(forks-1)/2)*spread+(R()-0.5)*0.18;
-      branch(x2,y2,a,len*(0.66+R()*0.16),wdt*0.68,depth+1,blue)}}
+      branch(x2,y2,a,len*(0.66+R()*0.16),wdt*0.68,depth+1,blue,
+        depth===0?i:(depth===1?(si*3+i+2):si))}}
   if(t.sessions<1&&t.pts<40){
     // nothing logged yet: a seed, and an honest one
     out+='<circle data-tp="seed" cx="'+(W/2)+'" cy="'+(groundY-9)+'" r="7" fill="'+col+'" opacity=".5"/>'+
@@ -8930,7 +8965,7 @@ function growTree(W,Hh){
       '<ellipse cx="'+(W/2+7)+'" cy="'+(groundY-31)+'" rx="6" ry="3.4" fill="'+col+'" opacity=".6" transform="rotate(-24 '+(W/2+7)+' '+(groundY-31)+')"/>';
     return'<svg viewBox="0 0 '+W+' '+Hh+'" style="width:100%;aspect-ratio:'+W+'/'+Hh+';display:block" aria-hidden="true">'+out+'</svg>'}
   branch(W/2,groundY,-Math.PI/2,trunkH,
-    Math.max(1.6,(2+t.sessions*0.06)*(1+Math.min(1.2,t.pts/8000))),0);
+    Math.max(1.6,(2+t.sessions*0.06)*(1+Math.min(1.2,t.pts/8000))),0,false,-1);
 
   const pad=8,vbX=mnX-pad,vbY=mnY-pad,vbW=(mxX-mnX)+pad*2,vbH=(mxY-mnY)+pad*2;
   return'<svg viewBox="'+vbX.toFixed(1)+' '+vbY.toFixed(1)+' '+vbW.toFixed(1)+' '+vbH.toFixed(1)+
@@ -15585,11 +15620,32 @@ setInterval(function(){try{
   const classify=function(x,y,wrap){
     for(const [dx,dy] of [[0,0],[4,0],[-4,0],[0,4],[0,-4],[6,6],[-6,6],[6,-6],[-6,-6]]){
       const el=document.elementFromPoint(x+dx,y+dy);
-      if(el&&el.dataset&&el.dataset.tp)return el.dataset.tp}
+      if(el&&el.dataset&&el.dataset.tp)return{k:el.dataset.tp,el:el}}
     const r=wrap.getBoundingClientRect(),fy=(y-r.top)/r.height;
-    return fy>0.86?'root':fy>0.62?'trunk':'leaf'};
+    return{k:fy>0.86?'root':fy>0.62?'trunk':'leaf',el:null}};
+  const fdate=function(d){try{return fmtDate(d)}catch(e){return String(d||'').slice(0,10)}};
+  /* the SPECIFIC datum (owner call: no two leaves say the same thing) —
+     each leaf index maps deterministically onto a real logged entry */
+  const specific=function(k,el){
+    if(!el||!td)return null;
+    try{
+      if((k==='leaf')&&el.dataset.li!=null&&td._sets.length){
+        const p9=td._sets[(+el.dataset.li*7919)%td._sets.length];
+        return['THIS LEAF',p9.ex+' \u2014 '+(p9.secs?p9.secs+'s':(p9.w!=null?p9.w+' kg':'')+(p9.r?' \u00d7 '+p9.r:''))+' \u00b7 '+fdate(p9.d)+'. One leaf per honest number.']}
+      if(k==='leafrun'&&el.dataset.li!=null&&td._runs.length){
+        const r9=td._runs[(+el.dataset.li*31)%td._runs.length];
+        return['THIS BLUE LEAF','Run '+(r9.km||0)+' km \u00b7 '+(r9.mins||0)+' min \u2014 '+fdate(r9.date)+'.']}
+      if(k==='bloom'&&el.dataset.bi!=null&&td._rare.length){
+        const b9=td._rare[+el.dataset.bi%td._rare.length];
+        return['A BLOSSOM','\u201c'+(b9.t||'a rare find')+'\u201d \u2014 '+(b9.rar||'rare')+', found '+fdate(b9.found)+'.']}
+      if((k==='branch'||k==='run')&&el.dataset.si!=null&&td.lifts&&td.lifts.length){
+        const lf=td.lifts[+el.dataset.si%td.lifts.length];
+        return['THIS LIMB','Grown by '+lf+' \u2014 '+((td.counts&&td.counts[lf])||'?')+' sets of it in the record.']}
+    }catch(e){}
+    return null};
   const show=function(x,y,wrap){
-    const k=classify(x,y,wrap),m=(MSG[k]||MSG.leaf)(td);
+    const c=classify(x,y,wrap),k=c.k;
+    const m=specific(k,c.el)||(MSG[k]||MSG.leaf)(td);
     if(!tipEl){tipEl=document.createElement('div');
       tipEl.style.cssText='position:fixed;z-index:95;max-width:230px;background:var(--raised);border:1px solid var(--line);border-radius:13px;padding:10px 13px;pointer-events:none;box-shadow:0 10px 28px rgba(0,0,0,.5)';
       document.body.appendChild(tipEl)}
@@ -15604,7 +15660,11 @@ setInterval(function(){try{
     if(!wrap)return;
     const t=e.touches[0],x=t.clientX,y=t.clientY;
     tmr=setTimeout(function(){on=true;
-      try{td=treeData()}catch(e2){td={weeks:0,rehab:0,sessions:0,liftCount:0,runs:0,km:0,pts:0,rare:0}}
+      try{td=treeData()}catch(e2){td={weeks:0,rehab:0,sessions:0,liftCount:0,runs:0,km:0,pts:0,rare:0,lifts:[]}}
+      try{td._sets=[];(S.history||[]).filter(h=>h.complete&&!h.run).forEach(h=>(h.log||[]).forEach(l=>{
+          if(l.w!=null||l.r!=null||l.secs!=null)td._sets.push({ex:l.ex,w:l.w,r:l.r,secs:l.secs,d:h.date})}));
+        td._runs=(S.runs||[]).slice().sort((a,b)=>String(a.date).localeCompare(String(b.date)));
+        td._rare=bankList().filter(x=>x.rar==='rare'||x.rar==='epic')}catch(e2){td._sets=[];td._runs=[];td._rare=[]}
       try{haptic('select')}catch(e2){}
       show(x,y,wrap)},260)},{passive:true});
   document.addEventListener('touchmove',e=>{
