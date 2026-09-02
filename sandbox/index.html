@@ -387,7 +387,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='57d1c3';  // stamped by tools/build.py with the content hash
+const BUILD_ID='504cda';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -10907,6 +10907,13 @@ function ghostCard(){
       '<p class="eyebrow" style="margin:0;flex:1">'+(f?'The race':'The ghost')+'</p>'+
       '<span class="mono" style="color:var(--faint);font-size:10px">'+
       (beat?'GHOST BEATEN':g.daysLeft>0?g.daysLeft+' DAY'+(g.daysLeft===1?'':'S')+' LEFT':'LAST DAY')+'</span></div>';
+    /* the live headline: the score moves with every session — the
+       card leads with what changed (owner call, Sep 2026) */
+    if(f){const gap=f.s-g.now;
+      const lead=g.now>f.s?'Ahead of '+esc(f.n)+' — '+g.now+'–'+f.s
+        :g.now===f.s?'Level with '+esc(f.n)+' at '+g.now
+        :esc(f.n)+' leads '+f.s+'–'+g.now+(gap===1?' — one session levels it':'');
+      h+='<p class="disp gradhead" style="font-size:20px;line-height:1.2;margin-top:9px">'+lead+'</p>'}
     if(f)h+='<div style="display:flex;align-items:center;gap:10px;margin-top:12px">'+
       '<span style="display:flex;align-items:center;gap:7px;flex:1">'+
       '<span style="width:30px;height:30px;border-radius:30px;background:var(--green);color:#12210f;font-weight:800;font-size:13px;display:inline-flex;align-items:center;justify-content:center">'+esc(name.charAt(0).toUpperCase())+'</span>'+
@@ -10955,11 +10962,11 @@ function viewToday(){
     '<span style="flex:1;font-size:12px;color:var(--dim)">Sample data is loaded so you can see the trends — tap to remove it and start clean.</span></button>';
   h+=garCard();
   h+=verdictCard();
+  h+=ghostCard();
   h+=(typeof wrapCard==='function'?wrapCard():'');
   h+=apptCard();
   h+=comebackCard();
   h+=sessionCard();
-  h+=ghostCard();
   h+=unlockCard();
   h+=newFindsCard();
   h+='<div class="row mt" style="gap:10px">'+dashTiles()+'</div>';
