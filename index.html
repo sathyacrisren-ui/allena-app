@@ -72,6 +72,11 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
 @keyframes anTick{0%{stroke-dashoffset:28}100%{stroke-dashoffset:0}}
 @keyframes anBreathe{0%,100%{opacity:.55}50%{opacity:1}}
 .an-breathe{animation:anBreathe 2.6s ease-in-out infinite}
+@keyframes shineSweep{0%{transform:translateX(-120%) skewX(-18deg)}100%{transform:translateX(240%) skewX(-18deg)}}
+.an-shine::after{content:'';position:absolute;top:0;bottom:0;width:45%;left:0;
+  background:linear-gradient(105deg,transparent,rgba(240,238,230,.14),transparent);
+  animation:shineSweep 1.6s ease-out .35s 2;pointer-events:none}
+@media (prefers-reduced-motion:reduce){.an-shine::after{animation:none;display:none}}
 @keyframes ceremony{0%{box-shadow:0 0 0 0 rgba(232,229,220,.35)}70%{box-shadow:0 0 34px 10px rgba(232,229,220,.12)}100%{box-shadow:0 0 22px 4px rgba(232,229,220,.10)}}
 .an-ceremony{animation:ceremony 1.4s ease-out forwards}
 @media (prefers-reduced-motion:reduce){.an-ceremony{animation:none}}
@@ -237,7 +242,16 @@ function ensureHaptic(){if(hapticEl)return hapticEl;
   return hapticEl}
 function iosTick(){const h=ensureHaptic();if(!h)return;
   try{h.i.click()}catch(e){try{h.l.click()}catch(e2){}}}
-const vib=p=>{let ok=false;try{ok=!!(navigator.vibrate&&navigator.vibrate(p))}catch(e){}if(!ok)iosTick()};
+const haptic=kind=>{try{
+  if(window.webkit&&window.webkit.messageHandlers&&window.webkit.messageHandlers.allena){
+    window.webkit.messageHandlers.allena.postMessage(JSON.stringify({type:'haptic',kind:kind}));return true}
+  }catch(e){}return false};
+const vib=p=>{
+  /* real haptics in the wrapper (owner call, 2 Sep — 'Duolingo's
+     haptics are so nice'): patterns map to UIKit generators; the web
+     vibration API stays as the non-wrapper fallback */
+  if(haptic(Array.isArray(p)?'reveal':p>=25?'heavy':p>=15?'medium':'light'))return;
+  let ok=false;try{ok=!!(navigator.vibrate&&navigator.vibrate(p))}catch(e){}if(!ok)iosTick()};
 
 const mk=(reps,rpes,w=null)=>rpes.map(r=>({w,reps,rpe:r}));
 const dl=(reps,w=null,n=2)=>Array.from({length:n},()=>({w,reps,rpe:6}));
@@ -393,7 +407,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='f3ef16';  // stamped by tools/build.py with the content hash
+const BUILD_ID='820377';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -1318,6 +1332,7 @@ A.preview=(di,pid)=>{const p=pid?S.lib.programs.find(x=>x.id===pid):activeProgSa
       if(dm.ms.some(m=>(hits[m]||0)>=1)){e.keep=false;e.doseHeld=true}})}catch(e2){}
   S.prev={pid:p.id,di:+di,wk:wk,ex:ex,mode:(cutHere.length?null:'full')};S.sheet={t:'preview'};render()};
 A.start=di=>{
+  try{A._lv0=dpLevel(dataPoints().total).lv}catch(e){A._lv0=null}
   /* one live session at a time (owner call, Sep 2026): starting another
      while one is minimized would silently clobber it — return to the
      live one instead */
@@ -1382,6 +1397,7 @@ A.finish=()=>{S.holdWait=false;const c=S.sess.sets[S.sess.idx],p=lastFor(c.ex,c.
   persistActive();render()};
 A.commit=(confirmed)=>{const s=S.sess,c=s.sets[s.idx],timed=!!c.secs;
   if(timed?!(+S.draft.secs>0):(S.draft.rpe==null||!S.draft.r))return;
+  try{haptic('light')}catch(e){}
   const e={ex:c.ex,setNo:c.setNo,targetW:c.targetW,targetReps:c.targetReps,targetRpe:c.targetRpe};
   if(timed){e.secs=+S.draft.secs;e.perSide=c.perSide;e.w=0;e.r=0;e.rpe=S.draft.rpe}
   else{e.w=uwIn(+S.draft.w||0);e.r=+S.draft.r||0;e.rpe=S.draft.rpe}
@@ -3009,6 +3025,33 @@ function checkAvg(field,days){
    it noticed something they did not.
    ══════════════════════════════════════════════════════════ */
 function todayKey(){return 'training-today-'+today()}
+
+async function pplanPhotoParse(dataUrl){
+  /* the physio's sheet, photographed at the appointment — parsed into
+     the plan builder for the human to check before saving. Timed holds
+     come through as '30s'; nothing saves without review. */
+  try{
+    S.ppErr=null;S.ppBusy=true;render();
+    const m=dataUrl.match(/^data:(image\/[a-z]+);base64,(.+)$/i);
+    if(!m)throw new Error('not an image');
+    const res=await claudeFetch({model:S.ai.model,max_tokens:2000,
+      system:'You read a physiotherapist\'s exercise sheet from a photo. Return ONLY JSON: {"ex":[{"n":"Exercise name","s":3,"r":"10"}]} — "s" is sets (number), "r" is reps as a string ("10","8-12") OR a timed hold like "30s" or "30s each side". Include every exercise you can read. No commentary.',
+      messages:[{role:'user',content:[{type:'image',source:{type:'base64',media_type:m[1],data:m[2]}},{type:'text',text:'Read this physio plan.'}]}]});
+    const j=await res.json();
+    const txt=((j.content||[])[0]||{}).text||'';
+    const jm=txt.match(/\{[\s\S]*\}/);
+    if(!jm)throw new Error('could not read the sheet — try a straighter, brighter photo');
+    const o=JSON.parse(jm[0]);
+    const rows=(o.ex||[]).filter(e=>e&&e.n).map(e=>{
+      const tm=(typeof pplanTimed==='function')?pplanTimed(String(e.r||'')):null;
+      return tm?{n:String(e.n).slice(0,60),s:Math.max(1,+e.s||3),r:tm.secs+'s',perSide:tm.perSide}
+               :{n:String(e.n).slice(0,60),s:Math.max(1,+e.s||3),r:String(e.r||'10').slice(0,12)}});
+    if(!rows.length)throw new Error('no exercises found in the photo');
+    S.pform=S.pform||{id:null,name:'',by:'',freq:'',notes:'',ex:[],exn:'',exs:'',exr:''};
+    rows.forEach(r9=>{if(!S.pform.ex.some(x=>x.n===r9.n))S.pform.ex.push(r9)});
+    S.ppBusy=false;render();
+    flash(rows.length+' exercise'+(rows.length===1?'':'s')+' read in — check them before saving.')
+  }catch(e){S.ppBusy=false;S.ppErr=String((e&&e.message)||'could not read the photo');render()}}
 function todayState(){
   const raw=lget(todayKey(),null);
   return raw||{done:{},revealed:false,seenIdx:null}}
@@ -4355,7 +4398,7 @@ function rehabBankMoments(){
       'Two weeks without missing. Allena can now read symptoms against training.');
     if(st2.n>=30)put('rehabstreak:30','epic','Thirty days of check-ins',
       'A month of showing up for a knee. Very few people manage this.');
-    if(dirty)bankSave()}catch(e){}}
+    if(dirty){bankSave();try{haptic('success')}catch(e){}}}catch(e){}}
 
 /* ── the hero (Sep 2026 rebuild) ─────────────────────────────
    The hub was assembled as add-ons and read like a settings
@@ -8533,7 +8576,7 @@ function questCheck(){
   const Q=S.quest;if(!Q||Q.state!=='on'||!Q.q)return false;
   const pr=questProgress();
   if(pr.have<pr.target)return false;
-  Q.state='done';questSave();
+  Q.state='done';questSave();try{haptic('success')}catch(e){}
   const bank=discBank(),id='quest:'+Q.wk;
   if(!bank[id]){
     bank[id]={t:'Quest: '+Q.q.t,
@@ -8842,6 +8885,7 @@ function predResolvePending(){
 function predBank(dk,d){
   /* only landed calls bank — an under is information, not a failure */
   if(d.outcome==='under')return;
+  try{haptic('success')}catch(e){}
   const id='pred:'+dk,bank=discBank();
   if(bank[id])return;
   const exN=String(d.ex).replace(/ — .*/,'');
@@ -11322,6 +11366,7 @@ function ghostBank(g){
     if(!g||g.now<=g.best||g.best<2)return;
     const bank=discBank(),id='ghost:'+questWeekKey();
     if(bank[id])return;
+    try{haptic('success')}catch(e){}
     bank[id]={t:'Beat your best week',
       d:g.now+' sessions against the '+g.best+' your best week ever held. The ghost is now you.',
       rar:'rare',tag:'streak',found:today()};
@@ -11603,13 +11648,22 @@ function viewSession(){
           '<p class="mono" style="color:var(--faint);font-size:8.5px;letter-spacing:.05em;margin-top:2px">THIS SESSION\u2019S DOSE, BANKED \u2014 THE DASHES, FILLED</p></div>';
         h+='</div>'}
      }catch(e){}}
+    /* the level-up burst — the volume knob (owner call, 2 Sep) */
+    try{const lvN=dpLevel(dataPoints().total).lv;
+      if(A._lv0!=null&&lvN>A._lv0){
+        try{haptic('reveal')}catch(e9){}
+        h+='<div class="card mt2 an-hero an-ceremony an-pop" style="padding:20px;border-radius:22px;border-color:var(--amber);text-align:center">'+
+          '<p class="mono" style="font-size:10px;color:var(--amber);letter-spacing:.12em">LEVEL UP</p>'+
+          '<p class="disp gradhead" style="font-size:44px;line-height:1;margin-top:8px">'+lvN+'</p>'+
+          '<p style="color:var(--dim);font-size:12.5px;margin-top:8px">'+dpLevel(dataPoints().total).left+' to the next — every point of it real.</p></div>';
+        A._lv0=lvN}}catch(e){}
     try{predResolvePending();h+=predSessionVerdict()}catch(e){}
     try{h+=tomorrowHook()}catch(e){}
     {const rev=S.sessReveal;
      if(rev&&rev.show){const r=rarityOf(rev.show.rar);
       const big9=rev.show.rar==='epic'||rev.show.rar==='rare';
-      if(big9)try{vib([15,60,25])}catch(e){}
-      h+='<div class="card mt2 an-hero an-glow an-pop'+(big9?' an-ceremony':'')+'" style="padding:17px;border-radius:20px;border-color:'+r[1]+'">'+
+      if(big9)try{haptic('reveal')}catch(e){}
+      h+='<div class="card mt2 an-hero an-glow an-pop'+(big9?' an-ceremony':'')+(rev.show.rar==='epic'?' an-shine':'')+'" style="padding:17px;border-radius:20px;border-color:'+r[1]+';position:relative;overflow:hidden">'+
         '<div style="display:flex;align-items:center;gap:9px">'+
         '<img src="'+MARK+'" alt="" class="an-mark" style="width:19px;height:19px;object-fit:contain">'+
         '<p class="mono" style="font-size:9.5px;color:'+r[1]+';letter-spacing:.06em">'+esc(r[2].toUpperCase())+' \u00b7 UNLOCKED</p></div>'+
@@ -13537,6 +13591,11 @@ function sheetHtml(){
       '<input data-in="pform.freq" value="'+esc(f.freq)+'" placeholder="How often"></div>'+
       '<textarea data-in="pform.notes" rows="2" placeholder="Notes from the physio (optional)" style="margin-top:10px">'+esc(f.notes)+'</textarea>'+
       '<p class="eyebrow mt2">Exercises</p>'+
+      (aiReady()
+        ?'<label class="btn mt" style="display:block;text-align:center;cursor:pointer;color:var(--amber);font-size:13px">'+(S.ppBusy?'Reading the photo…':'📷 Photo of the plan — Allena reads it in')+
+          '<input type="file" accept="image/*" data-pplanphoto="1" style="display:none"'+(S.ppBusy?' disabled':'')+'></label>'
+        :'')+
+      (S.ppErr?'<p style="color:var(--red);font-size:12px;margin-top:6px">'+esc(S.ppErr)+'</p>':'')+
       (f.ex.length?'<div class="card mt" style="padding:4px 15px">'+
         f.ex.map((e,i)=>'<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--line)">'+
           '<span style="flex:1;min-width:0;font-size:13.5px">'+esc(e.n)+'</span>'+
@@ -14711,6 +14770,13 @@ document.addEventListener('click',e=>{
   const a=t.dataset.a,v=t.dataset.v;
   if(a==='closeSheet'&&e.target.closest('[data-stop]')&&e.target.tagName!=='BUTTON')return;
   runAction(a,v,t,e)});
+document.addEventListener('change',e=>{
+  const t9=e.target;
+  if(t9&&t9.dataset&&t9.dataset.pplanphoto){
+    const fl=t9.files&&t9.files[0];if(!fl)return;
+    const r=new FileReader();
+    r.onload=()=>{try{pplanPhotoParse(String(r.result))}catch(e2){}};
+    r.readAsDataURL(fl)}},true);
 document.addEventListener('click',e=>{if(S.boot!=null&&e.target&&e.target.closest&&e.target.closest('#boot'))bootEnd()},true);
 
 
