@@ -591,7 +591,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='678605';  // stamped by tools/build.py with the content hash
+const BUILD_ID='55aec8';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -621,7 +621,7 @@ function saveHistory(){return lset(K_H,S.history)}
 function record(complete){const s=S.sess;return{id:String(s.startedAt),date:new Date(s.startedAt).toISOString(),
   block:s.block,progId:s.progId,dayIdx:s.dayIdx,dayTitle:s.dayName,week:s.week,
   minutes:Math.max(1,Math.round((Date.now()-s.startedAt)/60000)),
-  log:s.log,note:S.note,complete:!!complete,planned:s.sets.length,
+  log:s.log,note:S.note,exNotes:(s.exNotes&&Object.keys(s.exNotes).length?s.exNotes:null),complete:!!complete,planned:s.sets.length,
   motion:(function(){try{const m=s.motion||{};
     const moved=Object.keys(m).filter(k=>m[k]>=3).length;
     return moved?{m:moved,of:s.sets.length}:null}catch(e){return null}})()}}
@@ -1082,6 +1082,7 @@ function coachStats(){ // the profile Allena reasons over — computed fresh fro
   if(eased)out.push(eased+' sessions eased for low readiness');
   return out.join('\n')}
 function hintHtml(cls){if(!S.hint)return '';
+  if(S.sess&&S.sess.coachUsed)return '';   // the chat is the voice now — one Allena at a time
   const col=S.hint.level==='warn'?'var(--amber)':S.hint.level==='good'?'var(--green)':'var(--line)';
   return '<div class="cue '+(cls||'')+'" style="border-left-color:'+col+'">'+esc('Allena: '+S.hint.msg)+'</div>'}
 function sessLabel(h){const d=new Date(h.date);
@@ -1138,6 +1139,11 @@ async function claudeFetch(body){
 
 function coachContext(){
   const s=S.sess,p=activeProg(),out=[];
+  try{if(S.hint&&S.hint.msg)out.push('ALLENA\u2019S OWN SET COMMENT (already shown to the user this set \u2014 build on it or gently supersede it, never contradict it without saying why): \u201c'+S.hint.msg+'\u201d')}catch(e){}
+  try{if(s&&s.exNotes&&Object.keys(s.exNotes).length)
+    out.push('USER\u2019S EXERCISE NOTES THIS SESSION (their own words \u2014 acknowledge them): '+Object.keys(s.exNotes).map(k=>k+': \u201c'+s.exNotes[k]+'\u201d').join('; '))}catch(e){}
+  try{const nrows=[];(S.history||[]).slice(-20).forEach(h9=>{if(h9.exNotes)Object.keys(h9.exNotes).forEach(k=>nrows.push(k+' ('+String(h9.date).slice(0,10)+'): \u201c'+h9.exNotes[k]+'\u201d'))});
+    if(nrows.length)out.push('RECENT EXERCISE NOTES FROM HISTORY: '+nrows.slice(-8).join('; ')+' \u2014 if pain recurs across dates, suggest easing/swapping and seeing a health professional; NEVER diagnose.')}catch(e){}
   try{if(S.prof&&(S.prof.notes||'').trim())
     out.push('USER-STATED LIMITATION (from setup, honour it): \u201c'+S.prof.notes.trim()+'\u201d')}catch(e){}
   /* the model has no clock — without this it guesses the date from the
@@ -1259,6 +1265,11 @@ function coachContext(){
     return fb.join('\n')+'\n'+out.join('\n')}
   return out.join('\n')}
 async function askClaude(q){
+  /* one Allena, one voice (owner call, 3 Sep): once the user talks to
+     the chat mid-session, the deterministic set comments stand down —
+     two Allenas disagreeing is worse than either alone. The chat gets
+     the comment in context so nothing said is lost. */
+  try{if(S.sess)S.sess.coachUsed=1}catch(e){}
   S.coach.thread.push({r:'user',t:q});S.coach.input='';S.coach.busy=true;render();
   const th=S.coach.thread.slice(-8);
   const msgs=th.map((m,i)=>({role:m.r==='user'?'user':'assistant',content:m.t}));
@@ -13025,7 +13036,7 @@ function viewSession(){
      '<div class="confetti-burst" aria-hidden="true">'+
      Array.from({length:16},(_,i)=>{const cols=['var(--green)','var(--amber)','#1E9BFF','var(--gold)'];
        return '<i style="left:'+((i*6.3)%100)+'%;background:'+cols[i%4]+';animation-delay:'+(i%5*60)+'ms"></i>'}).join('')+'</div>'+
-     '<p class="disp gradhead an-hero" style="font-size:30px;line-height:1.05;margin-bottom:12px">'+cg+'</p>'+
+     '<p class="disp gradhead an-rise" style="font-size:30px;line-height:1.05;margin-bottom:12px">'+cg+'</p>'+
      '<div class="an-pop" style="display:flex;align-items:center;gap:10px">'+
      '<svg viewBox="0 0 24 24" style="width:24px;height:24px;flex:none"><circle cx="12" cy="12" r="10.5" fill="none" stroke="var(--green)" stroke-width="1.4" opacity=".35"/>'+
      '<path class="an-tick" d="M7.5 12.4l3.1 3.1 6-6.4" fill="none" stroke="var(--green)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>'+
@@ -13057,7 +13068,7 @@ function viewSession(){
           '<button data-a="shareLevel" data-v="'+(gained||0)+':'+L1.lv+'" class="btn mt" style="width:auto;padding:9px 18px;color:var(--amber);border-color:color-mix(in srgb, var(--text) 42%, transparent);font-size:12.5px">Share the level-up</button></div>';
         if(gained!=null)h+='<div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px">'+
           '<p class="eyebrow" style="margin:0">Banked this session</p>'+
-          '<span class="mono an-pop" style="color:var(--blue);font-size:15px;font-weight:600">+'+gained+' points</span></div>';
+          '<span class="mono an-pop" style="color:var(--blue);font-size:15px;font-weight:600">+'+Math.round(gained)+' points</span></div>';
         /* the witnessed verdict: was this session live by the clock and
            the cadence of its set stamps? Said plainly either way — a
            not-witnessed session keeps its points, it just is not
@@ -13110,8 +13121,7 @@ function viewSession(){
         '<span class="mono" style="color:var(--amber);font-weight:600">'+uwStr(p.e)+'</span>'+
         '<span style="color:var(--faint);font-size:11.5px"> estimated one-rep max</span></p>').join('')+'</div>';
     if(s.log.length)h+='<div class="mt2"><p class="eyebrow">Sets — tap to fix any</p><div style="margin-top:8px">'+logLines(s.log,'editLive')+'</div></div>';
-    h+='<div class="mt2"><p class="eyebrow">Session notes</p><div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px;margin-top:12px">'+
-       stepper('note.sleep','Sleep',S.note.sleep,0.5,'hrs')+stepper('note.fatigue','Fatigue 1-5',S.note.fatigue,1,'')+'</div>';
+    h+='<div class="mt2">';
     if(legs){h+='<div class="mt"><p style="color:var(--dim);font-size:11px;letter-spacing:.1em;text-transform:uppercase;margin-bottom:8px">Knee</p><div class="row">'+
       ['Fine','Mild','Swollen','Unstable'].map(k=>'<button data-a="knee" data-v="'+k+'" style="flex:1;padding:13px 0;border-radius:8px;font-size:12px;border:1px solid var(--line);'+
         (S.note.knee===k?'background:'+(k==='Fine'?'var(--green)':'var(--red)')+';color:#fff':'background:var(--surface);color:var(--dim)')+'">'+k+'</button>').join('')+'</div>';
@@ -13130,6 +13140,8 @@ function viewSession(){
    '<p class="disp" style="font-size:16px;font-weight:600;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(s.dayName)+'</p></div>'+
    '<div style="display:flex;gap:8px;flex:none;align-items:center">'+
    (S.lastAdj?'<button data-a="undoAdj" style="padding:9px 10px;border-radius:11px;background:var(--raised);border:1px solid var(--amber);color:var(--amber);font-size:12px;white-space:nowrap">Undo '+(S.lastAdj.delta>0?'+':'')+S.lastAdj.delta+'</button>':'')+
+   '<button data-a="exNoteOpen" style="width:40px;height:40px;border-radius:13px;background:var(--raised);border:1px solid '+(((s.exNotes||{})[gBase(s.sets[Math.min(s.idx,s.sets.length-1)].ex)])?'var(--green)':'var(--line)')+';color:var(--dim);display:flex;align-items:center;justify-content:center;padding:0">'+
+   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" style="width:19px;height:19px"><path d="M7 3h7l4 4v14H7z"/><path d="M14 3v4h4"/><path d="M10 12h5M10 16h5"/></svg></button>'+
    '<button data-a="coachOpen" style="width:40px;height:40px;border-radius:13px;background:var(--raised);border:1px solid var(--amber);display:flex;align-items:center;justify-content:center;padding:0"><img class="mk" src="'+MARK+'" alt="Allena" style="width:25px;height:25px;object-fit:contain"></button>'+
    '</div></div>'+
    '<div style="height:3px;background:var(--line)"><div style="height:3px;width:'+pct+'%;background:'+acc+';transition:width .3s"></div></div></div>';
@@ -13216,6 +13228,11 @@ function viewSession(){
   }
   body+='</div>';
   if(cur.cue&&s.phase==='ready')body+='<div class="cue mt" style="border-left-color:'+acc+'">'+esc(cur.cue)+'</div>';
+  if(s.phase==='ready'){try{
+    const b0=gBase(cur.ex),cut0=Date.now()-35*864e5;
+    const prior=(S.history||[]).slice().reverse().find(h9=>h9.exNotes&&h9.exNotes[b0]&&new Date(h9.date).getTime()>cut0&&/hurt|pain|sharp|numb|swell|tweak|pinch/i.test(h9.exNotes[b0]));
+    if(prior)body+='<div class="cue mt" style="border-left-color:var(--amber)">'+
+      esc('Last time on this you noted \u201c'+prior.exNotes[b0]+'\u201d ('+fmtDate(prior.date)+'). How is it today? If it speaks up again, ease it or swap it out \u2014 recurring pain is form or an injury, and that\u2019s a health professional\u2019s call, not an app\u2019s.')+'</div>'}catch(e){}}
   if(s.phase==='ready')body+=hintHtml('mt');
   if(s.phase==='ready'){const wu=warmupPlan(s,cur);if(wu)body+=warmupHtml(wu,cur,s)}
   if(s.phase==='working')body+='<p class="mono" id="elapsed" style="text-align:center;color:var(--faint);font-size:13px;margin-top:20px">'+mmss((Date.now()-(S.setStart||Date.now()))/1000)+' under the bar</p>';
@@ -13249,7 +13266,21 @@ function viewHistory(){
   let h='<div class="view pad stg" style="padding-top:24px">'+back+
     '<h1 class="disp" style="font-size:25px;font-weight:600">History</h1>'+
     '<div class="row" style="margin-top:14px">'+
-    [['sessions','Lifting'],['runs','Runs'],['blocks','Blocks']].map(x=>'<button data-a="histTab" data-v="'+x[0]+'" class="pill" style="flex:1;padding:11px 0'+(tab===x[0]?';background:var(--text);color:var(--bg);border-color:var(--text);font-weight:600':'')+'">'+x[1]+'</button>').join('')+'</div>';
+    [['sessions','Lifting'],['runs','Runs'],['blocks','Blocks'],['notes','Notes']].map(x=>'<button data-a="histTab" data-v="'+x[0]+'" class="pill" style="flex:1;padding:11px 0'+(tab===x[0]?';background:var(--text);color:var(--bg);border-color:var(--text);font-weight:600':'')+'">'+x[1]+'</button>').join('')+'</div>';
+  if(tab==='notes'){
+    const rows=[];
+    (S.history||[]).forEach(h9=>{if(!h9.exNotes)return;
+      Object.keys(h9.exNotes).forEach(k=>rows.push({ex:k,t:h9.exNotes[k],date:h9.date,id:h9.id}))});
+    rows.sort((a,b)=>String(b.date).localeCompare(String(a.date)));
+    h+=rows.length
+      ?'<div class="card mt2" style="padding:4px 16px">'+rows.map((n9,i)=>
+        '<div style="padding:11px 0'+(i?';border-top:1px solid var(--line)':'')+'">'+
+        '<div style="display:flex;justify-content:space-between;gap:10px;align-items:baseline">'+
+        '<span style="font-size:13px;font-weight:600">'+esc(n9.ex)+'</span>'+
+        '<span class="mono" style="color:var(--faint);font-size:10px;flex:none">'+fmtDate(n9.date)+'</span></div>'+
+        '<p style="color:var(--dim);font-size:12.5px;line-height:1.5;margin-top:3px">\u201c'+esc(n9.t)+'\u201d</p></div>').join('')+'</div>'
+      :'<div class="card mt2" style="padding:16px"><p style="color:var(--dim);font-size:12.5px;line-height:1.6">No exercise notes yet \u2014 the document icon during a session saves one on the exercise you\u2019re on. Pain, grip, form, a good day: it all becomes memory Allena reads.</p></div>';
+    return h+'</div>'}
   if(tab==='blocks'){
     const progs=S.lib.programs.filter(p=>!isSupport(p)).map(p=>{
       const rows=S.history.filter(x=>x.progId===p.id&&x.complete);
@@ -13306,6 +13337,8 @@ function viewHistory(){
               statBox(r.log.length,'sets')+statBox(r.minutes?r.minutes+' min':'\u2014','duration')+
               statBox(vol?tonStr(vol):'\u2014','volume')+'</div>'+
             (r.log.length?'<div style="margin-top:10px">'+logLines(r.log,'editHist',r.id)+'</div>':'')+
+            (r.exNotes?'<div class="mt" style="border-top:1px solid var(--line);padding-top:8px">'+Object.keys(r.exNotes).map(k=>
+              '<p style="font-size:12px;line-height:1.5;margin-top:4px"><span style="color:var(--dim);font-weight:600">'+esc(k)+':</span> <span style="color:var(--text)">\u201c'+esc(r.exNotes[k])+'\u201d</span></p>').join('')+'</div>':'')+
             '<div class="row mt" style="gap:8px;margin-top:12px">'+
             (r.run?'':'<button data-a="histAdd" data-v="'+r.id+'" class="btn" style="flex:1;color:var(--dim);font-size:12.5px">+ Add a set</button>')+
             (!r.complete&&!r.run?'<button data-a="resumeHist" data-v="'+r.id+'" class="btn" style="flex:1;border-color:var(--green);color:var(--green);font-size:12.5px">Resume</button>':'')+
@@ -14386,6 +14419,17 @@ function sheetHtml(){
         '<p style="color:var(--faint);font-size:11.5px;line-height:1.5;margin-top:5px">'+esc(w.d)+'</p>'+
         (w.gated?'<p class="mono" style="color:var(--amber);font-size:9px;letter-spacing:.05em;margin-top:4px">'+esc(String(w.gated).toUpperCase())+'</p>':'')+
         '</div>').join('')+'</div>')}
+  if(S.sheet.t==='exnote'){
+    const s9=S.sess;if(!s9)return '';
+    const cur9=s9.sets[Math.min(s9.idx,s9.sets.length-1)],b9=gBase(cur9.ex);
+    const val=(s9.exNotes||{})[b9]||'';
+    const pain=/hurt|pain|sharp|numb|swell|tweak|pinch/i.test(val);
+    return wrapSheet('Note on '+esc(b9),
+      '<p style="color:var(--dim);font-size:12.5px;line-height:1.55">Saved with today\u2019s session, kept in History, and every Allena in the app reads it \u2014 the coach, the deep read, next time\u2019s set screen.</p>'+
+      '<textarea data-exnote="1" rows="3" placeholder="e.g. felt strong \u00b7 grip slipping \u00b7 hurts lower back" style="margin-top:10px">'+esc(val)+'</textarea>'+
+      (pain?'<div class="card mt" style="padding:12px 14px;border-color:var(--amber)">'+
+        '<p style="color:var(--dim);font-size:12px;line-height:1.6">Noted \u2014 Allena will ask about this next time this exercise comes up. If it hurts again, ease the load or swap the movement. Anything sharp, swelling or numb is a health professional\u2019s call, not an app\u2019s.</p></div>':'')+
+      '<button data-a="closeSheet" class="big disp mt" style="background:var(--text);color:var(--bg);font-size:15px">Save note</button>')}
   if(S.sheet.t==='exportsave'){
     return wrapSheet('Save your export',
       '<p style="color:var(--dim);font-size:13px;line-height:1.6">iOS would not hand this build the share sheet, so here is the honest route'+(S.exportText?'':' — a fresh tap usually unlocks it')+'.</p>'+
@@ -16415,6 +16459,8 @@ document.addEventListener('change',e=>{ // any date input with a placeholder ove
   if(e.target&&e.target.type==='date'&&e.target.dataset&&e.target.dataset.in){
     try{render()}catch(e2){}}},true);
 document.addEventListener('input',e=>{const d=e.target.dataset;
+  if(d.exnote){try{const s9=S.sess;if(s9){const b9=gBase(s9.sets[Math.min(s9.idx,s9.sets.length-1)].ex);
+    (s9.exNotes=s9.exNotes||{})[b9]=e.target.value;persistActive()}}catch(_){}return}
   if(d.ppex){try{const q=d.ppex.split(':'),row=S.pform.ex[+q[0]];
     if(row){if(q[1]==='s')row.s=Math.max(1,parseInt(e.target.value,10)||1);
       else row[q[1]]=e.target.value}}catch(_){}return}
@@ -16860,6 +16906,7 @@ function runAction(a,v,t,e){
       if(S.sheet&&S.sheet.t==='dailyfind')S.dfExtra=null;
       S.sheet=null;render();break}
     case 'exportXlsx':A.exportXlsx();break;
+    case 'exNoteOpen':{if(S.sess)S.sheet={t:'exnote'};render();break}
     case 'exportCopy':{try{navigator.clipboard.writeText(S.exportText||'').then(
       function(){flash('Copied — paste it into a new file in Files or Notes.')},
       function(){flash('Copy blocked — try the export again.')})}catch(e){flash('Copy blocked — try the export again.')}break}
