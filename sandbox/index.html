@@ -616,7 +616,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='0f8583';  // stamped by tools/build.py with the content hash
+const BUILD_ID='8ba414';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -2583,7 +2583,20 @@ function muscleFresh(){
   Object.keys(RUN_M).forEach(m=>{
    const rule=MUSCLE_RULES.find(x=>x[0]===m);if(!rule)return;
    L[m]=(L[m]||0)+eff*RUN_M[m]*Math.exp(-Math.max(0,hrs)/rule[2])})});
- return MUSCLE_RULES.map(r=>({m:r[0],fresh:Math.max(0,Math.min(100,Math.round(100-(L[r[0]]||0)*16)))}))}
+ /* saturating fatigue (owner-caught, 4 Sep: upper back pinned at 0%
+    all week from ordinary rowing volume). Linear L*16 let a normal
+    week's accumulation hit the floor and stay there; the exponential
+    keeps early sets expensive but makes annihilation asymptotic —
+    4 sets yesterday reads ~65%, a genuinely brutal stretch reads
+    single digits, and hard 0% is reserved for the truly buried. */
+ return MUSCLE_RULES.map(r=>{const l9=L[r[0]]||0;
+  /* unchanged curve down to 36% — then a soft tail instead of a hard
+     floor: ordinary weekly volume on a often-trained muscle used to
+     pin it at 0% for days (owner-caught, 4 Sep: upper back at zero
+     from four sets of rows plus the week's residue). Deep fatigue now
+     reads 5–35%, and 0% is reserved for the truly buried. */
+  const f9=l9<=4?100-l9*16:36*Math.exp(-(l9-4)/2.8);
+  return{m:r[0],fresh:Math.max(0,Math.min(100,Math.round(f9)))}})}
 /* one scale with the glow figure: green = recovered, gold = part way,
    BRIGHT warm-white = most fatigued (attention is brighter, not louder
    — and red stays a stop signal, which 17% recovered is not) */
@@ -10313,10 +10326,14 @@ function todayVerdict(){
   if(hardRun&&legDay)return{tone:'warn',t:pick.name+', with a caveat',
     d:'You ran hard within the last two days and this session trains the same legs. Take the top set down or move it a day.',
     cta:{a:'prevOpen',v:p.id+':'+pick.i,label:'Start '+pick.name}};
-  const sore=['Quads','Hamstrings','Glutes','Chest','Lats'].filter(m=>fresh[m]!=null&&fresh[m]<55);
-  if(sore.length>=2&&legDay)return{tone:'warn',t:pick.name+' is a stretch today',
-    d:sore.slice(0,2).map(m=>m.toLowerCase()+' '+Math.round(fresh[m])+'%').join(' and ')+' recovered. It will not be your best session — worth swapping the order of the week if you can.',
-    cta:{a:'prevOpen',v:p.id+':'+pick.i,label:'Start anyway'}};
+  /* the stretch check reads the SESSION'S OWN muscles, not a fixed
+     big-five (owner-caught, 4 Sep: a press day claimed "nothing in
+     your data says to change it" while upper back sat at the floor) */
+  const dayM=(function(){try{return Object.keys(dayMuscles(p,pick.i,S.week))}catch(e){return[]}})();
+  const sore=dayM.filter(m=>fresh[m]!=null&&fresh[m]<55).sort((a,b)=>fresh[a]-fresh[b]);
+  if(sore.length>=2)return{tone:'warn',t:pick.name+' is a stretch today',
+    d:sore.slice(0,2).map(m=>m.toLowerCase()+' '+Math.round(fresh[m])+'%').join(' and ')+' recovered. The plan knows repeat exposure is the block\u2019s design \u2014 but expect working weights to feel heavier, and let the RPE targets do the governing.',
+    cta:{a:'prevOpen',v:p.id+':'+pick.i,label:'Start '+pick.name}};
   return{tone:'ok',t:pick.name,
     d:(rd&&rd.level==='high')?'Readiness is good this morning. This is the day to push if any day is.'
       :'Next in the week. Nothing in your data says to change it.',
