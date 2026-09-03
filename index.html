@@ -591,7 +591,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='95436d';  // stamped by tools/build.py with the content hash
+const BUILD_ID='521621';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -12212,7 +12212,17 @@ function secProgram(p,ws){
        mislogged a week): a NEW block explains the clock before it
        starts ticking — and offers to start it now or on first
        training. One-time, per block. */
-    if(!(S.weekStarts||{})[p.id+':1']&&!(S.weekStarts||{})[p.id+':ackclk'])
+    const clkChosen=!!((S.weekStarts||{})[p.id+':1']||(S.weekStarts||{})[p.id+':ackclk']);
+    const clkLocked=!!((S.weekStarts||{})[p.id+':clkedit'])||(S.history||[]).some(h9=>h9.progId===p.id&&h9.complete);
+    if(clkChosen&&!clkLocked){
+      /* one honest undo (owner call, 3 Sep): the first choice can be
+         a mis-tap — changeable exactly once, and never after real
+         training starts the clock for real */
+      const started=(S.weekStarts||{})[p.id+':1'];
+      h+='<button data-a="clkEdit" style="width:100%;text-align:left;display:flex;align-items:center;gap:9px;padding:10px 0 2px;border-top:1px solid var(--line);margin-top:12px">'+
+        '<span style="flex:1;font-size:11.5px;color:var(--faint)">Week-1 clock: '+(started?'started '+esc(started):'starts when you first train')+'</span>'+
+        '<span class="mono" style="color:var(--amber);font-size:10px;letter-spacing:.05em;flex:none">CHANGE \u00b7 ONCE</span></button>'}
+    if(!clkChosen)
       h+='<div style="border-top:1px solid var(--line);margin-top:12px;padding-top:12px">'+
         '<p class="eyebrow" style="color:var(--amber)">Before week 1 starts</p>'+
         '<p style="color:var(--dim);font-size:12.5px;line-height:1.6;margin-top:6px">Each week of this block is a <b style="color:var(--text)">7-day clock</b>. It starts the day of your first session (or right now, your call), counts your sessions against the week\u2019s plan, and when it runs out you close the week and the next one starts clean. The W-pills above are the block\u2019s weeks \u2014 train in the one that is lit.</p>'+
@@ -16853,6 +16863,12 @@ function runAction(a,v,t,e){
       S.weekStarts=S.weekStarts||{};S.weekStarts[p9.id+':'+S.week+':force']=1;lset(K_WK,S.weekStarts);
       S.sheet=null;flash('Week '+S.week+' opened — week '+(S.week-1)+' stays as it is.');render();break}
     case 'weekLockedInfo':flash('Week '+S.week+' is closed — its sessions live in History now. Tap the current W-pill to train this week\u2019s.');break;
+    case 'clkEdit':{const p9=activeProgSafe();if(!p9)break;
+      S.weekStarts=S.weekStarts||{};
+      if((S.history||[]).some(h9=>h9.progId===p9.id&&h9.complete)){flash('Training has started the clock — it is real now.');break}
+      delete S.weekStarts[p9.id+':1'];delete S.weekStarts[p9.id+':ackclk'];
+      S.weekStarts[p9.id+':clkedit']=1;lset(K_WK,S.weekStarts);
+      flash('One change — choose again, and it sticks.');render();break}
     case 'clkNow':{const p9=activeProgSafe();if(p9){S.weekStarts=S.weekStarts||{};
       S.weekStarts[p9.id+':1']=today();S.weekStarts[p9.id+':ackclk']=1;lset(K_WK,S.weekStarts);
       flash('Week 1 started today — seven days on the clock.')}render();break}
