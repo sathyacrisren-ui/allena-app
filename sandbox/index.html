@@ -591,7 +591,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='0dd34f';  // stamped by tools/build.py with the content hash
+const BUILD_ID='55798d';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -9137,8 +9137,49 @@ function whisperGen(){
           if(row.ready!=null)bits.push('readiness at '+Math.round(row.ready));
           if(bits.length)out.push({slot:at(10,30),id:'wh-edge'+today(),
             body:'Your last '+hitEx+' PR came off '+bits.join(', ')+'. '+String(rec.top.name||'Today')+' is on the card \u2014 the recipe is in your own history.'})}}}catch(e){}
+    // 4. THE ECHO — this week, a year or more ago, something real happened
+    try{
+      const now=new Date(),doy=k=>{const d=new Date(String(k).slice(0,10)+'T12:00');return{y:d.getFullYear(),m:d.getMonth(),day:d.getDate(),t:d.getTime()}};
+      const nowY=now.getFullYear();
+      let echo=null;
+      (S.runs||[]).forEach(r=>{if(!isRunType(r.type)||!(r.km>=4&&r.mins>0))return;
+        const d=doy(r.date);if(d.y>=nowY)return;
+        const then=new Date(now.getFullYear(),d.m,d.day).getTime();
+        if(Math.abs(then-now.getTime())>7*864e5)return;
+        const pace=r.mins/r.km;
+        if(!echo||pace<echo.pace)echo={kind:'run',pace:pace,km:r.km,y:d.y}});
+      if(!echo)(S.history||[]).forEach(h=>{if(!h.complete||h.run)return;
+        const d=doy(h.date);if(d.y>=nowY)return;
+        const then=new Date(now.getFullYear(),d.m,d.day).getTime();
+        if(Math.abs(then-now.getTime())>7*864e5)return;
+        let best=0,bx='';(h.log||[]).forEach(l=>{if(l.w>0&&l.r>0){const e9=e1rm(l.w,l.r);if(e9>best){best=e9;bx=gBase(l.ex)}}});
+        if(best>0&&(!echo||best>echo.e1))echo={kind:'lift',e1:best,ex:bx,y:d.y}});
+      if(echo){const ago=nowY-echo.y,agoTxt=ago===1?'A year ago this week':ago+' years ago this week';
+        out.push({slot:at(12,30),id:'wh-echo'+today(),
+          body:echo.kind==='run'
+            ?agoTxt+' you ran '+echo.km+' km at '+Math.floor(echo.pace)+':'+String(Math.round((echo.pace%1)*60)).padStart(2,'0')+'/km. The road remembers.'
+            :agoTxt+', your best '+echo.ex+' worked out to ~'+Math.round(echo.e1)+' kg. That lifter is still in there.'})}}catch(e){}
+    // 5. THE CHASE — an old PR, resurfaced ONLY when current form is
+    //    provably within reach (no fake urgency, ever)
+    try{
+      const cut21=Date.now()-21*864e5,cut60=Date.now()-60*864e5;
+      const bestBy={},recentBy={};
+      (S.history||[]).forEach(h=>{if(!h.complete||h.run)return;
+        const t=new Date(h.date).getTime();
+        (h.log||[]).forEach(l=>{if(!(l.w>0&&l.r>0))return;
+          const b2=gBase(l.ex),e9=e1rm(l.w,l.r);
+          if(t<cut60&&(!bestBy[b2]||e9>bestBy[b2].e1))bestBy[b2]={e1:e9,w:l.w,r:l.r,y:new Date(h.date).getFullYear()};
+          if(t>cut21&&(!recentBy[b2]||e9>recentBy[b2]))recentBy[b2]=e9})});
+      let chase=null;
+      Object.keys(bestBy).forEach(b2=>{
+        const old=bestBy[b2],rec=recentBy[b2];
+        if(!rec)return;
+        const ratio=rec/old.e1;
+        if(ratio>=0.96&&ratio<1&&(!chase||ratio>chase.ratio))chase={ex:b2,old:old,rec:rec,ratio:ratio}});
+      if(chase)out.push({slot:at(15,0),id:'wh-chase'+today(),
+        body:'Your all-time '+chase.ex+' works out to ~'+Math.round(chase.old.e1)+' kg ('+chase.old.w+'\u00d7'+chase.old.r+', '+chase.old.y+'). The last three weeks put you at ~'+Math.round(chase.rec)+' \u2014 that is '+Math.round((1-chase.ratio)*100)+'% away. It is in reach.'})}catch(e){}
   }catch(e){}
-  return out.slice(0,2)}
+  return out.slice(0,3)}
 
 /* ══ where you stand (Sep 2026) ══════════════════════════════
    Cross-domain rarity — the honest version of the viral
