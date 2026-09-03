@@ -263,7 +263,7 @@ pre{background:var(--surface);border:1px solid var(--line);border-radius:10px;pa
 .stickyhead{position:sticky;top:0;z-index:25;padding-top:env(safe-area-inset-top);background:var(--surface);
   backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
   border-bottom:1px solid var(--line)}
-.chatwrap{position:fixed;inset:0;display:flex;flex-direction:column;background:var(--bg);z-index:40}
+.chatwrap{position:fixed;inset:0;bottom:var(--kb,0px);display:flex;flex-direction:column;background:var(--bg);z-index:40;transition:bottom .22s ease-out}
 .chathead{flex:none;padding-top:env(safe-area-inset-top);background:var(--bg);border-bottom:1px solid var(--line)}
 .chatbtn{padding:7px 12px;border-radius:9px;background:var(--surface);border:1px solid var(--line);color:var(--dim);font-size:12.5px}
 .chatbody{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:18px 18px 8px;max-width:460px;width:100%;margin:0 auto}
@@ -591,7 +591,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='8008bd';  // stamped by tools/build.py with the content hash
+const BUILD_ID='8dccd8';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -17154,6 +17154,7 @@ document.addEventListener('click',e=>{if(S.boot!=null&&e.target&&e.target.closes
   let kbWas=false;
   const fit=function(){
     if(raf)return;raf=requestAnimationFrame(function(){raf=null;
+      if(window.__kbNativeOn)return; // the wrapper reports the keyboard itself
       const w=document.querySelector('.chatwrap');
       const kb=Math.max(0,window.innerHeight-vv.height-vv.offsetTop);
       const closing=kbWas&&kb<=40;kbWas=kb>40;
@@ -17173,13 +17174,26 @@ document.addEventListener('click',e=>{if(S.boot!=null&&e.target&&e.target.closes
       const b=document.getElementById('coachThread');
       if(b&&kb>40)b.scrollTop=b.scrollHeight})};
   vv.addEventListener('resize',fit);
-  /* belt-and-braces (owner-caught in the wrapper: the composer got
-     eaten by the keyboard). On focus of any chat input, pin + scroll
-     it visible after the keyboard settles. */
+  /* the wrapper's word is law: WKWebView slides the keyboard OVER the
+     page with no viewport signal, so the native side reports the exact
+     overlap here (build 4+). CSS does the lifting via --kb; JS only
+     keeps the thread pinned to the bottom. */
+  window.__kbNative=function(h){
+    window.__kbNativeOn=true;
+    document.documentElement.style.setProperty('--kb',(h|0)+'px');
+    const w=document.querySelector('.chatwrap');
+    if(w){w.classList.toggle('kb',h>40);
+      const b=document.getElementById('coachThread');
+      if(b&&h>40)requestAnimationFrame(function(){b.scrollTop=b.scrollHeight})}};
+  /* belt-and-braces for Safari (no wrapper): on focus of any chat
+     input, re-fit repeatedly while the keyboard animates in — a single
+     220ms shot fired before it settled and never again. */
   document.addEventListener('focusin',function(e){
     const t=e.target;if(!t||!(t.matches&&t.matches('.chatwrap textarea, .chatwrap input')))return;
-    setTimeout(function(){fit();try{t.scrollIntoView({block:'center'})}catch(e2){}},220)});
-  vv.addEventListener('resize',fit);
+    if(window.__kbNativeOn)return;
+    let n=0;const iv=setInterval(function(){
+      fit();if(++n===3){try{t.scrollIntoView({block:'center'})}catch(e2){}}
+      if(n>=8)clearInterval(iv)},130)});
   // vv 'scroll' fires on ordinary page scrolls too — only the chat's
   // pinned composer needs it; everywhere else it must never run
   vv.addEventListener('scroll',function(){if(document.querySelector('.chatwrap'))fit()});
