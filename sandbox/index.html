@@ -591,7 +591,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='669d19';  // stamped by tools/build.py with the content hash
+const BUILD_ID='564bb2';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -7705,6 +7705,10 @@ function notifPlan(){
         if(at430>Date.now()+60000)
           items.push({id:'dc'+today(),ts:Math.round(at430/1000),title:'Allena',
             body:'Today\u2019s call: '+String(rec.top.name)+' \u2014 '+String(rec.why||'').slice(0,110)+'.'})}}}catch(e){}}
+  /* the whisper layer: banked insights re-applied at the hour they
+     matter — application is continuous even when discovery is quiet */
+  if(P.reveal){try{(typeof whisperGen==='function'?whisperGen():[]).forEach(w=>{
+    if(w.slot*1000>Date.now()+60000)items.push({id:w.id,ts:w.slot,title:'Allena',body:w.body})})}catch(e){}}
   /* the honest reachable-find nudge (owner call, 3 Sep, reframed): NOT
      'go run to unlock' as blind bait — only when a find is genuinely
      one action away, and it names the real thing. Fires at most one a
@@ -7731,7 +7735,7 @@ function notifPlan(){
      reachable find \u00b7 16:30 the call \u00b7 18/8:00 physio \u00b7 19:30
      reveal) and each day keeps its best FOUR at most — scatter is
      texture, five pings is spam. */
-  const priOf=id=>/^ap/.test(id)?0:/^am/.test(id)?1:/^dr/.test(id)?2:/^fu/.test(id)?3:/^nf/.test(id)?4:/^dc/.test(id)?5:/^rv/.test(id)?6:/^q\d/.test(id)?7:/^wr/.test(id)?8:9;
+  const priOf=id=>/^ap/.test(id)?0:/^am/.test(id)?1:/^dr/.test(id)?2:/^fu/.test(id)?3:/^nf/.test(id)?4:/^dc/.test(id)?5:/^wh/.test(id)?6:/^rv/.test(id)?7:/^q\d/.test(id)?8:/^wr/.test(id)?9:10;
   const byD={};
   items.forEach(it=>{const d9=dayKey(new Date(it.ts*1000));(byD[d9]=byD[d9]||[]).push(it)});
   const keep=[];
@@ -8804,6 +8808,25 @@ function corrDayData(){
     if(nx){if(nx.sleep!=null)days[k].sleepo=nx.sleep;
       if(nx.hrv!=null)days[k].hrvo=nx.hrv;
       if(nx.ready!=null)days[k].readyo=nx.ready}})}catch(e){}
+  /* per-exercise top sets — the grid scales with the user's own
+     library (owner directive: toward 10,000s of hypotheses). The 12
+     most-trained lifts each become an outcome. */
+  try{
+    const cnt={};(S.history||[]).forEach(h=>{if(!h.complete||h.run)return;
+      (h.log||[]).forEach(l=>{if(l.w>0&&l.r>0)cnt[gBase(l.ex)]=(cnt[gBase(l.ex)]||0)+1})});
+    const topEx=Object.keys(cnt).filter(k=>cnt[k]>=10).sort((a,b)=>cnt[b]-cnt[a]).slice(0,12);
+    const exSet=new Set(topEx);
+    (S.history||[]).forEach(h=>{if(!h.complete||h.run)return;
+      const k=String(h.date).slice(0,10),tops={};
+      (h.log||[]).forEach(l=>{if(!(l.w>0&&l.r>0))return;const b2=gBase(l.ex);
+        if(exSet.has(b2))tops[b2]=Math.max(tops[b2]||0,e1rm(l.w,l.r))});
+      Object.keys(tops).forEach(b2=>put(k,'ex:'+b2,tops[b2]))})}catch(e){}
+  /* 3-day windowed signals: the body often answers averages, not days */
+  try{const ks3=Object.keys(days).sort();
+    ks3.forEach(k=>{['steps','kcal','protein'].forEach(f=>{
+      const vals=[];for(let b=0;b<3;b++){const d0=new Date(k+'T12:00');d0.setDate(d0.getDate()-b);
+        const row=days[dayKey(d0)];if(row&&row[f]!=null)vals.push(row[f])}
+      if(vals.length===3)days[k][f+'3']=vals.reduce((a,b)=>a+b,0)/3})})}catch(e){}
   /* sleep consistency: the spread of the last three nights */
   try{Object.keys(days).forEach(k=>{
     const vals=[];for(let b=0;b<3;b++){const d0=new Date(k+'T12:00');d0.setDate(d0.getDate()-b);
@@ -8841,20 +8864,37 @@ const CORR_OUTCOMES={
   benchtop:{n:'bench top set',good:'up',dir:1},
   squattop:{n:'squat top set',good:'up',dir:1},
   deadtop:{n:'deadlift top set',good:'up',dir:1}};
+function corrMaps(days){
+  /* the effective grid, built per account: baseline maps plus every
+     ex: outcome present in the rows and the windowed signal variants */
+  const sigs=Object.assign({},CORR_SIGNALS,{
+    steps3:{n:'a big-step stretch',dir:'a bigger three-day step average'},
+    kcal3:{n:'a well-fed stretch',dir:'more calories across three days'},
+    protein3:{n:'a high-protein stretch',dir:'more protein across three days'}});
+  const outs=Object.assign({},CORR_OUTCOMES);
+  const seenEx={};
+  Object.keys(days).forEach(k=>Object.keys(days[k]).forEach(f=>{
+    if(f.slice(0,3)==='ex:'&&!seenEx[f]){seenEx[f]=1;
+      outs[f]={n:f.slice(3)+' top set',good:'up',dir:1,exo:1}}}));
+  return{sigs:sigs,outs:outs}}
 function correlations(){
   const found=[];
   try{
+    /* memoized: the mass grid is cheap once a day, not every render */
+    const stamp=today()+':'+(S.history||[]).length+':'+(function(){try{return Object.keys(hkDailyStore().days).length}catch(e){return 0}})();
+    if(S._corrMemo&&S._corrMemo.stamp===stamp)return S._corrMemo.v;
     const days=corrDayData();
     const keys=Object.keys(days).sort();
-    if(keys.length<12)return found;
+    if(keys.length<12){S._corrMemo={stamp:stamp,v:found};return found}
     const idxByDate={};keys.forEach((k,i)=>idxByDate[k]=i);
     const dateAt=lag=>k=>{const d=new Date(k+'T12:00');d.setDate(d.getDate()+lag);return dayKey(d)};
-    Object.keys(CORR_SIGNALS).forEach(sig=>{
-      Object.keys(CORR_OUTCOMES).forEach(out=>{
+    const M=corrMaps(days);S._corrMaps=M;
+    Object.keys(M.sigs).forEach(sig=>{
+      Object.keys(M.outs).forEach(out=>{
         [0,1,2].forEach(lag=>{
           /* a training-derived signal correlating with same-day
              training is the same session talking to itself */
-          if(CORR_SIGNALS[sig].trained&&lag===0&&(out==='topset'||out==='tonnage'||out==='effort'||out==='fade'))return;
+          if(M.sigs[sig].trained&&lag===0&&(out==='topset'||out==='tonnage'||out==='effort'||out==='fade'||M.outs[out].exo))return;
           /* a signal never predicts its own tomorrow-twin */
           if((sig==='sleep'||sig==='sleep2'||sig==='sleepvar')&&out==='sleepo')return;
           if(sig==='hrv'&&out==='hrvo')return;
@@ -8873,15 +8913,24 @@ function correlations(){
           /* the strict gate — big effect, real sample, past the t-cut;
              conservative on purpose because we test many pairs */
           if(Math.abs(r.rho)<0.5||r.n<12||r.t<2.8)return;
+          /* split-half stability: a mass grid must never buy ghosts —
+             the effect has to hold in BOTH halves of the data */
+          {const half=Math.floor(pairs.length/2);
+            const r1=spearman(pairs.slice(0,half)),r2=spearman(pairs.slice(half));
+            if(!r1||!r2||r1.rho*r2.rho<=0||Math.abs(r1.rho)<0.25||Math.abs(r2.rho)<0.25)return}
           found.push({sig:sig,out:out,lag:lag,rho:r.rho,n:r.n,
             score:Math.abs(r.rho)*Math.sqrt(r.n)})})})});
     found.sort((a,b)=>b.score-a.score);
     // one per outcome so the set stays varied, top few overall
     const seen={};
-    return found.filter(f=>{if(seen[f.out])return false;seen[f.out]=1;return true}).slice(0,5);
+    const v=found.filter(f=>{if(seen[f.out])return false;seen[f.out]=1;return true}).slice(0,7);
+    S._corrMemo={stamp:stamp,v:v};
+    return v;
   }catch(e){return[]}}
 function corrPhrase(c){
-  const S9=CORR_SIGNALS[c.sig],O=CORR_OUTCOMES[c.out];
+  const M=S._corrMaps||{sigs:CORR_SIGNALS,outs:CORR_OUTCOMES};
+  const S9=M.sigs[c.sig]||CORR_SIGNALS[c.sig],O=M.outs[c.out]||CORR_OUTCOMES[c.out];
+  if(!S9||!O)return{title:'A pattern',body:'',strong:false,good:true};
   // does the signal RISING move the outcome UP or DOWN?
   const signalUp=S9.inv?-1:1;
   const outcomeRises=(c.rho*signalUp)>0;   // true = they move together
@@ -9006,6 +9055,56 @@ function learnedCard(){
       '<p style="font-size:12px;color:var(--dim);line-height:1.4">'+esc(r.k)+' <b style="color:var(--text)">'+esc(r.v)+'</b></p>'+
       '<p class="mono" style="font-size:9px;color:var(--faint);margin-top:1px">'+esc(r.s)+'</p></div>').join('')+'</div>'+
     '<p class="mono" style="color:var(--faint);font-size:9px;line-height:1.5;margin-top:12px">EVERY LINE IS STATISTICS ON YOUR OWN NUMBERS — NO GUESSWORK, NOTHING INVENTED. IT GROWS AS YOU DO.</p></div>'}
+
+/* ══ the whisper layer (owner call, 3 Sep) ══════════════════
+   Discovery is rare and gated; APPLICATION is continuous. Every
+   banked Insight is a standing playbook rule — when its context
+   recurs, Allena says the useful thing at the useful hour:
+   "tomorrow is the long run — your best ones follow big-carb
+   days. Eat your carbs." Derived only from THIS user's banked
+   insights and real calendar context. Never invented. */
+function whisperGen(){
+  const out=[];
+  try{
+    const bank=discBank();
+    const corr=Object.keys(bank).filter(id=>id.slice(0,5)==='corr:')
+      .map(id=>{const q=id.split(':');return{sig:q[1],out:q[2],lag:+q[3],t:bank[id].t||''}});
+    if(!corr.length)return out;
+    const at=(h,m)=>{const d=new Date(today()+'T12:00');d.setHours(h,m,0,0);return Math.round(d.getTime()/1000)};
+    const shortDay=d=>d.toLocaleDateString('en-US',{weekday:'short'});
+    const tomorrow=new Date(Date.now()+864e5);
+    // 1. FUEL — a food signal drives a run outcome, and a run is planned tomorrow
+    try{const rp=S.runplan;
+      const runsTomorrow=rp&&Array.isArray(rp.days)&&rp.days.some(d=>String(d).slice(0,3)===shortDay(tomorrow));
+      if(runsTomorrow){
+        const f=corr.find(c=>/^(carb|kcal|protein)/.test(c.sig)&&/(pace|beatkm)/.test(c.out)&&c.lag>=1);
+        if(f)out.push({slot:at(14,0),id:'wh-fuel'+today(),
+          body:'Tomorrow has a run on it \u2014 and your own data says '+f.t.toLowerCase()+'. Today is when that meal happens.'})}}catch(e){}
+    // 2. THE NIGHT BEFORE — sleep drives a lift outcome, and tomorrow has a session owed
+    try{const c9=weekClock();
+      if(c9&&c9.remaining&&c9.remaining.length){
+        const f=corr.find(c=>/^sleep/.test(c.sig)&&/(topset|tonnage|benchtop|squattop|deadtop|ex:)/.test(c.out)&&c.lag>=1);
+        if(f)out.push({slot:at(20,30),id:'wh-night'+today(),
+          body:'Training tomorrow \u2014 and in your data, '+f.t.toLowerCase()+'. Tonight is where that number comes from.'})}}catch(e){}
+    // 3. THE EDGE — today's call includes a goal lift; replay the last PR's real context
+    try{const rec=(typeof recommendToday==='function')?recommendToday():null;
+      if(rec&&rec.top&&!rec.empty){
+        const goals=(S.goals||[]).map(g=>gBase(g.ex).toLowerCase());
+        let hit=null,hitEx='';
+        (S.history||[]).slice().reverse().some(h=>{
+          return (h.log||[]).slice().reverse().some(l=>{
+            if(l.pr&&goals.some(g=>gBase(l.ex).toLowerCase().indexOf(g)>=0)){hit=h;hitEx=gBase(l.ex);return true}
+            return false})});
+        if(hit){
+          const row=corrDayData()[String(hit.date).slice(0,10)]||{};
+          const bits=[];
+          if(row.sleep!=null)bits.push(Math.round(row.sleep/6)/10+'h of sleep');
+          if(row.carb!=null)bits.push(Math.round(row.carb)+'g of carbs the day before');
+          if(row.ready!=null)bits.push('readiness at '+Math.round(row.ready));
+          if(bits.length)out.push({slot:at(10,30),id:'wh-edge'+today(),
+            body:'Your last '+hitEx+' PR came off '+bits.join(', ')+'. '+String(rec.top.name||'Today')+' is on the card \u2014 the recipe is in your own history.'})}}}catch(e){}
+  }catch(e){}
+  return out.slice(0,2)}
 
 /* ══ where you stand (Sep 2026) ══════════════════════════════
    Cross-domain rarity — the honest version of the viral
