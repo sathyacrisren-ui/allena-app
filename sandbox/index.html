@@ -591,7 +591,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='c1a50d';  // stamped by tools/build.py with the content hash
+const BUILD_ID='3fb09f';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -8547,6 +8547,17 @@ function sigSeries(kind){
   const cut=dayKey(new Date(Date.now()-90*864e5));
   return Object.keys(dd).filter(k=>k>=cut&&dd[k][kind.d]!=null&&dd[k][kind.d]!=='')
     .sort().map(k=>({t:new Date(k+'T12:00').getTime(),v:+dd[k][kind.d]}))}
+const SIG_WHY={
+ 'Sleep':'The recovery half of the model. Sessions after 7+ hour nights get compared with sessions after short ones — enough nights beside enough sessions and Allena can say what rest is worth to YOUR top sets, not a study\u2019s.',
+ 'Resting heart rate':'Your engine\u2019s idle. It drifts down as fitness builds and jumps when you are run down or getting sick — fourteen mornings build the baseline that makes a high day mean something.',
+ 'HRV':'Beat-to-beat variability — the nervous system\u2019s recovery dial. Higher generally means readier. Allena correlates it against training, sleep and protein to find what moves yours.',
+ 'VO2 max':'Your watch\u2019s estimate of engine size. Slow to move, honest over months — the long arc of aerobic work.',
+ 'Steps':'Background load. A 15,000-step workday is not a rest day, and the model counts it against recovery.',
+ 'Calories':'Total intake from your food app via Health. Fuel against the training that spends it.',
+ 'Protein':'The repair budget. Days over ~120 g get compared against next-day recovery and strength — the correlation engine\u2019s favourite input.',
+ 'Carbs':'The work fuel. Big-carb days beside big-session days show whether your volume runs on them.',
+ 'Fat':'The slow fuel — tracked for the complete intake picture.',
+ 'Bodyweight':'The denominator. Strength standards, bodyweight ratios and Where-you-stand percentiles all move with it.'};
 const SIG_KINDS=[
   {k:'Sleep',hk:'sleep',f:v=>Math.round(v/6)/10,u:'h',src:'Apple Health'},
   {k:'Resting heart rate',hk:'rhr',u:' bpm',src:'Apple Health'},
@@ -8570,7 +8581,13 @@ function sigStamp(){
     return n?last+':'+n:''}catch(e){return ''}}
 function unseenSignals(){
   try{const s9=sigStamp();return (s9&&lget('training-sigseen-v1','')!==s9)?1:0}catch(e){return 0}}
+function sigPrevDay(){
+  try{return String(lget('training-sigseen-v1','')).split(':')[0]||''}catch(e){return ''}}
 function viewSignals(){
+  /* remember what was new BEFORE marking seen — the page owes the
+     drawer dot an answer: WHICH points just landed (owner call) */
+  const prevDay=sigPrevDay();
+  const newAfter=prevDay?new Date(prevDay+'T23:59').getTime():0;
   try{lset('training-sigseen-v1',sigStamp())}catch(e){}
   let h='<div class="view pad modalrise" style="padding-top:20px">'+
     '<button data-a="back" class="btn" style="width:auto;padding:8px 14px;color:var(--dim);font-size:12.5px;margin-bottom:14px">\u2039 Back</button>'+
@@ -8584,14 +8601,17 @@ function viewSignals(){
     const vs=pts.map(p=>p.v),lo=Math.min.apply(null,vs),hi=Math.max.apply(null,vs);
     const pad=Math.max((hi-lo)*0.15,hi*0.02||1);
     const last=pts[pts.length-1];
-    h+='<div class="card mt" style="padding:14px 16px">'+
+    const fresh=newAfter?pts.filter(p9=>p9.t>newAfter).length:0;
+    h+='<div class="card mt" style="padding:14px 16px;position:relative">'+
+      '<button data-a="sigOpen" data-v="'+esc(kind.k)+'" style="position:absolute;inset:0;z-index:2"></button>'+
       '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px">'+
-      '<span style="font-size:14px;font-weight:600">'+kind.k+'</span>'+
-      '<span class="mono" style="font-size:12px;color:var(--text)">'+
+      '<span style="font-size:14px;font-weight:600">'+kind.k+
+      (fresh?' <span class="mono" style="font-size:8.5px;color:var(--green);letter-spacing:.06em">\u25cf '+fresh+' NEW</span>':'')+'</span>'+
+      '<span class="mono" style="font-size:12px;color:'+(fresh?'var(--green)':'var(--text)')+'">'+
       (kind.k==='Steps'||kind.k==='Calories'?Math.round(last.v).toLocaleString():last.v)+esc(kind.u)+'</span></div>'+
-      lineChart(pts,{min:Math.max(0,lo-pad),max:hi+pad,suffix:kind.u.trim(),color:'#1E9BFF',
-        marks:[Math.round(lo),Math.round(hi)]})+
-      '<p class="mono" style="color:var(--faint);font-size:9px;letter-spacing:.05em;margin-top:6px">'+pts.length+' DAYS \u00b7 '+esc(kind.src.toUpperCase())+'</p></div>'});
+      '<div style="position:relative;z-index:3">'+lineChart(pts,{min:Math.max(0,lo-pad),max:hi+pad,suffix:kind.u.trim(),color:'#1E9BFF',
+        marks:[Math.round(lo),Math.round(hi)],newAfter:newAfter})+'</div>'+
+      '<p class="mono" style="color:var(--faint);font-size:9px;letter-spacing:.05em;margin-top:6px">'+pts.length+' DAYS \u00b7 '+esc(kind.src.toUpperCase())+' \u00b7 TAP TO EXPLAIN</p></div>'});
   if(dry.length)h+='<div class="card mt2" style="padding:14px 16px"><p class="eyebrow">Not flowing yet</p>'+
     '<p style="color:var(--dim);font-size:12px;line-height:1.7;margin-top:7px">'+
     dry.map(k=>k.k).join(' \u00b7 ')+'</p>'+
@@ -8599,6 +8619,33 @@ function viewSignals(){
     (any?'These arrive the moment their apps write into Apple Health \u2014 macros need a food app (MyFitnessPal and friends) syncing to Health.'
         :'Connect Apple Health from Today and these fill in on their own \u2014 watch data, sleep, and any food app that writes into Health.')+'</p></div>';
   return h+'</div>'}
+
+function viewSigDetail(){
+  const kind=SIG_KINDS.find(x=>x.k===S.sigK)||SIG_KINDS[0];
+  const pts=sigSeries(kind);
+  let stats='';
+  if(pts.length>=2){
+    const vs=pts.map(p=>p.v).slice().sort((a,b)=>a-b);
+    const med=vs[Math.floor(vs.length/2)],lo=vs[0],hi=vs[vs.length-1];
+    const fmt=v=>(kind.k==='Steps'||kind.k==='Calories')?Math.round(v).toLocaleString():Math.round(v*10)/10;
+    stats='<div class="row mt" style="gap:10px">'+
+      [[fmt(pts[pts.length-1].v),'LATEST'],[fmt(med),'TYPICAL'],[fmt(lo)+'\u2013'+fmt(hi),'RANGE']].map(x=>
+      '<div class="card" style="flex:1;padding:11px 8px;text-align:center">'+
+      '<p class="mono" style="font-size:15px;font-weight:700">'+x[0]+'</p>'+
+      '<p class="mono" style="color:var(--faint);font-size:8px;letter-spacing:.08em;margin-top:3px">'+x[1]+'</p></div>').join('')+'</div>'}
+  return '<div class="view pad modalrise" style="padding-top:20px">'+
+    '<div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">'+
+    '<button data-a="nav" data-v="signals" style="width:42px;height:42px;border-radius:42px;background:var(--surface);border:1px solid var(--line);color:var(--dim);display:flex;align-items:center;justify-content:center;flex:none;font-size:16px">\u2039</button>'+
+    '<h1 class="disp" style="font-size:19px;font-weight:600;flex:1;text-align:center;margin:0">'+kind.k+'</h1>'+
+    '<span style="width:42px;flex:none"></span></div>'+
+    '<p style="color:var(--dim);font-size:13px;line-height:1.65;margin-top:8px">'+(SIG_WHY[kind.k]||'')+'</p>'+
+    (pts.length>=2?'<div class="card mt2" style="padding:14px 16px">'+
+      lineChart(pts,{min:0,max:Math.max.apply(null,pts.map(p=>p.v))*1.15,suffix:kind.u.trim(),color:'#1E9BFF',
+        marks:[Math.round(Math.max.apply(null,pts.map(p=>p.v)))]})+
+      '<p class="mono" style="color:var(--faint);font-size:9px;letter-spacing:.05em;margin-top:6px">'+pts.length+' DAYS \u00b7 HOLD THE CHART TO READ ANY POINT</p></div>'+stats
+     :'<div class="card mt2" style="padding:14px 16px"><p style="color:var(--dim);font-size:12.5px;line-height:1.6">Not flowing yet \u2014 it arrives on its own once its source writes into Apple Health.</p></div>')+
+    '<p class="mono" style="color:var(--faint);font-size:8.5px;letter-spacing:.05em;margin-top:14px">SOURCE: '+esc(kind.src.toUpperCase())+'</p>'+
+    '</div>'}
 /* ══ the correlation discoverer (owner call, 3 Sep) ══════════
    The crank. Instead of hand-writing every relationship, this
    pairs EVERY daily signal against EVERY training outcome at
@@ -13322,7 +13369,8 @@ function lineChart(pts,opts){
     (opts.marks||[]).map(g=>'<line x1="'+P+'" x2="'+(W-P)+'" y1="'+Y(g)+'" y2="'+Y(g)+'" stroke="var(--line)" stroke-width="1"/>'+
       '<text x="'+(W-P)+'" y="'+(Y(g)-3)+'" text-anchor="end" fill="var(--faint)" font-size="8" font-family="monospace">'+g+(opts.suffix||'')+'</text>').join('')+
     '<path d="'+pts.map((p,i)=>(i?'L':'M')+X(p.t).toFixed(1)+','+Y(p.v).toFixed(1)).join(' ')+'" fill="none" stroke="'+(opts.color||'#30D158')+'" stroke-width="2.2" stroke-linejoin="round"/>'+
-    pts.map(p=>'<circle cx="'+X(p.t).toFixed(1)+'" cy="'+Y(p.v).toFixed(1)+'" r="2.6" fill="'+(opts.color||'#30D158')+'"/>').join('')+'</svg>';
+    pts.map(p=>{const hot=opts.newAfter&&p.t>opts.newAfter;
+      return '<circle cx="'+X(p.t).toFixed(1)+'" cy="'+Y(p.v).toFixed(1)+'" r="'+(hot?3.6:2.6)+'" fill="'+(hot?'var(--green)':(opts.color||'#30D158'))+'"'+(hot?' stroke="var(--bg)" stroke-width="1"':'')+'/>'}).join('')+'</svg>';
   const scrub=pts.map(p=>({x:+X(p.t).toFixed(1),v:Math.round(p.v*10)/10,d:dayKey(new Date(p.t))}));
   return '<div data-scrub=\''+JSON.stringify(scrub)+'\' data-vb="'+W+'" data-suffix="'+esc(opts.suffix||'')+'" style="position:relative">'+out2+'</div>'}
 function rehabProgress(){
@@ -15842,6 +15890,7 @@ function render(){
   else if(S.view==='guide')body=viewGuide();
   else if(S.view==='acct')body=viewAcct();
   else if(S.view==='today'&&typeof arrivalDue==='function'&&arrivalDue())body=viewArrival();
+  else if(S.view==='sigdetail')body=viewSigDetail();
   else if(S.view==='chart')body=viewChart();
   else if(S.view==='own')body=viewOwn();
   else if(S.view==='ownreview')body=viewOwnReview();
@@ -16041,14 +16090,14 @@ setInterval(function(){try{
     /* hold still and the nearest point surfaces on its own, tree-style
        (owner call, 3 Sep) — no drag needed to start reading */
     clearTimeout(holdT);
-    holdT=setTimeout(function(){if(armed&&!active){active=true;try{vib(6)}catch(e2){}show(w,sx0)}},280)},{passive:true});
+    holdT=setTimeout(function(){if(armed&&!active){active=true;try{vib(6)}catch(e2){}show(w,sx0)}},200)},{passive:true});
   document.addEventListener('touchmove',e=>{
     if(!armed)return;
     const w=e.target.closest&&e.target.closest('[data-scrub]');
     if(!w){clear();return}
     const dx=e.touches[0].clientX-sx0,dy=e.touches[0].clientY-sy0;
-    if(!active){if(Math.abs(dy)>Math.abs(dx)+6){armed=false;clearTimeout(holdT);return}
-      if(Math.abs(dx)>5)active=true;else return}
+    if(!active){if(Math.abs(dy)>Math.abs(dx)*1.5+12){armed=false;clearTimeout(holdT);return}
+      if(Math.abs(dx)>4)active=true;else return}
     show(w,e.touches[0].clientX);
     if(e.cancelable)e.preventDefault()},{passive:false});
   document.addEventListener('touchend',()=>{armed=false;clearTimeout(holdT);setTimeout(clear,1400)},{passive:true});
@@ -18163,6 +18212,7 @@ function runAction(a,v,t,e){
       if(wi===4&&!(typeof acctReady==='function'&&acctReady()))wi=5;
       if(wi>=5){lset('training-welcome-v1',1);delete st9.wi}else st9.wi=wi;
       render();break}
+    case 'sigOpen':{S.sigK=v;S._navQuiet=1;S.view='sigdetail';render();break}
     case 'arrivalGo':{lset('training-arrival-v1',1);try{hapticRun('find')}catch(e){};render();break}
     case 'arrivalSee':{lset('training-arrival-v1',1);S.backTo='today';S._navQuiet=1;S.view='signals';render();break}
     case 'wBack':{const st9=S.setup||(S.setup={gate:true});let wi=(st9.wi||0)-1;
