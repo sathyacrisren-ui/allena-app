@@ -613,7 +613,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='d4b0d3';  // stamped by tools/build.py with the content hash
+const BUILD_ID='59c888';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -13653,7 +13653,7 @@ function viewSession(){
       '<p class="mono" style="color:var(--dim);font-size:14px;margin-top:4px;padding:0 8px">Set '+nx.setNo+' · '+
       (nx.secs?nx.secs+'s hold'+(nx.perSide?' / side':''):(nx.targetW!=null?uwNum(nx.targetW)+' '+uwUnit()+' ':'')+'× '+nx.targetReps+(nx.targetRpe!=null?' @ RPE '+nx.targetRpe:''))+'</p>'+
       muscleChips(nx.ex)+'</div>';
-    {const plan=A.exPlan(),curNo=s.sets[Math.min(s.idx,s.sets.length-1)].exNo;
+    {const plan=A.exPlan(),curNo=s.sets[Math.min(s.idx+1,s.sets.length-1)].exNo;
      const remain=plan.filter(e=>e.done<e.sets.length);
      const setsLeft=s.sets.length-s.log.filter(l=>l.w!=null||l.secs).length;
      rb+='<button data-a="planOpen" class="card mt2" style="width:100%;text-align:left;padding:12px 16px;display:block">'+
@@ -16303,10 +16303,12 @@ function sheetHtml(){
     return wrapSheet('Tune load',inner)}
   if(S.sheet.t==='plan'){
     const s2=S.sess;if(!s2)return '';
-    const plan=A.exPlan(),curNo=s2.sets[Math.min(s2.idx,s2.sets.length-1)].exNo;
+    const plan=A.exPlan();
+    const _ni=s2.phase==='resting'?Math.min(s2.idx+1,s2.sets.length-1):Math.min(s2.idx,s2.sets.length-1);
+    const curNo=s2.sets[_ni].exNo;
     let inner='<p style="color:var(--dim);font-size:13px;line-height:1.55">Tap to jump to an exercise. Hold, then drag to reorder. Logged sets stay logged.</p>'+
       '<div data-draglist="plan" style="margin-top:14px;display:flex;flex-direction:column;gap:8px">'+
-      plan.map((e,pi)=>{const total=e.sets.length,done=e.done,isCur=e.exNo===curNo;
+      plan.map((e,pi)=>{const total=e.sets.length,done=e.done,isCur=e.exNo===curNo&&done<total;
         const target=e.sets[0].st;
         const jumpTo=(e.sets.find(x=>!s2.log.some(l=>l.ex===x.st.ex&&l.setNo===x.st.setNo))||e.sets[0]).i;
         const state=done>=total?'done':(done>0?'part':'todo');
