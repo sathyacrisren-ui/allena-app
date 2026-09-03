@@ -616,7 +616,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='8ba414';  // stamped by tools/build.py with the content hash
+const BUILD_ID='fd9780';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -7895,7 +7895,7 @@ function notifPlan(){
   items.forEach(it=>{const d9=dayKey(new Date(it.ts*1000));(byD[d9]=byD[d9]||[]).push(it)});
   const keep=[];
   Object.keys(byD).forEach(d9=>{byD[d9].sort((a,b)=>priOf(a.id)-priOf(b.id));
-    keep.push.apply(keep,byD[d9].slice(0,4))});
+    keep.push.apply(keep,byD[d9].slice(0,5))});
   return keep.filter(x=>x.ts*1000>Date.now())}
 function notifPreviewHtml(){
   /* the trust surface (owner-approved, 3 Sep): the exact pings iOS is
@@ -7919,7 +7919,7 @@ function notifPreviewHtml(){
         '<span class="mono" style="color:var(--amber);font-size:9px;letter-spacing:.06em;flex:none">'+(KIND[kindOf(it.id)]||'').toUpperCase()+'</span>'+
         '<span class="mono" style="color:var(--faint);font-size:10px;flex:none">'+esc(when)+'</span></div>'+
         '<p style="color:var(--dim);font-size:12px;line-height:1.5;margin-top:3px">'+esc(it.body)+'</p></div>'}).join('')+'</div>'+
-      '<p style="color:var(--faint);font-size:10px;line-height:1.5;margin-top:8px">Each day keeps its best four at most. Every one exists because something is true \u2014 a quiet day sends nothing.</p></div>'+
+      '<p style="color:var(--faint);font-size:10px;line-height:1.5;margin-top:8px">Each day keeps its best five at most. Every one exists because something is true \u2014 a quiet day sends nothing.</p></div>'+
       (typeof notifDumpHtml==='function'?notifDumpHtml():'')
   }catch(e){return ''}}
 function notifAskCard(){
@@ -10331,6 +10331,14 @@ function todayVerdict(){
      your data says to change it" while upper back sat at the floor) */
   const dayM=(function(){try{return Object.keys(dayMuscles(p,pick.i,S.week))}catch(e){return[]}})();
   const sore=dayM.filter(m=>fresh[m]!=null&&fresh[m]<55).sort((a,b)=>fresh[a]-fresh[b]);
+  /* the calendar gets a vote (owner ask, 4 Sep): when the week clock
+     still has room for every remaining session, a sore day is moved,
+     not ground through — push-through is only the call when the days
+     genuinely run out */
+  if(sore.length>=2){const c9=(function(){try{return weekClock()}catch(e){return null}})();
+    if(c9&&c9.remaining.length<=c9.left)return{tone:'ok',t:pick.name+' can wait a day',
+      d:sore.slice(0,2).map(m=>m.toLowerCase()+' '+Math.round(fresh[m])+'%').join(' and ')+' recovered — and the week has room: '+c9.remaining.length+' session'+(c9.remaining.length===1?'':'s')+' left, '+c9.left+' day'+(c9.left===1?'':'s')+' after today. Recovery today buys a better session tomorrow; nothing gets missed.',
+      cta:{a:'prevOpen',v:p.id+':'+pick.i,label:'Train anyway'}}}
   if(sore.length>=2)return{tone:'warn',t:pick.name+' is a stretch today',
     d:sore.slice(0,2).map(m=>m.toLowerCase()+' '+Math.round(fresh[m])+'%').join(' and ')+' recovered. The plan knows repeat exposure is the block\u2019s design \u2014 but expect working weights to feel heavier, and let the RPE targets do the governing.',
     cta:{a:'prevOpen',v:p.id+':'+pick.i,label:'Start '+pick.name}};
@@ -15031,6 +15039,22 @@ function youPageHtml(){
     '<input data-in="prof.name" value="'+esc(pr.name||'')+'" autocomplete="off" style="width:100%;margin-top:8px;background:var(--surface);border:1px solid var(--line);border-radius:10px;color:var(--text);padding:12px;font-size:15px;outline:none">'+
     '<p class="eyebrow" style="margin-top:14px">Age</p>'+
     '<input data-in="prof.age" value="'+esc(pr.age!=null?pr.age:'')+'" inputmode="numeric" style="width:100%;margin-top:8px;background:var(--surface);border:1px solid var(--line);border-radius:10px;color:var(--text);padding:12px;font-size:15px;outline:none">'+
+    '<p class="eyebrow" style="margin-top:14px">Height (cm)</p>'+
+    '<input data-in="prof.height" value="'+esc(pr.height!=null?pr.height:'')+'" inputmode="numeric" style="width:100%;margin-top:8px;background:var(--surface);border:1px solid var(--line);border-radius:10px;color:var(--text);padding:12px;font-size:15px;outline:none">'+
+    (function(){try{
+      const h9=+pr.height;if(!(h9>120&&h9<230))return '<p style="color:var(--faint);font-size:11px;line-height:1.5;margin-top:6px">Height unlocks the fat-free mass index once a scan or bodyfat reading exists.</p>';
+      const sc=(typeof scansSorted==='function'?scansSorted():[])[0];
+      let bw=null,bf=null;
+      if(sc){bw=sc.weight||sc.bw||null;bf=sc.bf!=null?sc.bf:(sc.bodyfat!=null?sc.bodyfat:null)}
+      if(bw==null){const dd=(S.daily&&S.daily.days)||{};const ks=Object.keys(dd).sort().reverse();
+        for(const k9 of ks){if(dd[k9].bw!=null){bw=dd[k9].bw;break}}}
+      if(!(bw>30)||bf==null||!(bf>2&&bf<60))return '<p style="color:var(--faint);font-size:11px;line-height:1.5;margin-top:6px">Height is saved \u2014 a scan with bodyfat completes the fat-free mass index.</p>';
+      const ffmi=Math.round((bw*(1-bf/100))/Math.pow(h9/100,2)*10)/10;
+      return '<div class="card" style="padding:12px 14px;margin-top:10px">'+
+        '<div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font-size:13px;font-weight:600">FFMI</span>'+
+        '<span class="mono" style="font-size:16px;font-weight:700">'+ffmi+'</span></div>'+
+        '<p style="color:var(--faint);font-size:11px;line-height:1.55;margin-top:5px">Fat-free mass \u00f7 height\u00b2, from your latest scan. Published physique research puts the commonly cited drug-free ceiling around 25 \u2014 a scale-independent way to watch muscle, not weight.</p></div>'
+    }catch(e){return ''}})()+
     '<p class="eyebrow" style="margin-top:14px">Sex</p>'+
     '<div class="row" style="margin-top:8px;gap:8px">'+sexPill('female','Female')+sexPill('male','Male')+sexPill('na','Prefer not to say')+'</div>'+
     (function(){let signed=false,em='';try{const a=acct();signed=!!(a&&a.refresh);em=a&&a.email||''}catch(e){}
