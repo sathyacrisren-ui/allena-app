@@ -591,7 +591,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='db5194';  // stamped by tools/build.py with the content hash
+const BUILD_ID='d76010';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -8738,6 +8738,12 @@ function corrDayData(){
     if(best>0)put(k,'topset',best);
     if(ton>0){put(k,'tonnage',ton);put(k,'load',ton)}
     if(rpes.length)put(k,'effort',rpes.reduce((a,b)=>a+b,0)/rpes.length);
+    /* the gym's own micro-clock: live sets carry wall stamps — median
+       rest between sets, and what hour the session started */
+    try{const ts=(h.log||[]).map(l=>l.e&&l.e.t).filter(t=>t>0).sort((a,b)=>a-b);
+      const gaps=[];for(let i=1;i<ts.length;i++){const g=(ts[i]-ts[i-1])/1000;if(g>=25&&g<=420)gaps.push(g)}
+      if(gaps.length>=4){gaps.sort((a,b)=>a-b);put(k,'resty',gaps[Math.floor(gaps.length/2)])}}catch(e2){}
+    try{if(h.startedAt)put(k,'hour',new Date(h.startedAt).getHours())}catch(e2){}
     /* rep fade: first set vs last at the same weight, averaged */
     try{const byW={};(h.log||[]).forEach(l=>{if(l.w>0&&l.r>0)(byW[l.ex+'@'+l.w]=byW[l.ex+'@'+l.w]||[]).push(l.r)});
       const fades=Object.values(byW).filter(a=>a.length>=2).map(a=>a[0]-a[a.length-1]);
@@ -8753,6 +8759,21 @@ function corrDayData(){
     ks.forEach((k,i)=>{const y=new Date(k+'T12:00');y.setDate(y.getDate()-1);
       const prev=days[dayKey(y)];
       if(days[k].sleep!=null&&prev&&prev.sleep!=null)days[k].sleep2=(days[k].sleep+prev.sleep)/2})}catch(e){}
+  /* the day's CONSEQUENCES: tonight's sleep and tomorrow's morning as
+     outcomes of today's choices — training as cause, recovery as
+     effect, the direction the engine was missing */
+  try{Object.keys(days).forEach(k=>{
+    const n=new Date(k+'T12:00');n.setDate(n.getDate()+1);
+    const nx=days[dayKey(n)];
+    if(nx){if(nx.sleep!=null)days[k].sleepo=nx.sleep;
+      if(nx.hrv!=null)days[k].hrvo=nx.hrv;
+      if(nx.ready!=null)days[k].readyo=nx.ready}})}catch(e){}
+  /* sleep consistency: the spread of the last three nights */
+  try{Object.keys(days).forEach(k=>{
+    const vals=[];for(let b=0;b<3;b++){const d0=new Date(k+'T12:00');d0.setDate(d0.getDate()-b);
+      const row=days[dayKey(d0)];if(row&&row.sleep!=null)vals.push(row.sleep)}
+    if(vals.length===3){const m=vals.reduce((a,b)=>a+b,0)/3;
+      days[k].sleepvar=Math.sqrt(vals.reduce((a,b)=>a+(b-m)*(b-m),0)/3)}})}catch(e){}
   return days}
 const CORR_SIGNALS={
   sleep:{n:'a good sleep',dir:'more sleep',unit:'min',hi:'slept-well'},
@@ -8766,7 +8787,10 @@ const CORR_SIGNALS={
   kcal:{n:'a big-eating day',dir:'more calories'},
   bw:{n:'a heavier bodyweight',dir:'more bodyweight'},
   sleep2:{n:'two good nights in a row',dir:'better back-to-back sleep'},
-  load:{n:'a big training day',dir:'a bigger session',trained:1}};
+  load:{n:'a big training day',dir:'a bigger session',trained:1},
+  resty:{n:'longer rests between sets',dir:'longer rests'},
+  hour:{n:'training later in the day',dir:'a later session'},
+  sleepvar:{n:'an inconsistent sleep pattern',dir:'more night-to-night swing',inv:1}};
 const CORR_OUTCOMES={
   topset:{n:'top set',good:'up',dir:1},
   tonnage:{n:'session volume',good:'up',dir:1},
@@ -8774,7 +8798,10 @@ const CORR_OUTCOMES={
   fade:{n:'rep fade inside a session',good:'down',dir:-1,rpe:1},
   pace:{n:'easy-run pace',good:'faster',dir:-1,pace:1},
   beatkm:{n:'heartbeats per km',good:'down',dir:-1,rpe:1},
-  pain:{n:'the knee check-in score',good:'down',dir:-1,rpe:1}};
+  pain:{n:'the knee check-in score',good:'down',dir:-1,rpe:1},
+  sleepo:{n:'that night\u2019s sleep',good:'up',dir:1},
+  hrvo:{n:'next morning\u2019s HRV',good:'up',dir:1},
+  readyo:{n:'next morning\u2019s readiness',good:'up',dir:1}};
 function correlations(){
   const found=[];
   try{
@@ -8789,6 +8816,11 @@ function correlations(){
           /* a training-derived signal correlating with same-day
              training is the same session talking to itself */
           if(CORR_SIGNALS[sig].trained&&lag===0&&(out==='topset'||out==='tonnage'||out==='effort'||out==='fade'))return;
+          /* a signal never predicts its own tomorrow-twin */
+          if((sig==='sleep'||sig==='sleep2'||sig==='sleepvar')&&out==='sleepo')return;
+          if(sig==='hrv'&&out==='hrvo')return;
+          if(sig==='ready'&&out==='readyo')return;
+          if(sig==='hour'&&lag>0)return;   // the clock only speaks about its own day
           const pairs=[];
           keys.forEach(k=>{
             const s=days[k]&&days[k][sig];
@@ -8801,7 +8833,7 @@ function correlations(){
           if(!r)return;
           /* the strict gate — big effect, real sample, past the t-cut;
              conservative on purpose because we test many pairs */
-          if(Math.abs(r.rho)<0.5||r.n<12||r.t<2.5)return;
+          if(Math.abs(r.rho)<0.5||r.n<12||r.t<2.8)return;
           found.push({sig:sig,out:out,lag:lag,rho:r.rho,n:r.n,
             score:Math.abs(r.rho)*Math.sqrt(r.n)})})})});
     found.sort((a,b)=>b.score-a.score);
