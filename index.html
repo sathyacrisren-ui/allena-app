@@ -591,7 +591,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='3d8fc6';  // stamped by tools/build.py with the content hash
+const BUILD_ID='45a07f';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -8736,6 +8736,19 @@ function corrDayData(){
     (h.log||[]).forEach(l=>{if(l.w>0&&l.r>0){best=Math.max(best,e1rm(l.w,l.r));ton+=l.w*l.r}
       if(l.rpe!=null)rpes.push(l.rpe)});
     if(best>0)put(k,'topset',best);
+    /* per-lift tops: different lifts respond to recovery differently —
+       'sleep moves your squat but not your bench' is the sorcery tier */
+    try{const big={bench:/(^|\s)bench/,squat:/squat/,dead:/deadlift/};
+      const veto={bench:/dip|dumbbell|incline|decline|close|floor|machine/,
+        squat:/front|split|bulg|goblet|hack|box|jump/,dead:/romanian|rdl|stiff|single/};
+      const tops={};
+      (h.log||[]).forEach(l=>{if(!(l.w>0&&l.r>0))return;
+        const b2=gBase(l.ex).toLowerCase();
+        Object.keys(big).forEach(k2=>{if(big[k2].test(b2)&&!veto[k2].test(b2))
+          tops[k2]=Math.max(tops[k2]||0,e1rm(l.w,l.r))})});
+      if(tops.bench)put(k,'benchtop',tops.bench);
+      if(tops.squat)put(k,'squattop',tops.squat);
+      if(tops.dead)put(k,'deadtop',tops.dead)}catch(e2){}
     if(ton>0){put(k,'tonnage',ton);put(k,'load',ton)}
     if(rpes.length)put(k,'effort',rpes.reduce((a,b)=>a+b,0)/rpes.length);
     /* the gym's own micro-clock: live sets carry wall stamps — median
@@ -8801,7 +8814,10 @@ const CORR_OUTCOMES={
   pain:{n:'the knee check-in score',good:'down',dir:-1,rpe:1},
   sleepo:{n:'that night\u2019s sleep',good:'up',dir:1},
   hrvo:{n:'next morning\u2019s HRV',good:'up',dir:1},
-  readyo:{n:'next morning\u2019s readiness',good:'up',dir:1}};
+  readyo:{n:'next morning\u2019s readiness',good:'up',dir:1},
+  benchtop:{n:'bench top set',good:'up',dir:1},
+  squattop:{n:'squat top set',good:'up',dir:1},
+  deadtop:{n:'deadlift top set',good:'up',dir:1}};
 function correlations(){
   const found=[];
   try{
