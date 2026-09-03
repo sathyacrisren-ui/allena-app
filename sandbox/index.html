@@ -616,7 +616,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='7c0f0e';  // stamped by tools/build.py with the content hash
+const BUILD_ID='29680c';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -9054,6 +9054,8 @@ function corrDayData(){
       const gaps=[];for(let i=1;i<ts.length;i++){const g=(ts[i]-ts[i-1])/1000;if(g>=25&&g<=420)gaps.push(g)}
       if(gaps.length>=4){gaps.sort((a,b)=>a-b);put(k,'resty',gaps[Math.floor(gaps.length/2)])}}catch(e2){}
     try{if(h.startedAt)put(k,'hour',new Date(h.startedAt).getHours())}catch(e2){}
+    try{if(h.minutes>=15&&h.minutes<=240)put(k,'sessmins',h.minutes)}catch(e2){}
+    try{if(h.planned>0)put(k,'adher',Math.min(1.2,(h.log||[]).length/h.planned))}catch(e2){}
     /* rep fade: first set vs last at the same weight, averaged */
     try{const byW={};(h.log||[]).forEach(l=>{if(l.w>0&&l.r>0)(byW[l.ex+'@'+l.w]=byW[l.ex+'@'+l.w]||[]).push(l.r)});
       const fades=Object.values(byW).filter(a=>a.length>=2).map(a=>a[0]-a[a.length-1]);
@@ -9064,9 +9066,17 @@ function corrDayData(){
       put(k,'pace',r.mins/r.km);
       if(r.hr>0)put(k,'beatkm',(r.mins*r.hr)/r.km)}
     if(r.type==='ride'&&r.km>5&&r.mins>0&&r.hr>0)
-      put(k,'rideeff',(r.km/(r.mins/60))/r.hr)})}catch(e){}
+      put(k,'rideeff',(r.km/(r.mins/60))/r.hr);
+    /* daily movement volumes as signals in their own right */
+    if(isRunType(r.type)&&r.km>0)days[k]=Object.assign(days[k]||{},{km:((days[k]||{}).km||0)+r.km});
+    if(r.type==='walk'&&r.km>0)days[k]=Object.assign(days[k]||{},{walkkm:((days[k]||{}).walkkm||0)+r.km});
+    if(r.type==='ride'&&r.km>0)days[k]=Object.assign(days[k]||{},{ridekm:((days[k]||{}).ridekm||0)+r.km})})}catch(e){}
   /* rehab check-ins as an outcome — pain is data, never a diagnosis */
-  try{((S.acl&&S.acl.checks)||[]).forEach(c=>{if(c.pain!=null)put(String(c.date).slice(0,10),'pain',+c.pain)})}catch(e){}
+  try{((S.acl&&S.acl.checks)||[]).forEach(c=>{const k9=String(c.date).slice(0,10);
+    if(c.pain!=null)put(k9,'pain',+c.pain);
+    if(c.stiff!=null)put(k9,'stiff',+c.stiff);
+    if(c.conf!=null)put(k9,'conf',+c.conf);
+    if(c.swell!=null)put(k9,'swell',+c.swell)})}catch(e){}
   /* two-night sleep average rides as its own signal */
   try{const ks=Object.keys(days).sort();
     ks.forEach((k,i)=>{const y=new Date(k+'T12:00');y.setDate(y.getDate()-1);
@@ -9080,14 +9090,15 @@ function corrDayData(){
     const nx=days[dayKey(n)];
     if(nx){if(nx.sleep!=null)days[k].sleepo=nx.sleep;
       if(nx.hrv!=null)days[k].hrvo=nx.hrv;
+      if(nx.rhr!=null)days[k].rhro=nx.rhr;
       if(nx.ready!=null)days[k].readyo=nx.ready}})}catch(e){}
   /* per-exercise top sets — the grid scales with the user's own
-     library (owner directive: toward 10,000s of hypotheses). The 12
+     library (owner directive: toward 10,000s of hypotheses). The 20
      most-trained lifts each become an outcome. */
   try{
     const cnt={};(S.history||[]).forEach(h=>{if(!h.complete||h.run)return;
       (h.log||[]).forEach(l=>{if(l.w>0&&l.r>0)cnt[gBase(l.ex)]=(cnt[gBase(l.ex)]||0)+1})});
-    const topEx=Object.keys(cnt).filter(k=>cnt[k]>=10).sort((a,b)=>cnt[b]-cnt[a]).slice(0,12);
+    const topEx=Object.keys(cnt).filter(k=>cnt[k]>=8).sort((a,b)=>cnt[b]-cnt[a]).slice(0,20);
     const exSet=new Set(topEx);
     (S.history||[]).forEach(h=>{if(!h.complete||h.run)return;
       const k=String(h.date).slice(0,10),tops={};
@@ -9096,10 +9107,26 @@ function corrDayData(){
       Object.keys(tops).forEach(b2=>put(k,'ex:'+b2,tops[b2]))})}catch(e){}
   /* 3-day windowed signals: the body often answers averages, not days */
   try{const ks3=Object.keys(days).sort();
-    ks3.forEach(k=>{['steps','kcal','protein'].forEach(f=>{
+    ks3.forEach(k=>{['steps','kcal','protein','sleep','rhr','carb','fat','load','km'].forEach(f=>{
       const vals=[];for(let b=0;b<3;b++){const d0=new Date(k+'T12:00');d0.setDate(d0.getDate()-b);
         const row=days[dayKey(d0)];if(row&&row[f]!=null)vals.push(row[f])}
       if(vals.length===3)days[k][f+'3']=vals.reduce((a,b)=>a+b,0)/3})})}catch(e){}
+  /* HRV day-over-day swing — the direction of travel, not the level */
+  try{Object.keys(days).forEach(k=>{
+    const y=new Date(k+'T12:00');y.setDate(y.getDate()-1);
+    const prev=days[dayKey(y)];
+    if(days[k].hrv!=null&&prev&&prev.hrv!=null)days[k].hrvswing=days[k].hrv-prev.hrv})}catch(e){}
+  /* bodyweight trend: this week vs last — cutting hard has a cost the
+     scale sees before the bar does */
+  try{Object.keys(days).forEach(k=>{
+    if(days[k].bw==null)return;
+    for(let b=6;b<=8;b++){const d0=new Date(k+'T12:00');d0.setDate(d0.getDate()-b);
+      const row=days[dayKey(d0)];
+      if(row&&row.bw!=null){days[k].bwtrend=days[k].bw-row.bw;break}}})}catch(e){}
+  /* the calendar itself: weekends train differently */
+  try{Object.keys(days).forEach(k=>{
+    const dw=new Date(k+'T12:00').getDay();
+    days[k].weekend=(dw===0||dw===6)?1:0})}catch(e){}
   /* sleep consistency: the spread of the last three nights */
   try{Object.keys(days).forEach(k=>{
     const vals=[];for(let b=0;b<3;b++){const d0=new Date(k+'T12:00');d0.setDate(d0.getDate()-b);
@@ -9122,7 +9149,15 @@ const CORR_SIGNALS={
   load:{n:'a big training day',dir:'a bigger session',trained:1},
   resty:{n:'longer rests between sets',dir:'longer rests'},
   hour:{n:'training later in the day',dir:'a later session'},
-  sleepvar:{n:'an inconsistent sleep pattern',dir:'more night-to-night swing',inv:1}};
+  sleepvar:{n:'an inconsistent sleep pattern',dir:'more night-to-night swing',inv:1},
+  vo2:{n:'a higher VO2max reading',dir:'a higher VO2max'},
+  hrvswing:{n:'HRV on the way up',dir:'a rising HRV'},
+  bwtrend:{n:'bodyweight trending up',dir:'a rising weekly bodyweight'},
+  weekend:{n:'a weekend day',dir:'the weekend'},
+  km:{n:'a running day',dir:'more running km',trained:1},
+  walkkm:{n:'a big walking day',dir:'more walking'},
+  ridekm:{n:'a riding day',dir:'more riding km',trained:1},
+  sessmins:{n:'a long session',dir:'a longer session',trained:1}};
 const CORR_OUTCOMES={
   topset:{n:'top set',good:'up',dir:1},
   tonnage:{n:'session volume',good:'up',dir:1},
@@ -9137,14 +9172,25 @@ const CORR_OUTCOMES={
   benchtop:{n:'bench top set',good:'up',dir:1},
   squattop:{n:'squat top set',good:'up',dir:1},
   deadtop:{n:'deadlift top set',good:'up',dir:1},
-  rideeff:{n:'bike efficiency (speed per heartbeat)',good:'up',dir:1}};
+  rideeff:{n:'bike efficiency (speed per heartbeat)',good:'up',dir:1},
+  rhro:{n:'next morning\u2019s resting heart rate',good:'down',dir:-1,neg:1},
+  stiff:{n:'the stiffness check-in',good:'down',dir:-1,neg:1},
+  conf:{n:'knee confidence',good:'up',dir:1},
+  swell:{n:'the swelling check-in',good:'down',dir:-1,neg:1},
+  adher:{n:'how much of the plan got done',good:'up',dir:1}};
 function corrMaps(days){
   /* the effective grid, built per account: baseline maps plus every
      ex: outcome present in the rows and the windowed signal variants */
   const sigs=Object.assign({},CORR_SIGNALS,{
     steps3:{n:'a big-step stretch',dir:'a bigger three-day step average'},
     kcal3:{n:'a well-fed stretch',dir:'more calories across three days'},
-    protein3:{n:'a high-protein stretch',dir:'more protein across three days'}});
+    protein3:{n:'a high-protein stretch',dir:'more protein across three days'},
+    sleep3:{n:'a well-slept stretch',dir:'better sleep across three nights'},
+    rhr3:{n:'a settled resting heart rate',dir:'a lower three-day resting HR',inv:1},
+    carb3:{n:'a high-carb stretch',dir:'more carbs across three days'},
+    fat3:{n:'a high-fat stretch',dir:'more fat across three days'},
+    load3:{n:'a heavy training stretch',dir:'a bigger three-day training load',trained:1},
+    km3:{n:'a big running stretch',dir:'more running km across three days',trained:1}});
   const outs=Object.assign({},CORR_OUTCOMES);
   const seenEx={};
   Object.keys(days).forEach(k=>Object.keys(days[k]).forEach(f=>{
@@ -9155,7 +9201,7 @@ function correlations(){
   const found=[];
   try{
     /* memoized: the mass grid is cheap once a day, not every render */
-    const stamp=today()+':'+(S.history||[]).length+':'+(function(){try{return Object.keys(hkDailyStore().days).length}catch(e){return 0}})();
+    const stamp=today()+':'+(S.history||[]).length+':'+(S.runs||[]).length+':'+(function(){try{return Object.keys(hkDailyStore().days).length}catch(e){return 0}})();
     if(S._corrMemo&&S._corrMemo.stamp===stamp)return S._corrMemo.v;
     const days=corrDayData();
     const keys=Object.keys(days).sort();
@@ -9168,12 +9214,16 @@ function correlations(){
         [0,1,2].forEach(lag=>{
           /* a training-derived signal correlating with same-day
              training is the same session talking to itself */
-          if(M.sigs[sig].trained&&lag===0&&(out==='topset'||out==='tonnage'||out==='effort'||out==='fade'||M.outs[out].exo))return;
+          if(M.sigs[sig].trained&&lag===0&&(out==='topset'||out==='tonnage'||out==='effort'||out==='fade'||out==='adher'||out==='benchtop'||out==='squattop'||out==='deadtop'||M.outs[out].exo))return;
           /* a signal never predicts its own tomorrow-twin */
-          if((sig==='sleep'||sig==='sleep2'||sig==='sleepvar')&&out==='sleepo')return;
-          if(sig==='hrv'&&out==='hrvo')return;
+          if((sig==='sleep'||sig==='sleep2'||sig==='sleep3'||sig==='sleepvar')&&out==='sleepo')return;
+          if((sig==='hrv'||sig==='hrvswing')&&out==='hrvo')return;
+          if((sig==='rhr'||sig==='rhr3')&&out==='rhro')return;
           if(sig==='ready'&&out==='readyo')return;
           if(sig==='hour'&&lag>0)return;   // the clock only speaks about its own day
+          if((sig==='km'||sig==='km3')&&lag===0&&(out==='pace'||out==='beatkm'))return; // a run vs its own numbers
+          if(sig==='ridekm'&&lag===0&&out==='rideeff')return;
+          if(sig==='vo2'&&(out==='beatkm'||out==='rideeff'||out==='pace')&&lag===0)return; // engine measures agree by construction
           const pairs=[];
           keys.forEach(k=>{
             const s=days[k]&&days[k][sig];
@@ -9208,8 +9258,10 @@ function correlations(){
    +1 = should help, 0 = genuinely open either way. A finding that
    contradicts a +1 prior is a CONFOUND until proven otherwise — it
    gets named honestly as backwards, and it is NEVER advice. */
-const CORR_PRIOR={sleep:1,sleep2:1,hrv:1,rhr:1,ready:1,protein:1,protein3:1,
-  carb:1,kcal3:1,sleepvar:1,kcal:0,fat:0,bw:0,steps:0,steps3:0,load:0,resty:0,hour:0};
+const CORR_PRIOR={sleep:1,sleep2:1,sleep3:1,hrv:1,hrvswing:1,rhr:1,rhr3:1,ready:1,
+  protein:1,protein3:1,carb:1,carb3:1,kcal3:1,sleepvar:1,vo2:1,
+  kcal:0,fat:0,fat3:0,bw:0,bwtrend:0,steps:0,steps3:0,load:0,load3:0,
+  km:0,km3:0,walkkm:0,ridekm:0,sessmins:0,resty:0,hour:0,weekend:0};
 function corrPhrase(c){
   const M=S._corrMaps||{sigs:CORR_SIGNALS,outs:CORR_OUTCOMES};
   const S9=M.sigs[c.sig]||CORR_SIGNALS[c.sig],O=M.outs[c.out]||CORR_OUTCOMES[c.out];
@@ -9217,7 +9269,7 @@ function corrPhrase(c){
   // does the signal RISING move the outcome UP or DOWN?
   const signalUp=S9.inv?-1:1;
   const outcomeRises=(c.rho*signalUp)>0;   // true = they move together
-  const good=O.pace?(!outcomeRises):(O.rpe?(!outcomeRises):outcomeRises);
+  const good=O.pace?(!outcomeRises):(O.rpe||O.neg?(!outcomeRises):outcomeRises);
   const contra=(CORR_PRIOR[c.sig]===1)&&!good;
   const when=c.lag===0?'on the same day':c.lag===1?'the day after':'two days after';
   const move=O.pace?(outcomeRises?'slower':'faster')
