@@ -613,7 +613,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='76e5fa';  // stamped by tools/build.py with the content hash
+const BUILD_ID='d3e377';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -1404,7 +1404,8 @@ async function acctSend(email){
     const r=await fetch(CLOUD.url+'/auth/v1/otp?redirect_to='+encodeURIComponent(CLOUD.site),{method:'POST',
       headers:{'content-type':'application/json',apikey:CLOUD.anon},
       body:JSON.stringify({email:email,create_user:true,gotrue_meta_security:{}})});
-    if(r.ok)flash('Code sent — open your email and type the 8-digit code here.');
+    if(r.ok){flash('Code sent — open your email and type the 8-digit code here.');
+      S.acctResent=1;setTimeout(function(){S.acctResent=0;try{render()}catch(e9){}},2600)}
     else{S.acctPending=false;const d=await r.json().catch(()=>({}));
       flash(d.msg||d.error_description||'Could not send the code — try again in a minute.')}
   }catch(e){S.acctPending=false;flash('No connection.')}
@@ -1481,7 +1482,9 @@ function accountSection(){
       'Type the 8-digit code from the email here. If the email shows a button instead of a code, ignore the button — it opens the browser, not this app. The code is the way in.</p>'+
     '<input data-in="acctCode" value="'+esc(S.acctCode||'')+'" placeholder="8-digit code" inputmode="numeric" autocomplete="one-time-code" class="mono" style="width:100%;margin-top:10px;background:var(--surface);border:1px solid var(--line);border-radius:10px;color:var(--text);padding:12px;font-size:16px;letter-spacing:.2em;text-align:center;outline:none">'+
     '<button data-a="acctVerify" class="btn mt" style="color:var(--amber)">Sign in with the code</button>'+
-    '<button data-a="acctSend2" class="btn mt" style="color:var(--dim)">Send a fresh code</button>'+
+    (S.acctResent
+      ?'<button class="btn mt an-pop" style="color:var(--green);border-color:var(--greensoft)" disabled>\u2713 New code on its way</button>'
+      :'<button data-a="acctSend2" class="btn mt" style="color:var(--dim)">Send a fresh code</button>')+
     '<button data-a="acctReset" class="btn mt" style="color:var(--faint);font-size:11px">Different email</button>';
   return '<p style="color:var(--dim);font-size:13px;line-height:1.55;margin-top:8px">'+
       'Sign in with just your email — an emailed code, no password. It unlocks the coach chat without any API key, and backs up your score card (points, tier, tree, counts). Training data itself never leaves this phone.</p>'+
@@ -18912,7 +18915,7 @@ function runAction(a,v,t,e){
       flash(px9?'Saved — Allena runs through your cloud link.'
         :k9?'Saved — Allena runs on your own key ('+(S.ai.model&&S.ai.model.indexOf('haiku')>=0?'Haiku':'Sonnet')+').'
         :'Saved. Without a key or link, chat opens in the Claude app.');break}
-    case 'acctSend':case 'acctSend2':{const e2=(S.acctEmail||(acct()&&acct().email)||'').trim();
+    case 'acctSend':case 'acctSend2':{const e2=(S.acctEmail||(acct()&&(acct().pendingEmail||acct().email))||'').trim();
       if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e2)){flash('Enter a real email first.');break}
       acctSend(e2);break}
     case 'acctVerify':acctVerify(S.acctCode);break;
