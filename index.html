@@ -616,7 +616,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='10e0ff';  // stamped by tools/build.py with the content hash
+const BUILD_ID='57f1eb';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -7226,7 +7226,9 @@ function hkNative(list){
     if(!out.length)return;
     const res=hkImport({workouts:out,skipped:{}});
     try{if(res.added)hkPulse(res.added)}catch(e9){}
-    if(res.added){flash(res.added+' workout'+(res.added===1?'':'s')+' in from Apple Health.');render()}
+    if(res.added){flash(res.added+' workout'+(res.added===1?'':'s')+' in from Apple Health.');
+      try{sorceryOnArrival('workout')}catch(e9){}
+      render()}
   }catch(e){}}
 try{window.hkNative=hkNative}catch(e){}
 
@@ -7689,6 +7691,7 @@ function hkNutrition(rows){
       if(r.fat!=null&&d.fat==null){d.fat=Math.round(r.fat);n++}});
     if(n){lset(K_DAILY,S.daily);try{hkPulse(n)}catch(e9){}
       flash('Nutrition synced from Health — '+rows.length+' days.');
+      try{sorceryOnArrival('fuel')}catch(e9){}
       try{render()}catch(e9){} /* without this the drawer dot and cards stayed stale until the next tap */}}catch(e){}}
 try{window.hkNutrition=hkNutrition}catch(e){}
 
@@ -7804,6 +7807,8 @@ function notifSave(){lset(K_NOTIF,S.notifP)}
 function notifPlan(){
   const P=notifPrefs(),items=[];
   if(!P.on)return items;
+  try{const sq=(sorceryStore().queue||[]).filter(q=>q.ts>Date.now()/1000-600);
+    sq.forEach(q=>items.push(q))}catch(e){}
   const at=(d,h,m)=>{const x=new Date(d+'T12:00');x.setHours(h,m,0,0);return Math.round(x.getTime()/1000)};
   const dk=n=>dayKey(new Date(Date.now()+n*864e5));
   if(P.morning&&S.gar&&S.gar.on)for(let i=1;i<=3;i++)
@@ -7899,7 +7904,7 @@ function notifPlan(){
      reachable find \u00b7 16:30 the call \u00b7 18/8:00 physio \u00b7 19:30
      reveal) and each day keeps its best FOUR at most — scatter is
      texture, five pings is spam. */
-  const priOf=id=>/^ap/.test(id)?0:/^am/.test(id)?1:/^dr/.test(id)?2:/^fu/.test(id)?3:/^nf/.test(id)?4:/^dc/.test(id)?5:/^wh/.test(id)?6:/^rv/.test(id)?7:/^q\d/.test(id)?8:/^wr/.test(id)?9:10;
+  const priOf=id=>/^ap/.test(id)?0:/^sc/.test(id)?1:/^am/.test(id)?1:/^dr/.test(id)?2:/^fu/.test(id)?3:/^nf/.test(id)?4:/^dc/.test(id)?5:/^wh/.test(id)?6:/^rv/.test(id)?7:/^q\d/.test(id)?8:/^wr/.test(id)?9:10;
   const byD={};
   items.forEach(it=>{const d9=dayKey(new Date(it.ts*1000));(byD[d9]=byD[d9]||[]).push(it)});
   const keep=[];
@@ -8175,6 +8180,77 @@ function notifDumpHtml(){
   else h+='<p style="color:var(--faint);font-size:12px;margin-top:6px">Tap to ask iOS for its real list \u2014 do it mid-rest and \u201crestend\u201d must appear with a countdown.</p>';
   h+='<button data-a="notifDump" class="btn mt" style="font-size:12px">Ask iOS now</button></div>';
   return h}
+
+/* ══ ARRIVAL SORCERY (owner call, 4 Sep) ═════════════════════
+   Scheduled whispers speak at fixed hours; this speaks in the
+   minutes AFTER data lands — the moment the psychic feeling is
+   strongest. Hard honesty caps: each kind once a day, TWO arrival
+   notifications a day total, every line a real computed fact tied
+   to the user's own baselines or banked insights. Silence when the
+   data is ordinary — no participation trophies. */
+function sorceryStore(){const st=lget('training-sorcery-v1',{})||{};
+  if(st.day!==today()){st.day=today();st.fired={};st.queue=[]}return st}
+function sorceryQueue(kind,body){
+  try{
+    const st=sorceryStore();
+    if(st.fired[kind]||Object.keys(st.fired).length>=2)return;
+    st.fired[kind]=1;
+    st.queue=(st.queue||[]).filter(q=>q.ts>Date.now()/1000-3600);
+    st.queue.push({id:'sc'+kind+st.day,ts:Math.round(Date.now()/1000)+45,title:'Allena',body:body});
+    lset('training-sorcery-v1',st);
+    try{notifSync()}catch(e){}
+  }catch(e){}}
+function sorceryOnArrival(kind){
+  try{
+    const st=sorceryStore();
+    if(Object.keys(st.fired).length>=2)return;
+    if(kind==='workout'){
+      /* the engine read on the workout that JUST landed */
+      const r=(S.runs||[]).slice().sort((a,b)=>String(a.date).localeCompare(String(b.date))).pop();
+      if(!r)return;
+      if(r.type==='ride'&&r.hr>0&&r.km>5){
+        const effs=rides().map(x=>rideEff(x)).filter(x=>x!=null).sort((a,b)=>b-a);
+        const e9=rideEff(r),rank=effs.indexOf(e9)+1;
+        if(rank>0&&rank<=3&&effs.length>=5)sorceryQueue('workout',
+          'That ride: efficiency '+e9+' \u2014 your '+(rank===1?'best ever':rank===2?'second best':'third best')+' of '+effs.length+'. The engine is growing.')}
+      else if(isRunType(r.type)&&r.km>3&&r.mins>0){
+        const paces=(S.runs||[]).filter(x=>isRunType(x.type)&&x.km>3&&x.mins>0).map(x=>x.mins/x.km).sort((a,b)=>a-b);
+        const p9=r.mins/r.km,rank=paces.indexOf(p9)+1;
+        if(rank>0&&rank<=3&&paces.length>=6)sorceryQueue('workout',
+          'That run: '+paceStr(p9)+'/km \u2014 '+(rank===1?'your fastest ever':'top three all-time')+' at this distance class. Logged and counted.')}
+      return}
+    if(kind==='steps'){
+      /* today's PARTIAL steps already beat 90% of complete days */
+      const dd=hkDailyStore().days||{};
+      const tk=today(),cur=dd[tk]&&dd[tk].steps;
+      if(!(cur>2000))return;
+      const hist=Object.keys(dd).filter(k=>k<tk&&dd[k].steps>0).map(k=>dd[k].steps).sort((a,b)=>a-b);
+      if(hist.length<14)return;
+      const p90=hist[Math.floor(hist.length*0.9)];
+      if(cur>p90&&new Date().getHours()<=18)sorceryQueue('steps',
+        cur.toLocaleString()+' steps already \u2014 past 90% of your complete days with hours left. Legs will carry this into tomorrow\u2019s ledger.');
+      return}
+    if(kind==='fuel'){
+      /* a banked carb insight + a run planned tomorrow + today's carbs
+         genuinely behind the user's own pre-run norm — the 'eat your
+         carbs' whisper, fired by the live shortfall, not the clock */
+      if(new Date().getHours()<15)return;
+      const bank=discBank();
+      const hasCarb=Object.keys(bank).some(id=>/^corr:(carb|kcal)/.test(id)&&/(pace|beatkm|topset|benchtop)/.test(id)&&!bank[id].contra);
+      if(!hasCarb)return;
+      const rp=S.runplan;
+      const DN=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+      const runsTomorrow=rp&&Array.isArray(rp.days)&&rp.days.indexOf(DN[new Date(Date.now()+864e5).getDay()])>=0;
+      if(!runsTomorrow)return;
+      const dd=(S.daily&&S.daily.days)||{};
+      const cur=dd[today()]&&dd[today()].carb;
+      const hist=Object.keys(dd).filter(k=>k<today()&&dd[k].carb>0).map(k=>dd[k].carb).sort((a,b)=>a-b);
+      if(cur==null||hist.length<7)return;
+      const med=hist[Math.floor(hist.length/2)];
+      if(cur<med*0.6)sorceryQueue('fuel',
+        'Tomorrow runs, and today sits at '+Math.round(cur)+'g carbs \u2014 your good run days usually land near '+Math.round(med)+'g. The window is this evening.');
+      return}
+  }catch(e){}}
 const RARITY=[['common','#8A8782','Noticed'],['uncommon','#30D158','Worth knowing'],
   ['rare','#D9D6CD','Rare find'],['epic','#FFFFFF','Big one']];
 function rarityOf(k){return RARITY.find(x=>x[0]===k)||RARITY[0]}
@@ -8686,6 +8762,7 @@ function hkDaily(rows){
           const dd=S.daily.days[k]=S.daily.days[k]||{};
           if(dd.bw==null||dd.bw===''){dd.bw=Math.round(+r.bw*10)/10;lset(K_DAILY,S.daily);n++}}catch(e){}}});
     try{if(n)hkPulse(n)}catch(e9){}
+    try{if(typeof sorceryOnArrival==='function')sorceryOnArrival('steps')}catch(e9){}
     if(!n)return;
     const ks=Object.keys(st.days).sort();
     while(ks.length>180)delete st.days[ks.shift()];
