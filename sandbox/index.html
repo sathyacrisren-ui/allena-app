@@ -616,7 +616,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='fd9780';  // stamped by tools/build.py with the content hash
+const BUILD_ID='583e4a';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -1122,7 +1122,7 @@ function sessLine(h,full){
 /* the token ledger: every AI door counts itself per day and refuses
    honestly at its cap — the arbitrage only works if no path can run
    unmetered. Caps are generous for a human, impossible for a loop. */
-const AI_CAPS={coach:80,imp:15,scan:10,deep:2};
+const AI_CAPS={coach:80,imp:15,scan:10,deep:2,analyst:3};
 function aiSpend(kind){
   const d=today();S.ai.spend=S.ai.spend||{};
   if(S.ai.spend.day!==d)S.ai.spend={day:d};
@@ -9504,6 +9504,71 @@ function whisperGen(){
   }catch(e){}
   return out.slice(0,3)}
 
+/* ══ THE ANALYST PASS (premium lens, 4 Sep) ══════════════════
+   The strongest model reads EVERYTHING the deterministic engine
+   proved — and only that. It may synthesise across findings, argue
+   mechanisms, investigate the backwards patterns, and design ONE
+   two-week experiment the engine itself will verify. It may never
+   invent a finding. Deterministic before AI, always. */
+const ANALYST_SYS='You are Allena\u2019s analyst pass \u2014 the premium lens over a training app\u2019s deterministic statistics engine. The CONTEXT lists every correlation the engine has PROVEN in this user\u2019s own data (plus faded links, forecast record, training summary). Rules, absolute: 1) Never state a finding that is not in the context \u2014 you synthesise and explain, the engine discovers. 2) Look for the STORY: which findings are one mechanism wearing three coats? Name the loop and its cheapest intervention point. 3) For any [BACKWARDS/CONFOUND] finding, propose the most likely confound and how the user could check it. 4) End with exactly one two-week experiment: a concrete, small protocol change, what daily data to keep logging, and which single number the engine should watch to verdict it. 5) Voice: plain, direct, a sharp coach who respects the reader \u2014 no hype, no hedging fog, cite the correlation numbers you lean on. Under 320 words, short paragraphs, no headers.';
+function analystContext(){
+  const L=[];
+  try{const pr=S.prof||{};L.push('ATHLETE: '+(pr.sex||'?')+', age '+(pr.age||'?')+(pr.height?', '+pr.height+'cm':'')+'. Goal: '+(pr.goal||'general strength')+'.')}catch(e){}
+  try{
+    const cur=correlations();
+    if(cur.length){L.push('PROVEN CORRELATIONS (Spearman, split-half stable, n = days):');
+      cur.forEach(c=>{const p=corrPhrase(c);
+        L.push('- '+(p.contra?'[BACKWARDS/CONFOUND] ':'')+p.title+'. '+p.body)})}
+    else L.push('No correlations have cleared the evidence bar yet.');
+    const st=lget('training-corrstate-v1',{})||{};
+    const gone=Object.keys(st).filter(k=>st[k].gone);
+    if(gone.length)L.push('FADED LINKS (once held, no longer clear the bar): '+gone.join(' ; '));
+  }catch(e){}
+  try{const d=predStats();if(d.n)L.push('FORECAST RECORD: of '+d.n+' daily calls, '+d.called+' matched and '+d.beat+' were beaten.')}catch(e){}
+  try{
+    const cut=dayKey(new Date(Date.now()-14*864e5));
+    const hs=(S.history||[]).filter(h=>h.complete&&!h.run&&String(h.date).slice(0,10)>=cut);
+    const ton=hs.reduce((a,h)=>a+(h.log||[]).reduce((x,l)=>x+(l.w||0)*(l.r||0),0),0);
+    const km=(S.runs||[]).filter(r=>isRunType(r.type)&&String(r.date).slice(0,10)>=cut).reduce((a,r)=>a+(r.km||0),0);
+    L.push('LAST 14 DAYS: '+hs.length+' lifting sessions, '+Math.round(ton/1000*10)/10+'t total, '+Math.round(km)+'km run.');
+  }catch(e){}
+  try{const low=muscleFresh().filter(x=>x.fresh<60).sort((a,b)=>a.fresh-b.fresh).slice(0,3);
+    if(low.length)L.push('RECOVERY NOW: '+low.map(x=>x.m+' '+x.fresh+'%').join(', ')+'.')}catch(e){}
+  try{const g=(S.goals||[]);if(g.length)L.push('GOALS: '+g.map(x=>x.ex+' '+x.w+'\u00d7'+x.r).join('; ')+'.')}catch(e){}
+  return L.join('\n')}
+function analystStore(){return lget('training-analyst-v1',null)}
+async function analystRun(){
+  try{
+    if(!aiReady()){flash('Sign in first \u2014 the analyst runs through the Allena cloud.');return}
+    if(!aiSpend('analyst'))return;
+    S.analystBusy=true;render();
+    try{hapticRun('deep')}catch(e){}
+    const res=await claudeFetch({model:'claude-fable-5',max_tokens:1500,
+      system:ANALYST_SYS,messages:[{role:'user',content:'CONTEXT:\n'+analystContext()+'\n\nRun the analyst pass.'}]});
+    const d=await res.json();
+    S.analystBusy=false;
+    if(d&&d.content&&d.content.length){
+      const t=d.content.map(x=>x.text||'').join('').trim();
+      lset('training-analyst-v1',{day:today(),t:t});
+      try{hapticRun('find')}catch(e){}}
+    else flash(d&&d.error&&d.error.message||'The analyst could not run \u2014 try again in a minute.');
+    render()
+  }catch(e){S.analystBusy=false;flash('Couldn\u2019t reach the analyst \u2014 check your connection.');render()}}
+function analystCard(){
+  try{
+    const st=analystStore();
+    let h='<div class="card mt" style="padding:16px;border-color:var(--amber)">'+
+      '<p class="mono" style="font-size:9px;color:var(--amber);letter-spacing:.1em">\u2726 THE ANALYST PASS \u00b7 PREMIUM LENS \u00b7 BETA PREVIEW</p>'+
+      '<p class="disp" style="font-size:17px;font-weight:600;margin-top:6px">One analyst. Everything the engine has proven.</p>';
+    if(S.analystBusy)h+='<p style="color:var(--dim);font-size:12.5px;margin-top:8px">Reading every finding, the faded links, the forecast record\u2026</p>'+
+      '<div class="tdots" style="margin-top:10px"><span></span><span></span><span></span></div>';
+    else if(st&&st.t)h+='<div style="color:var(--text);font-size:13.5px;line-height:1.65;margin-top:10px">'+md(st.t)+'</div>'+
+      '<p class="mono" style="color:var(--faint);font-size:9.5px;margin-top:10px">RUN '+esc(st.day)+' \u00b7 THE ENGINE VERIFIES THE EXPERIMENT AS THE DAYS LAND</p>'+
+      '<button data-a="analystRun" class="btn mt" style="font-size:12.5px">Run it again</button>';
+    else h+='<p style="color:var(--dim);font-size:12.5px;line-height:1.6;margin-top:8px">The strongest model reads only what the statistics engine has proven in your data \u2014 finds the story across findings, interrogates the backwards patterns, and designs one two-week experiment your own engine will verdict.</p>'+
+      '<button data-a="analystRun" class="big disp mt" style="background:var(--amber);color:var(--bg);font-size:14.5px">Run the analyst pass</button>';
+    return h+'</div>'}catch(e){return ''}}
+
 /* ══ where you stand (Sep 2026) ══════════════════════════════
    Cross-domain rarity — the honest version of the viral
    "bench 225 = sub-19 5K" reels. Percentiles are computed vs
@@ -13140,6 +13205,7 @@ function viewFindings(){
     '<h1 class="disp" style="font-size:25px;font-weight:600">Findings</h1>'+
     '<p style="color:var(--dim);font-size:13px;line-height:1.6;margin-top:8px">Three lenses on the same data \u2014 the deeper the lens, the rarer what it sees.</p>'+
     '<div id="deepcard" style="scroll-margin-top:14px">'+deepCard()+'</div>'+
+    (typeof analystCard==='function'?analystCard():'')+
     analyseCard()+
     discCard()+
     nearRings()+
@@ -19129,6 +19195,7 @@ function runAction(a,v,t,e){
     case 'acctVerify':acctVerify(S.acctCode);break;
     case 'acctReset':lset(K_ACCT,null);S.acctPending=false;S.acctCode='';S.acctEmail='';render();break;
     case 'deepRun':deepRun();break;
+    case 'analystRun':analystRun();break;
     case 'cbGo':{const cb=cbStore();if(cb&&cb.state==='offered'){cb.state='on';cb.started=today();cb.progress=0;lset(K_CB,cb);vib(12)}render();break}
     case 'cbSkip':{const cb=cbStore();if(cb&&cb.state==='offered'){cb.state='skip';lset(K_CB,cb)}render();break}
     case 'muscleOpen':S.sheet={t:'muscle',m:v};render();break;
