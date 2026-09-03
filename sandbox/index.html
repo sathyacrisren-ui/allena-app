@@ -612,7 +612,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='76eca3';  // stamped by tools/build.py with the content hash
+const BUILD_ID='9123d1';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -9197,6 +9197,15 @@ function correlations(){
     S._corrMemo={stamp:stamp,v:v};
     return v;
   }catch(e){return[]}}
+/* the common-sense layer (beta-caught by Angus, 3 Sep: 'your incline
+   bench increase is correlated to less sleep' — statistically real,
+   physiologically backwards). Priors encode what exercise science
+   already knows about each GOOD-version signal helping outcomes:
+   +1 = should help, 0 = genuinely open either way. A finding that
+   contradicts a +1 prior is a CONFOUND until proven otherwise — it
+   gets named honestly as backwards, and it is NEVER advice. */
+const CORR_PRIOR={sleep:1,sleep2:1,hrv:1,rhr:1,ready:1,protein:1,protein3:1,
+  carb:1,kcal3:1,sleepvar:1,kcal:0,fat:0,bw:0,steps:0,steps3:0,load:0,resty:0,hour:0};
 function corrPhrase(c){
   const M=S._corrMaps||{sigs:CORR_SIGNALS,outs:CORR_OUTCOMES};
   const S9=M.sigs[c.sig]||CORR_SIGNALS[c.sig],O=M.outs[c.out]||CORR_OUTCOMES[c.out];
@@ -9205,10 +9214,16 @@ function corrPhrase(c){
   const signalUp=S9.inv?-1:1;
   const outcomeRises=(c.rho*signalUp)>0;   // true = they move together
   const good=O.pace?(!outcomeRises):(O.rpe?(!outcomeRises):outcomeRises);
+  const contra=(CORR_PRIOR[c.sig]===1)&&!good;
   const when=c.lag===0?'on the same day':c.lag===1?'the day after':'two days after';
   const move=O.pace?(outcomeRises?'slower':'faster')
     :O.rpe?(outcomeRises?'harder':'easier')
     :(outcomeRises?'higher':'lower');
+  if(contra){
+    const title='A backwards pattern: '+O.n+' vs '+S9.n.replace(/^(a|an|the) /,'');
+    const body='Across '+c.n+' days, your '+O.n+' tends to run '+move+' '+when+' '+S9.dir+
+      ' (correlation '+(Math.round(c.rho*100)/100)+'). Read that with a raised eyebrow: it is almost certainly not '+S9.dir+' hurting — far more likely your schedule bunches things (hard sessions landing after short nights, say), or something else drives both. Filed as a curiosity, never as advice — Allena will not coach against '+S9.n+'.';
+    return{title:title,body:body,strong:false,good:false,contra:true}}
   const title=O.n.charAt(0).toUpperCase()+O.n.slice(1)+' runs '+move+' after '+S9.n;
   const body='Across '+c.n+' days, your '+O.n+' tends to be '+move+' '+when+' '+S9.dir+' '+
     '(correlation '+(Math.round(c.rho*100)/100)+'). A pattern in your own data, not proof of cause — but worth watching.';
@@ -9218,7 +9233,7 @@ function correlationDiscoveries(){
   const cur=correlations();
   cur.forEach(c=>{
     const p=corrPhrase(c);
-    D.push({rar:p.strong?'epic':'rare',t:p.title,d:p.body,tag:'signal',id:'corr:'+c.sig+':'+c.out+':'+c.lag})});
+    D.push({rar:p.contra?'common':(p.strong?'epic':'rare'),t:p.title,d:p.body,tag:'signal',contra:p.contra?1:0,id:'corr:'+c.sig+':'+c.out+':'+c.lag})});
   /* the second harvest (owner call, 3 Sep — more, all day, honestly):
      a known link STRENGTHENING on new evidence, or a once-solid link
      BREAKING, is genuinely new information. Tracked against the last
@@ -9244,7 +9259,8 @@ function correlationDiscoveries(){
     if(dirty)lset('training-corrstate-v1',st)}catch(e){}
   return D}
 function correlationNoticed(){
-  return correlations().slice(0,1).map(c=>{const p=corrPhrase(c);return{t:p.title,d:p.body,tier:1}})}
+  return correlations().map(c=>corrPhrase(c)).filter(p=>!p.contra).slice(0,1)
+    .map(p=>({t:p.title,d:p.body,tier:1}))}
 
 /* ── the reveal (owner call, 3 Sep: 'super super cool, dramatic, in
    your face when found') ─────────────────────────────────────
@@ -9338,6 +9354,7 @@ function whisperGen(){
   try{
     const bank=discBank();
     const corr=Object.keys(bank).filter(id=>id.slice(0,5)==='corr:')
+      .filter(id=>!bank[id].contra)  // a backwards pattern must never become a timed nudge
       .map(id=>{const q=id.split(':');return{sig:q[1],out:q[2],lag:+q[3],t:bank[id].t||''}});
     if(!corr.length)return out;
     const at=(h,m)=>{const d=new Date(today()+'T12:00');d.setHours(h,m,0,0);return Math.round(d.getTime()/1000)};
