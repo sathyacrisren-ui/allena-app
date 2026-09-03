@@ -616,7 +616,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='3ee205';  // stamped by tools/build.py with the content hash
+const BUILD_ID='2e0a4f';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -9344,18 +9344,42 @@ function signalDue(){
     const bank=discBank();
     const fresh=correlationDiscoveries().find(d=>!bank[d.id]);
     return fresh||null}catch(e){return null}}
+/* the ceremony, generalized (owner: 'more of it please', 4 Sep):
+   the constellation scene fires for every moment that has EARNED it —
+   a fresh insight first, else any epic banked today that has not had
+   its scene. One per app-open, real events only, marked kept forever. */
+const REVEAL_DRESS={
+  signal:{e:'\u2726 AN INSIGHT',c:'#30D158'},
+  call:{e:'\u2726 THE CALL, ANSWERED',c:'#E0A458'},
+  quest:{e:'\u2726 QUEST COMPLETE',c:'#E0A458'},
+  rehab:{e:'\u2726 A GATE CLEARED',c:'#30D158'},
+  ghost:{e:'\u2726 THE GHOST, BEATEN',c:'#E0A458'},
+  record:{e:'\u2726 A RARE FIND',c:'#E0A458'}};
+function revealDue(){
+  try{
+    const sg=signalDue();
+    if(sg)return Object.assign({kind:'signal'},REVEAL_DRESS.signal,sg);
+    const seen=lget('training-revealseen-v1',{})||{};
+    const bank=discBank();
+    const cand=Object.keys(bank).map(id=>Object.assign({id:id},bank[id]))
+      .filter(x=>x.rar==='epic'&&x.found===today()&&!seen[x.id]&&x.tag!=='signal')
+      .sort((a,b)=>String(a.id).localeCompare(String(b.id)));
+    if(!cand.length)return null;
+    const x=cand[0];
+    return Object.assign({kind:'epic'},REVEAL_DRESS[x.tag]||REVEAL_DRESS.record,x)
+  }catch(e){return null}}
 function signalRevealHtml(){
   const sg=S.signalReveal;if(!sg)return '';
   return '<div id="signalReveal" data-a="signalKeep" style="position:fixed;inset:0;z-index:940;background:radial-gradient(circle at 50% 42%,#242b26,#141312 70%);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px;text-align:center;overflow:hidden">'+
     '<svg viewBox="0 0 300 200" style="position:absolute;width:min(90vw,420px);opacity:.9;top:14%">'+
-    '<line class="sig-link" x1="70" y1="60" x2="230" y2="150" stroke="#30D158" stroke-width="1.4" opacity=".55"/>'+
+    '<line class="sig-link" x1="70" y1="60" x2="230" y2="150" stroke="'+(sg.c||'#30D158')+'" stroke-width="1.4" opacity=".55"/>'+
     '<circle class="sig-a" cx="70" cy="60" r="6" fill="#E8E5DC"/>'+
-    '<circle class="sig-b" cx="230" cy="150" r="6" fill="#30D158"/>'+
+    '<circle class="sig-b" cx="230" cy="150" r="6" fill="'+(sg.c||'#30D158')+'"/>'+
     Array.from({length:22},(_,i)=>{const a=i*0.618*6.283,rr=30+((i*37)%120);
       return '<circle class="sig-dust" style="animation-delay:'+(i*40)+'ms" cx="'+(150+Math.cos(a)*rr).toFixed(0)+'" cy="'+(100+Math.sin(a)*rr*0.6).toFixed(0)+'" r="1.3" fill="#7BA88A" opacity="0"/>'}).join('')+
     '</svg>'+
     '<div style="position:relative;margin-top:34vh">'+
-    '<p class="mono sig-eyebrow" style="font-size:11px;letter-spacing:.24em;color:#30D158">✦ AN INSIGHT</p>'+
+    '<p class="mono sig-eyebrow" style="font-size:11px;letter-spacing:.24em;color:'+(sg.c||'#30D158')+'">'+(sg.e||'\u2726 AN INSIGHT')+'</p>'+
     '<p class="disp sig-title" style="font-size:27px;line-height:1.2;font-weight:700;margin-top:12px;max-width:15ch">'+esc(sg.t)+'</p>'+
     '<p class="sig-body" style="color:var(--dim);font-size:13.5px;line-height:1.6;margin-top:12px;max-width:34ch">'+esc(sg.d)+'</p>'+
     '<p class="mono sig-tap" style="color:var(--faint);font-size:10.5px;letter-spacing:.06em;margin-top:26px">TAP TO KEEP IT</p>'+
@@ -13711,7 +13735,7 @@ function viewToday(){
   if(demoPresent())h+='<button data-a="demoClear" class="card" style="width:100%;text-align:left;padding:11px 15px;margin-top:14px;border-color:var(--amber);display:flex;align-items:center;gap:10px">'+
     '<span class="mono" style="color:var(--amber);font-size:9.5px;flex:none">DEMO</span>'+
     '<span style="flex:1;font-size:12px;color:var(--dim)">Sample data is loaded so you can see the trends — tap to remove it and start clean.</span></button>';
-  try{if(!S.signalReveal&&!S.signalShownFor){const sg=signalDue();
+  try{if(!S.signalReveal&&!S.signalShownFor){const sg=(typeof revealDue==='function'?revealDue():signalDue());
     if(sg){S.signalShownFor=sg.id;S.signalReveal=sg;setTimeout(function(){render()},400)}}}catch(e){}
   /* the Health link outranks everything — it is the one tap that
      unlocks the whole engine, so it is the FIRST thing a fresh
@@ -18626,7 +18650,8 @@ function runAction(a,v,t,e){
       flash('No rush — the reminder will nudge you. It is the one thing that changes everything.');break}
     case 'signalOpen':{const sg=signalDue();if(sg){S.signalReveal=sg;render()}break}
     case 'signalKeep':{const sg=S.signalReveal;
-      if(sg){const bank=discBank();if(!bank[sg.id]){bank[sg.id]={t:sg.t,d:sg.d,rar:sg.rar,tag:'signal',found:today()};bankSave()}}
+      if(sg&&sg.kind==='epic'){const seen=lget('training-revealseen-v1',{})||{};seen[sg.id]=1;lset('training-revealseen-v1',seen)}
+      else if(sg){const bank=discBank();if(!bank[sg.id]){bank[sg.id]={t:sg.t,d:sg.d,rar:sg.rar,tag:'signal',found:today()};bankSave()}}
       S.signalReveal=null;render();break}
     case 'notifAskYes':{const P=notifPrefs();P.asked=1;P.on=true;notifSave();notifSync();render();break}
     case 'notifAskNo':{const P=notifPrefs();P.asked=1;P.on=false;notifSave();render();
