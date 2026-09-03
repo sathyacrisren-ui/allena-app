@@ -612,7 +612,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='d149ba';  // stamped by tools/build.py with the content hash
+const BUILD_ID='29faf8';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -7886,7 +7886,8 @@ function notifPreviewHtml(){
     const kindOf=id=>/^ap/.test(id)?'ap':/^am/.test(id)?'am':/^dr/.test(id)?'dr':/^fu/.test(id)?'fu':/^nf/.test(id)?'nf':/^dc/.test(id)?'dc':/^rv/.test(id)?'rv':/^q\d/.test(id)?'q':/^wr/.test(id)?'wr':/^rest/.test(id)?'re':'hc';
     const items=notifPlan().slice().sort((a,b)=>a.ts-b.ts).slice(0,8);
     if(!items.length)return '<div class="card mt" style="padding:13px 15px"><p class="eyebrow">Queued right now</p>'+
-      '<p style="color:var(--dim);font-size:12px;line-height:1.6;margin-top:6px">Nothing \u2014 nothing is true to say yet. Quiet is honest; the queue fills as real facts arrive.</p></div>';
+      '<p style="color:var(--dim);font-size:12px;line-height:1.6;margin-top:6px">Nothing \u2014 nothing is true to say yet. Quiet is honest; the queue fills as real facts arrive.</p></div>'+
+      (typeof notifDumpHtml==='function'?notifDumpHtml():'');
     return '<div class="card mt" style="padding:13px 15px"><p class="eyebrow">Queued right now</p>'+
       '<div style="margin-top:8px">'+items.map((it,i)=>{
         const d=new Date(it.ts*1000);
@@ -7896,7 +7897,8 @@ function notifPreviewHtml(){
         '<span class="mono" style="color:var(--amber);font-size:9px;letter-spacing:.06em;flex:none">'+(KIND[kindOf(it.id)]||'').toUpperCase()+'</span>'+
         '<span class="mono" style="color:var(--faint);font-size:10px;flex:none">'+esc(when)+'</span></div>'+
         '<p style="color:var(--dim);font-size:12px;line-height:1.5;margin-top:3px">'+esc(it.body)+'</p></div>'}).join('')+'</div>'+
-      '<p style="color:var(--faint);font-size:10px;line-height:1.5;margin-top:8px">Each day keeps its best four at most. Every one exists because something is true \u2014 a quiet day sends nothing.</p></div>'
+      '<p style="color:var(--faint);font-size:10px;line-height:1.5;margin-top:8px">Each day keeps its best four at most. Every one exists because something is true \u2014 a quiet day sends nothing.</p></div>'+
+      (typeof notifDumpHtml==='function'?notifDumpHtml():'')
   }catch(e){return ''}}
 function notifAskCard(){
   /* the pre-prompt (owner call, 3 Sep): our card asks first, with the
@@ -8109,6 +8111,33 @@ function hkHR(id,res){
   }catch(e){}}
 try{window.hkHR=hkHR}catch(e){}
 try{setTimeout(hrWitnessBackfill,6000)}catch(e){}
+
+/* ── the X-ray: what iOS is ACTUALLY holding ─────────────────
+   Guessing ends here. The wrapper asks UNUserNotificationCenter
+   for its real state and pending alarms; Settings prints it. */
+function notifDumpAsk(){
+  try{S._notifDump='waiting';render();
+    window.webkit.messageHandlers.allena.postMessage(JSON.stringify({type:'notifdump'}))}catch(e){}}
+try{window.__notifDump=function(d){S._notifDump=d;try{render()}catch(e){}}}catch(e){}
+function notifDumpHtml(){
+  if(!inWrapper())return '';
+  let h='<div class="card mt" style="padding:13px 15px">'+
+    '<p class="eyebrow">What iOS is actually holding</p>';
+  const d=S._notifDump;
+  if(d==='waiting')h+='<p style="color:var(--faint);font-size:12px;margin-top:6px">Asking iOS\u2026</p>';
+  else if(d&&typeof d==='object'){
+    const lab=(v)=>v===2?'on':v===0?'not asked / n-a':'OFF';
+    h+='<p class="mono" style="font-size:11px;color:var(--dim);line-height:1.8;margin-top:6px">'+
+      'permission: '+(d.auth===2?'granted':'NOT GRANTED ('+d.auth+')')+'<br>'+
+      'banners: '+lab(d.alerts)+' \u00b7 sound: '+lab(d.sound)+'<br>'+
+      'time-sensitive: '+lab(d.timeSensitive)+' \u00b7 summary-held: '+(d.scheduledSummary===2?'YES \u2014 this delays alerts':'no')+'</p>';
+    const pend=(d.pending||[]).slice().sort((a,b)=>a['in']-b['in']);
+    h+=pend.length?'<p class="mono" style="font-size:11px;color:var(--dim);line-height:1.8;margin-top:8px">'+
+        pend.slice(0,8).map(x=>x.id+' \u2192 fires in '+(x['in']>=0?(x['in']<120?x['in']+'s':Math.round(x['in']/60)+'m'):'?')).join('<br>')+'</p>'
+      :'<p style="color:var(--red);font-size:12px;margin-top:8px">iOS holds NOTHING for Allena \u2014 the plan is not reaching the scheduler.</p>'}
+  else h+='<p style="color:var(--faint);font-size:12px;margin-top:6px">Tap to ask iOS for its real list \u2014 do it mid-rest and \u201crestend\u201d must appear with a countdown.</p>';
+  h+='<button data-a="notifDump" class="btn mt" style="font-size:12px">Ask iOS now</button></div>';
+  return h}
 const RARITY=[['common','#8A8782','Noticed'],['uncommon','#30D158','Worth knowing'],
   ['rare','#D9D6CD','Rare find'],['epic','#FFFFFF','Big one']];
 function rarityOf(k){return RARITY.find(x=>x[0]===k)||RARITY[0]}
@@ -18917,6 +18946,7 @@ function runAction(a,v,t,e){
     case 'acctSend':case 'acctSend2':{const e2=(S.acctEmail||(acct()&&(acct().pendingEmail||acct().email))||'').trim();
       if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e2)){flash('Enter a real email first.');break}
       acctSend(e2);break}
+    case 'notifDump':notifDumpAsk();break;
     case 'acctVerify':acctVerify(S.acctCode);break;
     case 'acctReset':lset(K_ACCT,null);S.acctPending=false;S.acctCode='';S.acctEmail='';render();break;
     case 'deepRun':deepRun();break;
