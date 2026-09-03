@@ -484,20 +484,34 @@ const udStr=km=>udNum(km)+' '+UNITS.d;
 const entryStr=l=>l.secs!=null?l.secs+'s'+(l.perSide?'/side':''):(l.w?uwNum(l.w):'BW')+' × '+l.r+(l.rpe!=null?' @'+l.rpe:'');
 function download(blob,name){
   /* WKWebView has no download pipeline — an <a download> click dies
-     silently (owner-caught: exports 'not working' in the app). The
-     native share sheet is the real path: Save to Files → iCloud. The
-     anchor stays as the browser fallback. */
+     silently. Path 1: the native share sheet (Save to Files). If the
+     webview refuses file-sharing (owner-caught: toast claimed saved,
+     no sheet appeared), path 2: an honest fallback sheet with the
+     data itself. Browsers keep the anchor. Returns which path ran so
+     callers only celebrate what actually happened. */
   try{
-    if(navigator.canShare&&navigator.share){
+    if(navigator.share){
       const f=new File([blob],name,{type:blob.type||'application/octet-stream'});
-      if(navigator.canShare({files:[f]})){
-        navigator.share({files:[f]}).catch(function(){
-          try{flash('iOS needs a fresh tap for the save sheet — hit Export again.')}catch(e2){}});
-        return}}
+      if(navigator.canShare&&navigator.canShare({files:[f]})){
+        navigator.share({files:[f]})
+          .then(function(){try{flash('Saved.')}catch(e2){}})
+          .catch(function(err){
+            if(err&&err.name==='AbortError')return;      // user closed the sheet
+            exportFallback(blob,name)});
+        return 'share'}}
   }catch(e){}
+  const wrapped=(function(){try{return !!(window.webkit&&window.webkit.messageHandlers&&window.webkit.messageHandlers.allena)}catch(e){return false}})();
+  if(wrapped){exportFallback(blob,name);return 'fallback'}
   const u=URL.createObjectURL(blob);const a=document.createElement('a');
   a.href=u;a.download=name;document.body.appendChild(a);a.click();
-  setTimeout(()=>{URL.revokeObjectURL(u);a.remove()},1500)}
+  setTimeout(()=>{URL.revokeObjectURL(u);a.remove()},1500);
+  return 'anchor'}
+function exportFallback(blob,name){
+  try{
+    if(/\.json$/i.test(name)){
+      blob.text().then(function(t){S.exportText=t;S.exportName=name;S.sheet={t:'exportsave'};render()})}
+    else{S.exportText=null;S.exportName=name;S.sheet={t:'exportsave'};render()}
+  }catch(e){try{flash('Could not open the save sheet — try again.')}catch(e2){}}}
 
 /* ══ minimal XLSX writer ════════════════════════════════ */
 const CRC=(()=>{const t=new Uint32Array(256);for(let n=0;n<256;n++){let c=n;
@@ -571,7 +585,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='cb09e8';  // stamped by tools/build.py with the content hash
+const BUILD_ID='9a309c';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -1683,10 +1697,13 @@ A.backup=(auto)=>{
   /* auto-backups raise a real iOS save prompt — once a day is care,
      every save is nagging (owner-reported, Sep 2026) */
   if(auto&&Date.now()-(lget(K_BK,0)||0)<20*36e5)return;
-  download(new Blob([JSON.stringify(backupObj(),null,2)],{type:'application/json'}),
+  const mode=download(new Blob([JSON.stringify(backupObj(),null,2)],{type:'application/json'}),
   'training-backup-'+today()+'.json');
   lset(K_BK,Date.now());
-  flash(auto?'Auto-backup ready — tap Save to Files › iCloud Drive.':'Backup saved. Keep it in iCloud Drive.');render()};
+  // the share/fallback paths speak for themselves — only the browser
+  // anchor gets the old toast (a claimed save must be a real one)
+  if(mode==='anchor')flash(auto?'Auto-backup ready — check your downloads.':'Backup downloaded. Keep it in iCloud Drive.');
+  render()};
 A.copyProgram=()=>{const t=JSON.stringify(activeProg(),null,2);
   if(navigator.clipboard)navigator.clipboard.writeText(t).then(()=>flash('Program JSON copied — paste it to Claude for the next block.'),()=>flash('Copy blocked — use the backup file instead.'));
   else flash('Copy not supported here — use the backup file.')};
@@ -14204,6 +14221,14 @@ function sheetHtml(){
         '<p style="color:var(--faint);font-size:11.5px;line-height:1.5;margin-top:5px">'+esc(w.d)+'</p>'+
         (w.gated?'<p class="mono" style="color:var(--amber);font-size:9px;letter-spacing:.05em;margin-top:4px">'+esc(String(w.gated).toUpperCase())+'</p>':'')+
         '</div>').join('')+'</div>')}
+  if(S.sheet.t==='exportsave'){
+    return wrapSheet('Save your export',
+      '<p style="color:var(--dim);font-size:13px;line-height:1.6">iOS would not hand this build the share sheet, so here is the honest route'+(S.exportText?'':' — a fresh tap usually unlocks it')+'.</p>'+
+      (S.exportText
+        ?'<button data-a="exportCopy" class="big disp mt" style="background:var(--amber);color:var(--bg);font-size:15px">Copy the backup to the clipboard</button>'+
+         '<p style="color:var(--dim);font-size:12.5px;line-height:1.6;margin-top:10px">Then open <b style="color:var(--text)">Files</b> (or Notes), make a new file and paste. Name it <span class="mono" style="font-size:11px">'+esc(S.exportName||'backup.json')+'</span> and keep it in iCloud Drive — that file restores everything.</p>'
+        :'<button data-a="exportRetry" class="big disp mt" style="background:var(--amber);color:var(--bg);font-size:15px">Try the share sheet again</button>'+
+         '<p style="color:var(--dim);font-size:12.5px;line-height:1.6;margin-top:10px">Excel files need the native sheet — a fresh tap gives iOS the gesture it wants.</p>'))}
   if(S.sheet.t==='weekgate'){
     const p9=activeProgSafe(),pw=S.week-1;
     const ws9=p9?weekState(p9,pw):{n:0,total:0};
@@ -16652,6 +16677,10 @@ function runAction(a,v,t,e){
       if(S.sheet&&S.sheet.t==='dailyfind')S.dfExtra=null;
       S.sheet=null;render();break}
     case 'exportXlsx':A.exportXlsx();break;
+    case 'exportCopy':{try{navigator.clipboard.writeText(S.exportText||'').then(
+      function(){flash('Copied — paste it into a new file in Files or Notes.')},
+      function(){flash('Copy blocked — try the export again.')})}catch(e){flash('Copy blocked — try the export again.')}break}
+    case 'exportRetry':{S.sheet=null;render();A.exportXlsx();break}
     case 'backup':A.backup();break;
     case 'copyProgram':A.copyProgram();break;
     case 'askRemove':S.sheet={t:'removeprog',id:v};render();break;
