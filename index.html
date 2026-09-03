@@ -616,7 +616,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='57f1eb';  // stamped by tools/build.py with the content hash
+const BUILD_ID='d8f6b0';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -11184,14 +11184,18 @@ function watchList(){
    add('Which day you train best',usable,3,
      'Needs three sessions on each of three different days, with effort logged. Then Allena can tell you where to put the hard one.',
      discoveries().some(d=>/easiest day|train better in/.test(d.t)))}
-  /* time of day */
+  /* time of day — kept in the back pocket until the user's life
+     actually varies (owner call, 4 Sep): someone who only ever trains
+     evenings would stare at 1/2 forever, an un-completable nag. The
+     entry appears the day a second time-slot shows up in history. */
   {const slots={};H.forEach(h=>{const hr=new Date(h.date).getHours();
      const r=h.log.filter(l=>l.rpe!=null);if(!r.length)return;
      const s2=hr<11?'m':hr<16?'d':'e';slots[s2]=(slots[s2]||0)+1});
-   const n=Object.keys(slots).filter(k=>slots[k]>=4).length;
-   add('Whether mornings or evenings suit you',n,2,
-     'Four sessions at two different times of day. Most people are meaningfully better at one.',
-     discoveries().some(d=>/train better in the/.test(d.t)))}
+   if(Object.keys(slots).length>=2){
+     const n=Object.keys(slots).filter(k=>slots[k]>=4).length;
+     add('Whether mornings or evenings suit you',n,2,
+       'Four sessions at two different times of day. Most people are meaningfully better at one.',
+       discoveries().some(d=>/train better in the/.test(d.t)))}}
   /* readiness baseline */
   {const g=Object.keys((S.gar&&S.gar.days)||{}).filter(k=>S.gar.days[k].am!=null).length;
    add('Your readiness baseline',g,14,
