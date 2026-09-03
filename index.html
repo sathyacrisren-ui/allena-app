@@ -212,6 +212,13 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
   z-index:94;display:flex;align-items:center;gap:7px;padding:4px 13px;background:var(--raised);
   border:1.5px solid rgba(240,238,230,.65);border-radius:999px;box-shadow:0 5px 18px rgba(0,0,0,.45);
   transition:opacity .35s ease;pointer-events:none;white-space:nowrap}
+#livePill{position:fixed;top:calc(env(safe-area-inset-top) + 6px);left:50%;transform:translateX(-50%);
+z-index:96;display:flex;align-items:center;gap:7px;padding:7px 14px;border-radius:99px;
+background:var(--raised);border:1px solid var(--line);box-shadow:0 4px 18px rgba(0,0,0,.35);
+transition:opacity .4s;pointer-events:none}
+body.island #livePill{top:38px}
+body.sesslive #livePill{top:calc(env(safe-area-inset-top) + 40px)}
+body.island.sesslive #livePill{top:72px}
 body.island #hkPulse{top:38px}
 body.sesslive #hkPulse{top:calc(env(safe-area-inset-top) + 40px)}
 body.island.sesslive #hkPulse{top:72px}
@@ -394,6 +401,21 @@ function hkPulseEnd(){
       '<span class="mono" style="font-size:11px;font-weight:700;letter-spacing:.06em;color:var(--text)">'+n+' NEW</span>';
       setTimeout(function(){el.style.opacity='0';setTimeout(function(){try{el.remove()}catch(e){}},400)},1700)}
     else{el.style.opacity='0';setTimeout(function(){try{el.remove()}catch(e){}},400)}}catch(e){}}
+/* the live-verified pill (owner call, 3 Sep): when a witness lands
+   after the fact — HR window, day scan, watch overlap — the upgrade
+   gets the same quiet capsule as the Health pulse, in green. */
+let _lvPT=null;
+function livePill(){
+  try{
+    if(document.getElementById('bootHost'))return;
+    let el=document.getElementById('livePill');
+    if(!el){el=document.createElement('div');el.id='livePill';
+      el.innerHTML='<span class="mono" style="font-size:11px;font-weight:700;color:var(--green)">\u2713</span>'+
+        '<span class="mono" style="font-size:11px;font-weight:700;letter-spacing:.08em;color:var(--green)">LIVE VERIFIED</span>';
+      document.body.appendChild(el)}
+    el.style.opacity='1';
+    clearTimeout(_lvPT);_lvPT=setTimeout(function(){
+      el.style.opacity='0';setTimeout(function(){try{el.remove()}catch(e){}},400)},2800)}catch(e){}}
 const K_THEME='training-theme-v1';
 function applyTheme(){try{
   const t=lget(K_THEME,'system');
@@ -591,7 +613,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='8dccd8';  // stamped by tools/build.py with the content hash
+const BUILD_ID='85439b';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -7111,7 +7133,7 @@ function watchCorroborate(){
         /* say it out loud (owner call, 3 Sep): a witness that never
            testifies is wasted — the moment the watch corroborates a
            session, the user hears it */
-        try{flash('Your watch confirmed '+(String(h.date).slice(0,10)===today()?'today\u2019s':fmtDate(h.date)+'\u2019s')+' session \u2014 '+w.mins+' min at avg HR '+(w.hr||'?')+'. Witnessed live.');
+        try{livePill();flash('Your watch confirmed '+(String(h.date).slice(0,10)===today()?'today\u2019s':fmtDate(h.date)+'\u2019s')+' session \u2014 '+w.mins+' min at avg HR '+(w.hr||'?')+'. Witnessed live.');
           haptic('success')}catch(e9){}}});
     if(dirty){saveHistory();lset(K_WG,watchGym())}
   }catch(e){}}
@@ -8018,7 +8040,7 @@ function hkHR(id,res){
           const h=(S.history||[]).find(x=>String(x.id)===String(hid));
           if(h&&!h.hr){h.hr={avg:Math.round(b.avg),max:Math.round(b.max),n:b.n,day:1};
             saveHistory();
-            try{flash('Your watch carried a working-heart-rate block that day \u2014 avg '+h.hr.avg+'. The typed session checks out. Recorded live.');
+            try{livePill();flash('Your watch carried a working-heart-rate block that day \u2014 avg '+h.hr.avg+'. The typed session checks out. Recorded live.');
               haptic('success')}catch(e9){}
             render()}}}
       return}
@@ -8031,6 +8053,7 @@ function hkHR(id,res){
        activity started on the watch, but its all-day heart rate was
        sampling right through the session window */
     try{if(typeof heartWitnessed==='function'&&heartWitnessed(h)){
+      livePill();
       flash('Your watch was listening \u2014 avg HR '+h.hr.avg+' through '+(String(h.date).slice(0,10)===today()?'today\u2019s':fmtDate(h.date)+'\u2019s')+' session. Heart-witnessed.');
       haptic('success')}}catch(e9){}
     render()
