@@ -613,7 +613,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='85439b';  // stamped by tools/build.py with the content hash
+const BUILD_ID='6789ec';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -13322,6 +13322,17 @@ function ghostCard(){
       '<span class="mono" style="color:var(--amber);font-size:13px;flex:none">›</span></button>';
     else h+='<button data-a="fghostOpen" class="mono" style="display:block;width:100%;text-align:left;color:var(--faint);font-size:10.5px;margin-top:7px">Ghost codes ›</button>';
     return h+'</div>'}catch(e){return ''}}
+function resumeCard(){
+  if(S.sess)return '<button data-a="resume" class="card" style="width:100%;text-align:left;padding:16px;border-color:var(--amber);background:var(--raised);margin-top:18px">'+
+    '<p class="eyebrow" style="color:var(--amber)">Session in progress</p>'+
+    '<p class="disp" style="font-size:16.5px;font-weight:600;margin-top:4px">'+esc(S.sess.dayName)+'</p>'+
+    '<p class="mono" style="color:var(--dim);font-size:12px;margin-top:4px">'+S.sess.log.length+' of '+S.sess.sets.length+' sets logged \u00b7 tap to resume</p></button>';
+  const unf=(S.history||[]).filter(x=>!x.complete&&!x.run&&(x.log||[]).length&&(Date.now()-new Date(x.date).getTime())<36e5*20).slice(-1)[0];
+  if(unf)return '<button data-a="resumeHist" data-v="'+unf.id+'" class="card" style="width:100%;text-align:left;padding:16px;border-color:var(--line);background:var(--raised);margin-top:18px">'+
+    '<p class="eyebrow">Unfinished session</p>'+
+    '<p class="disp" style="font-size:16.5px;font-weight:600;margin-top:4px">'+esc(unf.dayTitle||'Session')+'</p>'+
+    '<p class="mono" style="color:var(--dim);font-size:12px;margin-top:4px">'+unf.log.length+' sets saved \u00b7 tap to pick it back up</p></button>';
+  return ''}
 function todayOrder(){
   /* the priority engine (owner call, Sep 2026): Today auto-arranges by
      what is most pressing and most NEW, computed from real state — not
@@ -13334,15 +13345,7 @@ function todayOrder(){
   const hr=new Date().getHours();
 
   // a running or unfinished session outranks everything — it's half-done work
-  if(S.sess)add('<button data-a="resume" class="card" style="width:100%;text-align:left;padding:16px;border-color:var(--amber);background:var(--raised);margin-top:18px">'+
-    '<p class="eyebrow" style="color:var(--amber)">Session in progress</p>'+
-    '<p class="disp" style="font-size:16.5px;font-weight:600;margin-top:4px">'+esc(S.sess.dayName)+'</p>'+
-    '<p class="mono" style="color:var(--dim);font-size:12px;margin-top:4px">'+S.sess.log.length+' of '+S.sess.sets.length+' sets logged · tap to resume</p></button>',95);
-  else{const unf=(S.history||[]).filter(x=>!x.complete&&!x.run&&(x.log||[]).length&&(Date.now()-new Date(x.date).getTime())<36e5*20).slice(-1)[0];
-    if(unf)add('<button data-a="resumeHist" data-v="'+unf.id+'" class="card" style="width:100%;text-align:left;padding:16px;border-color:var(--line);background:var(--raised);margin-top:18px">'+
-      '<p class="eyebrow">Unfinished session</p>'+
-      '<p class="disp" style="font-size:16.5px;font-weight:600;margin-top:4px">'+esc(unf.dayTitle||'Session')+'</p>'+
-      '<p class="mono" style="color:var(--dim);font-size:12px;margin-top:4px">'+unf.log.length+' sets saved · tap to pick it back up</p></button>',94)}
+  add(resumeCard(),S.sess?95:94);
 
   // the comeback's offer is an emotional moment — it goes high on arrival
   try{const cb=cbState();add(comebackCard(),cb&&cb.state==='offered'?88:55)}catch(e){add(comebackCard(),55)}
@@ -13419,6 +13422,7 @@ function viewHome(){
   let h='<div class="view pad stg" style="padding-top:28px">';
   h+='<div style="display:flex;justify-content:space-between;align-items:center;gap:12px">'+
     drawerBtn()+'<h1 class="disp" style="font-size:25px;font-weight:600;flex:1;min-width:0">Program</h1>'+(p.empty?'':weekChip())+headBtns()+'</div>';
+  try{h+=(typeof resumeCard==='function'?resumeCard():'')}catch(e){}
   if(p.empty){
     return h+'<div class="card mt2" style="padding:22px 18px">'+
       '<p class="disp" style="font-size:18px;font-weight:600">No program yet</p>'+
