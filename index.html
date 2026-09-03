@@ -591,7 +591,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='c0738a';  // stamped by tools/build.py with the content hash
+const BUILD_ID='db5194';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -8736,10 +8736,23 @@ function corrDayData(){
     (h.log||[]).forEach(l=>{if(l.w>0&&l.r>0){best=Math.max(best,e1rm(l.w,l.r));ton+=l.w*l.r}
       if(l.rpe!=null)rpes.push(l.rpe)});
     if(best>0)put(k,'topset',best);
-    if(ton>0)put(k,'tonnage',ton);
-    if(rpes.length)put(k,'effort',rpes.reduce((a,b)=>a+b,0)/rpes.length)})}catch(e){}
+    if(ton>0){put(k,'tonnage',ton);put(k,'load',ton)}
+    if(rpes.length)put(k,'effort',rpes.reduce((a,b)=>a+b,0)/rpes.length);
+    /* rep fade: first set vs last at the same weight, averaged */
+    try{const byW={};(h.log||[]).forEach(l=>{if(l.w>0&&l.r>0)(byW[l.ex+'@'+l.w]=byW[l.ex+'@'+l.w]||[]).push(l.r)});
+      const fades=Object.values(byW).filter(a=>a.length>=2).map(a=>a[0]-a[a.length-1]);
+      if(fades.length>=2)put(k,'fade',fades.reduce((a,b)=>a+b,0)/fades.length)}catch(e2){}})}catch(e){}
   try{(S.runs||[]).forEach(r=>{if(!isRunType(r.type)||!(r.km>2&&r.mins>0))return;
-    put(String(r.date).slice(0,10),'pace',r.mins/r.km)})}catch(e){}
+    const k=String(r.date).slice(0,10);
+    put(k,'pace',r.mins/r.km);
+    if(r.hr>0)put(k,'beatkm',(r.mins*r.hr)/r.km)})}catch(e){}
+  /* rehab check-ins as an outcome — pain is data, never a diagnosis */
+  try{((S.acl&&S.acl.checks)||[]).forEach(c=>{if(c.pain!=null)put(String(c.date).slice(0,10),'pain',+c.pain)})}catch(e){}
+  /* two-night sleep average rides as its own signal */
+  try{const ks=Object.keys(days).sort();
+    ks.forEach((k,i)=>{const y=new Date(k+'T12:00');y.setDate(y.getDate()-1);
+      const prev=days[dayKey(y)];
+      if(days[k].sleep!=null&&prev&&prev.sleep!=null)days[k].sleep2=(days[k].sleep+prev.sleep)/2})}catch(e){}
   return days}
 const CORR_SIGNALS={
   sleep:{n:'a good sleep',dir:'more sleep',unit:'min',hi:'slept-well'},
@@ -8751,12 +8764,17 @@ const CORR_SIGNALS={
   carb:{n:'a high-carb day',dir:'more carbs'},
   fat:{n:'a high-fat day',dir:'more fat'},
   kcal:{n:'a big-eating day',dir:'more calories'},
-  bw:{n:'a heavier bodyweight',dir:'more bodyweight'}};
+  bw:{n:'a heavier bodyweight',dir:'more bodyweight'},
+  sleep2:{n:'two good nights in a row',dir:'better back-to-back sleep'},
+  load:{n:'a big training day',dir:'a bigger session',trained:1}};
 const CORR_OUTCOMES={
   topset:{n:'top set',good:'up',dir:1},
   tonnage:{n:'session volume',good:'up',dir:1},
   effort:{n:'how hard a session felt',good:'down',dir:-1,rpe:1},
-  pace:{n:'easy-run pace',good:'faster',dir:-1,pace:1}};
+  fade:{n:'rep fade inside a session',good:'down',dir:-1,rpe:1},
+  pace:{n:'easy-run pace',good:'faster',dir:-1,pace:1},
+  beatkm:{n:'heartbeats per km',good:'down',dir:-1,rpe:1},
+  pain:{n:'the knee check-in score',good:'down',dir:-1,rpe:1}};
 function correlations(){
   const found=[];
   try{
@@ -8768,6 +8786,9 @@ function correlations(){
     Object.keys(CORR_SIGNALS).forEach(sig=>{
       Object.keys(CORR_OUTCOMES).forEach(out=>{
         [0,1,2].forEach(lag=>{
+          /* a training-derived signal correlating with same-day
+             training is the same session talking to itself */
+          if(CORR_SIGNALS[sig].trained&&lag===0&&(out==='topset'||out==='tonnage'||out==='effort'||out==='fade'))return;
           const pairs=[];
           keys.forEach(k=>{
             const s=days[k]&&days[k][sig];
@@ -8786,7 +8807,7 @@ function correlations(){
     found.sort((a,b)=>b.score-a.score);
     // one per outcome so the set stays varied, top few overall
     const seen={};
-    return found.filter(f=>{if(seen[f.out])return false;seen[f.out]=1;return true}).slice(0,3);
+    return found.filter(f=>{if(seen[f.out])return false;seen[f.out]=1;return true}).slice(0,5);
   }catch(e){return[]}}
 function corrPhrase(c){
   const S9=CORR_SIGNALS[c.sig],O=CORR_OUTCOMES[c.out];
@@ -8804,9 +8825,33 @@ function corrPhrase(c){
   return{title:title,body:body,strong:Math.abs(c.rho)>=0.65,good:good}}
 function correlationDiscoveries(){
   const D=[];
-  correlations().forEach(c=>{
+  const cur=correlations();
+  cur.forEach(c=>{
     const p=corrPhrase(c);
     D.push({rar:p.strong?'epic':'rare',t:p.title,d:p.body,tag:'signal',id:'corr:'+c.sig+':'+c.out+':'+c.lag})});
+  /* the second harvest (owner call, 3 Sep — more, all day, honestly):
+     a known link STRENGTHENING on new evidence, or a once-solid link
+     BREAKING, is genuinely new information. Tracked against the last
+     snapshot; ids bucket by sample size so each stage banks once. */
+  try{
+    const st=lget('training-corrstate-v1',{})||{};
+    let dirty=false;
+    cur.forEach(c=>{
+      const key=c.sig+':'+c.out+':'+c.lag,prev=st[key];
+      if(prev&&c.n>=prev.n+6&&Math.abs(c.rho)>=Math.abs(prev.rho)+0.1){
+        const p=corrPhrase(c);
+        D.push({rar:'uncommon',t:'Holding stronger: '+p.title.toLowerCase(),
+          d:'Six more days of evidence and the link tightened (correlation '+(Math.round(c.rho*100)/100)+' across '+c.n+' days). The pattern is earning trust.',
+          tag:'signal',id:'corrup:'+key+':'+Math.floor(c.n/10)})}
+      if(!prev||c.n>prev.n||Math.abs(c.rho-prev.rho)>0.02){st[key]={rho:c.rho,n:c.n};dirty=true}});
+    Object.keys(st).forEach(key=>{
+      if(cur.some(c=>c.sig+':'+c.out+':'+c.lag===key))return;
+      if(st[key].gone)return;
+      st[key].gone=1;dirty=true;
+      D.push({rar:'uncommon',t:'A link faded: '+key.split(':').slice(0,2).join(' \u2192 '),
+        d:'This connection no longer clears the evidence bar, so Allena stops claiming it. Bodies change \u2014 an honest engine changes with them.',
+        tag:'signal',id:'corrgone:'+key})});
+    if(dirty)lset('training-corrstate-v1',st)}catch(e){}
   return D}
 function correlationNoticed(){
   return correlations().slice(0,1).map(c=>{const p=corrPhrase(c);return{t:p.title,d:p.body,tier:1}})}
