@@ -591,7 +591,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='97d5e4';  // stamped by tools/build.py with the content hash
+const BUILD_ID='ae86bc';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -8590,26 +8590,31 @@ const SIG_KINDS=[
   {k:'Carbs',d:'carb',u:' g',src:'Health nutrition'},
   {k:'Fat',d:'fat',u:' g',src:'Health nutrition'},
   {k:'Bodyweight',d:'bw',u:' kg',src:'smart scale via Health, check-ins, scans'}];
-function sigStamp(){
-  /* one string that changes whenever ANY signal lands — last day seen
-     plus the total field count across both stores */
+function sigSnap(){
+  /* per-metric snapshot: last day carrying data + how many days do —
+     day-granular seen-tracking missed same-day arrivals entirely
+     (owner-caught: the pulse said 3 NEW, the dot stayed dark) */
   try{
-    const a=hkDailyStore().days,dd=(S.daily&&S.daily.days)||{};
-    let n=0,last='';
-    Object.keys(a).forEach(k=>{n+=Object.keys(a[k]).length;if(k>last)last=k});
-    Object.keys(dd).forEach(k=>{['kcal','pr','carb','fat','bw'].forEach(f=>{
-      if(dd[k][f]!=null&&dd[k][f]!=='')n++});if(k>last)last=k});
-    return n?last+':'+n:''}catch(e){return ''}}
+    const snap={d:{},n:{}};
+    SIG_KINDS.forEach(k9=>{const pts=sigSeries(k9);
+      if(!pts.length)return;
+      snap.n[k9.k]=pts.length;
+      snap.d[k9.k]=dayKey(new Date(pts[pts.length-1].t))});
+    return snap}catch(e){return{d:{},n:{}}}}
+function sigSeenPrev(){
+  try{const v=lget('training-sigseen-v1',null);
+    return (v&&typeof v==='object'&&v.d)?v:{d:{},n:{}}}catch(e){return{d:{},n:{}}}}
 function unseenSignals(){
-  try{const s9=sigStamp();return (s9&&lget('training-sigseen-v1','')!==s9)?1:0}catch(e){return 0}}
-function sigPrevDay(){
-  try{return String(lget('training-sigseen-v1','')).split(':')[0]||''}catch(e){return ''}}
+  try{
+    const now=sigSnap(),prev=sigSeenPrev();
+    return Object.keys(now.n).some(k=>(now.n[k]||0)>(prev.n[k]||0)||(now.d[k]||'')>(prev.d[k]||''))?1:0
+  }catch(e){return 0}}
 function viewSignals(){
   /* remember what was new BEFORE marking seen — the page owes the
-     drawer dot an answer: WHICH points just landed (owner call) */
-  const prevDay=sigPrevDay();
-  const newAfter=prevDay?new Date(prevDay+'T23:59').getTime():0;
-  try{lset('training-sigseen-v1',sigStamp())}catch(e){}
+     drawer dot an answer: WHICH points just landed, per metric,
+     same-day arrivals included */
+  const prev=sigSeenPrev();
+  try{lset('training-sigseen-v1',sigSnap())}catch(e){}
   let h='<div class="view pad modalrise" style="padding-top:20px">'+
     '<button data-a="back" class="btn" style="width:auto;padding:8px 14px;color:var(--dim);font-size:12.5px;margin-bottom:14px">\u2039 Back</button>'+
     '<h1 class="disp" style="font-size:25px;font-weight:600">Body signals</h1>'+
@@ -8622,7 +8627,13 @@ function viewSignals(){
     const vs=pts.map(p=>p.v),lo=Math.min.apply(null,vs),hi=Math.max.apply(null,vs);
     const pad=Math.max((hi-lo)*0.15,hi*0.02||1);
     const last=pts[pts.length-1];
-    const fresh=newAfter?pts.filter(p9=>p9.t>newAfter).length:0;
+    const pd=prev.d[kind.k]||'',pn=prev.n[kind.k]||0;
+    /* fresh: days after the last seen day — or, when the count grew
+       inside the same day, the latest point */
+    let newAfter=pd?new Date(pd+'T23:59').getTime():0;
+    let fresh=newAfter?pts.filter(p9=>p9.t>newAfter).length:(pn?0:0);
+    if(!fresh&&pts.length>pn&&pn>0){fresh=pts.length-pn;newAfter=pts[pts.length-1].t-1}
+    if(!pn&&!pd)newAfter=0;  // first ever visit: nothing screams NEW
     h+='<div class="card mt" style="padding:14px 16px;position:relative">'+
       '<button data-a="sigOpen" data-v="'+esc(kind.k)+'" style="position:absolute;inset:0;z-index:2"></button>'+
       '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px">'+
