@@ -591,7 +591,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='7f1d26';  // stamped by tools/build.py with the content hash
+const BUILD_ID='0a715b';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -17022,8 +17022,8 @@ function runAction(a,v,t,e){
         render();setTimeout(tick,620+Math.random()*260)};
       setTimeout(tick,700);break}
     case 'anReset':S.anState='idle';S.anStep=0;S.discShow=null;render();break;
-    case 'findingsOpen':{if(S.view!=='findings'){S.backTo=S.view;S.backDrawer=false}S.sheet=null;S.view='findings';render();break}
-    case 'findingsGo':{if(S.view!=='findings'){S.backTo=S.view;S.backDrawer=false}S.sheet=null;S.view='findings';runAction('anRun');break}
+    case 'findingsOpen':S._navQuiet=1;{if(S.view!=='findings'){S.backTo=S.view;S.backDrawer=false}S.sheet=null;S.view='findings';render();break}
+    case 'findingsGo':S._navQuiet=1;{if(S.view!=='findings'){S.backTo=S.view;S.backDrawer=false}S.sheet=null;S.view='findings';runAction('anRun');break}
     case 'prioSet':{S.prof=Object.assign({},S.prof||{},{prio:v});lset(K_PROF,S.prof);render();
       flash(v==='run'?'Running leads — leg days ease around hard runs.':v==='lift'?'Lifting leads — one quality run goes easy.':'Balanced — hard days alternate weekly.');break}
     case 'recapGo':{recapSeen()[v]=1;lset('training-recap-v1',S.recapSeen);
@@ -17241,10 +17241,11 @@ function runAction(a,v,t,e){
     case 'drawerNav':{const _f=S.view;S.drawerOpen=false;S._navQuiet=1;runAction('nav',v);S.backTo=_f;S.backDrawer=true;break}
     case 'back':{const _t=S.backTo||'today';const _d=!!S.backDrawer;
       S.backTo=null;S.backDrawer=false;S.view=_t;
-      /* back into the drawer is the drawer's motion alone — the page's
-         view transition running underneath it stuttered the slide-in
-         (owner-caught: findings → back) */
-      if(_d){S.drawerOpen=true;S._navQuiet=1}
+      /* ALL backs are instant (owner-caught three times on heavy
+         pages): the view-transition snapshot of two big pages is the
+         stutter — going back should just be there */
+      S._navQuiet=1;
+      if(_d)S.drawerOpen=true;
       render();break}
     case 'deepGo':{const _f=S.view;S.drawerOpen=false;S.backTo=_f;S.backDrawer=true;S.view='findings';S.scrollTo='deepcard';render();break}
     case 'chatNew':{S.coachBack=S.view;S.drawerOpen=false;chatNew();render();break}
