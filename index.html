@@ -613,7 +613,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='d30c32';  // stamped by tools/build.py with the content hash
+const BUILD_ID='77cbb8';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -1298,6 +1298,10 @@ async function askClaude(q){
      the comment in context so nothing said is lost. */
   try{if(S.sess)S.sess.coachUsed=1}catch(e){}
   S.coach.thread.push({r:'user',t:q});S.coach.input='';S.coach.busy=true;render();
+  /* render rebuilds the thread from scratch, which resets its scroll to
+     the top — pin it back to the newest message immediately on send,
+     not just when the reply lands (owner-caught, 3 Sep) */
+  try{const el0=document.getElementById('coachThread');if(el0)el0.scrollTop=el0.scrollHeight}catch(e0){}
   const th=S.coach.thread.slice(-8);
   const msgs=th.map((m,i)=>({role:m.r==='user'?'user':'assistant',content:m.t}));
   // context is rebuilt fresh for EVERY message — the previous
@@ -1315,7 +1319,12 @@ async function askClaude(q){
     S.coach.thread.push({r:'a',t:t,act:act});chatSaveCurrent();
   }catch(e){S.coach.thread.push({r:'a',t:"Couldn't reach Allena — check your connection and try again."})}
   S.coach.busy=false;render();
-  const el2=document.getElementById('coachThread');if(el2)el2.scrollTop=el2.scrollHeight}
+  const el2=document.getElementById('coachThread');if(el2)el2.scrollTop=el2.scrollHeight;
+  /* the reply reveals word by word — keep the bottom pinned while it grows */
+  try{let k=0;const iv=setInterval(function(){
+    const el3=document.getElementById('coachThread');
+    if(el3)el3.scrollTop=el3.scrollHeight;
+    if(++k>=10)clearInterval(iv)},350)}catch(e3){}}
 function lastFor(ex,no){const cid=S.sess?String(S.sess.startedAt):null;
   for(let i=S.history.length-1;i>=0;i--){const H=S.history[i];
     if(H.id===cid)continue;
