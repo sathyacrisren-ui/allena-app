@@ -616,7 +616,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='2e0a4f';  // stamped by tools/build.py with the content hash
+const BUILD_ID='ab1a57';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -7161,12 +7161,21 @@ function watchCorroborate(){
     const wg=watchGym();let dirty=false;
     wg.forEach(w=>{
       if(w.used)return;
-      const h=(S.history||[]).find(x=>{
+      let h=(S.history||[]).find(x=>{
         if(x.run||!x.complete||x.watch)return false;
         if(String(x.date).slice(0,10)!==w.date)return false;
         const hs=new Date(x.date).getTime(),he=hs+(x.minutes||45)*60000;
         const ws=new Date(w.date+'T'+(w.time||'12:00')).getTime(),we=ws+(w.mins||30)*60000;
         return ws<he&&we>hs});
+      /* no clock overlap (typed-later sessions carry no real start
+         time): when the day holds exactly ONE unmatched session and
+         ONE watch workout, the pairing is unambiguous — link it
+         instead of asking (beta ask, 4 Sep: 'if it's pretty
+         confident, don't make me check in') */
+      if(!h){
+        const dayS=(S.history||[]).filter(x=>!x.run&&x.complete&&!x.watch&&String(x.date).slice(0,10)===w.date);
+        const dayW=wg.filter(x=>!x.used&&x.date===w.date);
+        if(dayS.length===1&&dayW.length===1)h=dayS[0]}
       if(h){h.watch={mins:w.mins,hr:w.hr||0,src:w.src||''};w.used=1;dirty=true;
         /* say it out loud (owner call, 3 Sep): a witness that never
            testifies is wasted — the moment the watch corroborates a
@@ -10702,7 +10711,28 @@ function dailyBrief(){
       if(done<targ)out.push({tag:'REHAB',a:'nav',v:'acl',
         line:done+' of '+targ+' rehab sessions this week \u2014 one today keeps the climb honest'})}
   }catch(e){}
-  return out.slice(0,3)}
+  return briefDamp(out.slice(0,3))}
+function briefDamp(lines){
+  /* a line that says the same thing three days running has stopped
+     being information (beta-caught: 'squats pay the same bill every
+     single day is driving me insane'). Numbers are ignored when
+     comparing — 41% vs 43% is the same message. Third consecutive
+     day goes quiet; the line returns when the message changes or
+     after a day's gap. */
+  try{
+    const st=lget('training-briefseen-v1',{})||{};
+    const tk=today(),yk=dayKey(new Date(Date.now()-864e5));
+    let dirty=false;
+    const out=lines.filter(x=>{
+      const key=x.tag+':'+String(x.line).replace(/[\d.]+/g,'#');
+      const r=st[key];
+      if(r&&r.last===tk)return r.show!==false;
+      const consec=(r&&r.last===yk)?(r.n||1):0;
+      const show=consec<2;
+      st[key]={last:tk,n:consec+1,show:show};dirty=true;
+      return show});
+    if(dirty)lset('training-briefseen-v1',st);
+    return out}catch(e){return lines}}
 function briefLines(){
   const b=dailyBrief();if(!b.length)return '';
   return b.map(x=>'<button data-a="'+x.a+'" data-v="'+x.v+'" style="display:flex;align-items:center;gap:9px;margin-top:12px;padding-top:12px;border-top:1px solid var(--line);width:100%;text-align:left">'+
