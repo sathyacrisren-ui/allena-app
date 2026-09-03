@@ -585,7 +585,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='db4e90';  // stamped by tools/build.py with the content hash
+const BUILD_ID='b49115';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -2144,30 +2144,51 @@ function viewSetup(){
   if(st.gate&&!SANDBOX&&!lget('training-welcome-v1',null)){
     const wi=st.wi||0;
     const wrapOn=(typeof inWrapper==='function')&&inWrapper();
-    const steps=1+(wrapOn?2:0)+((typeof acctReady==='function'&&acctReady())?1:0);
-    const shown=wi===0?1:wi===1?2:wi===2?3:steps;
+    const steps=2+(wrapOn?2:0)+((typeof acctReady==='function'&&acctReady())?1:0);
+    const shown=Math.min(wi+1,steps);
+    /* wi 0 — THE PITCH (owner call, 3 Sep: the first screen sells,
+       instantly). One claim no competitor can make, proven with the
+       kind of sentences the engine actually produces. */
+    if(wi===0){
+      const proof=(t)=>'<div class="card" style="padding:12px 15px;border-color:var(--cardline)">'+
+        '<p style="font-size:13px;line-height:1.55;color:var(--text)">\u201c'+t+'\u201d</p></div>';
+      return '<div class="view pad stg pinpage" style="padding-top:54px">'+
+        '<div style="display:flex;align-items:center;gap:10px">'+
+        '<img class="mk" src="'+MARK+'" alt="" style="width:26px;height:26px;object-fit:contain">'+
+        '<h1 class="disp brand" style="font-size:24px;font-weight:600;margin:0">Allena</h1></div>'+
+        '<h2 class="disp gradhead" style="font-size:31px;font-weight:650;line-height:1.12;margin-top:22px">Your training has patterns you can\u2019t see.</h2>'+
+        '<p style="color:var(--dim);font-size:14.5px;line-height:1.65;margin-top:12px">Your watch knows your heart. Your gym app knows your bar. <b style="color:var(--text)">Nothing reads them together \u2014 Allena does.</b> Lifting, running, sleep and heart rate, one engine, finding what no single-purpose app can.</p>'+
+        '<div class="pinbody" style="display:flex;flex-direction:column;justify-content:center;gap:9px;padding:16px 0">'+
+        '<p class="mono" style="font-size:9px;letter-spacing:.14em;color:var(--amber)">\u2726 THE KIND OF THING IT FINDS</p>'+
+        proof('Your bench moves 4% more the morning after 7\u00bd hours \u2014 your number, not a study\u2019s.')+
+        proof('Legs follows Sunday\u2019s 18 km \u2014 squatting on unrecovered legs is where both sides lose.')+
+        proof('Your deadlift sits with the rarest 22% of tested lifters at your bodyweight.')+
+        '</div>'+
+        '<div class="pinfoot">'+
+        '<button data-a="wNext" class="big disp" style="background:var(--amber);color:var(--bg);font-size:16px">See what it finds in yours</button>'+
+        '<p style="color:var(--faint);font-size:11px;text-align:center;margin-top:12px">Computed on this phone. Nothing sold, nothing invented.</p></div></div>'}
     const wpage=(title,body,foot)=>'<div class="view pad stg pinpage" style="padding-top:56px">'+
       '<p class="mono" style="color:var(--amber);font-size:10px;letter-spacing:.14em">EARLY ACCESS</p>'+
       '<h1 class="disp" style="font-size:26px;font-weight:600;margin-top:6px;line-height:1.15">'+title+'</h1>'+
       '<div class="pinbody">'+body+'</div>'+
       '<div class="pinfoot"><div style="display:flex;flex-direction:column;gap:10px">'+foot+'</div>'+
       (steps>1?'<p class="mono" style="color:var(--faint);font-size:9px;letter-spacing:.1em;margin-top:16px;text-align:center">'+Math.min(shown,steps)+' OF '+steps+'</p>':'')+'</div></div>';
-    if(wi===0)return wpage('You\u2019re in early',
+    if(wi===1)return wpage('You\u2019re in early',
       '<p style="color:var(--dim);font-size:14px;line-height:1.7;margin-top:10px">Allena is in closed beta, and you\u2019re in it because you already carry what it runs on: <b style="color:var(--text)">real training data</b> \u2014 a watch on the wrist, sessions in a log, runs on the road.</p>'+
       '<p style="color:var(--dim);font-size:14px;line-height:1.7;margin-top:12px">One engine reads your lifting, running and recovery together and finds what single-purpose apps cannot see. Everything is computed on this phone. Nothing is sold, and nothing is invented.</p>'+
       '<p style="color:var(--dim);font-size:14px;line-height:1.7;margin-top:12px">Two asks: train like you normally do, and when something feels wrong, hit <b style="color:var(--text)">Report a problem</b> in the menu. Your feedback is why you are here first.</p>',
       '<button data-a="wNext" class="big disp" style="background:var(--amber);color:var(--bg);font-size:16px">Set me up</button>');
-    if(wi===1)return wpage('Allena can speak up',
+    if(wi===2)return wpage('Allena can speak up',
       '<p style="color:var(--dim);font-size:14px;line-height:1.7;margin-top:10px">Turn on notifications and you get told the moment new discoveries are made \u2014 plus your morning call, physio reminders and the monthly wrap.</p>'+
       '<p style="color:var(--dim);font-size:14px;line-height:1.7;margin-top:12px">Every one carries a real fact. There is no \u201cwe miss you\u201d, ever, and each kind switches off individually.</p>',
       '<button data-a="wNotifYes" class="big disp" style="background:var(--amber);color:var(--bg);font-size:16px">Turn them on</button>'+
       '<button data-a="wNotifNo" class="btn" style="color:var(--dim)">Not now</button>');
-    if(wi===2)return wpage('Link Apple Health',
+    if(wi===3)return wpage('Link Apple Health',
       '<p style="color:var(--dim);font-size:14px;line-height:1.7;margin-top:10px">This is the one that unlocks everything. Your watch \u2014 Garmin, Apple Watch, whatever you wear \u2014 already syncs workouts, sleep, heart rate and more into Apple Health.</p>'+
       '<p style="color:var(--dim);font-size:14px;line-height:1.7;margin-top:12px">Link it once and Allena ingests it automatically, forever: every workout lands moments after you finish, and the finds no single-purpose app can make switch on.</p>',
       '<button data-a="wHealth" class="big disp" style="background:var(--amber);color:var(--bg);font-size:16px">Link Health</button>'+
       '<button data-a="wNext" class="btn" style="color:var(--dim)">Later</button>');
-    if(wi===3)return wpage('One account, every device',
+    if(wi===4)return wpage('One account, every device',
       '<p style="color:var(--dim);font-size:14px;line-height:1.7;margin-top:10px">Sign in with just your email \u2014 a code, no password. It backs up your score card and is how a new phone picks up where this one left off. Training data itself never leaves this phone.</p>'+
       '<div class="mt2">'+accountSection()+'</div>',
       ((typeof acct==='function'&&acct()&&acct().refresh)
@@ -18069,9 +18090,9 @@ function runAction(a,v,t,e){
     case 'betaCopy':{try{navigator.clipboard.writeText(decodeURIComponent(v)).then(()=>flash('Copied \u2014 paste it to Sathya with a screenshot.')).catch(()=>flash('Long-press the text to copy it.'))}catch(e){flash('Long-press the text to copy it.')}break}
     case 'wNext':{const st9=S.setup||(S.setup={gate:true});let wi=(st9.wi||0)+1;
       const wr9=(typeof inWrapper==='function')&&inWrapper();
-      if(!wr9&&(wi===1||wi===2))wi=3;
-      if(wi===3&&!(typeof acctReady==='function'&&acctReady()))wi=4;
-      if(wi>=4){lset('training-welcome-v1',1);delete st9.wi}else st9.wi=wi;
+      if(!wr9&&(wi===2||wi===3))wi=4;
+      if(wi===4&&!(typeof acctReady==='function'&&acctReady()))wi=5;
+      if(wi>=5){lset('training-welcome-v1',1);delete st9.wi}else st9.wi=wi;
       render();break}
     case 'wDone':{lset('training-welcome-v1',1);if(S.setup)delete S.setup.wi;render();break}
     case 'wNotifYes':{const P=notifPrefs();P.asked=1;P.on=true;notifSave();notifSync();runAction('wNext');break}
