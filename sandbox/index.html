@@ -591,7 +591,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='ef8507';  // stamped by tools/build.py with the content hash
+const BUILD_ID='b376e5';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -2850,7 +2850,7 @@ function viewCoach(){
   h+='<div class="chatbar"><div class="composer">'+
     '<textarea data-in="coach.input" rows="1" placeholder="Ask Allena…" style="flex:1;min-width:0;background:none;border:none;outline:none;color:var(--text);font-size:16px;line-height:1.45;padding:9px 2px;resize:none;max-height:120px">'+esc(S.coach.input)+'</textarea>'+
     '<button data-a="'+(aiReady()?'coachSend':'coachApp')+'" class="sendbtn" style="opacity:'+(S.coach.input.trim()?'1':'.35')+';transform:scale('+(S.coach.input.trim()?'1':'.88')+')">↑</button></div>'+
-    (aiReady()?'':'<p style="color:var(--faint);font-size:10.5px;text-align:center;margin-top:7px">Sends to the Claude app · add a key or Allena cloud link in Data → Allena to chat here</p>')+
+    (aiReady()?'':'<p style="color:var(--faint);font-size:10.5px;text-align:center;margin-top:7px">Sends to the Claude app \u00b7 or sign in (Settings \u2192 your name) and Allena chats right here \u2014 no key, nothing to set up</p>')+
     '</div></div>';
   return h}
 
@@ -18008,7 +18008,19 @@ function runAction(a,v,t,e){
     case 'coachSend':if(!(S.coach.input||'').trim()){flash('Type something first.');break}
       if(!S.coach.busy&&aiReady())askClaude(S.coach.input.trim());break;
     case 'coachApp':{try{const q=coachContext()+'\n\nQuestion: '+(S.coach.input.trim()||'Coach me on my next set.');
-      window.open('https://claude.ai/new?q='+encodeURIComponent(q),'_blank')}catch(e){}break}
+      const url='https://claude.ai/new?q='+encodeURIComponent(q);
+      if(typeof inWrapper==='function'&&inWrapper()){
+        /* WKWebView swallows window.open — hand the URL to iOS via the
+           bridge (native build 4+); older wrappers get the honest
+           fallback: question+context on the clipboard, and a pointer
+           at the sign-in that makes chat work right here */
+        let sent=false;
+        try{window.webkit.messageHandlers.allena.postMessage(JSON.stringify({type:'openurl',url:url}));sent=true}catch(e2){}
+        try{navigator.clipboard.writeText(q)}catch(e2){}
+        flash(sent?'Handing over to Claude — your question and session context ride along (also copied, just in case).'
+                  :'Copied your question + full context — paste it into the Claude app. Or sign in (Settings \u2192 your name) and chat right here.');
+        break}
+      window.open(url,'_blank')}catch(e){}break}
     case 'aiModel':S.ai.model=v;lset(K_AI,S.ai);render();break;
     case 'creaTick':{const k=today();if(S.supp.days[k])delete S.supp.days[k];else{S.supp.days[k]=1;vib([18,40,18])}
       lset(K_SUPP,S.supp);render();break}
