@@ -591,7 +591,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='184ce8';  // stamped by tools/build.py with the content hash
+const BUILD_ID='0dd34f';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -6857,13 +6857,26 @@ function hkParse(xml){
   return{workouts:out,skipped:skipped}}
 function hkImport(parsed){
   const have=new Set(runs().map(r=>r.id));
+  /* cross-source clock skew: Garmin and Strava can write the SAME
+     workout with start times a minute apart — id dedupe alone missed
+     it (owner-caught). Same day, start within 10 min, distance within
+     0.2 km = the same workout. */
+  const nearDup=w=>{try{
+    const t0=new Date(w.date+'T'+(w.time||'12:00')).getTime();
+    return runs().some(r=>{
+      if(String(r.date).slice(0,10)!==w.date)return false;
+      const rt=new Date(String(r.date).slice(0,10)+'T'+(r.time||'12:00')).getTime();
+      if(Math.abs(rt-t0)>10*60000)return false;
+      return Math.abs((r.km||0)-(w.km||0))<=0.2})}catch(e){return false}};
   let added=0;const byType={};
   parsed.workouts.forEach(w=>{
     if(have.has(w.id))return;
+    if(nearDup(w))return;
     have.add(w.id);
     runAdd(w);added++;byType[w.type]=(byType[w.type]||0)+1});
   if(added&&!S.runOn){S.runOn=true;lset('training-runon-v1',true)}
-  return{added:added,dup:parsed.workouts.length-added,byType:byType,
+  const catalogued=added>=8?(typeof archiveSweep==='function'?archiveSweep():0):0;
+  return{added:added,dup:parsed.workouts.length-added,byType:byType,catalogued:catalogued,
     skipped:Object.keys(parsed.skipped).reduce((a,k)=>a+parsed.skipped[k],0)}}
 function hkParseFile(file,done){
   // chunked read with a carry-over tail so tags split across chunks survive
@@ -7410,6 +7423,10 @@ function histCommit(recs){
   try{const r9=historyAliasScan();
     const map={};(r9.autos||[]).forEach(a=>{map[a.from]=a.to});
     historyAliasApplyMap(map,r9.canon)}catch(e){}
+  /* a bulk lifting import catalogues its archive in one quiet sweep */
+  try{if(kept.length>=8&&typeof archiveSweep==='function'){
+    const n9=archiveSweep();
+    if(n9)setTimeout(function(){flash(n9+' finds from your history catalogued \u2014 records, milestones, firsts. All in the collection now; from here, reveals mean NEW.')},1200)}}catch(e){}
   return{added:kept.length,replaced:replaced,skippedReal:skipped}}
 
 /* ══ exercise aliasing at import (owner call, Sep 2026) ══════
@@ -8270,6 +8287,23 @@ function markDiscoveries(){
   const seen=discoverySeen();
   discoveries().forEach(d=>{if(!seen[d.id])seen[d.id]=today()});
   lset('training-disc-v1',seen)}
+function archiveSweep(){
+  /* the anti-love-bomb (owner call, 3 Sep): a bulk import computes
+     dozens of finds at once — records from 2024 are an ARCHIVE being
+     catalogued, not fifty pieces of today's news. Everything banks
+     and is browsable instantly (nothing withheld, per the standing
+     ruling); but archive finds don't queue as NEW, don't drip through
+     the reveal cadence, don't badge. One cataloguing moment instead —
+     and the daily rhythm starts honest at zero. Insights (tag
+     'signal') and patterns are exempt: they are current truths about
+     the body, few in number, and reveal paced. */
+  try{bankDiscoveries()}catch(e){}
+  try{
+    const seen=discoverySeen();let n=0;
+    discoveries().forEach(d=>{if(d.tag==='signal')return;
+      if(!seen[d.id]){seen[d.id]=today();n++}});
+    lset('training-disc-v1',seen);
+    return n}catch(e){return 0}}
 function newDiscoveries(){
   const seen=discoverySeen();
   return discoveries().filter(d=>!seen[d.id])}
@@ -15266,7 +15300,8 @@ function sheetHtml(){
         '<p class="eyebrow" style="color:var(--green)">Done</p>'+
         '<p class="disp" style="font-size:20px;font-weight:600;margin-top:6px">'+hr.added+' workout'+(hr.added===1?'':'s')+' in from Apple Health</p>'+
         '<p style="color:var(--dim);font-size:13px;line-height:1.6;margin-top:8px">'+
-        (hr.dup?hr.dup+' already here were skipped. ':'')+'Swims, rides and rows count as load; running is coached.</p>'+
+        (hr.dup?hr.dup+' already here were skipped. ':'')+'Swims, rides and rows count as load; running is coached.'+
+        (hr.catalogued?' <b style="color:var(--text)">'+hr.catalogued+' finds from the archive went straight to the collection</b> \u2014 from here, reveals mean new.':'')+'</p>'+
         ((!S.runplan&&runs().length>=6)?'<button data-a="runplanGenAsk" class="btn mt" style="color:var(--amber)">Build a running progression from it</button>':'')+
         '<button data-a="hkDone" class="btn mt" style="color:var(--dim)">Done</button>')}
     return wrapSheet('Import',
@@ -16139,7 +16174,7 @@ function viewGuide(){
       ['Just check Allena\u2019s access','iPhone Settings \u2192 Apps \u2192 Health \u2192 Data Access & Devices \u2192 Allena \u2192 Turn All Categories On.',''],
       ['Track sleep to unlock the good stuff','Wear the watch overnight with Sleep tracking on \u2014 the sleep\u2013strength insights need the nights.','']]},
     strava:{name:'Strava',addr:'',steps:[
-      ['Strava usually is not the source','If a watch records the run, its own app (Garmin Connect etc.) already writes to Health \u2014 connecting Strava too can double up.','Only do this if you record IN the Strava app itself.'],
+      ['Strava usually is not the source','If a watch records the run, its own app (Garmin Connect etc.) already writes to Health. Allena de-duplicates what it reads \u2014 but Apple Health itself will show the workout twice, so one writer keeps things clean.','Connect Strava only if you record IN the Strava app itself.'],
       ['Connect Strava to Health','Strava \u2192 You \u2192 Settings \u2192 Applications, Services & Devices \u2192 Health app \u2192 Connect.',''],
       ['Allow writing workouts','Turn on the workout categories when iOS asks \u2014 runs then land in Health and Allena reads them.','']]},
     food:{name:'Food apps',addr:'',steps:[
