@@ -591,7 +591,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='564bb2';  // stamped by tools/build.py with the content hash
+const BUILD_ID='184ce8';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -14364,7 +14364,8 @@ function viewData(){
    h+=setGroup('Tracking',[
     setRow(I.rehab,'Rehab pathway',(S.acl&&S.acl.on)?('Phase '+S.acl.phase+' of 5'):'Off','Rehab pathway'),
     setRow(I.run,'Running',S.runOn?'On':'Off','Running'),
-    setRow(I.heart,'Daily check-in',dc?'On':'Off','Daily check-in')]);}
+    setRow(I.heart,'Daily check-in',dc?'On':'Off','Daily check-in'),
+    setRow(I.run,'Connect wearables & apps','the Apple Health guide','__hguide')]);}
   {const th=lget('training-theme-v1','system');
    h+='<p class="eyebrow mt2">Appearance</p>'+
    '<div class="card mt" style="padding:13px 15px">'+
@@ -16122,10 +16123,31 @@ let lastAnimKey=null,lastSheetKey=null;
 
 function viewGuide(){
   /* the file guide, full-page and swipeable (owner call, 3 Sep): one
-     step per screen, drag horizontally between them — the same
-     honest steps, page-by-page instead of a cramped sheet. */
-  const src=S.impg||'garmin';
-  const G={
+     step per screen, drag horizontally between them. A second mode
+     (impgMode='health') teaches AUTO-SYNC instead: making each
+     wearable and app write into Apple Health so Allena feeds itself. */
+  const health=S.impgMode==='health';
+  const HG={
+    garmin:{name:'Garmin',addr:'',steps:[
+      ['Open the Garmin Connect app','Sign in \u2014 this app is the bridge between the watch and Apple Health.',''],
+      ['Connect it to Apple Health','More (\u2630) \u2192 Settings \u2192 Health \u2014 turn everything ON: workouts, heart rate, sleep, steps.','Allena only ever reads; nothing writes back to Garmin.'],
+      ['Let it run in the background','iPhone Settings \u2192 Apps \u2192 Garmin Connect: Background App Refresh ON, Bluetooth allowed.','This is the step everyone misses \u2014 without it you have to open Connect by hand every time.'],
+      ['Mind Low Power Mode','The yellow battery pauses background sync until you charge or open Connect \u2014 workouts arrive late, not lost.',''],
+      ['Test it','Save any activity on the watch with the phone nearby \u2014 it should appear in Apple Health within a minute or two, and Allena drinks from there automatically.','']]},
+    watch:{name:'Apple Watch',addr:'',steps:[
+      ['Nothing to set up','Apple Watch writes workouts, heart rate and sleep straight into Health on its own.',''],
+      ['Just check Allena\u2019s access','iPhone Settings \u2192 Apps \u2192 Health \u2192 Data Access & Devices \u2192 Allena \u2192 Turn All Categories On.',''],
+      ['Track sleep to unlock the good stuff','Wear the watch overnight with Sleep tracking on \u2014 the sleep\u2013strength insights need the nights.','']]},
+    strava:{name:'Strava',addr:'',steps:[
+      ['Strava usually is not the source','If a watch records the run, its own app (Garmin Connect etc.) already writes to Health \u2014 connecting Strava too can double up.','Only do this if you record IN the Strava app itself.'],
+      ['Connect Strava to Health','Strava \u2192 You \u2192 Settings \u2192 Applications, Services & Devices \u2192 Health app \u2192 Connect.',''],
+      ['Allow writing workouts','Turn on the workout categories when iOS asks \u2014 runs then land in Health and Allena reads them.','']]},
+    food:{name:'Food apps',addr:'',steps:[
+      ['Macros unlock a whole engine','Calories, protein and carbs feed the insights nothing else can make \u2014 what fuels your best sessions.',''],
+      ['MyFitnessPal','More \u2192 Settings \u2192 Sharing & Devices (or Apps & Devices) \u2192 Health \u2192 turn nutrition ON.',''],
+      ['Any other tracker','Look for \u201cApple Health\u201d in its settings and allow it to WRITE nutrition. Then log meals as normal \u2014 Allena picks the totals up daily.','']]}};
+  const src=health?(S.impg&&HG[S.impg]?S.impg:'garmin'):(S.impg||'garmin');
+  const G=health?HG:{
     garmin:{name:'Garmin',addr:'connect.garmin.com',steps:[
       ['Open Safari and go to connect.garmin.com','Sign in with your Garmin login. Stay in the browser — if it pushes you toward the app, decline.',''],
       ['Ask for the desktop site','Tap the \u1d00A button in Safari\u2019s address bar, then \u201cRequest Desktop Website\u201d.','The export button only exists on the desktop layout — without this step it will not be there.'],
@@ -16159,9 +16181,9 @@ function viewGuide(){
   return '<div class="view pad modalrise pinpage" style="padding-top:20px">'+
     '<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">'+
     '<button data-a="impGuideBack" style="width:42px;height:42px;border-radius:42px;background:var(--surface);border:1px solid var(--line);color:var(--dim);display:flex;align-items:center;justify-content:center;flex:none;font-size:16px">\u2039</button>'+
-    '<h1 class="disp" style="font-size:19px;font-weight:600;flex:1;text-align:center;margin:0">Getting your file</h1>'+
+    '<h1 class="disp" style="font-size:19px;font-weight:600;flex:1;text-align:center;margin:0">'+(health?'Auto-sync to Health':'Getting your file')+'</h1>'+
     '<span style="width:42px;flex:none"></span></div>'+
-    '<div style="display:flex;gap:6px">'+['garmin','strava','health'].map(k=>
+    '<div style="display:flex;gap:6px">'+(health?['garmin','watch','strava','food']:['garmin','strava','health']).map(k=>
       '<button data-a="impgSrc" data-v="'+k+'" class="pill'+(src===k?' on':'')+'" style="flex:1;text-align:center;font-size:12.5px">'+G[k].name+'</button>').join('')+'</div>'+
     '<div class="pinbody" data-swipestep="1" style="overflow:hidden;margin-top:20px">'+
     '<div class="swrow" style="display:flex;transform:translateX(-'+(i*100)+'%)">'+
@@ -18055,7 +18077,7 @@ function runAction(a,v,t,e){
     case 'cbWhy':{const cb=cbStore();if(cb){cb.why=v;lset(K_CB,cb)}render();break}
     case 'wrapShare':wrapShareRun(v);break;
     case 'predOpen':S.sheet={t:'pred'};render();break;
-    case 'impGuideOpen':S.impgBack=v||'';S.impg=S.impg||'garmin';S.impgStep=0;
+    case 'impGuideOpen':S.impgBack=v||'';S.impgMode=null;S.impg='garmin';S.impgStep=0;
       S.sheet=null;S.guideFrom=S.view;S._navQuiet=1;S.view='guide';render();break;
     case 'impgSrc':S.impg=v;S.impgStep=0;render();break;
     case 'impgStep':S.impgStep=Math.max(0,(S.impgStep||0)+(+v));render();break;
@@ -18594,6 +18616,8 @@ function runAction(a,v,t,e){
     case 'dsetOpen':{if(v==='__beta'){S.betaFrom=S.view;S.sheet={t:'beta'};render();break}
       if(v==='__report')v='Report a problem';   // the rows pass a token; the chunk key is the title
       if(v==='__setup'){S.sheet=null;runAction('setupOpen');break}
+      if(v==='__hguide'){S.sheet=null;S.impgMode='health';S.impg='garmin';S.impgStep=0;
+        S.guideFrom=S.view;S._navQuiet=1;S.view='guide';render();break}
       S.sheet={t:'dset',k:v};render();break}
     case 'acctSync':acctSync(true);break;
     case 'acctOut':lset(K_ACCT,null);S.acctPending=false;render();
