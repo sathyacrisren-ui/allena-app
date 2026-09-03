@@ -385,7 +385,11 @@ let _hkPEl=null,_hkPT=null,_hkPN=0;
 function hkPulse(n){
   try{
     if(typeof inWrapper==='function'&&!inWrapper())return;
-    if(document.getElementById('bootHost'))return;
+    if(document.getElementById('bootHost')){
+      // boot is up: hold the arrival and replay it once the curtain lifts
+      _hkPN+=(n||0);
+      clearTimeout(_hkPT);_hkPT=setTimeout(function(){hkPulse(0)},1300);
+      return}
     _hkPN+=(n||0);
     if(!_hkPEl){_hkPEl=document.createElement('div');_hkPEl.id='hkPulse';
       _hkPEl.innerHTML='<span style="width:11px;height:11px;border-radius:11px;border:1.5px solid var(--line);border-top-color:var(--text);display:inline-block;animation:spin .7s linear infinite"></span>'+
@@ -612,7 +616,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='9123d1';  // stamped by tools/build.py with the content hash
+const BUILD_ID='7c0f0e';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -8881,7 +8885,7 @@ function viewSignals(){
      drawer dot an answer: WHICH points just landed, per metric,
      same-day arrivals included */
   const prev=sigSeenPrev();
-  try{lset('training-sigseen-v1',sigSnap())}catch(e){}
+  if(S._sigVisit)try{lset('training-sigseen-v1',sigSnap())}catch(e){}
   let firstFresh=null;
   let h='<div class="view pad modalrise" style="padding-top:20px">'+
     '<button data-a="back" class="btn" style="width:auto;padding:8px 14px;color:var(--dim);font-size:12.5px;margin-bottom:14px">\u2039 Back</button>'+
@@ -17501,7 +17505,7 @@ function runAction(a,v,t,e){
   t=t||{dataset:{a:a,v:v}};e=e||{preventDefault:function(){},target:t};
   switch(a){
     case 'weekLook':{S.week=+v;render();break}   // view-only: never persisted
-    case 'nav':{S.drawerOpen=false;S.backTo=S.view;S.backDrawer=false;if(v!=='session')S.sessReveal=null;
+    case 'nav':{if(v==='signals')S._sigVisit=1;S.drawerOpen=false;S.backTo=S.view;S.backDrawer=false;if(v!=='session')S.sessReveal=null;
       const RF=['acl','aclpath','diary','report','proto'];
       if(RF.indexOf(S.view)>=0&&RF.indexOf(v)>=0)S._navQuiet=1;
       A.nav(v);break}
@@ -19038,7 +19042,7 @@ function runAction(a,v,t,e){
       render();break}
     case 'sigOpen':{S.sigK=v;S._navQuiet=1;S.view='sigdetail';render();break}
     case 'arrivalGo':{lset('training-arrival-v1',1);try{hapticRun('find')}catch(e){};render();break}
-    case 'arrivalSee':{lset('training-arrival-v1',1);S.backTo='today';S._navQuiet=1;S.view='signals';render();break}
+    case 'arrivalSee':{lset('training-arrival-v1',1);S._sigVisit=1;S.backTo='today';S._navQuiet=1;S.view='signals';render();break}
     case 'wBack':{const st9=S.setup||(S.setup={gate:true});let wi=(st9.wi||0)-1;
       const wr9=(typeof inWrapper==='function')&&inWrapper();
       if(!wr9&&(wi===3||wi===2))wi=1;
