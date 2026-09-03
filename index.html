@@ -591,7 +591,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='346df8';  // stamped by tools/build.py with the content hash
+const BUILD_ID='53c4df';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -6885,6 +6885,53 @@ function healthFlowing(){
     if(Object.keys((hkDailyStore().days)||{}).length>0)return true;
     if((S.history||[]).some(h=>h.watch))return true;
     return false}catch(e){return false}}
+/* ══ the arrival manifest (owner call, 3 Sep) ═══════════════
+   The origin point for the data roll-in: landing on Today with
+   runs and signals already flowing feels like a mistake unless
+   someone says where it came from. Once, before the first Today,
+   the manifest names exactly what Health handed over. */
+function arrivalCounts(){
+  try{
+    const st=hkDailyStore().days,dd=(S.daily&&S.daily.days)||{};
+    const c={
+      runs:(S.runs||[]).filter(r=>/via (Apple Health|Strava)/i.test(String(r.note||''))&&isRunType(r.type)).length,
+      walks:(S.runs||[]).filter(r=>/via (Apple Health|Strava)/i.test(String(r.note||''))&&!isRunType(r.type)).length,
+      gym:(typeof watchGym==='function'?watchGym():[]).length,
+      sleep:Object.keys(st).filter(k=>st[k].sleep!=null).length,
+      heart:Object.keys(st).filter(k=>st[k].rhr!=null||st[k].hrv!=null).length,
+      steps:Object.keys(st).filter(k=>st[k].steps!=null).length,
+      fuel:Object.keys(dd).filter(k=>dd[k].kcal!=null||dd[k].pr!=null).length};
+    c.total=c.runs+c.walks+c.gym+c.sleep+c.heart+c.steps+c.fuel;
+    return c}catch(e){return{total:0}}}
+function arrivalDue(){
+  try{
+    if(typeof SANDBOX!=='undefined'&&SANDBOX)return false;
+    if(lget('training-arrival-v1',null))return false;
+    if(!lget('training-welcome-v1',null))return false;
+    return arrivalCounts().total>0}catch(e){return false}}
+function viewArrival(){
+  const c=arrivalCounts();
+  const row=(n,label,sub)=>n?'<div class="card" style="padding:11px 15px;display:flex;align-items:baseline;gap:12px">'+
+    '<span class="mono disp" style="font-size:21px;font-weight:700;color:var(--text);flex:none;min-width:44px;text-align:right">'+n.toLocaleString()+'</span>'+
+    '<span style="flex:1;min-width:0"><span style="display:block;font-size:13px;font-weight:600">'+label+'</span>'+
+    '<span style="color:var(--faint);font-size:10.5px">'+sub+'</span></span></div>':'';
+  return '<div class="view pad stg pinpage" style="padding-top:40px">'+
+    '<p class="mono" style="color:var(--green);font-size:10px;letter-spacing:.14em">\u2726 YOUR DATA ARRIVED</p>'+
+    '<h1 class="disp gradhead" style="font-size:26px;font-weight:650;line-height:1.15;margin-top:8px">Health has been talking.</h1>'+
+    '<p style="color:var(--dim);font-size:13px;line-height:1.6;margin-top:9px">While you were setting up, Apple Health handed over your history \u2014 so Today already knows you. This is where it all came from:</p>'+
+    '<div class="pinbody" style="display:flex;flex-direction:column;justify-content:center;gap:7px;padding:10px 0">'+
+    row(c.runs,'Runs & cardio','From your watch, via Apple Health')+
+    row(c.walks,'Walks','Counted as background load, never as runs')+
+    row(c.gym,'Gym sessions the watch saw','Strength workouts, matched to your log')+
+    row(c.sleep,'Nights of sleep','The recovery half of the model')+
+    row(c.heart,'Days of heart data','Resting HR and HRV')+
+    row(c.steps,'Days of steps','The background load')+
+    row(c.fuel,'Days of nutrition','Calories and macros from your food app')+
+    '</div>'+
+    '<div class="pinfoot">'+
+    '<button data-a="arrivalGo" class="big disp" style="background:var(--amber);color:var(--bg);font-size:15px">Take me to Today</button>'+
+    '<button data-a="arrivalSee" class="btn" style="margin-top:8px;color:var(--dim);font-size:12.5px">Show me the data first</button>'+
+    '<p style="color:var(--faint);font-size:10px;text-align:center;margin-top:8px">All of it lives under \u2630 \u2192 Body signals, any time. Nothing invented \u2014 every number is yours.</p></div></div>'}
 function healthConnectCard(){
   /* THE first-run priority (owner call, 3 Sep): Allena is transformed
      by Health — say it loudly, and keep saying it until connected.
@@ -7850,7 +7897,9 @@ function rarityOf(k){return RARITY.find(x=>x[0]===k)||RARITY[0]}
 function discoveries(){
   const D=[];
   const H=(S.history||[]).filter(h=>h.complete&&!h.run).slice();
-  const R=(S.runs||[]);
+  /* walks and other cardio are ingested-never-coached (standing law)
+     — a 16min/km 'longest run' was a walk (owner-caught) */
+  const R=(S.runs||[]).filter(r=>typeof isRunType!=='function'||isRunType(r.type));
   const add=(rar,t,d,tag)=>D.push({rar:rar,t:t,d:d,tag:tag||'',id:t});
   if(!H.length&&!R.length)return D;
   const sets=[];H.forEach(h=>h.log.forEach(l=>{if(l.w&&l.r)sets.push({l:l,h:h,e:e1rm(l.w,l.r),b:gBase(l.ex)})}));
@@ -8157,6 +8206,13 @@ function discoveries(){
   try{if(typeof correlationDiscoveries==='function')correlationDiscoveries().forEach(d9=>D.push(d9))}catch(e){}
   try{if(typeof standingDiscoveries==='function')standingDiscoveries().forEach(d9=>D.push(d9))}catch(e){}
   return D}
+(function(){try{
+  if(lget('training-walkfix-v1',null))return;
+  const bank=discBank();let dirty=false;
+  Object.keys(bank).forEach(id=>{
+    if(/^(Longest run:|Quickest sustained pace:|First run logged)/.test(id)){delete bank[id];dirty=true}});
+  if(dirty)bankSave();
+  lset('training-walkfix-v1',1)}catch(e){}})();
 function discoverySeen(){return S.discSeen||(S.discSeen=lget('training-disc-v1',{}))}
 function markDiscoveries(){
   const seen=discoverySeen();
@@ -8261,7 +8317,8 @@ function treeData(){
   const st=weekStreak(),ds=dayStreak();
   return{pts:d.total,live:d.live,sessions:H.length,
     lifts:names.slice(0,9),liftCount:names.length,counts:lifts,
-    runs:(S.runs||[]).length,km:Math.round((S.runs||[]).reduce((a,r)=>a+(r.km||0),0)),
+    runs:(S.runs||[]).filter(r=>typeof isRunType!=='function'||isRunType(r.type)).length,
+    km:Math.round((S.runs||[]).filter(r=>typeof isRunType!=='function'||isRunType(r.type)).reduce((a,r)=>a+(r.km||0),0)),
     rehab:(function(){try{
       const rp=S.lib.programs.filter(p2=>p2.acl||p2.rehabProto).map(p2=>p2.id);
       const rs=(S.history||[]).filter(h=>h.complete&&rp.indexOf(h.progId)>=0).length;
@@ -10161,7 +10218,7 @@ function unlockCard(){
 function watchList(){
   const W=[];
   const H=(S.history||[]).filter(h=>h.complete&&!h.run);
-  const R=(S.runs||[]);
+  const R=(S.runs||[]).filter(r=>typeof isRunType!=='function'||isRunType(r.type));
   const runGated=!!(S.acl&&S.acl.on&&S.acl.phase<3);   // running waits for the knee
   const add=(t,have,need,d,got,opts)=>{
     if(have>=need){W.met=(W.met||0)+1;return}        // unlocked: it has answered or is about to
@@ -15780,6 +15837,7 @@ function render(){
   else if(S.view==='signals')body=viewSignals();
   else if(S.view==='guide')body=viewGuide();
   else if(S.view==='acct')body=viewAcct();
+  else if(S.view==='today'&&typeof arrivalDue==='function'&&arrivalDue())body=viewArrival();
   else if(S.view==='chart')body=viewChart();
   else if(S.view==='own')body=viewOwn();
   else if(S.view==='ownreview')body=viewOwnReview();
@@ -18101,6 +18159,8 @@ function runAction(a,v,t,e){
       if(wi===4&&!(typeof acctReady==='function'&&acctReady()))wi=5;
       if(wi>=5){lset('training-welcome-v1',1);delete st9.wi}else st9.wi=wi;
       render();break}
+    case 'arrivalGo':{lset('training-arrival-v1',1);try{hapticRun('find')}catch(e){};render();break}
+    case 'arrivalSee':{lset('training-arrival-v1',1);S.backTo='today';S._navQuiet=1;S.view='signals';render();break}
     case 'wBack':{const st9=S.setup||(S.setup={gate:true});let wi=(st9.wi||0)-1;
       const wr9=(typeof inWrapper==='function')&&inWrapper();
       if(!wr9&&(wi===3||wi===2))wi=1;
