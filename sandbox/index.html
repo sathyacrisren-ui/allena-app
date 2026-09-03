@@ -591,7 +591,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='edf4ee';  // stamped by tools/build.py with the content hash
+const BUILD_ID='5c97d3';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -1128,10 +1128,15 @@ async function claudeFetch(body){
       if(d.type==='error'||d.error)out.error=(d.error&&d.error.error)||d.error||d});
     return new Response(JSON.stringify(out),{status:200,headers:{'content-type':'application/json'}})}
   if(acctReady()&&acct()&&acct().refresh&&!(S.ai&&S.ai.key)){
-    const tok=await acctToken();
-    if(tok)return fetch(CLOUD.url+'/functions/v1/coach',{method:'POST',
-      headers:{'content-type':'application/json',apikey:CLOUD.anon,Authorization:'Bearer '+tok},
-      body:JSON.stringify(body)})}
+    try{
+      const tok=await acctToken();
+      if(tok)return await fetch(CLOUD.url+'/functions/v1/coach',{method:'POST',
+        headers:{'content-type':'application/json',apikey:CLOUD.anon,Authorization:'Bearer '+tok},
+        body:JSON.stringify(body)})
+    }catch(e){}}
+  if(!(S.ai&&S.ai.key))return new Response(JSON.stringify({error:{message:
+    'The Allena cloud link could not be reached \u2014 check your connection and try again in a minute.'}}),
+    {status:200,headers:{'content-type':'application/json'}});
   return fetch('https://api.anthropic.com/v1/messages',{method:'POST',
     headers:{'content-type':'application/json','x-api-key':S.ai.key,
       'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
@@ -1286,7 +1291,7 @@ async function askClaude(q){
       (m,ex,kg)=>{const n=parseFloat(String(kg).replace(/\s|,/g,'').replace('\u2212','-'));
         if(!isNaN(n))act={ex:ex.replace(/\*+/g,'').trim(),kg:n};return ''}).replace(/\n{3,}/g,'\n\n').trim();
     S.coach.thread.push({r:'a',t:t,act:act});chatSaveCurrent();
-  }catch(e){S.coach.thread.push({r:'a',t:"Couldn't reach Allena — check your connection and API key."})}
+  }catch(e){S.coach.thread.push({r:'a',t:"Couldn't reach Allena — check your connection and try again."})}
   S.coach.busy=false;render();
   const el2=document.getElementById('coachThread');if(el2)el2.scrollTop=el2.scrollHeight}
 function lastFor(ex,no){const cid=S.sess?String(S.sess.startedAt):null;
@@ -14777,7 +14782,7 @@ function viewYou(){
 function viewAcct(){
   return '<div class="view pad modalrise" style="padding-top:20px">'+
    '<div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">'+
-   '<button data-a="nav" data-v="you" style="width:42px;height:42px;border-radius:42px;background:var(--surface);border:1px solid var(--line);color:var(--dim);display:flex;align-items:center;justify-content:center;flex:none;font-size:16px">\u2039</button>'+
+   '<button data-a="back" style="width:42px;height:42px;border-radius:42px;background:var(--surface);border:1px solid var(--line);color:var(--dim);display:flex;align-items:center;justify-content:center;flex:none;font-size:16px">\u2039</button>'+
    '<h1 class="disp" style="font-size:19px;font-weight:600;flex:1;text-align:center;margin:0">Account &amp; sync</h1>'+
    '<span style="width:42px;flex:none"></span></div>'+
    accountSection()+'</div>'}
@@ -17665,6 +17670,7 @@ function runAction(a,v,t,e){
     case 'drawerNav':{const _f=S.view;S.drawerOpen=false;S._navQuiet=1;runAction('nav',v);S.backTo=_f;S.backDrawer=true;break}
     case 'back':{const _t=S.backTo||'today';const _d=!!S.backDrawer;
       S.backTo=null;S.backDrawer=false;S.view=_t;
+      if(_t==='you')S.backTo='data'; // You is only reached from Settings — a second back lands there, never loops
       /* ALL backs are instant (owner-caught three times on heavy
          pages): the view-transition snapshot of two big pages is the
          stutter — going back should just be there */
@@ -18797,7 +18803,7 @@ function runAction(a,v,t,e){
     case 'wHealth':{try{if(window.webkit&&window.webkit.messageHandlers&&window.webkit.messageHandlers.allena)
         window.webkit.messageHandlers.allena.postMessage('sync')}catch(e){}
       runAction('wNext');break}
-    case 'acctOpen':{S._navQuiet=1;S.view='acct';render();break}
+    case 'acctOpen':{if(S.view!=='acct')S.backTo=S.view;S._navQuiet=1;S.view='acct';render();break}
     case 'meOpen':{S.prof=S.prof||{};lset(K_PROF,S.prof);S.backTo=S.view;S._navQuiet=1;S.view='you';render();break}
     case 'meSex':{S.prof=S.prof||{};S.prof.sex=v;lset(K_PROF,S.prof);vib(8);render();break}
     case 'dsetOpen':{if(v==='__beta'){S.betaFrom=S.view;S.sheet={t:'beta'};render();break}
