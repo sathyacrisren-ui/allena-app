@@ -212,6 +212,11 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
   z-index:94;display:flex;align-items:center;gap:7px;padding:4px 13px;background:var(--raised);
   border:1.5px solid rgba(240,238,230,.65);border-radius:999px;box-shadow:0 5px 18px rgba(0,0,0,.45);
   transition:opacity .35s ease;pointer-events:none;white-space:nowrap}
+#winPill{position:fixed;top:calc(env(safe-area-inset-top) + 6px);left:50%;transform:translateX(-50%);
+z-index:96;display:flex;align-items:center;gap:7px;padding:7px 14px;border-radius:99px;
+background:var(--raised);border:1px solid var(--greensoft);box-shadow:0 4px 18px rgba(0,0,0,.35);
+transition:opacity .4s;pointer-events:none}
+body.sesslive #winPill{top:calc(env(safe-area-inset-top) + 40px)}
 #livePill{position:fixed;top:calc(env(safe-area-inset-top) + 6px);left:50%;transform:translateX(-50%);
 z-index:96;display:flex;align-items:center;gap:7px;padding:7px 14px;border-radius:99px;
 background:var(--raised);border:1px solid var(--line);box-shadow:0 4px 18px rgba(0,0,0,.35);
@@ -629,7 +634,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='8b2d79';  // stamped by tools/build.py with the content hash
+const BUILD_ID='d88302';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -7749,6 +7754,7 @@ function hkNutrition(rows){
     if(n){lset(K_DAILY,S.daily);try{hkPulse(n)}catch(e9){}
       flash('Nutrition synced from Health — '+rows.length+' days.');
       try{sorceryOnArrival('fuel')}catch(e9){}
+      try{fuelWins()}catch(e9){}
       try{render()}catch(e9){} /* without this the drawer dot and cards stayed stale until the next tap */}}catch(e){}}
 try{window.hkNutrition=hkNutrition}catch(e){}
 
@@ -8335,6 +8341,51 @@ function strainLine(h){
   if(st.pct>=5)return 'Heart signature '+st.pct+'% above '+base+' \u2014 you genuinely worked for this one.';
   if(st.pct<=-5)return 'Heart signature '+Math.abs(st.pct)+'% below '+base+' \u2014 smoother than usual, or better recovered.';
   return 'Heart signature right on '+base+'.'}
+
+/* ══ FUEL & MOVEMENT WINS (owner call, 4 Sep) ════════════════
+   Little celebrations for the quiet disciplines — protein hitting
+   YOUR target (scan lean-mass \u00d72.0g when a scan exists, bodyweight
+   \u00d71.6g otherwise) and steps beating YOUR own 30-day normal. A
+   green capsule + a tap of haptic, each once a day; real streaks
+   bank real finds at 7/14/30. Nothing generic, nothing to buy. */
+function proteinDayTarget(){
+  try{
+    const sc=(typeof scansSorted==='function'?scansSorted():[]).slice(-1)[0];
+    const pt=(typeof proteinTarget==='function')?proteinTarget(sc):null;
+    if(pt&&pt.lo)return pt.lo;
+    const dd=(S.daily&&S.daily.days)||{};
+    const ks=Object.keys(dd).sort().reverse();
+    for(const k of ks){if(dd[k].bw>30)return Math.round(dd[k].bw*1.6)}
+    return null}catch(e){return null}}
+function fuelWins(){
+  try{
+    const st=lget('training-fuelwins-v1',{})||{};
+    if(st.day!==today()){st.day=today();st.hit={}}
+    const dd=(S.daily&&S.daily.days)||{};
+    const t9=dd[today()]||{};
+    let dirty=false;
+    const tgt=proteinDayTarget();
+    if(!st.hit.pr&&tgt&&t9.pr>=tgt){
+      st.hit.pr=1;dirty=true;
+      winPill('PROTEIN '+Math.round(t9.pr)+'G \u00b7 TARGET MET');
+      const yk=dayKey(new Date(Date.now()-864e5));
+      st.prStreak=(st.prLast===yk?(st.prStreak||0):0)+1;st.prLast=today();
+      if([7,14,30].indexOf(st.prStreak)>=0){
+        try{const bank=discBank(),id='fuel:pr'+st.prStreak;
+          if(!bank[id]){bank[id]={t:st.prStreak+' protein days in a row',
+            d:'Every one at or past your own target of '+tgt+'g. Muscle is built in the kitchen\u2019s quiet reps too.',
+            rar:st.prStreak>=30?'epic':'rare',tag:'record',found:today()};bankSave()}}catch(e9){}}}
+    if(!st.hit.st){
+      const hk=hkDailyStore().days||{};
+      const hist=Object.keys(hk).filter(k=>k<today()&&hk[k].steps>0).map(k=>hk[k].steps).sort((a,b)=>a-b);
+      const cur=hk[today()]&&hk[today()].steps;
+      if(hist.length>=14&&cur>0){
+        const med=hist[Math.floor(hist.length/2)];
+        if(cur>=Math.max(med*1.15,med+1500)){
+          st.hit.st=1;dirty=true;
+          winPill('STEPS '+cur.toLocaleString()+' \u00b7 PAST YOUR NORMAL')}}}
+    if(dirty)lset('training-fuelwins-v1',st)
+  }catch(e){}}
 const RARITY=[['common','#8A8782','Noticed'],['uncommon','#30D158','Worth knowing'],
   ['rare','#D9D6CD','Rare find'],['epic','#FFFFFF','Big one']];
 function rarityOf(k){return RARITY.find(x=>x[0]===k)||RARITY[0]}
@@ -8848,6 +8899,7 @@ function hkDaily(rows){
           if(dd.bw==null||dd.bw===''){dd.bw=Math.round(+r.bw*10)/10;lset(K_DAILY,S.daily);n++}}catch(e){}}});
     try{if(n)hkPulse(n)}catch(e9){}
     try{if(typeof sorceryOnArrival==='function')sorceryOnArrival('steps')}catch(e9){}
+    try{if(typeof fuelWins==='function')fuelWins()}catch(e9){}
     if(!n)return;
     const ks=Object.keys(st.days).sort();
     while(ks.length>180)delete st.days[ks.shift()];
