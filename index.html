@@ -616,7 +616,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='b45c8b';  // stamped by tools/build.py with the content hash
+const BUILD_ID='4a29e7';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -1290,6 +1290,12 @@ function coachContext(){
     try{
       const prior=S.history.filter(h=>h.id!==foc.id&&h.dayTitle===foc.dayTitle&&h.date<foc.date).slice(-1)[0];
       if(prior)fb.push('Same day previously: '+sessLine(prior,true));
+    }catch(e){}
+    try{
+      if(foc.hr&&foc.hr.avg&&typeof strainLine==='function'){
+        const sl=strainLine(foc);
+        if(sl)fb.push('EFFORT SIGNATURE (watch heart rate vs this user\u2019s own history \u2014 a within-person comparison, never a per-set RPE verdict): avg HR '+foc.hr.avg+'. '+sl+
+          ' If logged RPEs and the signature disagree, note it gently as calibration info, never as an accusation.')}
     }catch(e){}
     fb.push('=== RULES: the user\u2019s questions are about THIS session unless they clearly say otherwise. Below is BACKGROUND — if you use any of it, name the date or session it comes from. ===');
     return fb.join('\n')+'\n'+out.join('\n')}
@@ -8138,13 +8144,15 @@ function hkHR(id,res){
     const h=(S.history||[]).find(x=>String(x.id)===String(id));
     if(!h||h.hr)return;
     h.hr={avg:Math.round(res.avg),max:Math.round(res.max),n:res.n};
+    try{const st=sessStrain(h);if(st)h.strain=st.pct}catch(e9){}
     saveHistory();
     /* the passive witness testifies too (owner call, 3 Sep): no
        activity started on the watch, but its all-day heart rate was
        sampling right through the session window */
     try{if(typeof heartWitnessed==='function'&&heartWitnessed(h)){
       livePill();
-      flash('Your watch was listening \u2014 avg HR '+h.hr.avg+' through '+(String(h.date).slice(0,10)===today()?'today\u2019s':fmtDate(h.date)+'\u2019s')+' session. Heart-witnessed.');
+      const sl9=strainLine(h);
+      flash('Your watch was listening \u2014 avg HR '+h.hr.avg+'. '+(sl9||'Heart-witnessed.'));
       haptic('success')}}catch(e9){}
     render()
   }catch(e){}}
@@ -8251,6 +8259,31 @@ function sorceryOnArrival(kind){
         'Tomorrow runs, and today sits at '+Math.round(cur)+'g carbs \u2014 your good run days usually land near '+Math.round(med)+'g. The window is this evening.');
       return}
   }catch(e){}}
+
+/* ══ THE EFFORT SIGNATURE (owner ask, 4 Sep) ═════════════════
+   What heart rate can honestly say about lifting effort: nothing
+   about one set\u2019s RPE (a true 9 at 3 reps barely moves it), but a
+   SESSION\u2019s average against the user\u2019s OWN history on the same day
+   type is a real within-person comparison. Needs 3 prior heart-
+   carrying sessions of the same day; speaks in percentages of the
+   user\u2019s own normal, never absolutes, never a verdict on honesty. */
+function sessStrain(h){
+  try{
+    if(!h||!h.hr||!(h.hr.avg>0))return null;
+    const peers=(S.history||[]).filter(x=>x.id!==h.id&&!x.run&&x.complete&&x.hr&&x.hr.avg>0&&x.dayTitle===h.dayTitle);
+    const pool=peers.length>=3?peers:(S.history||[]).filter(x=>x.id!==h.id&&!x.run&&x.complete&&x.hr&&x.hr.avg>0);
+    if(pool.length<3)return null;
+    const avgs=pool.map(x=>x.hr.avg).sort((a,b)=>a-b);
+    const med=avgs[Math.floor(avgs.length/2)];
+    if(!(med>0))return null;
+    const pct=Math.round((h.hr.avg/med-1)*100);
+    return{pct:pct,med:Math.round(med),same:peers.length>=3}}catch(e){return null}}
+function strainLine(h){
+  const st=sessStrain(h);if(!st)return '';
+  const base=st.same?'your usual '+String(h.dayTitle||'session').toLowerCase():'your usual session';
+  if(st.pct>=5)return 'Heart signature '+st.pct+'% above '+base+' \u2014 you genuinely worked for this one.';
+  if(st.pct<=-5)return 'Heart signature '+Math.abs(st.pct)+'% below '+base+' \u2014 smoother than usual, or better recovered.';
+  return 'Heart signature right on '+base+'.'}
 const RARITY=[['common','#8A8782','Noticed'],['uncommon','#30D158','Worth knowing'],
   ['rare','#D9D6CD','Rare find'],['epic','#FFFFFF','Big one']];
 function rarityOf(k){return RARITY.find(x=>x[0]===k)||RARITY[0]}
