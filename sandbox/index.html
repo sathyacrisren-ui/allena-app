@@ -634,7 +634,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='f2e9f5';  // stamped by tools/build.py with the content hash
+const BUILD_ID='d493f0';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -16108,9 +16108,21 @@ function sheetHtml(){
       w.parts.map(p=>'<div class="card" style="padding:13px 15px">'+
         '<p style="font-size:13.5px;font-weight:600">'+esc(p.t)+'</p>'+
         '<p style="color:var(--dim);font-size:12.5px;line-height:1.55;margin-top:4px">'+esc(p.d)+'</p></div>').join('')+'</div>'+
-      '<div class="card mt2" style="padding:14px 16px;border-color:var(--line)">'+
-      '<p class="eyebrow">What it does not know</p>'+
-      '<p style="color:var(--dim);font-size:12.5px;line-height:1.65;margin-top:6px">Sleep beyond what Body Battery already reflects, protein, calories, stress, alcohol, illness. It is not assuming those are fine — it has no data on them. If you slept badly or have not eaten properly, you know something the number does not, and you should trust yourself over it.</p></div>'+
+      (function(){
+        const knows=[],unknown=['stress','alcohol','illness'];
+        try{const hk=hkDailyStore().days||{};
+          if(Object.keys(hk).filter(k=>hk[k].sleep>0).length>=7)knows.push('last night’s sleep against your own month of nights');
+          else unknown.unshift('sleep')}catch(e){unknown.unshift('sleep')}
+        try{const tgt=(typeof proteinDayTarget==='function')?proteinDayTarget():null;
+          const dd=(S.daily&&S.daily.days)||{};const yk=dayKey(new Date(Date.now()-864e5));
+          if(tgt&&dd[yk]&&dd[yk].pr>0)knows.push('yesterday’s protein against your own target');
+          else unknown.push('protein')}catch(e){unknown.push('protein')}
+        return (knows.length?'<div class="card mt2" style="padding:14px 16px;border-color:var(--greensoft)">'+
+          '<p class="mono" style="font-size:9px;color:var(--green);letter-spacing:.1em">NOT A TIMER — MEASURED FROM YOU</p>'+
+          '<p style="color:var(--dim);font-size:12.5px;line-height:1.65;margin-top:6px">Most apps count hours since your last workout. This number bills each set by its real effort, drains on each muscle’s own clock — and that clock listens to '+knows.join(' and ')+'. Recover well and it knows before you feel it.</p></div>':'')+
+        '<div class="card mt2" style="padding:14px 16px;border-color:var(--line)">'+
+        '<p class="eyebrow">What it still does not know</p>'+
+        '<p style="color:var(--dim);font-size:12.5px;line-height:1.65;margin-top:6px">'+unknown.join(', ').replace(/^./,c=>c.toUpperCase())+'. It is not assuming those are fine — it has no data on them. If you know something the number does not, trust yourself over it.</p></div>'})()+
       '<button data-a="closeSheet" class="btn mt2">Got it</button>')}
   if(S.sheet.t==='bwq'){
     const f=S.gform||{bw:''};
@@ -16438,7 +16450,10 @@ function sheetHtml(){
         '<div class="card mt" style="padding:4px 15px">'+
         b.slice(0,6).map((x,i)=>'<p style="padding:10px 0;font-size:13.5px'+(i?';border-top:1px solid var(--line)':'')+'">'+esc(x)+'</p>').join('')+'</div>'
        :'<p style="color:var(--dim);font-size:13px;line-height:1.6;margin-top:10px">Nothing in your program or recent history trains this directly yet. The swap picker and program builder both know what does.</p>')+
-      '<p style="color:var(--faint);font-size:11px;line-height:1.55;margin-top:12px">Held by training inside a week, fading after eight days, unclaimed past a fortnight — an invitation, never a verdict.</p>')}
+      '<p style="color:var(--faint);font-size:11px;line-height:1.55;margin-top:12px">Held by training inside a week, fading after eight days, unclaimed past a fortnight — an invitation, never a verdict.</p>'+
+      '<div class="card mt2" style="padding:13px 15px">'+
+      '<p class="mono" style="font-size:9px;color:var(--amber);letter-spacing:.1em">HOW ALLENA MEASURES RECOVERY</p>'+
+      '<p style="color:var(--dim);font-size:12px;line-height:1.65;margin-top:7px">Most apps run a timer: trained Monday, "recovered" Wednesday. Allena bills every set to the muscles that did it — scaled by how hard it actually was (an RPE 9 costs more than a 6), with runs and rides charged to the legs at their real eccentric cost — then drains that bill on each muscle’s own clock. And the clock itself listens to your body: sleep last night against your own month of nights, protein yesterday against your own target — recover well and the map knows before you do. Every input is yours; nothing is a population average.</p></div>')}
   if(S.sheet.t==='dset'){
     const body=dataChunks()[S.sheet.k];
     if(body==null)return '';
