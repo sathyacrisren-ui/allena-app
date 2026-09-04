@@ -616,7 +616,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='14cc75';  // stamped by tools/build.py with the content hash
+const BUILD_ID='55d1fd';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -10519,7 +10519,7 @@ function todayVerdict(){
      not ground through — push-through is only the call when the days
      genuinely run out */
   if(sore.length>=2){const c9=(function(){try{return weekClock()}catch(e){return null}})();
-    if(c9&&c9.remaining.length<=c9.left)return{tone:'ok',t:pick.name+' can wait a day',
+    if(c9&&c9.remaining.length<=c9.left)return{tone:'ok',wait:true,t:pick.name+' can wait a day',
       d:sore.slice(0,2).map(m=>m.toLowerCase()+' '+Math.round(fresh[m])+'%').join(' and ')+' recovered — and the week has room: '+c9.remaining.length+' session'+(c9.remaining.length===1?'':'s')+' left, '+c9.left+' day'+(c9.left===1?'':'s')+' after today. Recovery today buys a better session tomorrow; nothing gets missed.',
       cta:{a:'prevOpen',v:p.id+':'+pick.i,label:'Train anyway'}}}
   if(sore.length>=2)return{tone:'warn',t:pick.name+' is a stretch today',
@@ -10868,7 +10868,8 @@ function verdictCard(){
      2026): once the noticed has been seen it goes stale — the live
      forecast takes the stage and the noticed drops to a quiet line. */
   const pd=(typeof predToday==='function')?(function(){try{return predToday()}catch(e){return null}})():null;
-  const callLive=pd&&pd.ex&&!pd.outcome;
+  const restDay=(function(){try{const v9=todayVerdict();return !!(v9&&v9.wait)}catch(e){return false}})();
+  const callLive=pd&&pd.ex&&!pd.outcome&&!restDay;
   const noticedQuiet=n?'<button data-a="noticedShow" style="display:flex;align-items:center;gap:9px;width:100%;text-align:left;margin-top:11px;padding-top:11px;border-top:1px solid var(--line)">'+
     '<span class="mono" style="font-size:9px;color:var(--faint);letter-spacing:.06em;flex:none">NOTICED</span>'+
     '<span style="flex:1;min-width:0;color:var(--dim);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(n.t)+'</span>'+
@@ -11045,6 +11046,8 @@ function predStats(){
 function predLine(){
   try{
     const d=predToday();if(!d||!d.ex)return '';
+    if(!d.outcome){try{const v9=todayVerdict();
+      if(v9&&v9.wait)return '<p class="mono" style="color:var(--faint);font-size:10px;letter-spacing:.05em;margin-top:11px;padding-top:11px;border-top:1px solid var(--line)">FORECAST HELD \u2014 recovery leads today; the call returns with the session</p>'}catch(e){}}
     const exN=esc(String(d.ex).replace(/ — .*/,''));
     if(d.outcome){
       const msg=d.outcome==='called'?'Called it — '+exN+' '+uwStr(d.actW)+'×'+d.actR
@@ -11119,7 +11122,7 @@ function fuseCard(){
       const cs=lget('training-chase-v1',{})||{};
       if(cs.day===today()&&pool.some(w=>w.t===cs.id))near=pool.find(w=>w.t===cs.id);
       else{
-        near=pool.find(w=>w.t!==cs.id)||pool[0];
+        near=cs.id?(pool.find(w=>w.t!==cs.id)||pool[0]):(pool[1]||pool[0]);
         lset('training-chase-v1',{day:today(),id:near.t})}
     }catch(e){near=pool[0]}
     const gap=near.need-near.have;
