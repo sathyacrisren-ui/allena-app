@@ -634,7 +634,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='8666b0';  // stamped by tools/build.py with the content hash
+const BUILD_ID='b3a184';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -11581,10 +11581,21 @@ function viewCollection(){
         '<b style="color:var(--text)">'+esc(c[1])+'</b> — '+esc(c[3])+'</p>').join('')+
       '<p style="color:var(--faint);font-size:11px;line-height:1.5;margin-top:9px">'+
       'Most of these need a few weeks of data before they can appear. They are not hidden, they just do not exist yet.</p></div>'}
-  DISC_CATALOG.forEach(c=>{
+  /* per-category NEW: banked since the last visit here — dot, glow,
+     and the fresh categories jump to the top (owner call, 4 Sep).
+     First-ever visit baselines silently, no false flood. */
+  const seenC=lget('training-collseen-v1',null);
+  const seenIds=(seenC&&seenC.ids)||{};
+  const freshBy={};
+  if(seenC)l.forEach(d=>{if(!seenIds[d.id])freshBy[d.tag||'record']=(freshBy[d.tag||'record']||0)+1});
+  try{const all={};l.forEach(d=>all[d.id]=1);lset('training-collseen-v1',{ids:all})}catch(e){}
+  DISC_CATALOG.slice().sort((a,b)=>(freshBy[b[0]]||0)-(freshBy[a[0]]||0)).forEach(c=>{
     const mine=l.filter(d=>(d.tag||'record')===c[0]);
     const open=!!S.openSec['cat:'+c[0]];
-    h+='<div class="card mt" style="padding:0;overflow:hidden'+(open?';border-color:var(--text);border-width:2px':'')+(mine.length?'':';opacity:.55')+'">'+
+    const frN=freshBy[c[0]]||0;
+    if(frN)h+='<div style="position:relative" class="an-glow">'+
+      '<span style="position:absolute;top:-6px;right:-4px;min-width:19px;height:19px;border-radius:19px;background:#FF453A;color:#fff;font-size:10.5px;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 5px;z-index:6;box-shadow:0 2px 8px rgba(0,0,0,.4)">'+frN+'</span>';
+    h+='<div class="card mt" style="padding:0;overflow:hidden'+(open?';border-color:var(--text);border-width:2px':(frN?';border-color:var(--greensoft)':''))+(mine.length?'':';opacity:.55')+'">'+
       '<button data-a="secToggle" data-v="cat:'+c[0]+'" style="width:100%;text-align:left;padding:13px 15px;display:flex;align-items:center;gap:11px">'+
       '<span style="flex:1;min-width:0"><span style="display:block;font-size:14px;font-weight:600">'+esc(c[1])+'</span>'+
       '<span style="display:block;color:var(--faint);font-size:11.5px;line-height:1.4">'+esc(mine.length?c[2]:c[3])+'</span></span>'+
@@ -11600,7 +11611,8 @@ function viewCollection(){
           '<p style="color:var(--dim);font-size:12px;line-height:1.55;margin-top:2px">'+esc(d.d)+'</p></div>'}).join('')+'</div>'
         :open?'<div style="border-top:1px solid var(--line);padding:13px 14px">'+
           '<p style="color:var(--faint);font-size:12px;line-height:1.55">Nothing here yet. '+esc(c[3])+'</p></div>':'')+
-      '</div>'});
+      '</div>';
+    if(frN)h+='</div>'});
   return h+'</div>'}
 
 /* ══ one pattern engine ═════════════════════════════════════
@@ -13598,14 +13610,23 @@ function discCard(){
     '<span class="mono" style="color:var(--faint);font-size:12px;flex:none">\u203a</span></button>'}
 function viewFindings(){
   try{bankDiscoveries()}catch(e){}   // found = banked, the day it happens — viewing counts
+  /* what's NEW leads and glows (owner call, 4 Sep): a page of pills
+     must say which pill holds the new thing, or the visit is a hunt */
+  const dot9=n=>'<span style="position:absolute;top:-6px;right:-4px;min-width:19px;height:19px;border-radius:19px;background:#FF453A;color:#fff;font-size:10.5px;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 5px;z-index:6;box-shadow:0 2px 8px rgba(0,0,0,.4)">'+n+'</span>';
+  const wrapF=(html,fresh,n)=>html?'<div style="position:relative" class="'+(fresh?'an-glow':'')+'">'+(fresh?dot9(n||'\u25cf'):'')+html+'</div>':'';
+  let deepFresh=false;try{deepFresh=!!deepReadyInfo()}catch(e){}
+  let patN=0,discN=0;try{patN=unseenPatterns()}catch(e){}try{discN=unseenDiscoveries()}catch(e){}
+  const secs=[
+    {f:deepFresh,n:'\u25cf',h:'<div id="deepcard" style="scroll-margin-top:14px">'+deepCard()+'</div>'},
+    {f:false,h:(typeof analystCard==='function'?analystCard():'')},
+    {f:patN>0,n:patN,h:analyseCard()},
+    {f:discN>0,n:discN,h:discCard()}];
+  secs.sort((a,b)=>(b.f?1:0)-(a.f?1:0));
   return '<div class="view pad stg" style="padding-top:24px">'+
     '<button data-a="back" class="btn" style="width:auto;padding:8px 14px;color:var(--dim);font-size:12.5px;margin-bottom:14px">‹ Back</button>'+
     '<h1 class="disp" style="font-size:25px;font-weight:600">Findings</h1>'+
     '<p style="color:var(--dim);font-size:13px;line-height:1.6;margin-top:8px">Three lenses on the same data \u2014 the deeper the lens, the rarer what it sees.</p>'+
-    '<div id="deepcard" style="scroll-margin-top:14px">'+deepCard()+'</div>'+
-    (typeof analystCard==='function'?analystCard():'')+
-    analyseCard()+
-    discCard()+
+    secs.map(x=>wrapF(x.h,x.f,x.n)).join('')+
     nearRings()+
     '</div>'}
 function nearRings(){
