@@ -634,7 +634,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='8608af';  // stamped by tools/build.py with the content hash
+const BUILD_ID='f2e9f5';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -2582,8 +2582,29 @@ function muscleHits(ex){
   try{SECONDARY.forEach(r=>{if(!r[0].test(ex))return;
     r[1].forEach(m=>{if(!out[m])out[m]=0.5})})}catch(e){}
   return out}
+function recoveryMod(){
+ /* recovery is not only time (owner call, 4 Sep): sleep and protein
+    modulate repair rate. Last night's sleep vs YOUR 30-day median and
+    yesterday's protein vs YOUR target scale the decay clock ±~20%,
+    clamped hard so the model bends, never breaks. No data = 1.0 —
+    the modifier only ever speaks from evidence. */
+ try{
+  let m=1;
+  const hk=hkDailyStore().days||{};
+  const ks=Object.keys(hk).filter(k=>hk[k].sleep>0).sort();
+  if(ks.length>=7){
+   const last=hk[ks[ks.length-1]].sleep;
+   const pool=ks.slice(-30).map(k=>hk[k].sleep).sort((a,b)=>a-b);
+   const med=pool[Math.floor(pool.length/2)];
+   if(med>0)m*=Math.max(0.85,Math.min(1.15,0.7+0.3*(last/med)))}
+  const dd=(S.daily&&S.daily.days)||{};
+  const yk=dayKey(new Date(Date.now()-864e5));
+  const tgt=(typeof proteinDayTarget==='function')?proteinDayTarget():null;
+  if(tgt&&dd[yk]&&dd[yk].pr>0)
+   m*=Math.max(0.9,Math.min(1.1,0.8+0.25*Math.min(1.4,dd[yk].pr/tgt)));
+  return Math.max(0.8,Math.min(1.25,m))}catch(e){return 1}}
 function muscleFresh(){
- const now=Date.now(),L={};
+ const now=Date.now(),L={},RM=recoveryMod();
  S.history.forEach(h=>{const hrs=(now-new Date(h.date).getTime())/36e5;
   if(hrs>168||hrs<-2)return;
   const TAU={};MUSCLE_RULES.forEach(r=>TAU[r[0]]=r[2]);
@@ -2595,7 +2616,7 @@ function muscleFresh(){
    const rq=l.rpe!=null?Math.max(0.4,Math.min(1.15,0.25+l.rpe/8)):1;
    Object.keys(hits).forEach(m=>{
     const eff=((l.r>0)?1:0.25)*hits[m]*rq;
-    L[m]=(L[m]||0)+eff*Math.exp(-Math.max(0,hrs)/(TAU[m]||44))})})});
+    L[m]=(L[m]||0)+eff*Math.exp(-Math.max(0,hrs)*RM/(TAU[m]||44))})})});
  /* running is leg load — the one-model promise. A half marathon the
     day before must show in the legs, whatever the lifting log says. */
  const RUN_M={'Quads':1,'Calves':1,'Hamstrings':0.8,'Glutes':0.6};
@@ -2606,7 +2627,7 @@ function muscleFresh(){
   const eff=Math.min(6,(r2.km/6)*(hard?1.6:(r2.rpe||5)>=6.5?1.2:1));
   Object.keys(RUN_M).forEach(m=>{
    const rule=MUSCLE_RULES.find(x=>x[0]===m);if(!rule)return;
-   L[m]=(L[m]||0)+eff*RUN_M[m]*Math.exp(-Math.max(0,hrs)/rule[2])})});
+   L[m]=(L[m]||0)+eff*RUN_M[m]*Math.exp(-Math.max(0,hrs)*RM/rule[2])})});
  /* saturating fatigue (owner-caught, 4 Sep: upper back pinned at 0%
     all week from ordinary rowing volume). Linear L*16 let a normal
     week's accumulation hit the floor and stay there; the exponential
@@ -5977,7 +5998,7 @@ function viewPoints(){
      ['nav','home','Log a session live','the biggest earner — every set, rep and effort counts, witnessed',doneSess],
      ((S.acl&&S.acl.on&&S.acl.phase<3)
        ?['runLog','','Take a walk','the knee\u2019s cardio \u2014 ticks itself from Health (a walk workout, or 4,000+ steps); running opens at phase 3',doneWalk]
-       :['runLog','','Log a run','distance, time, heart rate and zones all count',doneRun]),
+       :['runLog','','Go for a run','arrives from Health on its own — or log it here; distance, time, heart rate and zones all count',doneRun]),
      ['todayOpen','','The daily check-ins','readiness, weight, check-in — small, but they compound',doneChecks],
      ['drawerNav','findings','Visit your findings','new discoveries bank into the collection when seen',doneFinds]];
    h+='<div class="card mt2" style="padding:15px 16px">'+
