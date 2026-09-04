@@ -634,7 +634,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='d16e1c';  // stamped by tools/build.py with the content hash
+const BUILD_ID='c0d12d';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -9206,6 +9206,7 @@ function viewSignals(){
       '<div style="position:relative;z-index:3">'+lineChart(pts,{min:Math.max(0,lo-pad),max:hi+pad,suffix:kind.u.trim(),color:'#1E9BFF',
         marks:[Math.round(lo),Math.round(hi)],newAfter:newAfter})+'</div>'+
       '<p class="mono" style="color:var(--faint);font-size:9px;letter-spacing:.05em;margin-top:6px">'+pts.length+' DAYS \u00b7 '+esc(kind.src.toUpperCase())+' \u00b7 TAP TO EXPLAIN</p></div>'});
+  h+=(typeof tdeeCard==='function'?tdeeCard():'');
   h+=(typeof hkDumpCard==='function'?hkDumpCard():'');
   if(dry.length)h+='<div class="card mt2" style="padding:14px 16px"><p class="eyebrow">Not flowing yet</p>'+
     '<p style="color:var(--dim);font-size:12px;line-height:1.7;margin-top:7px">'+
@@ -9255,6 +9256,64 @@ function hkDumpCard(){
   else inner='<p style="color:var(--faint);font-size:12px;margin-top:6px">Asks iOS how many raw nutrition samples Allena can actually see.</p>';
   return '<div class="card mt" style="padding:13px 15px"><p class="eyebrow">Nutrition X-ray</p>'+inner+
     '<button data-a="hkDumpAsk" class="btn mt" style="font-size:12px">Ask iOS now</button></div>'}
+
+/* ══ THE ENERGY LEDGER (4 Sep) ═══════════════════════════════
+   The one honest calorimeter: logged intake against the scale's
+   trend. If you eat a tracked 2,400 a day and weight holds flat,
+   your true burn IS 2,400 — physics, not a wrist guess. Needs 10+
+   tracked-calorie days and a bodyweight span of 10+ days inside
+   the last three weeks; silent until then. */
+function tdeeLedger(){
+  try{
+    const dd=(S.daily&&S.daily.days)||{};
+    const cut=dayKey(new Date(Date.now()-21*864e5));
+    const ks=Object.keys(dd).filter(k=>k>=cut&&k<=today()).sort();
+    const kcals=ks.filter(k=>dd[k].kcal>600).map(k=>dd[k].kcal);
+    const bws=ks.filter(k=>dd[k].bw>30).map(k=>({k:k,v:dd[k].bw}));
+    if(kcals.length<10||bws.length<4)return null;
+    const span=(new Date(bws[bws.length-1].k+'T12:00')-new Date(bws[0].k+'T12:00'))/864e5;
+    if(span<10)return null;
+    const meanK=Math.round(kcals.reduce((a,b)=>a+b,0)/kcals.length);
+    // trend from endpoints of 3-reading medians (one weigh-in is noise)
+    const med3=a=>{const s9=a.slice().sort((x,y)=>x-y);return s9[Math.floor(s9.length/2)]};
+    const head=med3(bws.slice(0,3).map(x=>x.v)),tail=med3(bws.slice(-3).map(x=>x.v));
+    const dKg=(tail-head)/span;               // kg per day
+    const tdee=Math.round((meanK-dKg*7700)/10)*10;
+    if(!(tdee>800&&tdee<6000))return null;
+    return{tdee:tdee,meanK:meanK,gWk:Math.round(dKg*7000),nK:kcals.length,nB:bws.length,span:Math.round(span)}
+  }catch(e){return null}}
+function tdeeCard(){
+  try{
+    const t=tdeeLedger();if(!t)return '';
+    const dir=t.gWk>150?'a surplus — weight trending up '+t.gWk+' g/week'
+      :t.gWk<-150?'a deficit — weight trending down '+Math.abs(t.gWk)+' g/week'
+      :'maintenance — the scale is holding steady';
+    return '<div class="card mt" style="padding:15px 16px">'+
+      '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px">'+
+      '<span style="font-size:14px;font-weight:600">The energy ledger</span>'+
+      '<span class="mono" style="font-size:16px;font-weight:700;color:var(--green)">~'+t.tdee.toLocaleString()+' kcal</span></div>'+
+      '<p style="color:var(--dim);font-size:12px;line-height:1.6;margin-top:6px">Your measured daily burn — not a wrist estimate. Physics: you averaged '+t.meanK.toLocaleString()+' kcal across '+t.nK+' tracked days while the scale moved the way it did, so this is what your body actually spends. Right now you are eating at '+dir+'.</p>'+
+      '<p style="color:var(--faint);font-size:11px;line-height:1.6;margin-top:7px">The physics from here: ~'+(t.tdee+250).toLocaleString()+' kcal/day builds ~0.25 kg/month of lean-gain headroom; ~'+(t.tdee-500).toLocaleString()+' cuts ~0.5 kg/week. Your watch guesses burn; the scale does not.</p>'+
+      '<p class="mono" style="color:var(--faint);font-size:9px;letter-spacing:.05em;margin-top:7px">'+t.nK+' FOOD DAYS · '+t.nB+' WEIGH-INS · '+t.span+'-DAY WINDOW · SHARPENS AS BOTH ACCRUE</p></div>'
+  }catch(e){return ''}}
+
+/* timing arrives from the native hourly buckets: shares, not totals —
+   WHEN the day happened. 0-1 fractions per day. */
+function hkTiming(rows){
+  try{
+    if(typeof rows==='string')rows=JSON.parse(rows);
+    if(!Array.isArray(rows)||!rows.length)return;
+    const st=hkDailyStore();let n=0;
+    rows.forEach(r=>{
+      const k=String(r.date||'').slice(0,10);
+      if(!/^\d{4}-\d{2}-\d{2}$/.test(k))return;
+      const d=st.days[k]=st.days[k]||{};
+      ['msteps','eprot','ecarb'].forEach(f=>{
+        if(r[f]!=null&&isFinite(+r[f])&&+r[f]>=0&&+r[f]<=1){
+          if(d[f]==null)n++;d[f]=+r[f]}})});
+    if(n){lset(K_HKD,st);try{render()}catch(e){}}
+  }catch(e){}}
+try{window.hkTiming=hkTiming}catch(e){}
 /* ══ the correlation discoverer (owner call, 3 Sep) ══════════
    The crank. Instead of hand-writing every relationship, this
    pairs EVERY daily signal against EVERY training outcome at
@@ -9291,7 +9350,8 @@ function corrDayData(){
     Object.keys(st).forEach(k=>{const d=st[k];
       put(k,'sleep',d.sleep);put(k,'hrv',d.hrv);put(k,'rhr',d.rhr);
       put(k,'steps',d.steps);put(k,'vo2',d.vo2);
-      put(k,'wtemp',d.wtemp);put(k,'resp',d.resp);put(k,'spo2',d.spo2)});
+      put(k,'wtemp',d.wtemp);put(k,'resp',d.resp);put(k,'spo2',d.spo2);
+      put(k,'msteps',d.msteps);put(k,'eprot',d.eprot);put(k,'ecarb',d.ecarb)});
     const flows=Object.keys(st).filter(k=>st[k].flow).sort();
     if(flows.length){
       const starts=flows.filter(k=>{const y=new Date(k+'T12:00');y.setDate(y.getDate()-1);
@@ -9442,7 +9502,10 @@ const CORR_SIGNALS={
   wtemp:{n:'a warmer overnight wrist',dir:'a warmer overnight wrist'},
   resp:{n:'an elevated overnight breathing rate',dir:'a higher overnight breathing rate'},
   spo2:{n:'higher blood oxygen',dir:'higher blood oxygen'},
-  cyc:{n:'later in the cycle',dir:'a later cycle day'}};
+  cyc:{n:'later in the cycle',dir:'a later cycle day'},
+  msteps:{n:'a morning-heavy step day',dir:'more of the day\u2019s steps before noon'},
+  eprot:{n:'protein loaded late',dir:'a bigger share of protein after 5pm'},
+  ecarb:{n:'carbs loaded late',dir:'a bigger share of carbs after 5pm'}};
 const CORR_OUTCOMES={
   topset:{n:'top set',good:'up',dir:1},
   tonnage:{n:'session volume',good:'up',dir:1},
@@ -9551,7 +9614,7 @@ const CORR_PRIOR={sleep:1,sleep2:1,sleep3:1,hrv:1,hrvswing:1,rhr:1,rhr3:1,ready:
   protein:1,protein3:1,carb:1,carb3:1,kcal3:1,sleepvar:1,vo2:1,
   kcal:0,fat:0,fat3:0,bw:0,bwtrend:0,steps:0,steps3:0,load:0,load3:0,
   km:0,km3:0,walkkm:0,ridekm:0,sessmins:0,resty:0,hour:0,weekend:0,
-  wtemp:0,resp:0,cyc:0,spo2:1};
+  wtemp:0,resp:0,cyc:0,spo2:1,msteps:0,eprot:0,ecarb:0};
 function corrPhrase(c){
   const M=S._corrMaps||{sigs:CORR_SIGNALS,outs:CORR_OUTCOMES};
   const S9=M.sigs[c.sig]||CORR_SIGNALS[c.sig],O=M.outs[c.out]||CORR_OUTCOMES[c.out];
@@ -9696,6 +9759,10 @@ function learnedProfile(){
     // discovered correlations — the deepest learning
     try{correlations().forEach(c=>{const p=corrPhrase(c);
       rows.push({k:'A pattern only in you:',v:p.title,s:'correlation '+(Math.round(c.rho*100)/100)+' across '+c.n+' days'})})}catch(e){}
+    // the measured burn
+    try{const t9=(typeof tdeeLedger==='function')?tdeeLedger():null;
+      if(t9)rows.push({k:'Your measured daily burn is',v:'~'+t9.tdee.toLocaleString()+' kcal',
+        s:'from '+t9.nK+' food days against the scale \u2014 physics, not a formula'})}catch(e){}
     // per-lift adaptation state
     try{const lifts={};H.forEach(h=>h.log.forEach(l=>{if(l.w>0&&l.r>0)lifts[gBase(l.ex)]=(lifts[gBase(l.ex)]||0)+1}));
       const trained=Object.keys(lifts).filter(k=>lifts[k]>=6).length;
@@ -11120,7 +11187,24 @@ function verdictCard(){
     ((typeof predLine==='function'&&!(typeof callLive!=='undefined'&&callLive&&done&&n&&t.revealed&&!S.noticedBig))?predLine():'')+
     questLine()+
     (typeof deepLine==='function'?deepLine():'')+
+    (typeof tmrwLine==='function'?tmrwLine():'')+
     '</div>'}
+
+/* the evening cliffhanger (4 Sep): after 8pm the day points forward —
+   an honest open loop: tomorrow's call genuinely does not exist yet,
+   and tonight's sleep genuinely feeds it. */
+function tmrwLine(){
+  try{
+    if(new Date().getHours()<20)return '';
+    const c=weekClock();
+    const nx=c&&c.remaining&&c.remaining.length?c.remaining[0].name:null;
+    const line=nx
+      ?nx+' — the model drafts your call in the morning, and tonight’s sleep feeds it.'
+      :'the week is banked — tomorrow reads what recovery did with it.';
+    return '<div style="display:flex;align-items:baseline;gap:9px;margin-top:11px;padding-top:11px;border-top:1px solid var(--line)">'+
+      '<span class="mono" style="color:var(--faint);font-size:9px;letter-spacing:.06em;flex:none;min-width:52px">TOMORROW</span>'+
+      '<span style="flex:1;min-width:0;font-size:12px;line-height:1.5;color:var(--dim)">'+esc(line)+'</span></div>'
+  }catch(e){return ''}}
 /* ══ the prediction loop ═════════════════════════════════════
    Allena says what it expects BEFORE the session, and the new
    data settles it. A forecast is not a target and never a bounty
