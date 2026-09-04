@@ -634,7 +634,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='a4524d';  // stamped by tools/build.py with the content hash
+const BUILD_ID='164738';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -3711,9 +3711,13 @@ function noticedPool(){
         'That is '+Math.round(best/avg*100-100)+'% above your usual week. Bodies grow on the average, not the peak \u2014 but the peak proves the ceiling.')}}catch(e){}
   // set-level PR density in the recent month
   try{const cut9=Date.now()-28*864e5;
+    /* honesty gate (owner-caught, 5 Sep): with a 2-week-old account,
+       every early set trivially "beats everything before it". The
+       month-of-progress brag needs history OLDER than the month. */
+    const hasBase=H.some(h=>!h.run&&new Date(h.date).getTime()<=cut9);
     const prs=H.filter(h=>new Date(h.date).getTime()>cut9)
       .reduce((a,h)=>a+h.log.filter(l=>l.pr).length,0);
-    if(prs>=3)add(prs+' rep PRs in the last four weeks',
+    if(hasBase&&prs>=3)add(prs+' rep PRs in the last four weeks',
       'Each one is a set that beat everything before it. Whatever the plan says, the last month has been going somewhere.')}catch(e){}
   // the long-run habit
   try{const rl=(S.runs||[]).filter(r=>isRunType(r.type));
@@ -3875,6 +3879,7 @@ function noticedToday(){
   const pool=noticedPool();
   if(!pool.length)return null;
   const t=todayState();
+  if(t.noticedT){const f9=pool.find(p2=>p2.t===t.noticedT);if(f9)return f9}
   if(t.seenIdx!=null)return pool[Math.min(t.seenIdx,pool.length-1)];
   // stable for the day, different tomorrow — and "different tomorrow"
   // is enforced: date%pool can land on yesterday's item (small pools,
@@ -8928,7 +8933,13 @@ function hkDaily(rows){
       if(r.bw!=null&&isFinite(+r.bw)&&+r.bw>20&&+r.bw<400){
         try{S.daily=S.daily||{on:true,days:{}};S.daily.days=S.daily.days||{};
           const dd=S.daily.days[k]=S.daily.days[k]||{};
-          if(dd.bw==null||dd.bw===''){dd.bw=Math.round(+r.bw*10)/10;lset(K_DAILY,S.daily);n++}}catch(e){}}});
+          if(dd.bw==null||dd.bw===''){dd.bw=Math.round(+r.bw*10)/10;lset(K_DAILY,S.daily);n++;
+            /* a task the scale completes must SAY so — a silently
+               self-ticking checklist reads as a glitch (owner-caught) */
+            if(k===today())try{const fw=lget('training-fuelwins-v1',{})||{};
+              if(fw.day!==today()){fw.day=today();fw.hit={}}
+              if(!fw.hit.bw){fw.hit.bw=1;lset('training-fuelwins-v1',fw);
+                if(typeof winPill==='function')winPill('BODYWEIGHT '+dd.bw+' KG \u00b7 IN FROM THE SCALE')}}catch(e9){}}}catch(e){}}});
     try{if(n)hkPulse(n)}catch(e9){}
     try{if(typeof sorceryOnArrival==='function')sorceryOnArrival('steps')}catch(e9){}
     try{if(typeof fuelWins==='function')fuelWins()}catch(e9){}
@@ -11131,7 +11142,7 @@ function verdictCard(){
      forecast takes the stage and the noticed drops to a quiet line. */
   const pd=(typeof predToday==='function')?(function(){try{return predToday()}catch(e){return null}})():null;
   const restDay=(function(){try{const v9=todayVerdict();return !!(v9&&v9.wait)}catch(e){return false}})();
-  const callLive=pd&&pd.ex&&!pd.outcome&&!restDay;
+  const callLive=pd&&pd.ex&&!pd.outcome&&!restDay&&!pd.repeat;
   const noticedQuiet=n?'<button data-a="noticedShow" style="display:flex;align-items:center;gap:9px;width:100%;text-align:left;margin-top:11px;padding-top:11px;border-top:1px solid var(--line)">'+
     '<span class="mono" style="font-size:9px;color:var(--faint);letter-spacing:.06em;flex:none">NOTICED</span>'+
     '<span style="flex:1;min-width:0;color:var(--dim);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(n.t)+'</span>'+
@@ -11145,14 +11156,14 @@ function verdictCard(){
       '<button data-a="predOpen" class="mono" style="color:var(--amber);font-size:11px;margin-top:8px;text-align:left">Why this call ›</button></div>'+
       noticedQuiet+
       '<div style="display:flex;align-items:center;gap:9px;margin-top:11px;padding-top:11px;border-top:1px solid var(--line)">'+dots+
-      '<span class="mono" style="color:var(--faint);font-size:10.5px">all done today</span></div>'}
+      '<span class="mono" style="color:var(--faint);font-size:10.5px">'+(pr.done>=pr.total?'all done today':'core done \u2014 the rest is optional')+'</span></div>'}
   else if(done&&n&&t.revealed){
     inner+='<div class="an-rise" style="margin-top:11px">'+
       '<p class="mono" style="font-size:10px;color:var(--amber);letter-spacing:.08em">✦ ALLENA NOTICED</p>'+
       '<p class="disp gradhead" style="font-size:24px;line-height:1.18;margin-top:7px">'+esc(n.t)+'</p>'+
       '<p style="color:var(--dim);font-size:13.5px;line-height:1.6;margin-top:6px">'+esc(n.d)+'</p></div>'+
       '<div style="display:flex;align-items:center;gap:9px;margin-top:13px;padding-top:12px;border-top:1px solid var(--line)">'+dots+
-      '<span class="mono" style="color:var(--faint);font-size:10.5px">all done today</span></div>'}
+      '<span class="mono" style="color:var(--faint);font-size:10.5px">'+(pr.done>=pr.total?'all done today':'core done \u2014 the rest is optional')+'</span></div>'}
   else if(done&&n){
     inner+='<p class="disp gradhead" style="font-size:24px;line-height:1.18;margin-top:10px">All done today</p>'+
       '<p style="color:var(--dim);font-size:13.5px;line-height:1.6;margin-top:5px">And Allena found something in your data.</p>'+
@@ -11277,7 +11288,12 @@ function predToday(){
   if(st.days[tk])return st.days[tk];
   const call=predBuild();if(!call)return null;
   const rd=predReadyBuild();
-  st.days[tk]=Object.assign({made:tk},call,rd?{readyLo:rd.lo,readyHi:rd.hi,readyWhy:rd.whyR}:{});
+  /* same lift, same numbers, yesterday unanswered: today's card is
+     a CARRY, not news (owner-caught, 5 Sep) */
+  let rep=0;
+  try{const yk=dayKey(new Date(Date.now()-864e5)),yd=st.days[yk];
+    if(yd&&yd.outcome==null&&yd.ex===call.ex&&yd.predW===call.predW&&yd.predR===call.predR)rep=1}catch(e){}
+  st.days[tk]=Object.assign({made:tk,repeat:rep},call,rd?{readyLo:rd.lo,readyHi:rd.hi,readyWhy:rd.whyR}:{});
   predSave();
   return st.days[tk]}
 function predResolvePending(){
@@ -11326,6 +11342,7 @@ function predStats(){
 function predLine(){
   try{
     const d=predToday();if(!d||!d.ex)return '';
+    if(d.repeat&&!d.outcome)return '<p class="mono" style="color:var(--faint);font-size:10px;letter-spacing:.05em;margin-top:11px;padding-top:11px;border-top:1px solid var(--line)">STILL OPEN \u2014 '+esc(String(d.ex).replace(/ — .*/,''))+' '+uwStr(d.predW)+'\u00d7'+d.predR+', carried from yesterday; it settles when the session happens</p>';
     if(!d.outcome){try{const v9=todayVerdict();
       if(v9&&v9.wait)return '<p class="mono" style="color:var(--faint);font-size:10px;letter-spacing:.05em;margin-top:11px;padding-top:11px;border-top:1px solid var(--line)">FORECAST HELD \u2014 recovery leads today; the call returns with the session</p>'}catch(e){}}
     const exN=esc(String(d.ex).replace(/ — .*/,''));
@@ -11399,11 +11416,18 @@ function fuseCard(){
        a day, guaranteed different from yesterday when the pool allows. */
     let near;
     try{
-      const cs=lget('training-chase-v1',{})||{};
+      const cs=lget('training-chase-v1',{})||{};cs.hist=cs.hist||{};
       if(cs.day===today()&&pool.some(w=>w.t===cs.id))near=pool.find(w=>w.t===cs.id);
       else{
-        near=cs.id?(pool.find(w=>w.t!==cs.id)||pool[0]):(pool[1]||pool[0]);
-        lset('training-chase-v1',{day:today(),id:near.t})}
+        /* cooldown (owner-caught, 5 Sep): a face fronted two days with
+           ZERO progress is benched until its number actually moves */
+        const alive=pool.filter(w=>{const h9=cs.hist[w.t];
+          return !(h9&&h9.n>=2&&h9.have===w.have)});
+        const pick=alive.length?alive:pool;
+        near=(cs.id?pick.find(w=>w.t!==cs.id):pick[1])||pick[0];
+        const h9=cs.hist[near.t];
+        cs.hist[near.t]={n:(h9&&h9.have===near.have?h9.n:0)+1,have:near.have};
+        cs.day=today();cs.id=near.t;lset('training-chase-v1',cs)}
     }catch(e){near=pool[0]}
     const gap=near.need-near.have;
     const one=gap===1;
@@ -20050,7 +20074,7 @@ function doScroll(){
   if(!S.scrollTo)return;
   const id=S.scrollTo;S.scrollTo=null;
   try{const el=document.getElementById(id);
-    if(el&&el.scrollIntoView)el.scrollIntoView({behavior:'smooth',block:'start'})}catch(e){}}
+    if(el&&el.scrollIntoView)el.scrollIntoView({behavior:'smooth',block:'center'})}catch(e){}}
 try{navigator.storage&&navigator.storage.persist&&navigator.storage.persist().then(function(g){S.persisted=!!g})}catch(e){}
 try{sanityWeeks()}catch(e){}
 try{bootStart()}catch(e){}
