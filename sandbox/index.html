@@ -616,7 +616,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='55d1fd';  // stamped by tools/build.py with the content hash
+const BUILD_ID='824057';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -11551,6 +11551,55 @@ function apptCard(){
       '<span style="color:var(--faint);font-size:11.5px">Tap to build the report to bring</span></span>'+
       '<span class="mono" style="color:var(--faint);font-size:14px;flex:none">›</span></button>'}catch(e){return ''}}
 
+/* ══ SINCE YOU LAST LOOKED (owner vision, 4 Sep: excitement about
+   THEMSELVES) ═══════════════════════════════════════════════
+   The one novelty source that never dries up: time passing through
+   a training body. Each open diffs the world against the last visit
+   and says what MOVED — strength, recovery, load, the score. Always
+   true, never twice the same, and the star of every line is the
+   user. Quiet when the gap is under four hours; the snapshot rolls
+   forward only when shown. */
+function sinceSnap(){
+  const s9={e1:{},fresh:{},streak:0,pts:0,km:0,ins:0};
+  try{(S.goals||[]).forEach(g=>{
+    let best=0;(S.history||[]).forEach(h=>{if(h.run)return;
+      (h.log||[]).forEach(l=>{if(l.w>0&&l.r>0&&gBase(l.ex)===gBase(g.ex))best=Math.max(best,e1rm(l.w,l.r))})});
+    if(best)s9.e1[gBase(g.ex)]=Math.round(best*10)/10})}catch(e){}
+  try{muscleFresh().forEach(x=>s9.fresh[x.m]=x.fresh)}catch(e){}
+  try{s9.streak=dayStreak()}catch(e){}
+  try{s9.pts=Math.round(dataPoints().total)}catch(e){}
+  try{s9.km=Math.round(weeklyKm(1)[0].km*10)/10}catch(e){}
+  try{s9.ins=correlations().length}catch(e){}
+  return s9}
+function sinceCard(){
+  try{
+    const st=lget('training-lastlook-v1',null);
+    const now=Date.now();
+    if(S._sinceHtml!=null)return S._sinceHtml;   // stable within this open
+    if(!st||!st.snap){lset('training-lastlook-v1',{ts:now,snap:sinceSnap()});S._sinceHtml='';return ''}
+    if(now-st.ts<4*3600e3){S._sinceHtml='';return ''}
+    const a=st.snap,b=sinceSnap();
+    const rows=[];
+    try{Object.keys(b.e1).forEach(k=>{const d=b.e1[k]-(a.e1&&a.e1[k]||0);
+      if(a.e1&&a.e1[k]&&d>0.4)rows.push({s:100+d,h:k+' best e1RM '+a.e1[k]+' \u2192 '+b.e1[k],c:'var(--green)'})})}catch(e){}
+    try{const mv=Object.keys(b.fresh).map(m=>({m:m,d:b.fresh[m]-((a.fresh&&a.fresh[m])!=null?a.fresh[m]:b.fresh[m])}))
+      .filter(x=>Math.abs(x.d)>=18).sort((x,y)=>Math.abs(y.d)-Math.abs(x.d)).slice(0,2);
+      mv.forEach(x=>rows.push({s:40+Math.abs(x.d)/5,
+        h:x.m+' '+Math.round((a.fresh&&a.fresh[x.m])!=null?a.fresh[x.m]:0)+'% \u2192 '+Math.round(b.fresh[x.m])+'%'+(x.d>0?' \u2014 recovering on schedule':' \u2014 paying for the work'),
+        c:x.d>0?'var(--green)':'var(--dim)'}))}catch(e){}
+    try{if(b.ins>(a.ins||0))rows.push({s:90,h:(b.ins-a.ins)+' new insight'+(b.ins-a.ins===1?'':'s')+' cleared the evidence bar',c:'var(--green)'})}catch(e){}
+    try{if(b.km>(a.km||0)+0.5)rows.push({s:35,h:'This week\u2019s road: '+(a.km||0)+' \u2192 '+b.km+' km',c:'var(--text)'})}catch(e){}
+    try{const dp=b.pts-(a.pts||0);if(dp>=30)rows.push({s:25,h:'+'+dp+' points banked since then',c:'var(--text)'})}catch(e){}
+    if(!rows.length){S._sinceHtml='';return ''}
+    rows.sort((x,y)=>y.s-x.s);
+    lset('training-lastlook-v1',{ts:now,snap:b});
+    const hrs=Math.round((now-st.ts)/3600e3);
+    S._sinceHtml='<div class="card mt" style="padding:14px 16px">'+
+      '<p class="mono" style="font-size:9px;color:var(--faint);letter-spacing:.12em">SINCE YOU LAST LOOKED \u00b7 '+(hrs<48?hrs+'H':Math.round(hrs/24)+'D')+' AGO</p>'+
+      rows.slice(0,3).map(r=>'<p style="font-size:13px;line-height:1.55;margin-top:7px;color:'+r.c+'">'+esc(r.h)+'</p>').join('')+
+      '</div>';
+    return S._sinceHtml}catch(e){return ''}}
+
 /* ══ the muscle-map hold (prompt 16) ════════════════════════
    Territory over your own body. A muscle trained this week is
    HELD; 8–14 days untouched is FADING; longer is UNCLAIMED —
@@ -13831,6 +13880,7 @@ function todayOrder(){
 
   add((typeof notifAskCard==='function'?notifAskCard():''),86);
   add(apptCard(),85);                                    // renders only day-before / day-of
+  add((typeof sinceCard==='function'?sinceCard():''),84); // the mirror: what moved while you were away
   add(garCard(),hr<12?82:50);                            // the morning ask fades after noon
   add((typeof watchGymCard==='function'?watchGymCard():''),80);
   add((typeof wrapCard==='function'?wrapCard():''),75);
