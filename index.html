@@ -616,7 +616,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='4a29e7';  // stamped by tools/build.py with the content hash
+const BUILD_ID='75987d';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -3793,6 +3793,44 @@ function noticedPool(){
           'You are at '+n+', averaging '+(Math.round(rate*10)/10)+' a week since '+fmtDate(first.date)+'. At your own pace — no deadline, just the shape of the road.')}}}catch(e){}
   try{if(typeof healthNoticed==='function')healthNoticed().forEach(x=>{if(x.t&&x.d)out.push({t:x.t,d:x.d,tier:1})})}catch(e){}
   try{if(typeof correlationNoticed==='function')correlationNoticed().forEach(x=>{if(x.t&&x.d)out.push({t:x.t,d:x.d,tier:1})})}catch(e){}
+  /* ── the memory generators (owner call, 4 Sep: grow the pool) ── */
+  // anniversaries: the same date, a year or six months ago
+  try{const marks=[[365,'A year ago today'],[182,'Six months ago today']];
+    marks.forEach(mk=>{
+      const then=dayKey(new Date(Date.now()-mk[0]*864e5));
+      const h0=H.find(h=>String(h.date).slice(0,10)===then&&(h.log||[]).length);
+      if(h0){const top=(h0.log||[]).filter(l=>l.w>0&&l.r>0).sort((a,b)=>e1rm(b.w,b.r)-e1rm(a.w,a.r))[0];
+        add(mk[1]+': '+(h0.dayTitle||'a session'),
+          top?('You logged '+gBase(top.ex)+' '+top.w+'\u00d7'+top.r+' that day. Look how far the log reaches back \u2014 this record is becoming a training life.')
+             :'That session is still in the book. The log remembers what memory rounds off.',1)}})}catch(e){}
+  // near-misses: within touching distance of an all-time mark
+  try{const lifts2={};
+    H.forEach(h=>h.log.forEach(l=>{if(!l.w||!l.r)return;const b=gBase(l.ex);
+      const e=e1rm(l.w,l.r);(lifts2[b]=lifts2[b]||[]).push({e:e,d:String(h.date).slice(0,10)})}));
+    const cut14=dayKey(new Date(Date.now()-14*864e5));
+    Object.keys(lifts2).forEach(b=>{const arr=lifts2[b];if(arr.length<8)return;
+      const best=Math.max.apply(null,arr.map(x=>x.e));
+      const recent=Math.max.apply(null,arr.filter(x=>x.d>=cut14).map(x=>x.e).concat([0]));
+      if(recent>0&&recent<best&&recent>=best*0.96){
+        const gapK=Math.round((best-recent)*10)/10;
+        add(b+' is '+gapK+' kg of e1RM from your all-time',
+          'Your best-ever is within one good day\u2019s reach \u2014 the kind of gap that closes when sleep and timing line up.',1)}})}catch(e){}
+  // texture: round-number odometer moments
+  try{const totalSets=H.reduce((a,h)=>a+(h.log||[]).filter(l=>l.r>0||l.secs).length,0);
+    const near100=totalSets%100;
+    if(near100>=95||near100===0)add('Set number '+(Math.ceil(totalSets/100)*100)+' is '+(near100===0?'behind you':'this session'),
+      totalSets.toLocaleString()+' honest sets logged so far. Volume is the quiet author of every PR in this app.',3);
+    const nS=H.length;
+    if([25,50,75,100,150,200,300].indexOf(nS)>=0)add('Session '+nS+' is in the book',
+      'Most people quit before 10. The evidence pool this builds is why your insights keep getting sharper.',2)}catch(e){}
+  // consistency texture: same weekday, N in a row
+  try{const dows={};H.slice(-60).forEach(h=>{const dw=new Date(h.date).getDay();(dows[dw]=dows[dw]||[]).push(String(h.date).slice(0,10))});
+    const names=['Sundays','Mondays','Tuesdays','Wednesdays','Thursdays','Fridays','Saturdays'];
+    Object.keys(dows).forEach(dw=>{const ds=[...new Set(dows[dw])].sort().reverse();
+      let run=0;for(let i=0;i<ds.length;i++){const expect=dayKey(new Date(new Date(ds[0]+'T12:00')-i*7*864e5));
+        if(ds[i]===expect)run++;else break}
+      if(run>=4)add(run+' '+names[dw]+' in a row',
+        'The same day, week after week \u2014 scheduling is the strongest predictor of long-term progress there is.',2)})}catch(e){}
   return out}
 function noticedToday(){
   const pool=noticedPool();
@@ -8780,7 +8818,8 @@ function hkDaily(rows){
       const k=String(r.date||'').slice(0,10);
       if(!/^\d{4}-\d{2}-\d{2}$/.test(k))return;
       const d=st.days[k]=st.days[k]||{};
-      ['rhr','hrv','vo2','steps','sleep'].forEach(f=>{
+      if(r.spo2!=null&&isFinite(+r.spo2)&&+r.spo2>0&&+r.spo2<=1)r.spo2=Math.round(+r.spo2*1000)/10;
+      ['rhr','hrv','vo2','steps','sleep','resp','wtemp','spo2','flow'].forEach(f=>{
         if(r[f]!=null&&isFinite(+r[f])&&+r[f]>0){
           /* today's steps tick up all day — a value refresh is not a
              NEW point (owner-caught: '1 NEW' with nothing to show).
@@ -8993,7 +9032,10 @@ const SIG_KINDS=[
   {k:'Protein',d:'pr',u:' g',src:'Health nutrition or hand-logged'},
   {k:'Carbs',d:'carb',u:' g',src:'Health nutrition'},
   {k:'Fat',d:'fat',u:' g',src:'Health nutrition'},
-  {k:'Bodyweight',d:'bw',u:' kg',src:'smart scale via Health, check-ins, scans'}];
+  {k:'Bodyweight',d:'bw',u:' kg',src:'smart scale via Health, check-ins, scans'},
+  {k:'Wrist temperature',d:'wtemp',u:'\u00b0C',src:'Apple Watch, overnight'},
+  {k:'Breathing rate',d:'resp',u:'/min',src:'Apple Watch, overnight'},
+  {k:'Blood oxygen',d:'spo2',u:'%',src:'Apple Watch'}];
 function sigSnap(){
   /* per-metric snapshot: last day carrying data + how many days do —
      day-granular seen-tracking missed same-day arrivals entirely
@@ -9151,7 +9193,16 @@ function corrDayData(){
   try{const st=hkDailyStore().days||{};
     Object.keys(st).forEach(k=>{const d=st[k];
       put(k,'sleep',d.sleep);put(k,'hrv',d.hrv);put(k,'rhr',d.rhr);
-      put(k,'steps',d.steps);put(k,'vo2',d.vo2)})}catch(e){}
+      put(k,'steps',d.steps);put(k,'vo2',d.vo2);
+      put(k,'wtemp',d.wtemp);put(k,'resp',d.resp);put(k,'spo2',d.spo2)});
+    const flows=Object.keys(st).filter(k=>st[k].flow).sort();
+    if(flows.length){
+      const starts=flows.filter(k=>{const y=new Date(k+'T12:00');y.setDate(y.getDate()-1);
+        return flows.indexOf(dayKey(y))<0});
+      Object.keys(days).forEach(k=>{
+        let s0=null;starts.forEach(x=>{if(x<=k)s0=x});
+        if(s0){const n=Math.round((new Date(k+'T12:00')-new Date(s0+'T12:00'))/864e5);
+          if(n>=0&&n<=45)days[k].cyc=n}})}}catch(e){}
   try{const g=(S.gar&&S.gar.days)||{};Object.keys(g).forEach(k=>{
     if(g[k].am!=null)put(k,'ready',g[k].am)})}catch(e){}
   try{const dd=(S.daily&&S.daily.days)||{};Object.keys(dd).forEach(k=>{
@@ -9290,7 +9341,11 @@ const CORR_SIGNALS={
   km:{n:'a running day',dir:'more running km',trained:1},
   walkkm:{n:'a big walking day',dir:'more walking'},
   ridekm:{n:'a riding day',dir:'more riding km',trained:1},
-  sessmins:{n:'a long session',dir:'a longer session',trained:1}};
+  sessmins:{n:'a long session',dir:'a longer session',trained:1},
+  wtemp:{n:'a warmer overnight wrist',dir:'a warmer overnight wrist'},
+  resp:{n:'an elevated overnight breathing rate',dir:'a higher overnight breathing rate'},
+  spo2:{n:'higher blood oxygen',dir:'higher blood oxygen'},
+  cyc:{n:'later in the cycle',dir:'a later cycle day'}};
 const CORR_OUTCOMES={
   topset:{n:'top set',good:'up',dir:1},
   tonnage:{n:'session volume',good:'up',dir:1},
@@ -9398,7 +9453,8 @@ function correlations(){
 const CORR_PRIOR={sleep:1,sleep2:1,sleep3:1,hrv:1,hrvswing:1,rhr:1,rhr3:1,ready:1,
   protein:1,protein3:1,carb:1,carb3:1,kcal3:1,sleepvar:1,vo2:1,
   kcal:0,fat:0,fat3:0,bw:0,bwtrend:0,steps:0,steps3:0,load:0,load3:0,
-  km:0,km3:0,walkkm:0,ridekm:0,sessmins:0,resty:0,hour:0,weekend:0};
+  km:0,km3:0,walkkm:0,ridekm:0,sessmins:0,resty:0,hour:0,weekend:0,
+  wtemp:0,resp:0,cyc:0,spo2:1};
 function corrPhrase(c){
   const M=S._corrMaps||{sigs:CORR_SIGNALS,outs:CORR_OUTCOMES};
   const S9=M.sigs[c.sig]||CORR_SIGNALS[c.sig],O=M.outs[c.out]||CORR_OUTCOMES[c.out];
