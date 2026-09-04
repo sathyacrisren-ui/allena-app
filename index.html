@@ -634,7 +634,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='47d9e4';  // stamped by tools/build.py with the content hash
+const BUILD_ID='1ddbd3';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -5968,12 +5968,15 @@ function viewPoints(){
    const tk=today();
    const doneSess=S.history.some(h=>!h.run&&h.complete&&String(h.date).slice(0,10)===tk&&!h.demo);
    const doneRun=runs().some(r=>String(r.date).slice(0,10)===tk);
+   /* the knee's cardio completes ITSELF (owner-caught, 4 Sep): a
+      Health-synced walk workout counts, and so do 4,000+ plain steps */
+   const doneWalk=doneRun||(function(){try{const d9=hkDailyStore().days[tk];return !!(d9&&d9.steps>=4000)}catch(e){return false}})();
    const doneChecks=(function(){try{return todayProgress().complete}catch(e){return false}})();
    const doneFinds=(function(){try{return unseenPatterns()===0&&!bankDiscoveries().length}catch(e){return false}})();
    const earn=[
      ['nav','home','Log a session live','the biggest earner — every set, rep and effort counts, witnessed',doneSess],
      ((S.acl&&S.acl.on&&S.acl.phase<3)
-       ?['runLog','','Log a walk','the knee\u2019s cardio \u2014 distance, time and heart rate count; running opens at phase 3',doneRun]
+       ?['runLog','','Take a walk','the knee\u2019s cardio \u2014 ticks itself from Health (a walk workout, or 4,000+ steps); running opens at phase 3',doneWalk]
        :['runLog','','Log a run','distance, time, heart rate and zones all count',doneRun]),
      ['todayOpen','','The daily check-ins','readiness, weight, check-in — small, but they compound',doneChecks],
      ['drawerNav','findings','Visit your findings','new discoveries bank into the collection when seen',doneFinds]];
@@ -11091,6 +11094,7 @@ function verdictCard(){
       '<button data-a="todayOpen" class="mono" style="color:var(--amber);font-size:11px;flex:none">All</button></div>'}
   return '<div class="card an-hero" style="padding:18px;border-radius:22px;margin-top:16px;border-color:'+(done?'var(--greensoft)':'var(--line)')+'">'+
     inner+
+    (typeof sinceLines==='function'?sinceLines():'')+
     briefLines()+
     ((typeof predLine==='function'&&!(typeof callLive!=='undefined'&&callLive&&done&&n&&t.revealed&&!S.noticedBig))?predLine():'')+
     questLine()+
@@ -11754,13 +11758,13 @@ function sinceSnap(){
   try{s9.km=Math.round(weeklyKm(1)[0].km*10)/10}catch(e){}
   try{s9.ins=correlations().length}catch(e){}
   return s9}
-function sinceCard(){
+function sinceData(){
   try{
     const st=lget('training-lastlook-v1',null);
     const now=Date.now();
-    if(S._sinceHtml!=null)return S._sinceHtml;   // stable within this open
-    if(!st||!st.snap){lset('training-lastlook-v1',{ts:now,snap:sinceSnap()});S._sinceHtml='';return ''}
-    if(now-st.ts<4*3600e3){S._sinceHtml='';return ''}
+    if(S._sinceD!==undefined)return S._sinceD;   // stable within this open
+    if(!st||!st.snap){lset('training-lastlook-v1',{ts:now,snap:sinceSnap()});S._sinceD=null;return null}
+    if(now-st.ts<3600e3){S._sinceD=null;return null}
     const a=st.snap,b=sinceSnap();
     const rows=[];
     try{Object.keys(b.e1).forEach(k=>{const d=b.e1[k]-(a.e1&&a.e1[k]||0);
@@ -11773,15 +11777,23 @@ function sinceCard(){
     try{if(b.ins>(a.ins||0))rows.push({s:90,h:(b.ins-a.ins)+' new insight'+(b.ins-a.ins===1?'':'s')+' cleared the evidence bar',c:'var(--green)'})}catch(e){}
     try{if(b.km>(a.km||0)+0.5)rows.push({s:35,h:'This week\u2019s road: '+(a.km||0)+' \u2192 '+b.km+' km',c:'var(--text)'})}catch(e){}
     try{const dp=b.pts-(a.pts||0);if(dp>=30)rows.push({s:25,h:'+'+dp+' points banked since then',c:'var(--text)'})}catch(e){}
-    if(!rows.length){S._sinceHtml='';return ''}
+    if(!rows.length){S._sinceD=null;return null}
     rows.sort((x,y)=>y.s-x.s);
     lset('training-lastlook-v1',{ts:now,snap:b});
-    const hrs=Math.round((now-st.ts)/3600e3);
-    S._sinceHtml='<div class="card mt" style="padding:14px 16px">'+
-      '<p class="mono" style="font-size:9px;color:var(--faint);letter-spacing:.12em">SINCE YOU LAST LOOKED \u00b7 '+(hrs<48?hrs+'H':Math.round(hrs/24)+'D')+' AGO</p>'+
-      rows.slice(0,3).map(r=>'<p style="font-size:13px;line-height:1.55;margin-top:7px;color:'+r.c+'">'+esc(r.h)+'</p>').join('')+
-      '</div>';
-    return S._sinceHtml}catch(e){return ''}}
+    const hrs=Math.max(1,Math.round((now-st.ts)/3600e3));
+    S._sinceD={hrs:hrs,rows:rows};
+    return S._sinceD}catch(e){return null}}
+function sinceLines(){
+  /* the mirror rides INSIDE the green hero (owner call, 4 Sep) \u2014 up to
+     two quiet rows in the verdict card's own line language, hourly */
+  try{
+    const d=sinceData();if(!d)return '';
+    const tag='SINCE \u00b7 '+(d.hrs<48?d.hrs+'H':Math.round(d.hrs/24)+'D');
+    return d.rows.slice(0,2).map((r,i)=>
+      '<div style="display:flex;align-items:baseline;gap:9px;margin-top:11px;padding-top:11px;border-top:1px solid var(--line)">'+
+      '<span class="mono" style="color:var(--faint);font-size:9px;letter-spacing:.06em;flex:none;min-width:52px">'+(i===0?tag:'')+'</span>'+
+      '<span style="flex:1;min-width:0;font-size:12px;line-height:1.5;color:'+r.c+'">'+esc(r.h)+'</span></div>').join('')
+  }catch(e){return ''}}
 
 /* ══ the muscle-map hold (prompt 16) ════════════════════════
    Territory over your own body. A muscle trained this week is
@@ -14076,7 +14088,6 @@ function todayOrder(){
 
   add((typeof notifAskCard==='function'?notifAskCard():''),86);
   add(apptCard(),85);                                    // renders only day-before / day-of
-  add((typeof sinceCard==='function'?sinceCard():''),84); // the mirror: what moved while you were away
   add(garCard(),hr<12?82:50);                            // the morning ask fades after noon
   add((typeof watchGymCard==='function'?watchGymCard():''),80);
   add((typeof wrapCard==='function'?wrapCard():''),75);
