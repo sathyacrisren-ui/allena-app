@@ -634,7 +634,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='c3dad5';  // stamped by tools/build.py with the content hash
+const BUILD_ID='dfd331';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -13865,7 +13865,7 @@ function viewFindings(){
      makes:'Mechanisms, confounds named, and one experiment your own engine referees',
      h:(typeof analystCard==='function'?analystCard():'')}];
   const freshIdx=LENSES.findIndex(x=>x.f);
-  if(freshIdx>0)S.scrollTo='lens-'+freshIdx;
+  if(S.lensIdx==null&&freshIdx>0){S.scrollTo='lens-'+freshIdx;S.lensIdx=freshIdx}
   const ladder=cur=>'<p class="mono" style="font-size:9px;letter-spacing:.08em;margin-top:4px;color:var(--faint)">'+
     LENSES.map((x,i)=>(i===cur?'<span style="color:var(--amber)">'+x.name.toUpperCase()+'</span>':x.name.toUpperCase())).join(' → ')+'</p>';
   return '<div class="view pad stg" style="padding-top:24px">'+
@@ -13873,11 +13873,18 @@ function viewFindings(){
     '<h1 class="disp" style="font-size:25px;font-weight:600">Findings</h1>'+
     '<p style="color:var(--dim);font-size:13px;line-height:1.6;margin-top:8px">Four lenses, one body of data — each swipe goes deeper, and the deeper the lens, the rarer what it sees.</p>'+
     '<p class="mono" style="color:var(--faint);font-size:9px;letter-spacing:.12em;margin-top:12px">'+LENSES.map(x=>(x.f?'●':'○')).join(' ')+' · SWIPE ›</p>'+
-    '<div style="display:flex;overflow-x:auto;scroll-snap-type:x mandatory;align-items:stretch;gap:14px;margin:2px -18px 0;padding:0 18px 6px;-webkit-overflow-scrolling:touch;scrollbar-width:none">'+
+    '<div id="lenswrap" style="display:flex;overflow-x:auto;scroll-snap-type:x mandatory;align-items:stretch;gap:14px;margin:2px -18px 0;padding:0 18px 6px;-webkit-overflow-scrolling:touch;scrollbar-width:none">'+
     LENSES.map((x,i)=>'<div id="lens-'+i+'" style="flex:0 0 100%;scroll-snap-align:center;min-width:0">'+
-      '<div style="margin-top:12px"><p class="mono" style="font-size:9.5px;color:var(--amber);letter-spacing:.12em">'+x.tag+'</p>'+
+      '<div style="margin-top:14px;display:flex;align-items:flex-end;gap:14px">'+
+      '<span class="disp gradhead" style="font-size:46px;font-weight:800;line-height:.9;flex:none">'+(i+1)+'</span>'+
+      '<span style="flex:1;min-width:0">'+
+      '<span class="mono" style="display:block;font-size:9px;color:var(--amber);letter-spacing:.14em">'+x.tag.split('\u00b7')[1].trim()+'</span>'+
+      '<span class="disp" style="display:block;font-size:21px;font-weight:650;line-height:1.1;margin-top:2px">'+x.name+'</span></span>'+
+      '<span style="display:flex;align-items:flex-end;gap:4px;flex:none;padding-bottom:4px">'+
+      LENSES.map((_,j)=>'<span style="width:9px;border-radius:3px;height:'+(8+j*6)+'px;background:'+(j===i?'var(--amber)':j<i?'color-mix(in srgb, var(--text) 35%, transparent)':'var(--line)')+'"></span>').join('')+
+      '</span></div>'+
       ladder(i)+
-      '<p style="color:var(--dim);font-size:12.5px;line-height:1.55;margin-top:7px">'+x.one+'</p></div>'+
+      '<p style="color:var(--dim);font-size:12.5px;line-height:1.55;margin-top:8px">'+x.one+'</p>'+
       wrapF(x.h,x.f,x.n)+
       '<div class="card mt" style="padding:13px 15px">'+
       [['READS',x.reads],['SPEAKS',x.speaks],['MAKES',x.makes]].map((r,j)=>
@@ -17716,6 +17723,8 @@ function render(){
     if(!big){try{const vEl=document.querySelector('#app .view.stg');if(vEl&&vEl.classList&&vEl.classList.remove)vEl.classList.remove('stg')}catch(e){}}
     if(key){const el=document.querySelector('[data-in="'+key+'"]');
       if(el){el.focus();try{if(pos!=null)el.setSelectionRange(pos,pos)}catch(e){}}}
+    try{const lw=document.getElementById('lenswrap');
+      if(lw&&S.lensIdx>0&&!S.scrollTo)lw.scrollLeft=S.lensIdx*(lw.clientWidth+14)}catch(e){}
     if(S.scrollTo)setTimeout(doScroll,30);
     try{const dr=document.getElementById('drawer');
       /* slide in only on a FRESH open — a re-render while the drawer is
@@ -18071,6 +18080,9 @@ document.addEventListener('change',e=>{if(e.target&&e.target.dataset&&e.target.d
 document.addEventListener('change',e=>{ // any date input with a placeholder overlay: re-render on pick
   if(e.target&&e.target.type==='date'&&e.target.dataset&&e.target.dataset.in){
     try{render()}catch(e2){}}},true);
+document.addEventListener('scroll',e=>{ // the findings carousel remembers its lens
+  try{const t=e.target;
+    if(t&&t.id==='lenswrap'&&t.clientWidth>0)S.lensIdx=Math.round(t.scrollLeft/(t.clientWidth+14))}catch(e2){}},true);
 document.addEventListener('change',e=>{ // the goal-lift dropdown
   if(e.target&&e.target.dataset&&e.target.dataset.gex!=null){
     S.gform.ex=e.target.value;try{render()}catch(e2){}}},true);
