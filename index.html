@@ -634,7 +634,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='9d8839';  // stamped by tools/build.py with the content hash
+const BUILD_ID='b20631';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -11723,6 +11723,15 @@ function sessionReveal(){
   return{show:fresh[0],more:fresh.length-1}}
 function viewCollection(){
   const st=bankStats(),l=bankList();
+  const GROUPS=[
+    ['insights','Insights & calls',['signal','insight','call'],'What the engine found between your numbers, and the forecasts it settled.','Sync a watch and train \u2014 the links surface on their own.'],
+    ['bests','Records & bests',['record','reps','session','round'],'Bests, biggest days, rep records and the plates that mean something.','Keep logging weights and reps.'],
+    ['firsts','Firsts & milestones',['first','first-up','milestone','streak'],'The early ones, the running totals, and the not-missing.','Log a session.'],
+    ['compare','Ratios & comparisons',['ratio','balance','timing','block'],'You against bodyweight, lifts against each other, block against block.','Log your bodyweight and a main lift.'],
+    ['bodyrehab','Body & rehab',['body','rehab'],'Scans, symmetry, symptoms and gates cleared.','Add a body scan or keep up the check-ins.'],
+    ['quests','Quests & wins',['quest','ghost'],'Weekly challenges and beaten ghosts.','Accept a weekly quest and see it through.']];
+  const tag2g={};GROUPS.forEach(g=>g[2].forEach(t9=>tag2g[t9]=g[0]));
+  const gOf=d=>tag2g[d.tag||'record']||'bests';
   let h='<div class="view pad stg" style="padding-top:24px">'+
    '<button data-a="back" class="btn" style="width:auto;padding:8px 14px;color:var(--dim);font-size:12.5px;margin-bottom:14px">\u2039 Back</button>'+
    '<h1 class="disp" style="font-size:25px;font-weight:600">Everything Allena has found</h1>'+
@@ -11739,7 +11748,7 @@ function viewCollection(){
        '</div>'})()+
    '<div class="row mt2" style="gap:12px">'+
      bigNum(st.total,'found')+
-     bigNum(st.cats+'/'+st.catTotal,'categories')+
+     bigNum((function(){const g9={};l.forEach(d=>g9[gOf(d)]=1);return Object.keys(g9).length})()+'/6','categories')+
      bigNum((st.rar.epic||0)+(st.rar.rare||0),'rare or better',(st.rar.epic?'var(--amber)':'var(--text)'))+'</div>';
   if(st.total<12){
     const missing=DISC_CATALOG.filter(c=>!st.by[c[0]]).slice(0,3);
@@ -11750,36 +11759,43 @@ function viewCollection(){
         '<b style="color:var(--text)">'+esc(c[1])+'</b> — '+esc(c[3])+'</p>').join('')+
       '<p style="color:var(--faint);font-size:11px;line-height:1.5;margin-top:9px">'+
       'Most of these need a few weeks of data before they can appear. They are not hidden, they just do not exist yet.</p></div>'}
-  /* per-category NEW: banked since the last visit here — dot, glow,
-     and the fresh categories jump to the top (owner call, 4 Sep).
-     First-ever visit baselines silently, no false flood. */
+  /* SIX groups, not eighteen pills (owner call, 5 Sep): stored tags
+     never change — this is display-layer folding. The red dot runs
+     all the way to the exact entry: fresh group glows with a count,
+     auto-opens, the page scrolls to it, and the new entries inside
+     wear their own NEW chips. First-ever visit baselines silently. */
   const seenC=lget('training-collseen-v1',null);
   const seenIds=(seenC&&seenC.ids)||{};
-  const freshBy={};
-  if(seenC)l.forEach(d=>{if(!seenIds[d.id])freshBy[d.tag||'record']=(freshBy[d.tag||'record']||0)+1});
+  const freshBy={},freshIds={};
+  if(seenC)l.forEach(d=>{if(!seenIds[d.id]){freshIds[d.id]=1;freshBy[gOf(d)]=(freshBy[gOf(d)]||0)+1}});
   try{const all={};l.forEach(d=>all[d.id]=1);lset('training-collseen-v1',{ids:all})}catch(e){}
-  DISC_CATALOG.slice().sort((a,b)=>(freshBy[b[0]]||0)-(freshBy[a[0]]||0)).forEach(c=>{
-    const mine=l.filter(d=>(d.tag||'record')===c[0]);
-    const open=!!S.openSec['cat:'+c[0]];
-    const frN=freshBy[c[0]]||0;
+  const firstFresh=GROUPS.find(g=>freshBy[g[0]]);
+  if(firstFresh){S.openSec['grp:'+firstFresh[0]]=1;S.scrollTo='grp-'+firstFresh[0]}
+  GROUPS.slice().sort((a,b)=>(freshBy[b[0]]||0)-(freshBy[a[0]]||0)).forEach(g=>{
+    const mine=l.filter(d=>gOf(d)===g[0]).sort((a,b)=>{
+      const fa=freshIds[a.id]?1:0,fb=freshIds[b.id]?1:0;
+      return fb-fa||String(b.found||'').localeCompare(String(a.found||''))});
+    const open=!!S.openSec['grp:'+g[0]];
+    const frN=freshBy[g[0]]||0;
     if(frN)h+='<div style="position:relative" class="an-glow">'+
       '<span style="position:absolute;top:-6px;right:-4px;min-width:19px;height:19px;border-radius:19px;background:#FF453A;color:#fff;font-size:10.5px;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 5px;z-index:6;box-shadow:0 2px 8px rgba(0,0,0,.4)">'+frN+'</span>';
-    h+='<div class="card mt" style="padding:0;overflow:hidden'+(open?';border-color:var(--text);border-width:2px':(frN?';border-color:var(--greensoft)':''))+(mine.length?'':';opacity:.55')+'">'+
-      '<button data-a="secToggle" data-v="cat:'+c[0]+'" style="width:100%;text-align:left;padding:13px 15px;display:flex;align-items:center;gap:11px">'+
-      '<span style="flex:1;min-width:0"><span style="display:block;font-size:14px;font-weight:600">'+esc(c[1])+'</span>'+
-      '<span style="display:block;color:var(--faint);font-size:11.5px;line-height:1.4">'+esc(mine.length?c[2]:c[3])+'</span></span>'+
+    h+='<div class="card mt" id="grp-'+g[0]+'" style="padding:0;overflow:hidden'+(open?';border-color:var(--text);border-width:2px':(frN?';border-color:var(--greensoft)':''))+(mine.length?'':';opacity:.55')+'">'+
+      '<button data-a="secToggle" data-v="grp:'+g[0]+'" style="width:100%;text-align:left;padding:13px 15px;display:flex;align-items:center;gap:11px">'+
+      '<span style="flex:1;min-width:0"><span style="display:block;font-size:14px;font-weight:600">'+esc(g[1])+'</span>'+
+      '<span style="display:block;color:var(--faint);font-size:11.5px;line-height:1.4">'+esc(mine.length?g[3]:g[4])+'</span></span>'+
       '<span class="mono" style="color:'+(mine.length?'var(--amber)':'var(--faint)')+';font-size:11px;flex:none">'+(mine.length||'\u2014')+'</span>'+
       '<span class="mono" style="color:var(--faint);font-size:13px;flex:none">'+(open?'\u2304':'\u203a')+'</span></button>'+
       (open&&mine.length?'<div style="border-top:1px solid var(--line);padding:10px 14px;display:flex;flex-direction:column;gap:9px">'+
         mine.map(d=>{const r=rarityOf(d.rar);
           return '<div>'+
           '<div style="display:flex;align-items:baseline;gap:8px">'+
+          (freshIds[d.id]?'<span class="mono" style="color:var(--green);font-size:8.5px;letter-spacing:.06em">\u25cf NEW</span>':'')+
           '<span class="mono" style="color:'+r[1]+';font-size:9px;letter-spacing:.06em">'+esc(r[2].toUpperCase())+'</span>'+
           '<span class="mono" style="color:var(--faint);font-size:9.5px">'+esc(fmtDate(d.found+'T12:00'))+'</span></div>'+
           '<p style="font-size:13.5px;font-weight:600;margin-top:3px">'+esc(d.t)+'</p>'+
           '<p style="color:var(--dim);font-size:12px;line-height:1.55;margin-top:2px">'+esc(d.d)+'</p></div>'}).join('')+'</div>'
         :open?'<div style="border-top:1px solid var(--line);padding:13px 14px">'+
-          '<p style="color:var(--faint);font-size:12px;line-height:1.55">Nothing here yet. '+esc(c[3])+'</p></div>':'')+
+          '<p style="color:var(--faint);font-size:12px;line-height:1.55">Nothing here yet. '+esc(g[4])+'</p></div>':'')+
       '</div>';
     if(frN)h+='</div>'});
   return h+'</div>'}
@@ -13820,11 +13836,15 @@ function viewFindings(){
     {f:patN>0,n:patN,h:analyseCard()},
     {f:discN>0,n:discN,h:discCard()}];
   secs.sort((a,b)=>(b.f?1:0)-(a.f?1:0));
+  const anyFresh=secs.some(x=>x.f);
   return '<div class="view pad stg" style="padding-top:24px">'+
     '<button data-a="back" class="btn" style="width:auto;padding:8px 14px;color:var(--dim);font-size:12.5px;margin-bottom:14px">‹ Back</button>'+
     '<h1 class="disp" style="font-size:25px;font-weight:600">Findings</h1>'+
-    '<p style="color:var(--dim);font-size:13px;line-height:1.6;margin-top:8px">Three lenses on the same data \u2014 the deeper the lens, the rarer what it sees.</p>'+
-    secs.map(x=>wrapF(x.h,x.f,x.n)).join('')+
+    '<p style="color:var(--dim);font-size:13px;line-height:1.6;margin-top:8px">Four lenses on the same data \u2014 swipe between them. '+(anyFresh?'The one with news leads.':'The deeper the lens, the rarer what it sees.')+'</p>'+
+    '<p class="mono" style="color:var(--faint);font-size:9px;letter-spacing:.12em;margin-top:14px">'+secs.map((x,i)=>(x.f?'\u25cf':'\u25cb')).join(' ')+' \u00b7 SWIPE \u203a</p>'+
+    '<div style="display:flex;overflow-x:auto;scroll-snap-type:x mandatory;align-items:flex-start;gap:14px;margin:2px -18px 0;padding:0 18px 6px;-webkit-overflow-scrolling:touch;scrollbar-width:none">'+
+    secs.map(x=>'<div style="flex:0 0 100%;scroll-snap-align:center;min-width:0">'+wrapF(x.h,x.f,x.n)+'</div>').join('')+
+    '</div>'+
     nearRings()+
     '</div>'}
 function nearRings(){
