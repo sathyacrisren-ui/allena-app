@@ -634,7 +634,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='35949f';  // stamped by tools/build.py with the content hash
+const BUILD_ID='d5e242';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -13830,20 +13830,56 @@ function viewFindings(){
   const wrapF=(html,fresh,n)=>html?'<div style="position:relative" class="'+(fresh?'an-glow':'')+'">'+(fresh?dot9(n||'\u25cf'):'')+html+'</div>':'';
   let deepFresh=false;try{deepFresh=!!deepReadyInfo()}catch(e){}
   let patN=0,discN=0;try{patN=unseenPatterns()}catch(e){}try{discN=unseenDiscoveries()}catch(e){}
-  const secs=[
-    {f:deepFresh,n:'\u25cf',h:'<div id="deepcard" style="scroll-margin-top:14px">'+deepCard()+'</div>'},
-    {f:false,h:(typeof analystCard==='function'?analystCard():'')},
-    {f:patN>0,n:patN,h:analyseCard()},
-    {f:discN>0,n:discN,h:discCard()}];
-  secs.sort((a,b)=>(b.f?1:0)-(a.f?1:0));
-  const anyFresh=secs.some(x=>x.f);
+  /* the tier ladder is the page's geography (owner call, 5 Sep):
+     swiping right goes DEEPER — discoveries → patterns → deep read
+     → analyst — and every page teaches its lens instead of floating
+     one card in space. Fresh news auto-swipes the pager to its lens. */
+  const LENSES=[
+    {k:'disc',name:'Discoveries',tag:'LENS 1 · THE RULES',f:discN>0,n:discN,
+     one:'Records and firsts the rules can prove — no model, no maybe.',
+     reads:'Every set, run, ride, scan and check-in you log',
+     speaks:'The moment a record falls — banked the same day, kept for good',
+     makes:'The collection: bests, firsts, milestones, streaks',
+     h:discCard()},
+    {k:'pat',name:'Patterns',tag:'LENS 2 · THE ENGINES',f:patN>0,n:patN,
+     one:'Four deterministic engines crossing lifting, running, rehab and recovery.',
+     reads:'Your whole history — all three sports against one recovery model',
+     speaks:'Whenever the numbers cross a real threshold — never on a schedule',
+     makes:'Patterns with a what-to-do line — a warning here always carries an action',
+     h:analyseCard()},
+    {k:'deep',name:'The deep read',tag:'LENS 3 · THE NARRATOR',f:deepFresh,n:'●',
+     one:'A model reads what the engines proved and tells the story.',
+     reads:'Everything the statistics found since the last read — and only that',
+     speaks:'Evidence-gated: about six new activities, or three quiet weeks',
+     makes:'A written read of where your training is actually going',
+     h:'<div id="deepcard" style="scroll-margin-top:14px">'+deepCard()+'</div>'},
+    {k:'an',name:'The analyst',tag:'LENS 4 · THE STRATEGIST',f:false,
+     one:'The strongest model, reading only what your engine has proven.',
+     reads:'Every stable insight, the faded links, your forecast record',
+     speaks:'Once a day at most — depth is the point, not frequency',
+     makes:'Mechanisms, confounds named, and one experiment your own engine referees',
+     h:(typeof analystCard==='function'?analystCard():'')}];
+  const freshIdx=LENSES.findIndex(x=>x.f);
+  if(freshIdx>0)S.scrollTo='lens-'+freshIdx;
+  const ladder=cur=>'<p class="mono" style="font-size:9px;letter-spacing:.08em;margin-top:4px;color:var(--faint)">'+
+    LENSES.map((x,i)=>(i===cur?'<span style="color:var(--amber)">'+x.name.toUpperCase()+'</span>':x.name.toUpperCase())).join(' → ')+'</p>';
   return '<div class="view pad stg" style="padding-top:24px">'+
     '<button data-a="back" class="btn" style="width:auto;padding:8px 14px;color:var(--dim);font-size:12.5px;margin-bottom:14px">‹ Back</button>'+
     '<h1 class="disp" style="font-size:25px;font-weight:600">Findings</h1>'+
-    '<p style="color:var(--dim);font-size:13px;line-height:1.6;margin-top:8px">Four lenses on the same data \u2014 swipe between them. '+(anyFresh?'The one with news leads.':'The deeper the lens, the rarer what it sees.')+'</p>'+
-    '<p class="mono" style="color:var(--faint);font-size:9px;letter-spacing:.12em;margin-top:14px">'+secs.map((x,i)=>(x.f?'\u25cf':'\u25cb')).join(' ')+' \u00b7 SWIPE \u203a</p>'+
-    '<div style="display:flex;overflow-x:auto;scroll-snap-type:x mandatory;align-items:flex-start;gap:14px;margin:2px -18px 0;padding:0 18px 6px;-webkit-overflow-scrolling:touch;scrollbar-width:none">'+
-    secs.map(x=>'<div style="flex:0 0 100%;scroll-snap-align:center;min-width:0">'+wrapF(x.h,x.f,x.n)+'</div>').join('')+
+    '<p style="color:var(--dim);font-size:13px;line-height:1.6;margin-top:8px">Four lenses, one body of data — each swipe goes deeper, and the deeper the lens, the rarer what it sees.</p>'+
+    '<p class="mono" style="color:var(--faint);font-size:9px;letter-spacing:.12em;margin-top:12px">'+LENSES.map(x=>(x.f?'●':'○')).join(' ')+' · SWIPE ›</p>'+
+    '<div style="display:flex;overflow-x:auto;scroll-snap-type:x mandatory;align-items:stretch;gap:14px;margin:2px -18px 0;padding:0 18px 6px;-webkit-overflow-scrolling:touch;scrollbar-width:none">'+
+    LENSES.map((x,i)=>'<div id="lens-'+i+'" style="flex:0 0 100%;scroll-snap-align:center;min-width:0">'+
+      '<div style="margin-top:12px"><p class="mono" style="font-size:9.5px;color:var(--amber);letter-spacing:.12em">'+x.tag+'</p>'+
+      ladder(i)+
+      '<p style="color:var(--dim);font-size:12.5px;line-height:1.55;margin-top:7px">'+x.one+'</p></div>'+
+      wrapF(x.h,x.f,x.n)+
+      '<div class="card mt" style="padding:13px 15px">'+
+      [['READS',x.reads],['SPEAKS',x.speaks],['MAKES',x.makes]].map((r,j)=>
+        '<div style="display:flex;gap:10px;align-items:baseline'+(j?';margin-top:9px;padding-top:9px;border-top:1px solid var(--line)':'')+'">'+
+        '<span class="mono" style="color:var(--faint);font-size:8.5px;letter-spacing:.08em;flex:none;min-width:44px">'+r[0]+'</span>'+
+        '<span style="flex:1;min-width:0;color:var(--dim);font-size:12px;line-height:1.5">'+r[1]+'</span></div>').join('')+
+      '</div></div>').join('')+
     '</div>'+
     nearRings()+
     '</div>'}
@@ -20152,7 +20188,9 @@ function doScroll(){
   if(!S.scrollTo)return;
   const id=S.scrollTo;S.scrollTo=null;
   try{const el=document.getElementById(id);
-    if(el&&el.scrollIntoView)el.scrollIntoView({behavior:'smooth',block:'center'})}catch(e){}}
+    if(el&&el.scrollIntoView)el.scrollIntoView(id.slice(0,5)==='lens-'
+      ?{behavior:'smooth',inline:'center',block:'nearest'}
+      :{behavior:'smooth',block:'center'})}catch(e){}}
 try{navigator.storage&&navigator.storage.persist&&navigator.storage.persist().then(function(g){S.persisted=!!g})}catch(e){}
 try{sanityWeeks()}catch(e){}
 try{bootStart()}catch(e){}
