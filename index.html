@@ -634,7 +634,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='a70c67';  // stamped by tools/build.py with the content hash
+const BUILD_ID='af958c';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -11432,16 +11432,20 @@ function fuseCard(){
     let near;
     try{
       const cs=lget('training-chase-v1',{})||{};cs.hist=cs.hist||{};
-      if(cs.day===today()&&pool.some(w=>w.t===cs.id))near=pool.find(w=>w.t===cs.id);
+      /* strikes: times shown at THIS progress value — any progress resets */
+      const h9of=w=>{const h9=cs.hist[w.t];return(h9&&h9.have===w.have)?h9.n:0};
+      const stored=pool.find(w=>w.t===cs.id);
+      if(cs.day===today()&&stored&&h9of(stored)<2)near=stored;
       else{
-        /* cooldown (owner-caught, 5 Sep): a face fronted two days with
-           ZERO progress is benched until its number actually moves */
-        const alive=pool.filter(w=>{const h9=cs.hist[w.t];
-          return !(h9&&h9.n>=2&&h9.have===w.have)});
-        const pick=alive.length?alive:pool;
-        near=(cs.id?pick.find(w=>w.t!==cs.id):pick[1])||pick[0];
-        const h9=cs.hist[near.t];
-        cs.hist[near.t]={n:(h9&&h9.have===near.have?h9.n:0)+1,have:near.have};
+        /* least-shown leads (owner-escalated, 5 Sep): the pool cycles
+           fully before ANY face repeats, and two showings with zero
+           progress benches a face until its number actually moves —
+           even mid-day if it is already up when the strike lands */
+        const alive=pool.filter(w=>h9of(w)<2);
+        const pick=(alive.length?alive:pool).slice().sort((a,b)=>h9of(a)-h9of(b));
+        const notLast=pick.filter(w=>w.t!==cs.id);
+        near=(notLast.length?notLast:pick)[0];
+        cs.hist[near.t]={n:h9of(near)+1,have:near.have};
         cs.day=today();cs.id=near.t;lset('training-chase-v1',cs)}
     }catch(e){near=pool[0]}
     const gap=near.need-near.have;
