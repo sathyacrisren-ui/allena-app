@@ -634,7 +634,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='00727f';  // stamped by tools/build.py with the content hash
+const BUILD_ID='9d8839';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -9892,7 +9892,7 @@ function whisperGen(){
    mechanisms, investigate the backwards patterns, and design ONE
    two-week experiment the engine itself will verify. It may never
    invent a finding. Deterministic before AI, always. */
-const ANALYST_SYS='You are Allena\u2019s analyst pass \u2014 the premium lens over a training app\u2019s deterministic statistics engine. The CONTEXT lists every correlation the engine has PROVEN in this user\u2019s own data (plus faded links, forecast record, training summary). Rules, absolute: 1) Never state a finding that is not in the context \u2014 you synthesise and explain, the engine discovers. 2) Look for the STORY: which findings are one mechanism wearing three coats? Name the loop and its cheapest intervention point. 3) For any [BACKWARDS/CONFOUND] finding, propose the most likely confound and how the user could check it. 4) End with exactly one two-week experiment: a concrete, small protocol change, what daily data to keep logging, and which single number the engine should watch to verdict it. 5) Voice: plain, direct, a sharp coach who respects the reader \u2014 no hype, no hedging fog, cite the correlation numbers you lean on. Under 320 words, short paragraphs, no headers. 6) If \u2014 and only if \u2014 the experiment is a simple exercise addition, end with ONE final line exactly of the form PLAN|{"ex":"Bent-over row","anchor":"bench","sets":1,"reps":"5-8","pct":0.65} \u2014 ex = exercise to add, anchor = the lift whose program days receive it (lowercase substring), sets/reps per session, pct = load as a fraction of the anchor\u2019s working weight. Plain JSON, those keys only. If the experiment is not an exercise addition, end with PLAN|null.';
+const ANALYST_SYS='You are Allena\u2019s analyst pass \u2014 the premium lens over a training app\u2019s deterministic statistics engine. The CONTEXT lists every correlation the engine has PROVEN in this user\u2019s own data (plus faded links, forecast record, training summary). Rules, absolute: 1) Never state a finding that is not in the context \u2014 you synthesise and explain, the engine discovers. 2) Look for the STORY: which findings are one mechanism wearing three coats? Name the loop and its cheapest intervention point. 3) For any [BACKWARDS/CONFOUND] finding, propose the most likely confound and how the user could check it. 4) End with exactly one two-week experiment: a concrete, small protocol change, what daily data to keep logging, and which single number the engine should watch to verdict it. 5) Voice: plain, direct, a sharp coach who respects the reader \u2014 no hype, no hedging fog, cite the correlation numbers you lean on. Under 320 words, short paragraphs, no headers. 6) If \u2014 and only if \u2014 the experiment is a simple exercise addition, end with ONE final line exactly of the form PLAN|{"ex":"Bent-over row","anchor":"bench","sets":1,"reps":"5-8","pct":0.65} \u2014 ex = exercise to add, anchor = the lift whose program days receive it (lowercase substring), sets/reps per session, pct = load as a fraction of the anchor\u2019s working weight. Plain JSON, those keys only. If the experiment is not an exercise addition, end with PLAN|null. 7) CONTINUITY IS LAW: the context includes your PREVIOUS READ and any RUNNING EXPERIMENT. You are one analyst across sessions \u2014 never contradict a standing prescription without naming it and saying why it is superseded; if an experiment is running, today\u2019s read evaluates and continues it (or ends it with reasons), never ignores it; do not propose a new experiment while one is running.';
 function analystContext(){
   const L=[];
   try{const pr=S.prof||{};L.push('ATHLETE: '+(pr.sex||'?')+', age '+(pr.age||'?')+(pr.height?', '+pr.height+'cm':'')+'. Goal: '+(pr.goal||'general strength')+'.')}catch(e){}
@@ -9917,6 +9917,12 @@ function analystContext(){
   try{const low=muscleFresh().filter(x=>x.fresh<60).sort((a,b)=>a.fresh-b.fresh).slice(0,3);
     if(low.length)L.push('RECOVERY NOW: '+low.map(x=>x.m+' '+x.fresh+'%').join(', ')+'.')}catch(e){}
   try{const g=(S.goals||[]);if(g.length)L.push('GOALS: '+g.map(x=>x.ex+' '+x.w+'\u00d7'+x.r).join('; ')+'.')}catch(e){}
+  try{
+    const st=analystStore();
+    if(st&&st.t)L.push('YOUR PREVIOUS READ ('+st.day+') \u2014 you are the same analyst; stay consistent with it or supersede it BY NAME: '+String(st.t).slice(0,700));
+    const ex9=st&&(st.exp||(st.applied?{plan:st.plan,applied:st.applied}:null));
+    if(ex9&&ex9.plan)L.push('RUNNING EXPERIMENT (user ACCEPTED it; it is in their program, flagged): '+ex9.plan.ex+' on every '+ex9.plan.anchor+' day since '+ex9.applied+'. Today\u2019s read must evaluate/continue/end this \u2014 never ignore it.');
+  }catch(e){}
   return L.join('\n')}
 function analystStore(){return lget('training-analyst-v1',null)}
 async function analystRun(){
@@ -9935,7 +9941,10 @@ async function analystRun(){
       try{const m=t.match(/\nPLAN\|(\{[\s\S]*?\}|null)\s*$/);
         if(m){if(m[1]!=='null')plan=JSON.parse(m[1]);t=t.slice(0,m.index).trim()}}catch(e9){}
       if(plan&&!(plan.ex&&plan.anchor))plan=null;
-      lset('training-analyst-v1',{day:today(),t:t,plan:plan});
+      const prev9=analystStore();
+      const exp9=prev9&&(prev9.exp||(prev9.applied?{plan:prev9.plan,applied:prev9.applied}:null))||null;
+      if(exp9)plan=null;   // one experiment at a time — a new proposal waits for the running one to settle
+      lset('training-analyst-v1',{day:today(),t:t,plan:plan,exp:exp9});
       try{hapticRun('find')}catch(e9){}}
     else flash(d&&d.error&&d.error.message||'The analyst could not run \u2014 try again in a minute.');
     render()
@@ -9950,10 +9959,11 @@ function analystCard(){
       '<div class="tdots" style="margin-top:10px"><span></span><span></span><span></span></div>';
     else if(st&&st.t){h+='<div style="color:var(--text);font-size:13.5px;line-height:1.65;margin-top:10px">'+md(st.t)+'</div>'+
       '<p class="mono" style="color:var(--faint);font-size:9.5px;margin-top:10px">RUN '+esc(st.day)+' \u00b7 THE ENGINE VERIFIES THE EXPERIMENT AS THE DAYS LAND</p>';
-      if(st.plan&&!st.applied)h+='<button data-a="analystApply" class="big disp mt" style="background:var(--green);color:var(--bg);font-size:14.5px">Add \u201c'+esc(st.plan.ex)+'\u201d to my week</button>'+
+      const exp9=st.exp||(st.applied?{plan:st.plan,applied:st.applied}:null);
+      if(st.plan&&!exp9)h+='<button data-a="analystApply" class="big disp mt" style="background:var(--green);color:var(--bg);font-size:14.5px">Add \u201c'+esc(st.plan.ex)+'\u201d to my week</button>'+
         '<p style="color:var(--faint);font-size:11px;line-height:1.5;margin-top:6px">Lands on every '+esc(st.plan.anchor)+' day, flagged as the analyst\u2019s, removable in one tap. Nothing changes until you say so.</p>';
-      if(st.applied)h+='<div class="card mt" style="padding:11px 14px;border-color:var(--greensoft);display:flex;align-items:center;gap:10px">'+
-        '<span style="flex:1;font-size:12.5px">\u2697 Experiment running since '+esc(st.applied)+' \u2014 '+esc(st.plan&&st.plan.ex||'the addition')+' rides your '+esc(st.plan&&st.plan.anchor||'anchor')+' days.</span>'+
+      if(exp9)h+='<div class="card mt" style="padding:11px 14px;border-color:var(--greensoft);display:flex;align-items:center;gap:10px">'+
+        '<span style="flex:1;font-size:12.5px">\u2697 Experiment running since '+esc(exp9.applied)+' \u2014 '+esc(exp9.plan&&exp9.plan.ex||'the addition')+' rides your '+esc(exp9.plan&&exp9.plan.anchor||'anchor')+' days.</span>'+
         '<button data-a="analystRemove" class="mono" style="color:var(--red);font-size:11px;flex:none">Remove</button></div>';
       h+='<button data-a="analystRun" class="btn mt" style="font-size:12.5px">Run it again</button>'}
     else h+='<p style="color:var(--dim);font-size:12.5px;line-height:1.6;margin-top:8px">The strongest model reads only what the statistics engine has proven in your data \u2014 finds the story across findings, interrogates the backwards patterns, and designs one two-week experiment your own engine will verdict.</p>'+
@@ -19842,7 +19852,7 @@ function runAction(a,v,t,e){
         d.exercises.push({name:String(pl.ex),rest:120,note:'\u2697 Analyst experiment \u00b7 added '+today(),
           sets:{'default':Array.from({length:Math.max(1,Math.min(3,+pl.sets||1))},function(){return{w:w,reps:pl.reps||'5-8',rpe:8}})}});
         hits++});
-      if(hits){st.applied=today();lset('training-analyst-v1',st);saveLib();
+      if(hits){st.applied=today();st.exp={plan:st.plan,applied:today()};lset('training-analyst-v1',st);saveLib();
         flash('Added to '+hits+' day'+(hits===1?'':'s')+' \u2014 flagged as the analyst\u2019s, removable from the same card.');render()}
       else flash('No program day carries \u201c'+pl.anchor+'\u201d \u2014 nothing was changed.');
       break}
@@ -19850,7 +19860,7 @@ function runAction(a,v,t,e){
       const st=analystStore();const p=activeProg();let n=0;
       if(p&&p.days)p.days.forEach(d=>{const b4=(d.exercises||[]).length;
         d.exercises=(d.exercises||[]).filter(ex=>!/analyst experiment/i.test(ex.note||''));n+=b4-d.exercises.length});
-      if(st){st.applied=null;lset('training-analyst-v1',st)}
+      if(st){st.applied=null;st.exp=null;lset('training-analyst-v1',st)}
       saveLib();flash(n?'Experiment removed \u2014 '+n+' addition'+(n===1?'':'s')+' gone, the program is as it was.':'Nothing to remove.');render();break}
     case 'cbGo':{const cb=cbStore();if(cb&&cb.state==='offered'){cb.state='on';cb.started=today();cb.progress=0;lset(K_CB,cb);vib(12)}render();break}
     case 'cbSkip':{const cb=cbStore();if(cb&&cb.state==='offered'){cb.state='skip';lset(K_CB,cb)}render();break}
