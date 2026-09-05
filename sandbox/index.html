@@ -634,7 +634,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='164738';  // stamped by tools/build.py with the content hash
+const BUILD_ID='4d9a8a';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -11483,7 +11483,7 @@ function watchList(){
   const R=(S.runs||[]).filter(r=>typeof isRunType!=='function'||isRunType(r.type));
   const runGated=!!(S.acl&&S.acl.on&&S.acl.phase<3);   // running waits for the knee
   const add=(t,have,need,d,got,opts)=>{
-    if(have>=need){W.met=(W.met||0)+1;return}        // unlocked: it has answered or is about to
+    if(have>=need){W.met=(W.met||0)+1;(W.metList=W.metList||[]).push({t:t,d:d});return}
     W.push(Object.assign({t:t,have:have,need:need,d:d,pct:Math.round(Math.min(1,have/need)*100)},opts||{}))};
   /* the cold-start ladder (Sep 2026): short thresholds FIRST, so a
      week-one account watches bars move every single day. The list is
@@ -11504,8 +11504,8 @@ function watchList(){
     const nights=Object.keys(st9.days).filter(k=>st9.days[k].sleep!=null).length;
     const rdays=Object.keys(st9.days).filter(k=>st9.days[k].rhr!=null).length;
     if(nights>0||rdays>0){
-      add('The sleep–strength read',Math.min(8,nights),8,
-        'Eight nights of sleep beside your sessions and Allena can say what rest is worth to your top sets — in your numbers, not a study\u2019s.',nights>=8);
+      add('The sleep\u2013strength read',Math.min(12,nights),12,
+        'Twelve nights of sleep beside your sessions \u2014 the evidence bar for saying what rest is worth to your top sets, in your numbers, not a study\u2019s.',nights>=12);
       add('A resting-heart baseline',Math.min(14,rdays),14,
         'Fourteen mornings of resting HR and a high day means something — your normal, not the population\u2019s.',rdays>=14)}}}catch(e){}
   if(S.runOn){const hrRuns=R.filter(r=>r.hr>0&&r.km>=3).length;
@@ -11923,6 +11923,27 @@ function sinceLines(){
       '<span class="mono" style="color:var(--faint);font-size:9px;letter-spacing:.06em;flex:none;min-width:52px">'+(i===0?tag:'')+'</span>'+
       '<span style="flex:1;min-width:0;font-size:12px;line-height:1.5;color:'+r.c+'">'+esc(r.h)+'</span></div>').join('')
   }catch(e){return ''}}
+
+/* a filled watchlist bar must SAY so (owner-caught, 5 Sep: "I got the
+   8/8 and nothing happened"). Crossing a threshold banks a rare find
+   through the normal announcement machinery — dot, NEW, collection.
+   First-ever sweep baselines silently: no retroactive flood. */
+function watchMetSweep(){
+  try{
+    const W=watchList();
+    const met=(W.metList||[]);if(!met.length)return;
+    const seen=lget('training-watchmet-v1',null);
+    if(!seen){const all={};met.forEach(m=>all[m.t]=1);lset('training-watchmet-v1',all);return}
+    let dirty=false;
+    met.forEach(m=>{
+      if(seen[m.t])return;
+      seen[m.t]=1;dirty=true;
+      try{const bank=discBank(),id='unlock:'+m.t;
+        if(!bank[id]){bank[id]={t:'Unlocked: '+m.t.toLowerCase(),
+          d:'The data bar is full \u2014 this analysis now runs on every new day. What it finds surfaces as insights the moment the evidence clears the bar, and when it finds nothing yet, that silence is honest too.',
+          rar:'rare',tag:'record',found:today()};bankSave()}}catch(e9){}});
+    if(dirty)lset('training-watchmet-v1',seen)
+  }catch(e){}}
 
 /* ══ the muscle-map hold (prompt 16) ════════════════════════
    Territory over your own body. A muscle trained this week is
@@ -20063,6 +20084,7 @@ function morningAsk(){try{
   S.gform={am:''};S.sheet={t:'gam'};render();return true}catch(e){return false}}
 let lastDay=today();
 function dayCheck(){
+  try{if(typeof watchMetSweep==='function')watchMetSweep()}catch(e){}
   const k=today();
   if(k!==lastDay){lastDay=k;S.garSkip=false}   // a new day: clear yesterday's skips
   if(!morningAsk())dailyFindAsk()}
