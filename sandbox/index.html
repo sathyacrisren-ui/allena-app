@@ -634,7 +634,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='07cd93';  // stamped by tools/build.py with the content hash
+const BUILD_ID='4617bd';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -8920,7 +8920,7 @@ function hkDaily(rows){
       if(!/^\d{4}-\d{2}-\d{2}$/.test(k))return;
       const d=st.days[k]=st.days[k]||{};
       if(r.spo2!=null&&isFinite(+r.spo2)&&+r.spo2>0&&+r.spo2<=1)r.spo2=Math.round(+r.spo2*1000)/10;
-      ['rhr','hrv','vo2','steps','sleep','resp','wtemp','spo2','flow'].forEach(f=>{
+      ['rhr','hrv','vo2','steps','sleep','sldeep','slrem','resp','wtemp','spo2','flow'].forEach(f=>{
         if(r[f]!=null&&isFinite(+r[f])&&+r[f]>0){
           /* today's steps tick up all day — a value refresh is not a
              NEW point (owner-caught: '1 NEW' with nothing to show).
@@ -9141,6 +9141,8 @@ const SIG_KINDS=[
   {k:'Carbs',d:'carb',u:' g',src:'Health nutrition'},
   {k:'Fat',d:'fat',u:' g',src:'Health nutrition'},
   {k:'Bodyweight',d:'bw',u:' kg',src:'smart scale via Health, check-ins, scans'},
+  {k:'Deep sleep',d:'sldeep',u:' min',src:'Apple Watch sleep stages'},
+  {k:'REM sleep',d:'slrem',u:' min',src:'Apple Watch sleep stages'},
   {k:'Wrist temperature',d:'wtemp',u:'\u00b0C',src:'Apple Watch, overnight'},
   {k:'Breathing rate',d:'resp',u:'/min',src:'Apple Watch, overnight'},
   {k:'Blood oxygen',d:'spo2',u:'%',src:'Apple Watch'}];
@@ -9362,6 +9364,7 @@ function corrDayData(){
       put(k,'sleep',d.sleep);put(k,'hrv',d.hrv);put(k,'rhr',d.rhr);
       put(k,'steps',d.steps);put(k,'vo2',d.vo2);
       put(k,'wtemp',d.wtemp);put(k,'resp',d.resp);put(k,'spo2',d.spo2);
+      put(k,'sldeep',d.sldeep);put(k,'slrem',d.slrem);
       put(k,'msteps',d.msteps);put(k,'eprot',d.eprot);put(k,'ecarb',d.ecarb)});
     const flows=Object.keys(st).filter(k=>st[k].flow).sort();
     if(flows.length){
@@ -9514,6 +9517,8 @@ const CORR_SIGNALS={
   resp:{n:'an elevated overnight breathing rate',dir:'a higher overnight breathing rate'},
   spo2:{n:'higher blood oxygen',dir:'higher blood oxygen'},
   cyc:{n:'later in the cycle',dir:'a later cycle day'},
+  sldeep:{n:'a deep-sleep-heavy night',dir:'more deep sleep'},
+  slrem:{n:'a REM-heavy night',dir:'more REM sleep'},
   msteps:{n:'a morning-heavy step day',dir:'more of the day\u2019s steps before noon'},
   eprot:{n:'protein loaded late',dir:'a bigger share of protein after 5pm'},
   ecarb:{n:'carbs loaded late',dir:'a bigger share of carbs after 5pm'}};
@@ -9575,7 +9580,7 @@ function correlations(){
              training is the same session talking to itself */
           if(M.sigs[sig].trained&&lag===0&&(out==='topset'||out==='tonnage'||out==='effort'||out==='fade'||out==='adher'||out==='benchtop'||out==='squattop'||out==='deadtop'||M.outs[out].exo))return;
           /* a signal never predicts its own tomorrow-twin */
-          if((sig==='sleep'||sig==='sleep2'||sig==='sleep3'||sig==='sleepvar')&&out==='sleepo')return;
+          if((sig==='sleep'||sig==='sleep2'||sig==='sleep3'||sig==='sleepvar'||sig==='sldeep'||sig==='slrem')&&out==='sleepo')return;
           if((sig==='hrv'||sig==='hrvswing')&&out==='hrvo')return;
           if((sig==='rhr'||sig==='rhr3')&&out==='rhro')return;
           if(sig==='ready'&&out==='readyo')return;
@@ -9625,7 +9630,7 @@ const CORR_PRIOR={sleep:1,sleep2:1,sleep3:1,hrv:1,hrvswing:1,rhr:1,rhr3:1,ready:
   protein:1,protein3:1,carb:1,carb3:1,kcal3:1,sleepvar:1,vo2:1,
   kcal:0,fat:0,fat3:0,bw:0,bwtrend:0,steps:0,steps3:0,load:0,load3:0,
   km:0,km3:0,walkkm:0,ridekm:0,sessmins:0,resty:0,hour:0,weekend:0,
-  wtemp:0,resp:0,cyc:0,spo2:1,msteps:0,eprot:0,ecarb:0};
+  wtemp:0,resp:0,cyc:0,spo2:1,msteps:0,eprot:0,ecarb:0,sldeep:1,slrem:1};
 function corrPhrase(c){
   const M=S._corrMaps||{sigs:CORR_SIGNALS,outs:CORR_OUTCOMES};
   const S9=M.sigs[c.sig]||CORR_SIGNALS[c.sig],O=M.outs[c.out]||CORR_OUTCOMES[c.out];
