@@ -652,7 +652,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='78bcb1';  // stamped by tools/build.py with the content hash
+const BUILD_ID='95892d';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -1563,6 +1563,7 @@ function accountSection(){
     '<button data-a="acctSend" class="btn mt" style="color:var(--amber)">Email me a sign-in code</button>'}
 const A={};
 A.nav=v=>{if(v!=='session'&&S.sess&&S.sess.phase==='resting'){/* the timer keeps running; the beep is rescheduled on return */}
+  if(v!=='findings')S.discLensShow=null;
   S.sheet=null;S.view=v;if(v!=='session')wakeOff();render()};
 A.pickProg=id=>{S.lib.activeId=id;saveLib();setWeek(weekFor(id),id);render()};
 A.week=w=>{const p=activeProgSafe();setWeek(Math.min(+w,p?p.weeks:+w));render()};
@@ -14086,10 +14087,40 @@ function depthGlyph(d){
   L2.forEach(p=>{g+='<circle cx="'+p[0]+'" cy="'+p[1]+'" r="2.6" fill="'+(lit2?'var(--blue)':'var(--line)')+'"/>'});
   L3.forEach(p=>{g+='<circle cx="'+p[0]+'" cy="'+p[1]+'" r="3" fill="'+(lit3?'var(--blue)':'var(--line)')+'"/>'});
   return g+'</svg>'}
+function discMarkSoon(){
+  /* seen by being seen (owner ruling, 7 Sep): fresh finds render in
+     full on the Discoveries lens, and looking at them is what clears
+     the badge — after the same 2.5s grace every reveal uses. */
+  try{
+    if(S._discMarkT)return;
+    if(!(typeof newDiscoveries==='function'&&newDiscoveries().length))return;
+    S._discMarkT=setTimeout(function(){S._discMarkT=null;
+      try{markDiscoveries();render()}catch(e9){}},2500)}catch(e){}}
 function discCard(){
   const st=bankStats();
   const rareN=(st.rar&&((st.rar.rare||0)+(st.rar.epic||0)))||0;
-  return '<button data-a="collOpen" class="card" style="width:100%;text-align:left;padding:14px 16px;margin-top:12px;display:flex;align-items:center;gap:14px">'+
+  /* the new thing reveals HERE (owner ruling, 7 Sep: a fresh find must
+     never be a door into a scroll-hunt). Up to four fresh finds render
+     in full; the rest are named; the collection stays one tap away for
+     browsing. A snapshot keeps them on screen while they're read even
+     after the badge clears. */
+  let h='';
+  try{
+    if(!S.discLensShow){const nw=newDiscoveries();if(nw.length)S.discLensShow=nw.map(d=>d.id)}
+    if(S.discLensShow&&S.discLensShow.length){
+      const all=discoveries(),show=S.discLensShow.map(id=>all.find(d=>d.id===id)).filter(Boolean).slice(0,4);
+      if(show.length){
+        h+='<p class="eyebrow" style="margin-top:12px;color:var(--amber)">New — just found</p>'+
+          show.map(d=>{const r=rarityOf(d.rar);
+            return '<div class="card an-pop" style="padding:14px 16px;margin-top:8px;border-color:'+r[1]+'">'+
+            '<p class="mono" style="font-size:8.5px;letter-spacing:.08em;color:'+r[1]+'">'+esc(r[2].toUpperCase())+'</p>'+
+            '<p style="font-size:14px;font-weight:600;line-height:1.35;margin-top:4px">'+esc(d.t)+'</p>'+
+            (d.d?'<p style="color:var(--dim);font-size:12px;line-height:1.55;margin-top:5px">'+esc(String(d.d).slice(0,220))+'</p>':'')+'</div>'}).join('');
+        const more=S.discLensShow.length-show.length;
+        if(more>0)h+='<p class="mono" style="color:var(--faint);font-size:10px;margin-top:7px">and '+more+' more new — filed in the collection below.</p>';
+        if(S.lensIdx==null||S.lensIdx===0)discMarkSoon()}}
+  }catch(e){}
+  return h+'<button data-a="collOpen" class="card" style="width:100%;text-align:left;padding:14px 16px;margin-top:12px;display:flex;align-items:center;gap:14px">'+
     '<div style="width:44px;flex:none">'+depthGlyph(1)+'</div>'+
     '<span style="flex:1;min-width:0"><span class="disp" style="display:block;font-size:15.5px;font-weight:600">Discoveries</span>'+
     '<span style="color:var(--faint);font-size:11px;line-height:1.4">Records and firsts the rules can prove \u2014 kept for good.</span></span>'+
@@ -14145,7 +14176,7 @@ function viewFindings(){
     '<p style="color:var(--dim);font-size:13px;line-height:1.6;margin-top:8px">Four lenses, one body of data — each swipe goes deeper, and the deeper the lens, the rarer what it sees.</p>'+
     '<p class="mono" style="color:var(--faint);font-size:9px;letter-spacing:.12em;margin-top:12px">'+
     LENSES.map((x,i)=>'<span id="ldot-'+i+'">'+(i===(S.lensIdx||0)?'●':'○')+'</span>').join(' ')+' · SWIPE ›</p>'+
-    '<div id="lenswrap" style="display:flex;overflow-x:auto;overflow-y:hidden;scroll-snap-type:x mandatory;align-items:flex-start;gap:14px;margin:2px -18px 0;padding:0 18px 6px;-webkit-overflow-scrolling:touch;scrollbar-width:none;transition:height .25s ease">'+
+    '<div id="lenswrap" style="display:flex;overflow-x:auto;overflow-y:hidden;scroll-snap-type:x mandatory;align-items:flex-start;gap:14px;margin:2px -18px 0;padding:0 18px 6px;-webkit-overflow-scrolling:touch;scrollbar-width:none">'+
     LENSES.map((x,i)=>'<div id="lens-'+i+'" style="flex:0 0 100%;scroll-snap-align:center;min-width:0">'+
       '<div style="margin-top:14px;display:flex;align-items:flex-end;gap:14px">'+
       '<span class="disp gradhead" style="font-size:46px;font-weight:800;line-height:.9;flex:none">'+(i+1)+'</span>'+
@@ -18527,8 +18558,13 @@ document.addEventListener('scroll',e=>{ // the findings carousel remembers its l
          (owner-caught, 6 Sep: dots never moved) */
       for(let i9=0;i9<4;i9++){const d9=document.getElementById('ldot-'+i9);
         if(d9)d9.textContent=(i9===S.lensIdx?'●':'○')}
-      const c9=t.children[S.lensIdx];
-      if(c9)t.style.height=c9.offsetHeight+'px'}}catch(e2){}},true);
+      /* height syncs only once the swipe SETTLES — resizing mid-drag
+         trapped the snap between two pages (owner-caught, 7 Sep) */
+      clearTimeout(window.__lensHT);
+      window.__lensHT=setTimeout(function(){try{
+        const c8=t.children[S.lensIdx];
+        if(c8)t.style.height=c8.offsetHeight+'px';
+        if(S.lensIdx===0&&S.view==='findings'&&typeof discMarkSoon==='function')discMarkSoon()}catch(e8){}},160)}}catch(e2){}},true);
 document.addEventListener('change',e=>{ // the goal-lift dropdown
   if(e.target&&e.target.dataset&&e.target.dataset.gex!=null){
     S.gform.ex=e.target.value;try{render()}catch(e2){}}},true);
