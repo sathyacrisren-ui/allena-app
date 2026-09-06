@@ -656,7 +656,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='2f4c84';  // stamped by tools/build.py with the content hash
+const BUILD_ID='f6bc1e';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -14199,10 +14199,10 @@ function viewFindings(){
     '<button data-a="back" class="btn" style="width:auto;padding:8px 14px;color:var(--dim);font-size:12.5px;margin-bottom:14px">‹ Back</button>'+
     '<h1 class="disp" style="font-size:25px;font-weight:600">Findings</h1>'+
     '<p style="color:var(--dim);font-size:13px;line-height:1.6;margin-top:8px">Four lenses, one body of data — each swipe goes deeper, and the deeper the lens, the rarer what it sees.</p>'+
-    '<p class="mono" style="color:var(--faint);font-size:9px;letter-spacing:.12em;margin-top:12px">'+
-    LENSES.map((x,i)=>'<span id="ldot-'+i+'">'+(i===(S.lensIdx||0)?'●':'○')+'</span>').join(' ')+' · SWIPE ›</p>'+
-    '<div id="lenswrap" style="display:flex;overflow-x:auto;overflow-y:hidden;scroll-snap-type:x mandatory;align-items:flex-start;gap:14px;margin:2px -18px 0;padding:0 18px 6px;-webkit-overflow-scrolling:touch;scrollbar-width:none">'+
-    LENSES.map((x,i)=>'<div id="lens-'+i+'" style="flex:0 0 100%;scroll-snap-align:center;min-width:0">'+
+    '<p class="mono" style="text-align:center;font-size:15px;letter-spacing:.35em;margin-top:12px">'+
+    LENSES.map((x,i)=>'<span id="ldot-'+i+'" style="color:'+(i===(S.lensIdx||0)?'var(--text)':'color-mix(in srgb, var(--text) 22%, transparent)')+'">'+(i===(S.lensIdx||0)?'●':'○')+'</span>').join('')+'</p>'+
+    '<div id="lenswrap" style="display:flex;overflow-x:auto;overflow-y:hidden;scroll-snap-type:x mandatory;align-items:flex-start;gap:0;margin:2px -18px 0;padding:0 0 6px;-webkit-overflow-scrolling:touch;scrollbar-width:none">'+
+    LENSES.map((x,i)=>'<div id="lens-'+i+'" style="flex:0 0 100%;scroll-snap-align:start;scroll-snap-stop:always;min-width:0;padding:0 18px;box-sizing:border-box">'+
       '<div style="margin-top:14px;display:flex;align-items:flex-end;gap:14px">'+
       '<span class="disp gradhead" style="font-size:46px;font-weight:800;line-height:.9;flex:none">'+(i+1)+'</span>'+
       '<span style="flex:1;min-width:0">'+
@@ -18215,7 +18215,7 @@ function render(){
       S._tourChecked=1;
       if(!lget('training-tour-v1',null)){S.tour={i:0};setTimeout(function(){try{render()}catch(e9){}},60)}}}catch(e){}
     try{const lw=document.getElementById('lenswrap');
-      if(lw&&S.lensIdx>0&&!S.scrollTo)lw.scrollLeft=S.lensIdx*(lw.clientWidth+14);
+      if(lw&&S.lensIdx>0&&!S.scrollTo)lw.scrollLeft=S.lensIdx*lw.clientWidth;
       /* each lens page keeps its own height; the pager tracks the one
          in view — a short page (the analyst) no longer trails the dead
          space of the tallest (owner-caught, 6 Sep) */
@@ -18579,11 +18579,12 @@ document.addEventListener('change',e=>{ // any date input with a placeholder ove
 document.addEventListener('scroll',e=>{ // the findings carousel remembers its lens
   try{const t=e.target;
     if(t&&t.id==='lenswrap'&&t.clientWidth>0){
-      S.lensIdx=Math.round(t.scrollLeft/(t.clientWidth+14));
+      S.lensIdx=Math.round(t.scrollLeft/Math.max(1,t.clientWidth));
       /* the position dots follow the swipe live — no re-render mid-drag
          (owner-caught, 6 Sep: dots never moved) */
       for(let i9=0;i9<4;i9++){const d9=document.getElementById('ldot-'+i9);
-        if(d9)d9.textContent=(i9===S.lensIdx?'●':'○')}
+        if(d9){d9.textContent=(i9===S.lensIdx?'●':'○');
+          d9.style.color=(i9===S.lensIdx?'var(--text)':'color-mix(in srgb, var(--text) 22%, transparent)')}}
       /* height syncs only once the swipe SETTLES — resizing mid-drag
          trapped the snap between two pages (owner-caught, 7 Sep) */
       clearTimeout(window.__lensHT);
