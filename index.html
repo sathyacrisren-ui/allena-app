@@ -517,7 +517,14 @@ function backupDays(){const t=lget(K_BK,null);if(!t)return null;
   return Math.floor((Date.now()-t)/864e5)}
 function backupDue(){const d=backupDays();return S.history.length>=1&&(d===null||d>=7)}
 const mmss=s=>{s=Math.max(0,Math.round(s));return Math.floor(s/60)+':'+String(s%60).padStart(2,'0')};
-const e1rm=(w,r)=>(r>0&&w>0?w*(1+r/30):0);
+/* Epley, RPE-aware (owner-caught, 6 Sep: reading a 1RM off an RPE-6
+   volume set treats four reps in the tank as zero and craters the
+   estimate — "asking a blind man to play darts"). When the set carries
+   an RPE, reps-in-reserve join the rep count, capped at 4 (the range
+   the formula is validated for). A set without an RPE reads as before. */
+const e1rm=(w,r,rpe)=>{if(!(r>0&&w>0))return 0;
+  const p=parseFloat(rpe),rir=isFinite(p)?Math.min(4,Math.max(0,10-p)):0;
+  return w*(1+(r+rir)/30)};
 const fmtDate=i=>new Date(i).toLocaleDateString(undefined,{day:'numeric',month:'short',year:'2-digit'});
 const rir=v=>{const n=parseFloat(v);return isFinite(n)?Math.max(0,10-n):null};
 const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -645,7 +652,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='ce3a9a';  // stamped by tools/build.py with the content hash
+const BUILD_ID='0293c3';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -692,9 +699,9 @@ function isPR(e){
   let best=0;
   S.history.forEach(h=>h.log.forEach(l=>{if(l===e)return;
     if(e.secs!=null){if(l.ex===e.ex&&l.secs!=null)best=Math.max(best,l.secs)}
-    else if(l.ex===e.ex&&l.w&&l.r)best=Math.max(best,e1rm(l.w,l.r))}));
+    else if(l.ex===e.ex&&l.w&&l.r)best=Math.max(best,e1rm(l.w,l.r,l.rpe))}));
   if(e.secs!=null)return best>0&&e.secs>best?'longest hold yet ('+e.secs+'s)':null;
-  const cur=e.w&&e.r?e1rm(e.w,e.r):0;
+  const cur=e.w&&e.r?e1rm(e.w,e.r,e.rpe):0;
   return best>0&&cur>best?'best est 1RM yet ('+Math.round(cur)+' kg)':null}
 const MODELS=[['claude-haiku-4-5-20251001','Haiku — fast, near-free'],['claude-sonnet-4-6','Sonnet — smarter']];
 const COACH_SYS="You are Allena, a strength coach inside a training app. Bench wave 5wk (100x4/102.5x3/105x2/100x5/102.5x4), +2.5kg per block; back-offs 90% of top set, top reps +2-3; volume bench 87.5x4x8 -> 90 when all four hit 8 @RPE<=8; accessories double progression; wk6 deload. Goal bench 100x8. ACL-deficient knee: any knee pain/swelling/instability -> stop, log, physio decides. Under 80 words. One concrete call (kg x reps) first, then one line why. No fluff. If a programmed load should change, end your reply with a line exactly like ADJUST|<exercise name as given>|<number in kg>, e.g. ADJUST|Bench — back-off|-2.5 (one only, nothing else on that line).";
@@ -719,7 +726,7 @@ function entrySanity(e,c){
   S.history.forEach(h=>h.log.forEach(l=>{
     if(!l.w||!l.r)return;
     if(gBase(l.ex).toLowerCase()!==gBase(e.ex).toLowerCase())return;
-    hist.push({w:+l.w,r:+l.r,e:e1rm(+l.w,+l.r)})}));
+    hist.push({w:+l.w,r:+l.r,e:e1rm(+l.w,+l.r,l.rpe)})}));
   const usual=hist.length>=3?hist.map(x=>x.w).sort((a,b)=>a-b)[Math.floor(hist.length/2)]:null;
   const bestE=hist.length?Math.max.apply(null,hist.map(x=>x.e)):null;
   if(w>0&&tW&&w<=tW*0.5)flags.push('the target was '+tW+' kg and you logged '+w);
@@ -1811,7 +1818,7 @@ A.exportXlsx=()=>{
     l.targetW==null?'':l.targetW,l.targetReps==null?'':String(l.targetReps),'',
     l.targetRpe==null?'':String(l.targetRpe),
     l.w||'',l.r||'',l.secs==null?'':l.secs,l.rpe==null?'':l.rpe,
-    Math.round((l.w||0)*(l.r||0))||'',l.w&&l.r?Math.round(e1rm(l.w,l.r)*10)/10:''])));
+    Math.round((l.w||0)*(l.r||0))||'',l.w&&l.r?Math.round(e1rm(l.w,l.r,l.rpe)*10)/10:''])));
   download(makeXlsx([{name:'Sessions',rows:sh},{name:'Sets',rows:st}]),
     'training-log-'+today()+'.xlsx');
   flash('Excel file saved.')};
@@ -2523,7 +2530,7 @@ function goalStats(g){
   const target=e1rm(g.w,g.r);const pts=[];let actual=false;
   S.history.forEach(h=>{let best=0;
     h.log.forEach(l=>{if(gBase(l.ex)!==g.ex||!l.w||!l.r)return;
-      best=Math.max(best,e1rm(l.w,l.r));if(l.w>=g.w&&l.r>=g.r)actual=true});
+      best=Math.max(best,e1rm(l.w,l.r,l.rpe));if(l.w>=g.w&&l.r>=g.r)actual=true});
     if(best>0)pts.push({t:new Date(h.date).getTime(),v:best})});
   pts.sort((a,b)=>a.t-b.t);
   const cur=pts.length?Math.max.apply(null,pts.map(p=>p.v)):0;
@@ -3657,7 +3664,7 @@ function noticedPool(){
   // best lift, and how far it has come
   try{const lifts={};
     H.forEach(h=>h.log.forEach(l=>{if(!l.w||!l.r)return;const b=gBase(l.ex);
-      const e=e1rm(l.w,l.r);(lifts[b]=lifts[b]||[]).push({e:e,d:h.date})}));
+      const e=e1rm(l.w,l.r,l.rpe);(lifts[b]=lifts[b]||[]).push({e:e,d:h.date})}));
     Object.keys(lifts).forEach(b=>{const l=lifts[b].sort((a,c)=>a.d.localeCompare(c.d));
       if(l.length<6)return;
       const first=l[0].e,last=l[l.length-1].e;
@@ -3763,7 +3770,7 @@ function noticedPool(){
     H.filter(h=>!h.run).forEach(h=>{
       const d0=new Date(h.date.slice(0,10)+'T12:00');
       let gap=0;for(let g=1;g<=3;g++){const k=dayKey(new Date(d0-g*864e5));if(days[k])break;gap=g}
-      let best=0;h.log.forEach(l=>{if(l.w&&l.r)best=Math.max(best,e1rm(l.w,l.r))});
+      let best=0;h.log.forEach(l=>{if(l.w&&l.r)best=Math.max(best,e1rm(l.w,l.r,l.rpe))});
       if(best)(byGap[gap?'rest':'b2b']=byGap[gap?'rest':'b2b']||[]).push(best)});
     const avg=a=>a.reduce((x,y)=>x+y,0)/a.length;
     if(byGap.rest&&byGap.b2b&&byGap.rest.length>=4&&byGap.b2b.length>=4){
@@ -3790,7 +3797,7 @@ function noticedPool(){
       h.log.forEach(l=>{if(!l.w||!l.r)return;const b=gBase(l.ex);if(goals.indexOf(b)<0)return;
         const t=new Date(h.date).getTime();
         if(lastByEx[b]){const gap=Math.round((t-lastByEx[b])/864e5);
-          if(gap>=1&&gap<=10)pts.push({gap:gap<=2?'short':gap<=4?'mid':'long',e:e1rm(l.w,l.r)})}
+          if(gap>=1&&gap<=10)pts.push({gap:gap<=2?'short':gap<=4?'mid':'long',e:e1rm(l.w,l.r,l.rpe)})}
         lastByEx[b]=t})});
     const g2={};pts.forEach(p2=>{(g2[p2.gap]=g2[p2.gap]||[]).push(p2.e)});
     const avg=a=>a.reduce((x,y)=>x+y,0)/a.length;
@@ -3833,7 +3840,7 @@ function noticedPool(){
   // the quiet climber: up without a single headline set
   try{const cut=dayKey(new Date(Date.now()-30*864e5));const by={};
     H.filter(h=>!h.run).forEach(h=>h.log.forEach(l=>{if(!l.w||!l.r)return;
-      const b=gBase(l.ex);(by[b]=by[b]||[]).push({d:h.date.slice(0,10),e:e1rm(l.w,l.r),pr:!!l.pr})}));
+      const b=gBase(l.ex);(by[b]=by[b]||[]).push({d:h.date.slice(0,10),e:e1rm(l.w,l.r,l.rpe),pr:!!l.pr})}));
     let best=null;
     Object.keys(by).forEach(b=>{const l=by[b];if(l.length<8)return;
       const recent=l.filter(x=>x.d>=cut),before=l.filter(x=>x.d<cut);
@@ -3872,14 +3879,14 @@ function noticedPool(){
     marks.forEach(mk=>{
       const then=dayKey(new Date(Date.now()-mk[0]*864e5));
       const h0=H.find(h=>String(h.date).slice(0,10)===then&&(h.log||[]).length);
-      if(h0){const top=(h0.log||[]).filter(l=>l.w>0&&l.r>0).sort((a,b)=>e1rm(b.w,b.r)-e1rm(a.w,a.r))[0];
+      if(h0){const top=(h0.log||[]).filter(l=>l.w>0&&l.r>0).sort((a,b)=>e1rm(b.w,b.r,b.rpe)-e1rm(a.w,a.r,a.rpe))[0];
         add(mk[1]+': '+(h0.dayTitle||'a session'),
           top?('You logged '+gBase(top.ex)+' '+top.w+'\u00d7'+top.r+' that day. Look how far the log reaches back \u2014 this record is becoming a training life.')
              :'That session is still in the book. The log remembers what memory rounds off.',1)}})}catch(e){}
   // near-misses: within touching distance of an all-time mark
   try{const lifts2={};
     H.forEach(h=>h.log.forEach(l=>{if(!l.w||!l.r)return;const b=gBase(l.ex);
-      const e=e1rm(l.w,l.r);(lifts2[b]=lifts2[b]||[]).push({e:e,d:String(h.date).slice(0,10)})}));
+      const e=e1rm(l.w,l.r,l.rpe);(lifts2[b]=lifts2[b]||[]).push({e:e,d:String(h.date).slice(0,10)})}));
     const cut14=dayKey(new Date(Date.now()-14*864e5));
     Object.keys(lifts2).forEach(b=>{const arr=lifts2[b];if(arr.length<8)return;
       const best=Math.max.apply(null,arr.map(x=>x.e));
@@ -8490,7 +8497,7 @@ function discoveries(){
   const R=(S.runs||[]).filter(r=>typeof isRunType!=='function'||isRunType(r.type));
   const add=(rar,t,d,tag)=>D.push({rar:rar,t:t,d:d,tag:tag||'',id:t});
   if(!H.length&&!R.length)return D;
-  const sets=[];H.forEach(h=>h.log.forEach(l=>{if(l.w&&l.r)sets.push({l:l,h:h,e:e1rm(l.w,l.r),b:gBase(l.ex)})}));
+  const sets=[];H.forEach(h=>h.log.forEach(l=>{if(l.w&&l.r)sets.push({l:l,h:h,e:e1rm(l.w,l.r,l.rpe),b:gBase(l.ex)})}));
   const byLift={};sets.forEach(x=>{(byLift[x.b]=byLift[x.b]||[]).push(x)});
   const lifts=Object.keys(byLift);
   const bw=(function(){const dd=(S.daily&&S.daily.days)||{};
@@ -9024,7 +9031,7 @@ function healthDiscoveries(){
         const dk=String(h.date).slice(0,10);
         const night=(st.days[dk]||{}).sleep;
         if(night==null)return;
-        let best=0;h.log.forEach(l=>{if(l.w>0&&l.r>0)best=Math.max(best,e1rm(l.w,l.r))});
+        let best=0;h.log.forEach(l=>{if(l.w>0&&l.r>0)best=Math.max(best,e1rm(l.w,l.r,l.rpe))});
         if(!best)return;
         if(night>=420)good.push(best);else if(night<360)poor.push(best);});
       if(good.length>=4&&poor.length>=4){
@@ -9441,7 +9448,7 @@ function corrDayData(){
   // outcomes from training
   try{(S.history||[]).forEach(h=>{if(!h.complete||h.run)return;
     const k=String(h.date).slice(0,10);let best=0,rpes=[],ton=0;
-    (h.log||[]).forEach(l=>{if(l.w>0&&l.r>0){best=Math.max(best,e1rm(l.w,l.r));ton+=l.w*l.r}
+    (h.log||[]).forEach(l=>{if(l.w>0&&l.r>0){best=Math.max(best,e1rm(l.w,l.r,l.rpe));ton+=l.w*l.r}
       if(l.rpe!=null)rpes.push(l.rpe)});
     if(best>0)put(k,'topset',best);
     /* per-lift tops: different lifts respond to recovery differently —
@@ -9453,7 +9460,7 @@ function corrDayData(){
       (h.log||[]).forEach(l=>{if(!(l.w>0&&l.r>0))return;
         const b2=gBase(l.ex).toLowerCase();
         Object.keys(big).forEach(k2=>{if(big[k2].test(b2)&&!veto[k2].test(b2))
-          tops[k2]=Math.max(tops[k2]||0,e1rm(l.w,l.r))})});
+          tops[k2]=Math.max(tops[k2]||0,e1rm(l.w,l.r,l.rpe))})});
       if(tops.bench)put(k,'benchtop',tops.bench);
       if(tops.squat)put(k,'squattop',tops.squat);
       if(tops.dead)put(k,'deadtop',tops.dead)}catch(e2){}
@@ -9514,7 +9521,7 @@ function corrDayData(){
     (S.history||[]).forEach(h=>{if(!h.complete||h.run)return;
       const k=String(h.date).slice(0,10),tops={};
       (h.log||[]).forEach(l=>{if(!(l.w>0&&l.r>0))return;const b2=gBase(l.ex);
-        if(exSet.has(b2))tops[b2]=Math.max(tops[b2]||0,e1rm(l.w,l.r))});
+        if(exSet.has(b2))tops[b2]=Math.max(tops[b2]||0,e1rm(l.w,l.r,l.rpe))});
       Object.keys(tops).forEach(b2=>put(k,'ex:'+b2,tops[b2]))})}catch(e){}
   /* 3-day windowed signals: the body often answers averages, not days */
   try{const ks3=Object.keys(days).sort();
@@ -9918,7 +9925,7 @@ function whisperGen(){
         const d=doy(h.date);if(d.y>=nowY)return;
         const then=new Date(now.getFullYear(),d.m,d.day).getTime();
         if(Math.abs(then-now.getTime())>7*864e5)return;
-        let best=0,bx='';(h.log||[]).forEach(l=>{if(l.w>0&&l.r>0){const e9=e1rm(l.w,l.r);if(e9>best){best=e9;bx=gBase(l.ex)}}});
+        let best=0,bx='';(h.log||[]).forEach(l=>{if(l.w>0&&l.r>0){const e9=e1rm(l.w,l.r,l.rpe);if(e9>best){best=e9;bx=gBase(l.ex)}}});
         if(best>0&&(!echo||best>echo.e1))echo={kind:'lift',e1:best,ex:bx,y:d.y}});
       if(echo){const ago=nowY-echo.y,agoTxt=ago===1?'A year ago this week':ago+' years ago this week';
         out.push({slot:at(12,30),id:'wh-echo'+today(),
@@ -9933,7 +9940,7 @@ function whisperGen(){
       (S.history||[]).forEach(h=>{if(!h.complete||h.run)return;
         const t=new Date(h.date).getTime();
         (h.log||[]).forEach(l=>{if(!(l.w>0&&l.r>0))return;
-          const b2=gBase(l.ex),e9=e1rm(l.w,l.r);
+          const b2=gBase(l.ex),e9=e1rm(l.w,l.r,l.rpe);
           if(t<cut60&&(!bestBy[b2]||e9>bestBy[b2].e1))bestBy[b2]={e1:e9,w:l.w,r:l.r,y:new Date(h.date).getFullYear()};
           if(t>cut21&&(!recentBy[b2]||e9>recentBy[b2]))recentBy[b2]=e9})});
       let chase=null;
@@ -10107,7 +10114,7 @@ function standBestLifts(){
       Object.keys(STAND_MATCH).forEach(k=>{
         const m2=STAND_MATCH[k];
         if(!m2.re.test(b)||m2.not.test(b))return;
-        const e=e1rm(l.w,l.r);
+        const e=e1rm(l.w,l.r,l.rpe);
         if(!best[k]||e>best[k].e1)best[k]={e1:e,w:l.w,r:l.r,date:h.date}})})});
   return best}
 function standBest5k(){
@@ -10527,7 +10534,7 @@ function restPool(){
   try{ // biggest lift move over 8 weeks
     const since=dayKey(new Date(Date.now()-56*864e5)),lifts={};
     H.forEach(h=>{if(h.date.slice(0,10)<since)return;
-      h.log.forEach(l=>{if(!l.w||!l.r)return;const b=gBase(l.ex),e=e1rm(l.w,l.r);
+      h.log.forEach(l=>{if(!l.w||!l.r)return;const b=gBase(l.ex),e=e1rm(l.w,l.r,l.rpe);
         (lifts[b]=lifts[b]||[]).push({e:e,d:h.date})})});
     let best=null;
     Object.keys(lifts).forEach(b=>{const l=lifts[b].sort((a,c)=>a.d.localeCompare(c.d));
@@ -10536,7 +10543,7 @@ function restPool(){
     if(best)add(best.b+' is up '+Math.round((best.gain-1)*100)+'% over eight weeks. That is what the slow part looks like from above.','nav','progress')}catch(e){}
   try{ // the standing best
     let top=null;
-    H.forEach(h=>h.log.forEach(l=>{if(!l.w||!l.r)return;const e=e1rm(l.w,l.r);
+    H.forEach(h=>h.log.forEach(l=>{if(!l.w||!l.r)return;const e=e1rm(l.w,l.r,l.rpe);
       if(!top||e>top.e)top={e:e,ex:gBase(l.ex),w:l.w,r:l.r,d:h.date.slice(0,10)}}));
     if(top)add('Your best set ever is still '+uwNum(top.w)+' '+uwUnit()+' × '+top.r+' on '+top.ex+', from '+fmtDate(top.d+'T12:00')+'. It is waiting.','nav','progress')}catch(e){}
   try{ // readiness week vs baseline
@@ -10613,7 +10620,7 @@ function wrapBuild(ym){
   try{const inM={},before={};
     (S.history||[]).filter(h=>h.complete&&!h.run).forEach(h=>{
       const m=(h.date||'').slice(0,7);
-      h.log.forEach(l=>{if(!l.w||!l.r)return;const b=gBase(l.ex),e=e1rm(l.w,l.r);
+      h.log.forEach(l=>{if(!l.w||!l.r)return;const b=gBase(l.ex),e=e1rm(l.w,l.r,l.rpe);
         if(m===ym){if(!inM[b]||e>inM[b])inM[b]=e}
         else if(m<ym){if(!before[b]||e>before[b])before[b]=e}})});
     Object.keys(inM).forEach(b=>{if(!before[b])return;const g=inM[b]/before[b];
@@ -11328,7 +11335,7 @@ function predLastTop(ex){
     if(h.run||!h.complete)continue;
     let top=null;
     (h.log||[]).forEach(l=>{if(gBase(l.ex)!==b||!(l.w>0&&l.r>0))return;
-      if(!top||e1rm(l.w,l.r)>e1rm(top.w,top.r))top={w:l.w,r:l.r,rpe:l.rpe}});
+      if(!top||e1rm(l.w,l.r,l.rpe)>e1rm(top.w,top.r))top={w:l.w,r:l.r,rpe:l.rpe}});
     if(top)return Object.assign(top,{date:h.date,n:histCountFor(b)})}
   return null}
 function histCountFor(base){
@@ -11405,7 +11412,7 @@ function predResolvePending(){
       const h=(S.history||[]).find(x=>!x.run&&dayKey(new Date(x.date))===dk&&(x.log||[]).some(l=>gBase(l.ex)===b&&l.w>0&&l.r>0));
       if(h){let top=null;
         (h.log||[]).forEach(l=>{if(gBase(l.ex)!==b||!(l.w>0&&l.r>0))return;
-          if(!top||e1rm(l.w,l.r)>e1rm(top.w,top.r))top=l});
+          if(!top||e1rm(l.w,l.r,l.rpe)>e1rm(top.w,top.r))top=l});
         const actE=Math.round(e1rm(top.w,top.r)*10)/10,gap=(actE-d.predE)/d.predE;
         d.actW=top.w;d.actR=top.r;d.actE=actE;
         d.outcome=gap>0.025?'beat':gap<-0.025?'under':'called';
@@ -12002,7 +12009,7 @@ function sinceSnap(){
   const s9={e1:{},fresh:{},streak:0,pts:0,km:0,ins:0};
   try{(S.goals||[]).forEach(g=>{
     let best=0;(S.history||[]).forEach(h=>{if(h.run)return;
-      (h.log||[]).forEach(l=>{if(l.w>0&&l.r>0&&gBase(l.ex)===gBase(g.ex))best=Math.max(best,e1rm(l.w,l.r))})});
+      (h.log||[]).forEach(l=>{if(l.w>0&&l.r>0&&gBase(l.ex)===gBase(g.ex))best=Math.max(best,e1rm(l.w,l.r,l.rpe))})});
     if(best)s9.e1[gBase(g.ex)]=Math.round(best*10)/10})}catch(e){}
   try{muscleFresh().forEach(x=>s9.fresh[x.m]=x.fresh)}catch(e){}
   try{s9.streak=dayStreak()}catch(e){}
@@ -12632,7 +12639,7 @@ function blockStats(p){
   let planned=0;for(let w=1;w<=p.weeks;w++)planned+=weekState(p,w).total;
   const byEx={};
   rows.forEach(h=>h.log.forEach(l=>{if(!l.w||!l.r)return;const b=gBase(l.ex);
-    (byEx[b]=byEx[b]||[]).push({t:new Date(h.date).getTime(),e:e1rm(l.w,l.r),rpe:parseFloat(l.rpe)})}));
+    (byEx[b]=byEx[b]||[]).push({t:new Date(h.date).getTime(),e:e1rm(l.w,l.r,l.rpe),rpe:parseFloat(l.rpe)})}));
   const moved=[];
   Object.keys(byEx).forEach(b=>{const a=byEx[b].sort((x,y)=>x.t-y.t);
     if(a.length<3)return;
@@ -13910,7 +13917,10 @@ function viewFindings(){
   /* what's NEW leads and glows (owner call, 4 Sep): a page of pills
      must say which pill holds the new thing, or the visit is a hunt */
   const dot9=n=>'<span style="position:absolute;top:-6px;right:-4px;min-width:19px;height:19px;border-radius:19px;background:#FF453A;color:#fff;font-size:10.5px;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 5px;z-index:6;box-shadow:0 2px 8px rgba(0,0,0,.4)">'+n+'</span>';
-  const wrapF=(html,fresh,n)=>html?'<div style="position:relative" class="'+(fresh?'an-glow':'')+'">'+(fresh?dot9(n||'\u25cf'):'')+html+'</div>':'';
+  /* the glow shadow lives on this wrapper \u2014 it must share the card's
+     20px radius or the pulse traces a sharp-cornered RECTANGLE around
+     the rounded pill (owner-caught, 6 Sep: "dark rectangle artefact") */
+  const wrapF=(html,fresh,n)=>html?'<div style="position:relative;border-radius:20px" class="'+(fresh?'an-glow':'')+'">'+(fresh?dot9(n||'\u25cf'):'')+html+'</div>':'';
   let deepFresh=false;try{deepFresh=!!deepReadyInfo()}catch(e){}
   let patN=0,discN=0;try{patN=unseenPatterns()}catch(e){}try{discN=unseenDiscoveries()}catch(e){}
   /* the tier ladder is the page's geography (owner call, 5 Sep):
@@ -14180,7 +14190,7 @@ function deepContext(){
   // main lifts: last 8 best-of-session e1rm points each
   const lifts={};
   H.forEach(h=>{let best={};
-    h.log.forEach(l=>{if(!l.w||!l.r)return;const b=gBase(l.ex),e=e1rm(l.w,l.r);
+    h.log.forEach(l=>{if(!l.w||!l.r)return;const b=gBase(l.ex),e=e1rm(l.w,l.r,l.rpe);
       if(!best[b]||e>best[b])best[b]=e});
     Object.keys(best).forEach(b=>{(lifts[b]=lifts[b]||[]).push([h.date.slice(5,10),Math.round(best[b])])})});
   Object.keys(lifts).filter(b=>lifts[b].length>=5).slice(0,6).forEach(b=>{
@@ -14622,10 +14632,10 @@ function sessionPRs(s2){
   s2.log.forEach(l=>{
     if(!l.w||!l.r)return;
     const b=gBase(l.ex);if(seen[b])return;
-    const e=e1rm(l.w,l.r);
+    const e=e1rm(l.w,l.r,l.rpe);
     let prior=0;
     S.history.forEach(h=>{if(h.id===s2.id)return;
-      h.log.forEach(x=>{if(gBase(x.ex)===b&&x.w&&x.r)prior=Math.max(prior,e1rm(x.w,x.r))})});
+      h.log.forEach(x=>{if(gBase(x.ex)===b&&x.w&&x.r)prior=Math.max(prior,e1rm(x.w,x.r,x.rpe))})});
     if(prior&&e>prior+0.5){seen[b]=1;out.push({ex:b,e:Math.round(e),prev:Math.round(prior)})}});
   return out}
 function viewSession(){
@@ -15002,7 +15012,7 @@ function monthName(ym){
 
 function liftPts(ex){const raw=[];
   S.history.forEach(h=>{let best=0;
-    h.log.forEach(l=>{if(gBase(l.ex)!==ex||!l.w||!l.r)return;best=Math.max(best,e1rm(l.w,l.r))});
+    h.log.forEach(l=>{if(gBase(l.ex)!==ex||!l.w||!l.r)return;best=Math.max(best,e1rm(l.w,l.r,l.rpe))});
     if(best>0)raw.push({t:new Date(h.date).getTime(),v:best})});
   raw.sort((a,b)=>a.t-b.t);
   const m=[];raw.forEach(p=>{const k=dayKey(p.t);
@@ -15374,7 +15384,7 @@ function chartPoints(kind,ex){
       if(!l.w||!l.r)return;
       if(gBase(l.ex).toLowerCase()!==String(ex).toLowerCase()&&l.ex!==ex)return;
       out.push({id:h.id+':'+li,date:h.date,label:'Set '+(l.setNo||'')+' · '+uwNum(l.w)+' '+uwUnit()+' × '+l.r+(l.rpe?' @'+l.rpe:''),
-        sub:uwNum(Math.round(e1rm(l.w,l.r)))+' '+uwUnit()+' est 1RM'+(l.pr?' · PR':''),hid:h.id,li:li,editable:true})}));
+        sub:uwNum(Math.round(e1rm(l.w,l.r,l.rpe)))+' '+uwUnit()+' est 1RM'+(l.pr?' · PR':''),hid:h.id,li:li,editable:true})}));
   }
   if(kind==='bw'){Object.keys(S.daily.days||{}).forEach(k=>{const d=S.daily.days[k];
     if(d&&d.bw)out.push({id:'bw:'+k,date:k+'T12:00',label:uwNum(d.bw)+' '+uwUnit(),sub:'daily check-in',dayK:k,editable:true})})}
@@ -15536,7 +15546,7 @@ function viewProgress(){
   const bests={},weekVol={};
   S.history.forEach(h=>h.log.forEach(l=>{
     if(l.w&&l.r){const wk=isoWeek(h.date);weekVol[wk]=(weekVol[wk]||0)+l.w*l.r;
-      const e=e1rm(l.w,l.r);if(!bests[l.ex]||e>(bests[l.ex].e||0))bests[l.ex]={e:e,label:l.w+' × '+l.r}}
+      const e=e1rm(l.w,l.r,l.rpe);if(!bests[l.ex]||e>(bests[l.ex].e||0))bests[l.ex]={e:e,label:l.w+' × '+l.r}}
     else if(l.secs){if(!bests[l.ex]||l.secs>(bests[l.ex].secs||0))bests[l.ex]={secs:l.secs,label:l.secs+'s'+(l.perSide?'/side':'')}}}));
   const goalSet=new Set(S.goals.map(g=>g.ex));
   const others=[];S.history.forEach(h=>h.log.forEach(l=>{const b=gBase(l.ex);
