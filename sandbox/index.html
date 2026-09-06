@@ -652,7 +652,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='6a6c7c';  // stamped by tools/build.py with the content hash
+const BUILD_ID='a05c76';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -10089,6 +10089,50 @@ function analystContext(){
     if(ex9&&ex9.plan)L.push('RUNNING EXPERIMENT (user ACCEPTED it; it is in their program, flagged): '+ex9.plan.ex+' on every '+ex9.plan.anchor+' day since '+ex9.applied+'. Today\u2019s read must evaluate/continue/end this \u2014 never ignore it.');
   }catch(e){}
   return L.join('\n')}
+function expStatus(){
+  /* the personal lab (dossier idea 3 — N-of-1 structure per PREEMPT /
+     StudyU): every analyst experiment carries a PRE-DECLARED outcome
+     (the anchor lift's RPE-aware e1RM), a fixed 14-day window, and the
+     deterministic engine as referee. The model proposes; the
+     statistics verdict. A correlation becomes a fact proven on YOU. */
+  try{
+    const st=analystStore();const e=st&&st.exp;if(!e||!e.applied)return null;
+    const anchor=String(e.plan&&e.plan.anchor||'').toLowerCase();if(!anchor)return null;
+    const start=e.applied;
+    const dayN=Math.floor((new Date(today()+'T12:00')-new Date(start+'T12:00'))/864e5)+1;
+    const top=(from,to)=>{const v=[];
+      (S.history||[]).forEach(h=>{if(!h.complete||h.run)return;
+        const k=String(h.date).slice(0,10);if(k<from||k>=to)return;
+        let b=0;(h.log||[]).forEach(l=>{if(l.w>0&&l.r>0&&String(gBase(l.ex)).toLowerCase().indexOf(anchor)>=0)b=Math.max(b,e1rm(l.w,l.r,l.rpe))});
+        if(b>0)v.push(b)});return v};
+    const before=top(dayKey(new Date(new Date(start+'T12:00').getTime()-28*864e5)),start);
+    const during=top(start,dayKey(new Date(Date.now()+864e5)));
+    const ripe=dayN>=14&&during.length>=3&&before.length>=3;
+    let verdict=null,delta=null;
+    if(ripe){const m=a=>a.reduce((x,y)=>x+y,0)/a.length;
+      delta=Math.round((m(during)/m(before)-1)*1000)/10;
+      verdict=delta>=2?'worked':delta<=-2?'hurt':'flat'}
+    return{day:Math.min(dayN,14),n:during.length,nb:before.length,ripe:ripe,
+      verdict:verdict,delta:delta,watch:(e.plan&&e.plan.anchor)||'',ex:(e.plan&&e.plan.ex)||''}}catch(e9){return null}}
+function expSettle(){
+  /* when the window closes with enough sessions on both sides, the
+     verdict banks as a find and the experiment slot opens for the next
+     one. The program rows stay until the user removes them — nothing
+     silently disappears. */
+  try{
+    const st=analystStore();if(!st||!st.exp)return;
+    const x=expStatus();if(!x||!x.ripe)return;
+    const bank=discBank();const id='exp:'+st.exp.applied;
+    if(!bank[id]){
+      const line=x.verdict==='worked'
+        ?'Adding '+x.ex+' lifted your '+x.watch+' about '+x.delta+'% over 14 days against the month before \u2014 proven on you, by your own engine.'
+        :x.verdict==='hurt'
+        ?x.ex+' cost your '+x.watch+' about '+Math.abs(x.delta)+'% over its 14 days \u2014 a real answer; the engine recommends removing it.'
+        :'14 days of '+x.ex+' moved your '+x.watch+' by only '+x.delta+'% \u2014 no clear effect, which is itself an answer.';
+      bank[id]={t:'Experiment settled: '+x.ex,d:line,rar:'epic',tag:'insight',found:today()};
+      bankSave();try{hapticRun('find')}catch(e8){}}
+    st.lastExp={plan:st.exp.plan,applied:st.exp.applied,verdict:x.verdict,delta:x.delta};
+    st.exp=null;lset('training-analyst-v1',st)}catch(e){}}
 function analystStore(){return lget('training-analyst-v1',null)}
 async function analystRun(){
   try{
@@ -10127,9 +10171,14 @@ function analystCard(){
       const exp9=st.exp||(st.applied?{plan:st.plan,applied:st.applied}:null);
       if(st.plan&&!exp9)h+='<button data-a="analystApply" class="big disp mt" style="background:var(--green);color:var(--bg);font-size:14.5px">Add \u201c'+esc(st.plan.ex)+'\u201d to my week</button>'+
         '<p style="color:var(--faint);font-size:11px;line-height:1.5;margin-top:6px">Lands on every '+esc(st.plan.anchor)+' day, flagged as the analyst\u2019s, removable in one tap. Nothing changes until you say so.</p>';
-      if(exp9)h+='<div class="card mt" style="padding:11px 14px;border-color:var(--greensoft);display:flex;align-items:center;gap:10px">'+
-        '<span style="flex:1;font-size:12.5px">\u2697 Experiment running since '+esc(exp9.applied)+' \u2014 '+esc(exp9.plan&&exp9.plan.ex||'the addition')+' rides your '+esc(exp9.plan&&exp9.plan.anchor||'anchor')+' days.</span>'+
-        '<button data-a="analystRemove" class="mono" style="color:var(--red);font-size:11px;flex:none">Remove</button></div>';
+      if(exp9){const x9=(typeof expStatus==='function')?expStatus():null;
+        h+='<div class="card mt" style="padding:11px 14px;border-color:var(--greensoft)">'+
+        '<div style="display:flex;align-items:center;gap:10px">'+
+        '<span style="flex:1;font-size:12.5px">\u2697 Experiment \u2014 day '+(x9?x9.day:'?')+' of 14. '+esc(exp9.plan&&exp9.plan.ex||'The addition')+' rides your '+esc(exp9.plan&&exp9.plan.anchor||'anchor')+' days; the engine is watching '+esc(x9&&x9.watch||'the anchor')+' e1RM against the month before.</span>'+
+        '<button data-a="analystRemove" class="mono" style="color:var(--red);font-size:11px;flex:none">Remove</button></div>'+
+        (x9&&!x9.ripe&&x9.day>=14?'<p style="color:var(--faint);font-size:10.5px;margin-top:6px">Window done \u2014 needs '+Math.max(0,3-x9.n)+' more '+esc(x9.watch)+' session'+(3-x9.n===1?'':'s')+' to verdict honestly.</p>':'')+'</div>'}
+      const le9=st.lastExp;
+      if(!exp9&&le9&&le9.verdict)h+='<p class="mono" style="color:var(--faint);font-size:9.5px;letter-spacing:.05em;margin-top:8px">LAST EXPERIMENT \u00b7 '+esc(String(le9.plan&&le9.plan.ex||'').toUpperCase())+' \u00b7 '+(le9.verdict==='worked'?'WORKED (+'+le9.delta+'%)':le9.verdict==='hurt'?'COST '+Math.abs(le9.delta)+'%':'NO CLEAR EFFECT')+' \u00b7 BANKED IN THE COLLECTION</p>';
       h+='<button data-a="analystRun" class="btn mt" style="font-size:12.5px">Run it again</button>'}
     else h+='<p style="color:var(--dim);font-size:12.5px;line-height:1.6;margin-top:8px">The strongest model reads only what the statistics engine has proven in your data \u2014 finds the story across findings, interrogates the backwards patterns, and designs one two-week experiment your own engine will verdict.</p>'+
       '<button data-a="analystRun" class="big disp mt" style="background:var(--amber);color:var(--bg);font-size:14.5px">Run the analyst pass</button>';
@@ -20678,6 +20727,7 @@ function morningAsk(){try{
 let lastDay=today();
 function dayCheck(){
   try{if(typeof watchMetSweep==='function')watchMetSweep()}catch(e){}
+  try{if(typeof expSettle==='function')expSettle()}catch(e){}
   const k=today();
   if(k!==lastDay){lastDay=k;S.garSkip=false}   // a new day: clear yesterday's skips
   if(!morningAsk())dailyFindAsk()}
