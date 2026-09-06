@@ -652,7 +652,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='7772cb';  // stamped by tools/build.py with the content hash
+const BUILD_ID='dc65cc';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -4066,6 +4066,29 @@ function sessionLiveWhy(h){
       return{live:false,why:maxBurst+' sets logged inside one minute — a superset is quick, a whole block at once is typing'};}
   return{live:true,why:'witnessed — this phone ran the clock and the sets spread like a real session'}}
 function sessionLive(h){return sessionLiveWhy(h).live}
+function srpeStrain(){
+  /* Foster 1998: illness and overtraining cluster after MONOTONOUS
+     heavy weeks — load × sameness, not big load alone. Cross-domain by
+     construction: lifting, runs, rides and rehab all bill this ledger
+     (runs mirror into history), which is the one-model moat — no
+     single-sport app can compute this number. */
+  try{
+    const by={};
+    (S.history||[]).filter(h=>h.complete).forEach(h=>{
+      const k=String(h.date).slice(0,10);
+      const t=new Date(k+'T12:00').getTime();
+      if(t<Date.now()-27*864e5||t>Date.now()+864e5)return;
+      const rp=(h.log||[]).map(l=>parseFloat(l.rpe)).filter(x=>isFinite(x));
+      const rpe=rp.length?rp.reduce((a,b)=>a+b,0)/rp.length:5;
+      by[k]=(by[k]||0)+rpe*(h.minutes||45)});
+    const wk=[];for(let i=6;i>=0;i--)wk.push(by[dayKey(new Date(Date.now()-i*864e5))]||0);
+    const tot=wk.reduce((a,b)=>a+b,0);if(tot<600)return null;
+    const m=tot/7,sd=Math.sqrt(wk.reduce((a,b)=>a+(b-m)*(b-m),0)/7);
+    const mono=sd>1?m/sd:9.9;
+    let prior=0;for(let i=27;i>=7;i--)prior+=by[dayKey(new Date(Date.now()-i*864e5))]||0;
+    const priorWk=prior/3;
+    return{mono:Math.round(mono*10)/10,load:Math.round(tot),
+      strain:Math.round(tot*mono),heavy:priorWk>0&&tot>=priorWk*1.15}}catch(e){return null}}
 function dpPlausible(h){
   // obvious nonsense earns nothing
   const bad=(h.log||[]).filter(l=>{
@@ -5360,6 +5383,13 @@ function viewRun(){
     const b=runPB(x[0]),eq=(typeof runPBeq==='function')?runPBeq(x[0]):null;
     return (b||eq)?{n:x[1],d:x[0],b:b,eq:eq}:null}).filter(Boolean);
   const tstr=m=>Math.floor(m)+':'+String(Math.round((m%1)*60)).padStart(2,'0');
+  try{const cs9=(typeof criticalSpeed==='function')?criticalSpeed():null;
+   if(cs9)h+='<p class="eyebrow mt2">Critical speed</p><div class="card mt" style="padding:14px 16px">'+
+    '<div style="display:flex;justify-content:space-between;align-items:baseline">'+
+    '<span class="mono" style="font-size:20px;font-weight:600">'+paceStr(cs9.paceMins,1)+'</span>'+
+    '<span class="mono" style="color:var(--faint);font-size:10px">FROM '+cs9.n+' BEST EFFORTS \u00b7 90 DAYS</span></div>'+
+    '<p style="color:var(--dim);font-size:12px;line-height:1.55;margin-top:7px">The fastest pace your engine can hold at its ceiling \u2014 measured from your own runs, no test day needed. Marathon shape right now: ~'+cs9.mar+'.'+iBtn('cs')+'</p>'+
+    iBody('cs','Fitted from your fastest efforts at '+cs9.n+' different distances (Smyth & Muniz-Pumares 2020, validated on 25,000 runners \u2014 marathon prediction within ~7.7%). Above this pace you spend a fixed reserve (~'+cs9.dp+' m of it); below it you can cruise. Easy runs belong well under it, tempo just under, intervals above.')+'</div>'}catch(e){}
   if(pbs.length)h+='<p class="eyebrow mt2">Best efforts</p><button data-a="runDetail" data-v="pb" class="card mt" style="width:100%;text-align:left;padding:4px 16px;display:block">'+
     pbs.map((p,i)=>{
       /* two truths per distance: the literal best NEAR the distance,
@@ -6548,12 +6578,19 @@ function weeklyKm(weeksBack){
       end:dayKey(end)})}
   return out}
 function acwr(){
-  const wk=weeklyKm(5);
-  const acute=wk[wk.length-1].load;
-  const prior=wk.slice(0,4).map(x=>x.load).filter(x=>x>0);
-  if(!prior.length||!acute)return null;
-  const chronic=prior.reduce((a,b)=>a+b,0)/prior.length;
-  if(!chronic)return null;
+  /* EWMA load ratio (Williams 2017, BJSM: more sensitive than rolling
+     windows), UNCOUPLED per Impellizzeri 2020 — the acute week must not
+     sit inside its own denominator, and this number only ever DESCRIBES
+     a spike against your own normal; it never predicts injury. */
+  const by={};runs().forEach(r=>{if(!isRunType(r.type))return;
+    const k=String(r.date).slice(0,10);by[k]=(by[k]||0)+(runLoad(r)||0)});
+  const days=[];for(let i=27;i>=0;i--)days.push(by[dayKey(new Date(Date.now()-i*864e5))]||0);
+  if(days.filter(x=>x>0).length<4)return null;
+  const acute=days.slice(-7).reduce((a,b)=>a+b,0);   // the actual last week
+  if(!acute)return null;
+  const ew=(arr,n)=>{const l=2/(n+1);let m=arr[0];arr.forEach((x,i)=>{if(i)m=x*l+m*(1-l)});return m};
+  const chronic=ew(days.slice(0,21),28)*7;           // weekly-equivalent, acute week excluded
+  if(chronic<=3)return null;
   return Math.round(acute/chronic*100)/100}
 function runFitness(){
   // pace at a comfortable effort, the honest proxy for aerobic progress
@@ -6594,6 +6631,32 @@ function aeroCard(){
     (up?'Up '+Math.abs(e.pct)+'% on the five runs before — same heartbeats, more road. Every HR run moves this number.'
      :down?'Down '+Math.abs(e.pct)+'% on the five before — tired weeks read slower. Judge it over a month, not a run.'
      :'Holding steady across your last ten HR runs. Every run with heart rate moves this number.')+'</p></div>'}
+function criticalSpeed(){
+  /* Smyth & Muniz-Pumares 2020 (MSSE): critical speed fitted from
+     ordinary training history predicted marathon time within ~7.7%
+     across 25,000 runners — no test day needed. Linear fit of
+     distance on time over best efforts at 3+ distinct distances
+     in the last 90 days. Physiological sanity gates keep a thin
+     history from producing a nonsense number. */
+  try{
+    const cut=dayKey(new Date(Date.now()-90*864e5));
+    const R=runs().filter(r=>isRunType(r.type)&&r.mins>0&&r.km>=1&&String(r.date).slice(0,10)>=cut);
+    const B=[[1,1.6],[1.6,2.6],[2.6,4],[4,6.5],[6.5,9],[9,13],[13,22]];
+    const eff=[];
+    B.forEach(b=>{let best=null;
+      R.forEach(r=>{if(r.km>=b[0]&&r.km<b[1]){const sp=r.km/r.mins;
+        if(!best||sp>best.sp)best={d:r.km*1000,t:r.mins*60}}});
+      if(best)eff.push(best)});
+    if(eff.length<3)return null;
+    const n=eff.length;let sx=0,sy=0,sxy=0,sxx=0;
+    eff.forEach(e=>{sx+=e.t;sy+=e.d;sxy+=e.t*e.d;sxx+=e.t*e.t});
+    const cs=(n*sxy-sx*sy)/(n*sxx-sx*sx);
+    const dp=(sy-cs*sx)/n;
+    if(!(cs>1.5&&cs<8)||dp<-100||dp>2500)return null;
+    const marS=42195/(cs*0.85);
+    return{cs:Math.round(cs*100)/100,dp:Math.max(0,Math.round(dp)),n:n,
+      paceMins:(1000/cs)/60,
+      mar:Math.floor(marS/3600)+':'+String(Math.floor(marS%3600/60)).padStart(2,'0')}}catch(e){return null}}
 function runPBeq(dist){
   /* the best 5K you have IMPLIED, from any longer run (beta-caught by
      Angus: his half marathon out-projects his literal near-5K best).
@@ -7052,10 +7115,12 @@ function cardioAcwr(){
   if(all.length<6)return null;
   const load=r=>runLoad(r)*(r.type==='ride'?0.6:1);
   const day=r=>String(r.date).slice(0,10);
-  const sum=(from,to)=>all.filter(r=>day(r)>=from&&day(r)<to).reduce((a,r)=>a+load(r),0);
-  const t=dayKey(new Date(Date.now()+864e5));
-  const a=sum(dayKey(new Date(Date.now()-6*864e5)),t);
-  const c=sum(dayKey(new Date(Date.now()-27*864e5)),t)/4;
+  const by={};all.forEach(r=>{const k=day(r);by[k]=(by[k]||0)+load(r)});
+  const days=[];for(let i=27;i>=0;i--)days.push(by[dayKey(new Date(Date.now()-i*864e5))]||0);
+  const a=days.slice(-7).reduce((x,y)=>x+y,0);
+  if(!a)return null;
+  const ew=(arr,n)=>{const l=2/(n+1);let m=arr[0];arr.forEach((x,i)=>{if(i)m=x*l+m*(1-l)});return m};
+  const c=ew(days.slice(0,21),28)*7;                  // weekly-equivalent, uncoupled
   if(c<30)return null;
   return{ratio:Math.round(a/c*100)/100,acute:Math.round(a),chronic:Math.round(c)}}
 function viewRide(){
@@ -9032,6 +9097,22 @@ function hkdSeries(f,days){
   const st=hkDailyStore(),cut=dayKey(new Date(Date.now()-(days||90)*864e5));
   return Object.keys(st.days).filter(k=>k>=cut&&st.days[k][f]!=null)
     .sort().map(k=>({date:k,v:st.days[k][f]}))}
+function hrvGate(){
+  /* the trial-validated day rule (Vesterinen 2016; Kiviniemi 2007;
+     Javaloyes 2019): a hard day is well placed when 7-day rolling HRV
+     sits inside your own smallest-worthwhile-change band (baseline
+     mean ± 0.5 SD of ln-HRV). HRV alone can mislead (Bellenger 2016:
+     it can RISE in overreach), so this only ever EASES, never pushes,
+     and stays silent under 21 days of data. */
+  try{
+    const s=hkdSeries('hrv',35);if(s.length<21)return null;
+    const ln=s.map(x=>Math.log(Math.max(1,x.v)));
+    const base=ln.slice(0,-7),wk=ln.slice(-7);
+    const m=base.reduce((a,b)=>a+b,0)/base.length;
+    const sd=Math.sqrt(base.reduce((a,b)=>a+(b-m)*(b-m),0)/base.length);
+    const m7=wk.reduce((a,b)=>a+b,0)/wk.length;
+    if(sd<=0)return null;
+    return{low:m7<m-0.5*sd,n:s.length}}catch(e){return null}}
 function hkdMed(a){if(!a.length)return null;const s9=a.slice().sort((x,y)=>x-y);return s9[Math.floor(s9.length/2)]}
 function healthDiscoveries(){
   const D=[];
@@ -11198,6 +11279,16 @@ function dailyBrief(){
       if(done<targ)out.push({tag:'REHAB',a:'nav',v:'acl',
         line:done+' of '+targ+' rehab sessions this week \u2014 one today keeps the climb honest'})}
   }catch(e){}
+  /* the body line (dossier idea 2): easing-only signals from the wrist.
+     HRV band outranks the short night; one line at most; damped like
+     every other line. */
+  try{
+    const g9=(typeof hrvGate==='function')?hrvGate():null;
+    if(g9&&g9.low)out.push({tag:'BODY',key:'body-hrv',a:'nav',v:'signals',
+      line:'7-day HRV is under your normal band \u2014 an easy day here buys back more than it costs'});
+    else{const sl9=(typeof hkdSeries==='function')?hkdSeries('sleep',2).slice(-1)[0]:null;
+      if(sl9&&sl9.date===today()&&sl9.v>0&&sl9.v<360)out.push({tag:'BODY',key:'body-sleep',a:'nav',v:'signals',
+        line:'short night ('+Math.round(sl9.v/6)/10+'h) \u2014 expect less in the tank; let the RPE targets set the loads'})}}catch(e){}
   return briefDamp(out.slice(0,3))}
 function briefDamp(lines){
   /* a line that says the same thing three days running has stopped
@@ -11907,6 +11998,10 @@ function allPatterns(){
   const out=[];
   const tag=(list,dom)=>{(list||[]).forEach(p=>{if(!p.dom)p.dom=dom;out.push(p)})};
   try{tag(crossPatterns(),'lift')}catch(e){}
+  try{const s9=srpeStrain();
+    if(s9&&s9.mono>=2&&s9.heavy)out.push({t:'Heavy and the same, every day',
+      d:'This week is running '+s9.load+' load units at monotony '+s9.mono+' \u2014 a heavy week where every day lands alike. The research (Foster) finds illness and overtraining cluster after weeks like this one; the load is less of a problem than the sameness.',
+      tone:'warn',dom:'cross',src:['sessions']})}catch(e){}
   try{tag(runVsLift(),'cross')}catch(e){}
   try{tag(zonePatterns(),'run')}catch(e){}
   try{tag(rehabPatterns(),'rehab')}catch(e){}
@@ -12626,6 +12721,7 @@ function patDetail(title){
   return h+'</div>'}
 function patAction(p){
   const t=p.t.toLowerCase();
+  if(/heavy and the same/.test(t))return 'Keep the hard days hard \u2014 and make one day genuinely easy. Contrast is what lets a heavy week land as fitness instead of fatigue.';
   if(/easy runs are not easy/.test(t))return 'Pick a pace you can hold a conversation at and stay there, even if it feels absurdly slow. The point of an easy run is that it costs almost nothing, so the hard sessions can cost a lot.';
   if(/load jumped|climbing fast/.test(t))return 'Keep next week at the same distance rather than building on it. If it already hurts somewhere, take 20% off instead.';
   if(/follows a hard run/.test(t))return 'Either move that session later in the week, or keep it and drop the top set by about 10%. Doing both hard is the version that goes wrong.';
