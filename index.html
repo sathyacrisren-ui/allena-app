@@ -656,7 +656,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='f6bc1e';  // stamped by tools/build.py with the content hash
+const BUILD_ID='602b8e';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -758,7 +758,7 @@ function recentCutKey(){return dayKey(new Date(Date.now()-182*864e5))}
 function dustF(){
   /* six green motes rising off a fresh find — deterministic placement,
      looping; the glow itself stays perfectly still */
-  return Array.from({length:6},(_,i)=>'<i class="find-dust" style="left:'+(7+(i*16.4)%86).toFixed(0)+'%;'+(i%2?'top:-3px':'bottom:-3px')+';animation-delay:'+(i*0.46).toFixed(2)+'s"></i>').join('')}
+  return Array.from({length:arguments[0]||6},(_,i)=>'<i class="find-dust" style="left:'+(7+(i*16.4)%86).toFixed(0)+'%;'+(i%2?'top:-3px':'bottom:-3px')+';animation-delay:'+(i*0.46).toFixed(2)+'s"></i>').join('')}
 function iBtn(k){return '<button data-a="iTog" data-v="'+esc(k)+'" aria-label="More info" style="width:17px;height:17px;border-radius:17px;border:1px solid var(--line);background:none;color:var(--faint);font-size:10px;font-style:italic;font-family:Georgia,serif;line-height:1;display:inline-flex;align-items:center;justify-content:center;vertical-align:-2px;margin-left:7px;padding:0;flex:none">i</button>'}
 function iOn(k){return !!S.openSec['i:'+k]}
 function iBody(k,txt){return iOn(k)?'<p style="color:var(--dim);font-size:11.5px;line-height:1.6;margin-top:7px">'+txt+'</p>':''}
@@ -9899,7 +9899,7 @@ function signalDue(){
     /* one constellation per open, at most five a day — abundance with
        a ceiling, so a rich reservoir feels alive, never like a flood */
     const todayN=Object.keys(bank).filter(id=>id.slice(0,5)==='corr:'&&bank[id].found===today()).length;
-    if(todayN>=5)return null;
+    if(todayN>=8)return null;   // owner call, 7 Sep: 'more of these finds'
     const fresh=correlationDiscoveries().find(d=>!bank[d.id]);
     return fresh||null}catch(e){return null}}
 /* the ceremony, generalized (owner: 'more of it please', 4 Sep):
@@ -12072,7 +12072,8 @@ function viewCollection(){
       '<span class="mono" style="color:var(--faint);font-size:13px;flex:none">'+(open?'\u2304':'\u203a')+'</span></button>'+
       (open&&mine.length?'<div style="border-top:1px solid var(--line);padding:10px 14px;display:flex;flex-direction:column;gap:9px">'+
         mine.map(d=>{const r=rarityOf(d.rar);
-          return '<div>'+
+          const hot=(d.found===today())&&(d.rar==='rare'||d.rar==='epic');
+          return '<div class="'+(hot?'find-glow':'')+'"'+(hot?' style="position:relative;border-radius:12px;padding:7px 9px;margin:-2px -9px"':'')+'>'+(hot?dustF(3):'')+
           '<div style="display:flex;align-items:baseline;gap:8px">'+
           (freshIds[d.id]?'<span class="mono" style="color:var(--green);font-size:8.5px;letter-spacing:.06em">\u25cf NEW</span>':'')+
           '<span class="mono" style="color:'+r[1]+';font-size:9px;letter-spacing:.06em">'+esc(r[2].toUpperCase())+'</span>'+
@@ -14237,7 +14238,8 @@ function lensWord(k){
     if(!ks.length)return '';
     ks.sort((a,b)=>String(B[b].found||'').localeCompare(String(B[a].found||'')));
     const rows=ks.slice(0,3).map(id=>{const e2=B[id];
-      return '<div style="display:flex;gap:9px;align-items:baseline;margin-top:8px">'+
+      const hot=(e2.found===today())&&(e2.rar==='rare'||e2.rar==='epic');
+      return '<div class="'+(hot?'find-glow':'')+'" style="display:flex;gap:9px;align-items:baseline;margin-top:8px;position:relative;border-radius:10px'+(hot?';padding:6px 8px;margin-left:-8px;margin-right:-8px':'')+'">'+(hot?dustF(3):'')+
       '<span style="width:7px;height:7px;border-radius:7px;flex:none;background:'+rarityOf(e2.rar)[1]+';transform:translateY(-1px)"></span>'+
       '<span style="flex:1;min-width:0;font-size:12.5px;line-height:1.45">'+esc(e2.t)+'</span>'+
       '<span class="mono" style="color:var(--faint);font-size:9px;flex:none">'+esc(String(e2.found||'').slice(5))+'</span></div>'}).join('');
