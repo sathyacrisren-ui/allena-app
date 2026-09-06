@@ -634,7 +634,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='edbc54';  // stamped by tools/build.py with the content hash
+const BUILD_ID='8a3ac2';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -729,6 +729,13 @@ function entrySanity(e,c){
    forever, but TARGETS decay — anything that sets today's bar only
    trusts the last ~6 months. The 2024 you is history, not evidence. */
 function recentCutKey(){return dayKey(new Date(Date.now()-182*864e5))}
+
+/* the (i) pattern (beta ask, 6 Sep — "overwhelming in terms of text"):
+   numbers and headlines first; the explanatory paragraph waits behind
+   a small greyed circle. One tap reveals, one tap hides. */
+function iBtn(k){return '<button data-a="iTog" data-v="'+esc(k)+'" aria-label="More info" style="width:17px;height:17px;border-radius:17px;border:1px solid var(--line);background:none;color:var(--faint);font-size:10px;font-style:italic;font-family:Georgia,serif;line-height:1;display:inline-flex;align-items:center;justify-content:center;vertical-align:-2px;margin-left:7px;padding:0;flex:none">i</button>'}
+function iOn(k){return !!S.openSec['i:'+k]}
+function iBody(k,txt){return iOn(k)?'<p style="color:var(--dim);font-size:11.5px;line-height:1.6;margin-top:7px">'+txt+'</p>':''}
 function rpeLow(v){const m=String(v==null?'':v).match(/(\d+(?:\.\d+)?)/);return m?parseFloat(m[1]):NaN}
 function rpeHigh(v){const m=String(v==null?'':v).match(/(\d+(?:\.\d+)?)\s*[-–—to]+\s*(\d+(?:\.\d+)?)/);
   return m?parseFloat(m[2]):rpeLow(v)}
@@ -19989,6 +19996,7 @@ function runAction(a,v,t,e){
     case 'acctVerify':acctVerify(S.acctCode);break;
     case 'acctReset':lset(K_ACCT,null);S.acctPending=false;S.acctCode='';S.acctEmail='';render();break;
     case 'deepRun':deepRun();break;
+    case 'iTog':S.openSec['i:'+v]=!S.openSec['i:'+v];render();break;
     case 'mergeOpen':S.sheet={t:'merge'};render();break;
     case 'mergeStart':{
       const m=mergeBuild();if(!m)break;
