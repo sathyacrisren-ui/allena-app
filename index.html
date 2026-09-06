@@ -104,6 +104,10 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
 @keyframes anCount{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
 @keyframes anPop{0%{transform:scale(.82);opacity:0}60%{transform:scale(1.06)}100%{transform:scale(1);opacity:1}}
 @keyframes anGlow{0%,100%{box-shadow:0 0 0 0 rgba(240,238,230,0)}50%{box-shadow:0 0 22px 0 rgba(240,238,230,.28)}}
+@keyframes findDust{0%{opacity:0;transform:translateY(3px)}30%{opacity:.85}100%{opacity:0;transform:translateY(-15px)}}
+.find-glow{box-shadow:0 0 20px 0 rgba(48,209,88,.18),0 0 4px 0 rgba(48,209,88,.28)}
+.find-dust{position:absolute;width:3px;height:3px;border-radius:3px;background:var(--green);opacity:0;pointer-events:none;z-index:6;animation:findDust 2.8s ease-out infinite}
+@media (prefers-reduced-motion:reduce){.find-dust{display:none}.find-glow{box-shadow:0 0 12px 0 rgba(48,209,88,.18)}}
 @keyframes anShimmer{0%{background-position:-220% 0}100%{background-position:220% 0}}
 @keyframes anBarGrow{from{transform:scaleX(0)}to{transform:scaleX(1)}}
 @keyframes anTick{0%{stroke-dashoffset:28}100%{stroke-dashoffset:0}}
@@ -652,7 +656,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='340daf';  // stamped by tools/build.py with the content hash
+const BUILD_ID='2f4c84';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -751,6 +755,10 @@ function recentCutKey(){return dayKey(new Date(Date.now()-182*864e5))}
 /* the (i) pattern (beta ask, 6 Sep — "overwhelming in terms of text"):
    numbers and headlines first; the explanatory paragraph waits behind
    a small greyed circle. One tap reveals, one tap hides. */
+function dustF(){
+  /* six green motes rising off a fresh find — deterministic placement,
+     looping; the glow itself stays perfectly still */
+  return Array.from({length:6},(_,i)=>'<i class="find-dust" style="left:'+(7+(i*16.4)%86).toFixed(0)+'%;'+(i%2?'top:-3px':'bottom:-3px')+';animation-delay:'+(i*0.46).toFixed(2)+'s"></i>').join('')}
 function iBtn(k){return '<button data-a="iTog" data-v="'+esc(k)+'" aria-label="More info" style="width:17px;height:17px;border-radius:17px;border:1px solid var(--line);background:none;color:var(--faint);font-size:10px;font-style:italic;font-family:Georgia,serif;line-height:1;display:inline-flex;align-items:center;justify-content:center;vertical-align:-2px;margin-left:7px;padding:0;flex:none">i</button>'}
 function iOn(k){return !!S.openSec['i:'+k]}
 function iBody(k,txt){return iOn(k)?'<p style="color:var(--dim);font-size:11.5px;line-height:1.6;margin-top:7px">'+txt+'</p>':''}
@@ -12054,7 +12062,7 @@ function viewCollection(){
       return fb-fa||String(b.found||'').localeCompare(String(a.found||''))});
     const open=!!S.openSec['grp:'+g[0]];
     const frN=freshBy[g[0]]||0;
-    if(frN)h+='<div style="position:relative" class="an-glow">'+
+    if(frN)h+='<div style="position:relative;border-radius:20px" class="find-glow">'+dustF()+
       '<span style="position:absolute;top:-6px;right:-4px;min-width:19px;height:19px;border-radius:19px;background:#FF453A;color:#fff;font-size:10.5px;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 5px;z-index:6;box-shadow:0 2px 8px rgba(0,0,0,.4)">'+frN+'</span>';
     h+='<div class="card mt" id="grp-'+g[0]+'" style="padding:0;overflow:hidden'+(open?';border-color:var(--text);border-width:2px':(frN?';border-color:var(--greensoft)':''))+(mine.length?'':';opacity:.55')+'">'+
       '<button data-a="secToggle" data-v="grp:'+g[0]+'" style="width:100%;text-align:left;padding:13px 15px;display:flex;align-items:center;gap:11px">'+
@@ -14151,7 +14159,7 @@ function viewFindings(){
   /* the glow shadow lives on this wrapper \u2014 it must share the card's
      20px radius or the pulse traces a sharp-cornered RECTANGLE around
      the rounded pill (owner-caught, 6 Sep: "dark rectangle artefact") */
-  const wrapF=(html,fresh,n)=>html?'<div style="position:relative;border-radius:20px" class="'+(fresh?'an-glow':'')+'">'+(fresh?dot9(n||'\u25cf'):'')+html+'</div>':'';
+  const wrapF=(html,fresh,n)=>html?'<div style="position:relative;border-radius:20px" class="'+(fresh?'find-glow':'')+'">'+(fresh?dot9(n||'\u25cf')+dustF():'')+html+'</div>':'';
   let deepFresh=false;try{deepFresh=!!deepReadyInfo()}catch(e){}
   let patN=0,discN=0;try{patN=unseenPatterns()}catch(e){}try{discN=unseenDiscoveries()}catch(e){}
   /* the tier ladder is the page's geography (owner call, 5 Sep):
