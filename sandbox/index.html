@@ -652,7 +652,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='9245b4';  // stamped by tools/build.py with the content hash
+const BUILD_ID='7772cb';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -1214,6 +1214,21 @@ async function claudeFetch(body){
       'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
     body:JSON.stringify(body)})}
 
+function coachMemory(){
+  /* memory made visible (dossier idea 4 — Bickmore's relational-agent
+     trials: an agent that references past conversations builds a
+     measurably stronger bond). Deterministic extraction of the user's
+     own recent words; the model is told to reference naturally by
+     date, never to recite. */
+  try{
+    const L=[];
+    (S.chats||[]).filter(c=>c.id!==(S.coach&&S.coach.chatId)).slice(0,8).forEach(c=>{
+      const d=String(c.at||'').slice(0,10);
+      (c.thread||[]).filter(m=>m.r==='user').slice(-2).forEach(m=>{
+        const t=String(m.t||'').trim();
+        if(t.length>=8&&t.length<=160)L.push('- ('+d+') \u201c'+t.replace(/"/g,'\u2019')+'\u201d')})});
+    if(!L.length)return '';
+    return '\nWHAT YOU REMEMBER (the user\u2019s own words from past conversations. Reference one naturally and BY DATE when genuinely relevant \u2014 \u201con the 2nd you said\u2026\u201d \u2014 it shows you know them. Never recite this list, never force a reference):\n'+L.slice(0,6).join('\n')}catch(e){return ''}}
 function coachContext(){
   const s=S.sess,p=activeProg(),out=[];
   try{if(S.hint&&S.hint.msg)out.push('ALLENA\u2019S OWN SET COMMENT (already shown to the user this set \u2014 build on it or gently supersede it, never contradict it without saying why): \u201c'+S.hint.msg+'\u201d')}catch(e){}
@@ -1345,8 +1360,8 @@ function coachContext(){
           ' If logged RPEs and the signature disagree, note it gently as calibration info, never as an accusation.')}
     }catch(e){}
     fb.push('=== RULES: the user\u2019s questions are about THIS session unless they clearly say otherwise. Below is BACKGROUND — if you use any of it, name the date or session it comes from. ===');
-    return fb.join('\n')+'\n'+out.join('\n')}
-  return out.join('\n')}
+    return fb.join('\n')+'\n'+out.join('\n')+coachMemory()}
+  return out.join('\n')+coachMemory()}
 async function askClaude(q){
   /* one Allena, one voice (owner call, 3 Sep): once the user talks to
      the chat mid-session, the deterministic set comments stand down —
@@ -8025,15 +8040,16 @@ function notifPlan(){
     if(!trained){
       const rec=(typeof recommendToday==='function')?recommendToday():null;
       if(rec&&rec.top&&!rec.empty){
-        const at430=new Date(today()+'T16:30:00').getTime();
+        const at430=new Date(today()+'T'+(P.cueT||'16:30')+':00').getTime();
         /* verdict-aware (beta-caught by Dafydd: pushed a workout on his
            day off): when the week has room and the muscles say wait,
            the 16:30 call prescribes RECOVERY — the honest opposite of
            a guilt ping */
         const v9=(function(){try{return todayVerdict()}catch(e){return null}})();
+        const cue9=P.cueL?P.cueL+' \u2014 ':'';
         const body9=(v9&&v9.wait)
-          ?'Today\u2019s call: recovery. '+String(v9.d||'').slice(0,140)
-          :'Today\u2019s call: '+String(rec.top.name)+' \u2014 '+String((v9&&v9.d)||rec.why||'').slice(0,120)+'.';
+          ?cue9+'Today\u2019s call: recovery. '+String(v9.d||'').slice(0,140)
+          :cue9+'Today\u2019s call: '+String(rec.top.name)+' \u2014 '+String((v9&&v9.d)||rec.why||'').slice(0,120)+'.';
         if(at430>Date.now()+60000)
           items.push({id:'dc'+today(),ts:Math.round(at430/1000),title:'Allena',
             body:body9})}}}catch(e){}}
@@ -12431,6 +12447,7 @@ function comebackCard(){
     if(cb.state==='offered')return '<div class="card mt" style="padding:16px;border-radius:20px;border-color:color-mix(in srgb, var(--text) 45%, transparent)">'+
       '<p class="eyebrow" style="color:var(--amber)">The comeback</p>'+
       '<p class="disp gradhead" style="font-size:20px;margin-top:6px">'+cb.gapDays+' days away. Welcome back.</p>'+
+      (new Date().getDate()<=3?'<p class="mono" style="color:var(--amber);font-size:10px;letter-spacing:.08em;margin-top:4px">NEW MONTH \u00b7 CLEAN SLATE</p>':'')+
       '<p style="color:var(--dim);font-size:13px;line-height:1.6;margin-top:6px">No streak died — that is not how this app works. The way back in: three sessions, eased on purpose. Finishing all three banks a rare find.</p>'+
       '<p class="eyebrow" style="margin-top:12px">What kept you away? (it changes the easing)</p>'+
       '<div style="display:flex;flex-wrap:wrap;gap:7px;margin-top:8px">'+
@@ -15995,7 +16012,14 @@ function notifPageHtml(){
       '<span style="flex:1;min-width:0"><span style="font-size:13px;font-weight:600;display:block">'+k[1]+'</span>'+
       '<span style="color:var(--faint);font-size:11px">'+k[2]+'</span></span>'+
       '<button data-a="notifKind" data-v="'+k[0]+'" class="pill'+(NP[k[0]]?' on':'')+'" style="width:56px;padding:8px 0;font-size:11px">'+(NP[k[0]]?'On':'Off')+'</button></div>').join(''):'')+
-    '<p style="color:var(--faint);font-size:11px;line-height:1.5;margin-top:10px">Every notification carries a real fact tied to a real date. There is no “we miss you” — by design, there never will be.</p></div>'+(typeof notifPreviewHtml==='function'?notifPreviewHtml():'')}
+    '<p style="color:var(--faint);font-size:11px;line-height:1.5;margin-top:10px">Every notification carries a real fact tied to a real date. There is no “we miss you” — by design, there never will be.</p></div>'+
+    '<div class="card mt" style="padding:13px 15px">'+
+    '<p style="font-size:13.5px;font-weight:600">When do you usually train?</p>'+
+    '<p style="color:var(--faint);font-size:11px;line-height:1.5;margin-top:3px">The day\u2019s call lands at your moment, not the clock\u2019s \u2014 a plan tied to a cue you already have sticks about twice as well.</p>'+
+    '<div class="row" style="gap:6px;margin-top:10px">'+
+    [['07:00','Morning'],['12:30','Lunch'],['17:30','After work'],['19:30','Evening']].map(c=>
+      '<button data-a="cueTime" data-v="'+c[0]+'|'+c[1]+'" class="pill'+(NP.cueT===c[0]?' on':'')+'" style="flex:1;font-size:11.5px;padding:9px 0">'+c[1]+'</button>').join('')+'</div></div>'+
+    (typeof notifPreviewHtml==='function'?notifPreviewHtml():'')}
 function youPageHtml(){
   /* who the model is calibrated to — age and sex shape the strength
      and running standards in Where you stand; the name is the welcome
@@ -16619,6 +16643,7 @@ function sheetHtml(){
       (st>1||pts?'<p class="mono" style="color:var(--faint);font-size:11px;margin-top:8px">'+
         (st>1?st+' days in a row':'')+(st>1&&pts?' \u00b7 ':'')+(pts?'+'+pts+' points today':'')+'</p>':'')+
       (st>1&&dayStreakInfo().quietThisWeek?'<p class="mono" style="color:var(--faint);font-size:10.5px;margin-top:4px">\u25e6 streak includes 1 quiet day this week \u2014 the one each week that can pass unlogged</p>':'')+
+      (st>1?'<p style="color:var(--faint);font-size:10.5px;line-height:1.5;margin-top:4px">A missed day never breaks a habit \u2014 the research is clear on that (Lally 2010, 96 people followed for 12 weeks). Same time, same place is what builds it.</p>':'')+
       '<div style="margin-top:14px;display:flex;flex-direction:column;gap:10px">'+
       pr.tasks.map(x=>'<div class="card" style="padding:13px 15px;display:flex;align-items:center;gap:11px'+(x.done?';border-color:var(--greensoft)':'')+'">'+
         '<span style="width:21px;height:21px;border-radius:7px;flex:none;display:inline-flex;align-items:center;justify-content:center;font-size:12px;'+
@@ -19669,6 +19694,10 @@ function runAction(a,v,t,e){
     case 'availEqApply':{try{const r=equipRework();
       S.confirm={t:'Rework the block?',m:r.summary,yes:'availEqGo',v:''};render()}catch(e){flash('Nothing to rework.')}break}
     case 'availEqGo':{try{equipReworkApply();S.confirm=null;render();flash('Block reworked around your equipment.')}catch(e){S.confirm=null;flash('Could not rework.')}break}
+    case 'cueTime':{const P9=notifPrefs();const pr9=String(v).split('|');
+      P9.cueT=pr9[0];P9.cueL=pr9[1]||'';lset(K_NOTIF,P9);
+      flash('Your call now lands at '+pr9[0]+' \u2014 '+(pr9[1]||'').toLowerCase()+'.');
+      try{notifSync()}catch(e9){}render();break}
     case 'notifOn':{const P=notifPrefs();P.on=!P.on;P.asked=1;notifSave();notifSync();render();
       if(P.on)flash('iOS will ask permission once — allow it and Allena can speak up.');break}
     case 'notifKind':{const P=notifPrefs();P[v]=!P[v];notifSave();notifSync();render();break}
