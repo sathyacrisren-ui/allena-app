@@ -652,7 +652,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='a1005b';  // stamped by tools/build.py with the content hash
+const BUILD_ID='340daf';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -11154,11 +11154,18 @@ function questGen(wk,preferK){
        t:target===p.days.length?'All '+target+' sessions this week':target+' sessions this week',
        d:'You have done '+bestN+' in a week before, so this is proven ground. Which days is up to you.',
        target:target,basis:{what:'most sessions in one week',proven:bestN,target:target}})}}
-  // 3. nudge past your biggest running week
-  if(S.runOn){const cut=recentCutKey();const byWk={};(S.runs||[]).forEach(r=>{if(r.date<cut||!isRunType(r.type))return;const k=questWeekKey(r.date);
+  // 3. nudge past your biggest RECENT running week (beta-caught via
+  //    Angus: the 182-day reach pulled an archived — possibly
+  //    double-imported — monster week and asked for 120 km. A weekly
+  //    quest baselines on CURRENT form: eight weeks back, and a lone
+  //    outlier week defers to the second-best, because a week 1.5×
+  //    anything around it is a race, a holiday, or a duplicate — not
+  //    proven weekly ground.)
+  if(S.runOn){const cut=dayKey(new Date(Date.now()-56*864e5));const byWk={};(S.runs||[]).forEach(r=>{if(r.date<cut||!isRunType(r.type))return;const k=questWeekKey(r.date);
      byWk[k]=(byWk[k]||0)+(r.km||0)});delete byWk[wk];
    const vals=Object.keys(byWk).map(k=>byWk[k]);
-   if(vals.length>=2){const bestKm=Math.max.apply(null,vals);
+   if(vals.length>=2){vals.sort((a,b)=>b-a);
+     const bestKm=Math.min(vals[0],Math.round(vals[1]*1.5*10)/10);
      if(bestKm>=8){
        const target=Math.max(Math.floor(bestKm),Math.min(Math.round(bestKm*1.04),Math.floor(bestKm*1.05)));
        C.push({k:'runkm',t:'Run '+udNum(target)+' '+udUnit()+' this week',
