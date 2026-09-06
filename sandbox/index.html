@@ -652,7 +652,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='28b149';  // stamped by tools/build.py with the content hash
+const BUILD_ID='39d89c';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -7411,6 +7411,20 @@ function watchCorroborate(){
         const dayS=(S.history||[]).filter(x=>!x.run&&x.complete&&!x.watch&&String(x.date).slice(0,10)===w.date);
         const dayW=wg.filter(x=>!x.used&&x.date===w.date);
         if(dayS.length===1&&dayW.length===1)h=dayS[0]}
+      /* the import hole (beta-caught, Harry: 'it says I haven't done a
+         single weights session' while his watch logged every gym trip):
+         a strength workout that finds NO logged session to corroborate
+         within 3 days becomes a session of its own — 'Gym — from your
+         watch': real minutes, real heart rate, no sets, imported-never-
+         live. The record finally matches the life. */
+      if(!h&&w.date<dayKey(new Date(Date.now()-3*864e5))&&!w.mat){
+        const sid='wgs'+w.id;
+        if(!(S.history||[]).some(x=>String(x.id)===sid)){
+          S.history.push({id:sid,date:w.date+'T'+(w.time||'12:00'),complete:true,imported:true,watchOnly:true,
+            progId:'watch',dayTitle:'Gym \u2014 from your watch',dayName:'Gym \u2014 from your watch',
+            minutes:w.mins||30,hr:{avg:w.hr||0,n:w.hr?1:0},log:[],
+            note:{src:'Apple Watch'+(w.src?' \u00b7 '+w.src:'')}});
+          w.mat=1;dirty=true}}
       if(h){h.watch={mins:w.mins,hr:w.hr||0,src:w.src||''};w.used=1;dirty=true;
         /* say it out loud (owner call, 3 Sep): a witness that never
            testifies is wasted — the moment the watch corroborates a
@@ -10058,7 +10072,7 @@ function whisperGen(){
    mechanisms, investigate the backwards patterns, and design ONE
    two-week experiment the engine itself will verify. It may never
    invent a finding. Deterministic before AI, always. */
-const ANALYST_SYS='You are Allena\u2019s analyst pass \u2014 the premium lens over a training app\u2019s deterministic statistics engine. The CONTEXT lists every correlation the engine has PROVEN in this user\u2019s own data (plus faded links, forecast record, training summary). Rules, absolute: 1) Never state a finding that is not in the context \u2014 you synthesise and explain, the engine discovers. 2) Look for the STORY: which findings are one mechanism wearing three coats? Name the loop and its cheapest intervention point. 3) For any [BACKWARDS/CONFOUND] finding, propose the most likely confound and how the user could check it. 4) End with exactly one two-week experiment: a concrete, small protocol change, what daily data to keep logging, and which single number the engine should watch to verdict it. 5) Voice: plain, direct, a sharp coach who respects the reader \u2014 no hype, no hedging fog, cite the correlation numbers you lean on. Under 320 words, short paragraphs, no headers. 6) If \u2014 and only if \u2014 the experiment is a simple exercise addition, end with ONE final line exactly of the form PLAN|{"ex":"Bent-over row","anchor":"bench","sets":1,"reps":"5-8","pct":0.65} \u2014 ex = exercise to add, anchor = the lift whose program days receive it (lowercase substring), sets/reps per session, pct = load as a fraction of the anchor\u2019s working weight. Plain JSON, those keys only. If the experiment is not an exercise addition, end with PLAN|null. 7) CONTINUITY IS LAW: the context includes your PREVIOUS READ and any RUNNING EXPERIMENT. You are one analyst across sessions \u2014 never contradict a standing prescription without naming it and saying why it is superseded; if an experiment is running, today\u2019s read evaluates and continues it (or ends it with reasons), never ignores it; do not propose a new experiment while one is running.';
+const ANALYST_SYS='You are Allena\u2019s analyst pass \u2014 the premium lens over a training app\u2019s deterministic statistics engine. The CONTEXT lists every correlation the engine has PROVEN in this user\u2019s own data (plus faded links, forecast record, training summary). Rules, absolute: 1) Never state a finding that is not in the context \u2014 you synthesise and explain, the engine discovers. 2) Look for the STORY: which findings are one mechanism wearing three coats? Name the loop and its cheapest intervention point. 3) For any [BACKWARDS/CONFOUND] finding, propose the most likely confound and how the user could check it. 4) End with exactly one two-week experiment: a concrete, small protocol change, what daily data to keep logging, and which single number the engine should watch to verdict it. 5) Voice: plain, direct, a sharp coach who respects the reader \u2014 no hype, no hedging fog, cite the correlation numbers you lean on. Under 320 words, short paragraphs, no headers. 6) If \u2014 and only if \u2014 the experiment is a simple exercise addition, end with ONE final line exactly of the form PLAN|{"ex":"Bent-over row","anchor":"bench","sets":1,"reps":"5-8","pct":0.65} \u2014 ex = exercise to add, anchor = the lift whose program days receive it (lowercase substring), sets/reps per session, pct = load as a fraction of the anchor\u2019s working weight. Plain JSON, those keys only. If the experiment is not an exercise addition, end with PLAN|null. 7) CONTINUITY IS LAW: the context includes your PREVIOUS READ and any RUNNING EXPERIMENT. You are one analyst across sessions \u2014 never contradict a standing prescription without naming it and saying why it is superseded; if an experiment is running, today\u2019s read evaluates and continues it (or ends it with reasons), never ignores it; do not propose a new experiment while one is running. 8) DATA GAPS OUTRANK STORIES (beta-caught): if the window looks empty or a metric collapses between periods, the FIRST explanation is missing or unsynced data \u2014 say so as a possibility and stop; NEVER tell the user they did not show up or did not train, never infer intent, \u201cstrategy\u201d or motivation from the shape of the data, and never build a narrative on a gap. Walks are never runs \u2014 do not blend them.';
 function analystContext(){
   const L=[];
   try{const pr=S.prof||{};L.push('ATHLETE: '+(pr.sex||'?')+', age '+(pr.age||'?')+(pr.height?', '+pr.height+'cm':'')+'. Goal: '+(pr.goal||'general strength')+'.')}catch(e){}
@@ -10138,6 +10152,11 @@ function analystStore(){return lget('training-analyst-v1',null)}
 async function analystRun(){
   try{
     if(!aiReady()){flash('Sign in first \u2014 the analyst runs through the Allena cloud.');return}
+    /* the evidence floor (beta-caught, Harry: the analyst lectured a
+       new account about 'not showing up' when the truth was a sync
+       gap): below real history the analyst refuses, plainly. */
+    const sess9=(S.history||[]).filter(h=>h.complete&&!h.run).length;
+    if(sess9<8){flash('The analyst needs about '+(8-sess9)+' more logged sessions before it can say anything honest \u2014 the engine reads data, it never guesses.');return}
     if(!aiSpend('analyst'))return;
     S.analystBusy=true;render();
     try{hapticRun('deep')}catch(e){}
@@ -13281,7 +13300,8 @@ function muscleRowsHtml(p,i,forceOpen){
           '<div style="height:5px;width:'+donePct+'%;background:var(--blue)"></div>'+
           '<div style="height:5px;width:'+addPct+'%;background:repeating-linear-gradient(90deg,var(--blue) 0 3px,transparent 3px 6px);opacity:.85"></div></div>'+
           '<span class="mono" style="color:var(--blue);font-size:9.5px;font-weight:600;width:28px;text-align:right;flex:none">+'+r9.stim+'</span></div>'}).join('')+
-      '<p class="mono" style="color:var(--faint);font-size:8.5px;letter-spacing:.03em;margin-top:3px;line-height:1.5">GREEN = RECOVERED \u00b7 BLUE = THIS WEEK\u2019S WORK (DASHES = THIS SESSION ADDS) \u00b7 +N = GROWTH</p></div>'
+      '<p style="color:var(--faint);font-size:10.5px;margin-top:4px;line-height:1.5">Green: how recovered each muscle is. Blue: this week\u2019s work so far.'+iBtn('recbars')+'</p>'+
+      iBody('recbars','Each row is a muscle this session trains. The green bar fills as it recovers from its last work \u2014 full green means fresh. The blue bar is how much it has already worked this week, and the dashed part is what this session would add. The +number is the growth stimulus this session gives that muscle. Freshest muscles first is the whole logic.')+'</div>'
   }catch(e){return ''}}
 function dayReadiness(prog,di,wk){
   const load=dayMuscles(prog,di,wk);
@@ -14381,7 +14401,7 @@ function deepContext(){
   return L.join('\n')}
 const DEEP_SYS='You are the analysis engine of a training app. You receive condensed weekly training data. '+
 'Find 2-4 NON-OBVIOUS findings: relationships BETWEEN signals (readiness vs load vs performance vs pain vs timing, and LIFTING vs RUNNING — km near leg work, pace vs tonnage weeks), lags, thresholds, divergences. '+
-'FORBIDDEN: restating any single statistic, anything a simple rule could flag (totals, bests, ratios), motivation talk, advice. '+
+'FORBIDDEN: restating any single statistic, anything a simple rule could flag (totals, bests, ratios), motivation talk, advice, and INTENT STORIES \u2014 never infer strategy, motivation or a \u201cshift in approach\u201d from data shape; if a metric collapses or a window looks sparse, the first reading is missing or differently-logged data, and a finding must not be built on it. Walk entries are not runs \u2014 never blend them into running trends. '+
 'Every finding MUST cite at least two specific numbers from the data and name the relationship. If the data is too thin for real nuance, return fewer findings — never pad. '+
 'Reply with ONLY a JSON array, no fences: [{"t":"short title IN PLAIN WORDS a non-lifter understands","d":"2 sentences citing the numbers","plain":"2-3 sentences for a layperson: what happened, why it matters to their training, and what they might watch or try - no jargon, no numbers required","refs":[{"kind":"lift","ex":"Chin-up"}],"rar":"rare"}] . "plain" is REQUIRED - it is the translation of "d" for someone who has never read a training log. "refs" (0-3) names the charts that show this finding: kind one of "lift" (with "ex": the exact exercise name from the data), "tonnage", "runs", "bw". "rar" may be "epic" only when the pattern repeats 3+ times in the data.';
 function deepParse(txt){
@@ -15977,6 +15997,7 @@ function viewData(){
     setRow('logo','Allena chat',
       ((S.ai&&(S.ai.proxy||'').trim())?'Cloud link':(S.ai&&S.ai.key)?'Own key':signed?'Signed in':'Claude app'),
       'Allena — AI coach')]);
+  h+='<button data-a="tourOpen" class="btn mt" style="font-size:12.5px;color:var(--dim)">Show me around \u2014 the 60-second tour</button>';
   h+=setGroup('Your data',[
     setRow(I.save,'Export a backup',backupDue()?'due':'','Export'),
     setRow(I.back,'Restore from backup','','Restore'),
@@ -18045,7 +18066,26 @@ function render(){
        rest countdown in blue — no exercise, no set count. Tap resumes. */
     return '<button data-a="resume" id="sessBanner" style="border:1.5px solid '+(resting?'#1E9BFF':'var(--green)')+';padding:4px 13px">'+
       '<span class="mono" id="spTime" data-end="'+(resting?S.restEnd:'')+'" style="font-size:12px;font-weight:700;letter-spacing:.04em;color:'+(resting?'#1E9BFF':'var(--green)')+';flex:none">'+(resting?mmss(left):'LIVE')+'</span></button>'};
-  const extraHtml=sessPillHtml()+drawerHtml()+sheetHtml()+(S.toast?'<div class="toast"><div class="'+(S.toastGold?'gold':'')+'">'+esc(S.toast)+'</div></div>':'');
+  const tourHtml=()=>{
+    if(!S.tour)return '';
+    const STEPS=[
+      ['One answer, every day','The big card on Today is the verdict \u2014 what today should be, and why. Everything else on this page supports it. The four dots underneath are today\u2019s small check-ins; finishing them unlocks what Allena noticed in your data.'],
+      ['The menu is the map','The \u2630 button, top left, holds every page. It starts small on purpose \u2014 new pages appear as your data earns them, so nothing here is ever an empty room.'],
+      ['Program is the plan','Your sessions live under Program. Tap a day to start it \u2014 Allena adjusts future loads from how your sets actually felt, one honest rep at a time.'],
+      ['Findings is where Allena thinks','The network icon on Today opens four lenses \u2014 swipe deeper from simple records to full analysis. A red dot means something genuinely new; no dot, nothing new. It fills as you train.'],
+      ['Everything explains itself','Any \u24d8 opens the why behind a number in plain words. If something confuses you and has no \u24d8, that\u2019s a bug \u2014 tell us from Settings \u2192 Report a problem.']];
+    const st=STEPS[Math.min(S.tour.i,STEPS.length-1)];
+    return '<div style="position:fixed;inset:0;z-index:120;background:color-mix(in srgb, var(--bg) 82%, black);display:flex;align-items:center;justify-content:center;padding:26px">'+
+      '<div class="card" style="max-width:400px;width:100%;padding:24px 22px;border-radius:22px">'+
+      '<p class="mono" style="color:var(--amber);font-size:9.5px;letter-spacing:.12em">THE 60-SECOND TOUR \u00b7 '+(S.tour.i+1)+' OF '+STEPS.length+'</p>'+
+      '<p class="disp" style="font-size:22px;font-weight:650;line-height:1.15;margin-top:8px">'+st[0]+'</p>'+
+      '<p style="color:var(--dim);font-size:13.5px;line-height:1.65;margin-top:10px">'+st[1]+'</p>'+
+      '<p class="mono" style="color:var(--faint);font-size:11px;letter-spacing:.2em;margin-top:16px">'+STEPS.map((_,j)=>j===S.tour.i?'\u25cf':'\u25cb').join(' ')+'</p>'+
+      '<div class="row" style="gap:10px;margin-top:16px">'+
+      '<button data-a="tourSkip" class="btn" style="flex:1;color:var(--faint);font-size:12.5px">Skip</button>'+
+      '<button data-a="tourNext" class="big disp" style="flex:2;background:var(--amber);color:var(--bg);font-size:15px">'+(S.tour.i>=STEPS.length-1?'Let\u2019s go':'Next')+'</button>'+
+      '</div></div></div>'};
+  const extraHtml=tourHtml()+sessPillHtml()+drawerHtml()+sheetHtml()+(S.toast?'<div class="toast"><div class="'+(S.toastGold?'gold':'')+'">'+esc(S.toast)+'</div></div>':'');
   const keyA=S.view+'|'+(S.sess&&S.view==='session'?S.sess.phase+':'+S.sess.idx:'');
   const sheetKey=S.sheet?S.sheet.t:'';
   const viewChanged=keyA!==lastAnimKey,sheetChanged=sheetKey!==lastSheetKey;
@@ -18114,6 +18154,9 @@ function render(){
     if(!big){try{const vEl=document.querySelector('#app .view.stg');if(vEl&&vEl.classList&&vEl.classList.remove)vEl.classList.remove('stg')}catch(e){}}
     if(key){const el=document.querySelector('[data-in="'+key+'"]');
       if(el){el.focus();try{if(pos!=null)el.setSelectionRange(pos,pos)}catch(e){}}}
+    try{if(!S.tour&&!S._tourChecked&&S.view==='today'&&S.boot==null&&!S.sheet&&!S.sess){
+      S._tourChecked=1;
+      if(!lget('training-tour-v1',null)){S.tour={i:0};setTimeout(function(){try{render()}catch(e9){}},60)}}}catch(e){}
     try{const lw=document.getElementById('lenswrap');
       if(lw&&S.lensIdx>0&&!S.scrollTo)lw.scrollLeft=S.lensIdx*(lw.clientWidth+14);
       /* each lens page keeps its own height; the pager tracks the one
@@ -20163,6 +20206,11 @@ function runAction(a,v,t,e){
       else histAliasApply(S.histImp&&S.histImp.weeks,ha.map,ha.r.canon);
       const nx=ha.next;S.halias=null;
       if(typeof nx==='function')nx();else{S.sheet=null;render()}break}
+    case 'tourNext':{if(!S.tour)break;S.tour.i++;
+      if(S.tour.i>=5){S.tour=null;lset('training-tour-v1',{seen:today()});flash('Replay it any time \u2014 Settings \u2192 Show me around.')}
+      render();break}
+    case 'tourSkip':S.tour=null;lset('training-tour-v1',{seen:today()});render();break;
+    case 'tourOpen':S.tour={i:0};S.sheet=null;S.view='today';render();break;
     case 'ledgerOpen':S.sheet={t:'ledger'};render();break;
     case 'weekClockOpen':S.sheet={t:'wkclock'};render();break;
     case 'clkSetDay':{const p=activeProgSafe();if(!p)break;
