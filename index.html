@@ -634,7 +634,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='ee3d85';  // stamped by tools/build.py with the content hash
+const BUILD_ID='00b6b4';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -13936,6 +13936,7 @@ function viewFindings(){
       ladder(i)+
       '<p style="color:var(--dim);font-size:12.5px;line-height:1.55;margin-top:8px">'+x.one+'</p>'+
       wrapF(x.h,x.f,x.n)+
+      lensWord(x.k)+
       (!iOn('lens'+i)?'':'<div class="card mt" style="padding:13px 15px">'+
       [['READS',x.reads],['SPEAKS',x.speaks],['MAKES',x.makes]].map((r,j)=>
         '<div style="display:flex;gap:10px;align-items:baseline'+(j?';margin-top:9px;padding-top:9px;border-top:1px solid var(--line)':'')+'">'+
@@ -13945,6 +13946,61 @@ function viewFindings(){
     '</div>'+
     nearRings()+
     '</div>'}
+function lensWord(k){
+ /* Each lens page shows the last thing it actually PRODUCED, plus its
+    track record (owner pick, 6 Sep: fill the room with living content,
+    never filler). An empty lens adds nothing extra. */
+ try{
+  const wrap=(t,body,rec)=>'<div class="card mt" style="padding:12px 15px">'+
+    '<p class="mono" style="color:var(--faint);font-size:8.5px;letter-spacing:.08em">'+t+'</p>'+body+
+    (rec?'<p class="mono" style="color:var(--faint);font-size:9px;letter-spacing:.05em;margin-top:10px;padding-top:9px;border-top:1px solid var(--line)">'+rec+'</p>':'')+'</div>';
+  if(k==='disc'){
+    const B=discBank();
+    const ks=Object.keys(B).filter(id=>B[id].tag!=='insight'&&B[id].tag!=='signal');
+    if(!ks.length)return '';
+    ks.sort((a,b)=>String(B[b].found||'').localeCompare(String(B[a].found||'')));
+    const rows=ks.slice(0,3).map(id=>{const e2=B[id];
+      return '<div style="display:flex;gap:9px;align-items:baseline;margin-top:8px">'+
+      '<span style="width:7px;height:7px;border-radius:7px;flex:none;background:'+rarityOf(e2.rar)[1]+';transform:translateY(-1px)"></span>'+
+      '<span style="flex:1;min-width:0;font-size:12.5px;line-height:1.45">'+esc(e2.t)+'</span>'+
+      '<span class="mono" style="color:var(--faint);font-size:9px;flex:none">'+esc(String(e2.found||'').slice(5))+'</span></div>'}).join('');
+    const nR=ks.filter(id=>B[id].rar==='rare').length,nE=ks.filter(id=>B[id].rar==='epic').length;
+    const first=String(B[ks[ks.length-1]].found||'');
+    return wrap('THE LATEST FINDS',rows,
+      ks.length+' FOUND'+(nE?' · '+nE+' EPIC':'')+(nR?' · '+nR+' RARE':'')+(first?' · SINCE '+esc(first):''))}
+  if(k==='pat'){
+    const ps=allPatterns();
+    if(!ps.length)return '';
+    const p=ps[0],act=patAction(p)||'';
+    return wrap('THE TOP PATTERN RIGHT NOW',
+      '<p style="font-size:13px;font-weight:600;line-height:1.4;margin-top:7px">'+esc(p.t)+'</p>'+
+      (act?'<p style="color:var(--dim);font-size:12px;line-height:1.5;margin-top:5px">'+esc(act)+'</p>':''),
+      ps.length+' LIVE · EVERY ONE CARRIES A WHAT-TO-DO LINE')}
+  if(k==='deep'){
+    const st=deepStore();
+    if(!st.last||!(st.items||[]).length)return '';
+    const it=st.items[0];
+    const B=discBank(),ins=Object.keys(B).filter(id=>B[id].tag==='insight');
+    const readDays={};ins.forEach(id=>{if(B[id].found)readDays[B[id].found]=1});
+    const nReads=Math.max(st.n||0,Object.keys(readDays).length);
+    return wrap('FROM THE LAST READ · '+esc(st.last),
+      '<p style="font-size:13px;font-weight:600;line-height:1.4;margin-top:7px">'+esc(it.t||'')+'</p>'+
+      (it.d?'<p style="color:var(--dim);font-size:12px;line-height:1.5;margin-top:5px">'+esc(String(it.d).slice(0,180))+'</p>':''),
+      (nReads?nReads+' READ'+(nReads===1?'':'S')+' DELIVERED':'')+(ins.length?' · '+ins.length+' INSIGHTS KEPT FOR GOOD':''))}
+  if(k==='an'){
+    const a=analystStore();
+    const P=predStore();let n=0,on=0;
+    Object.keys(P.days||{}).forEach(d9=>{const o=P.days[d9]&&P.days[d9].outcome;
+      if(o){n++;if(o==='called'||o==='beat')on++}});
+    const rec=n>=3?'FORECASTS · '+n+' SETTLED · '+on+' ON OR ABOVE THE CALL':'';
+    if(!a||!a.t){return rec?wrap('THE FORECAST RECORD','<p style="color:var(--dim);font-size:12px;line-height:1.5;margin-top:7px">Every morning call is scored against what actually happened — the ledger is public to you.</p>',rec):''}
+    let head=String(a.t).split(/\n/).filter(x=>x.trim())[0]||'';
+    if(head.length>170)head=head.slice(0,167)+'…';
+    return wrap('FROM THE LAST PASS · '+esc(a.day||''),
+      '<p style="font-size:12.5px;line-height:1.55;margin-top:7px;color:var(--dim)">'+esc(head)+'</p>'+
+      (a.exp&&a.exp.applied?'<p class="mono" style="color:var(--amber);font-size:9px;letter-spacing:.06em;margin-top:8px">⚗ EXPERIMENT RUNNING · SINCE '+esc(a.exp.applied)+'</p>':''),
+      rec)}
+  return ''}catch(e){return ''}}
 function nearRings(){
   /* the honest version of anticipation: analyses genuinely close to
      having enough data, drawn as progress rings. Real thresholds from
@@ -14219,7 +14275,8 @@ async function deepRun(){
       if(!bank[id])bank[id]={t:x.t,d:x.d+' — the model’s reading of your numbers.',
         rar:x.rar,tag:'insight',found:today()}});
     bankSave();
-    lset(K_DEEP,{last:today(),items:items});
+    {const st0=deepStore();
+     lset(K_DEEP,{last:today(),items:items,watches:st0.watches||[],n:(st0.n||0)+1})}
     const doneAt=Date.now(),minRun=6800;
     const linger=S.deepAnim?Math.max(0,minRun-(doneAt-S.deepAnim.t0)):0;
     setTimeout(function(){S.deepAnim=null;S.deepBusy=false;try{hapticRun('deep')}catch(e8){};vib([25,45,25]);render()},linger);
