@@ -652,7 +652,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='7facc5';  // stamped by tools/build.py with the content hash
+const BUILD_ID='a1005b';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -4998,6 +4998,21 @@ function rehabBankMoments(){
       'Two weeks without missing. Allena can now read symptoms against training.');
     if(st2.n>=30)put('rehabstreak:30','epic','Thirty days of check-ins',
       'A month of showing up for a knee. Very few people manage this.');
+    /* the head comes back too (owner-shared therapist reel, 7 Sep: the
+       psychological arc of injury stays silent everywhere — not here).
+       Confidence is a logged axis with real crossings; they bank like
+       any gate. Fear of reinjury predicts return to sport on its own. */
+    try{
+      const cs=(S.acl.checks||[]).filter(c=>c.conf!=null)
+        .map(c=>({d:c.date,v:+c.conf})).sort((a,b)=>a.d.localeCompare(b.d));
+      const wk7=cs.slice(-7);
+      if(wk7.length>=5){
+        const avg=wk7.reduce((a,b)=>a+b.v,0)/wk7.length;
+        const everLow=cs.some(c=>c.v<=4);
+        if(avg>=7)put('conf:7','rare','Trust in the knee is back above 7',
+          'A week of check-ins averaging '+(Math.round(avg*10)/10)+' out of 10'+(everLow?' — up from days it sat at 4 or under':'')+'. Fear of reinjury predicts return to sport independently of strength; this number coming back is a milestone, not a footnote.');
+        if(avg>=9)put('conf:9','epic','The knee is yours again',
+          'Confidence averaging '+(Math.round(avg*10)/10)+' out of 10 across a week of honest answers. The head comes back too — and yours has.')}}catch(e9){}
     if(dirty){bankSave();try{haptic('success')}catch(e){}}}catch(e){}}
 
 /* ── the hero (Sep 2026 rebuild) ─────────────────────────────
