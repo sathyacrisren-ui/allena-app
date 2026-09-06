@@ -469,12 +469,23 @@ const reps=(r,n,perSide)=>Array.from({length:n},()=>({reps:r,perSide:!!perSide})
 function setsForWeek(ex,wk){const s=ex.sets;if(Array.isArray(s))return s;
   if(s&&typeof s==='object')return s[String(wk)]||s.default||null;return null}
 function adjOf(prog,name){return (prog&&prog.adj&&prog.adj[name])||0}
+function heldBest(ex){
+ /* the longest hold actually LOGGED for this exercise. Prescribed hold
+    times are a floor, not a ceiling — the first real sessions find the
+    true number, not the two-minute physio conversation (owner law,
+    6 Sep). Never shrinks below the prescription; capped at 20 min so
+    a typo can never become the default. */
+ try{let b=0;const g=gBase(ex);
+  (S.history||[]).forEach(h=>(h.log||[]).forEach(l=>{
+    if(l.secs>0&&l.secs<1200&&l.secs>b&&gBase(l.ex)===g)b=l.secs}));
+  return b}catch(e){return 0}}
 function buildSets(prog,di,wk){const d=prog.days[di];if(!d)return[];const out=[];let n=0;
   d.exercises.forEach(ex=>{const l=setsForWeek(ex,wk);if(!l||!l.length)return;n++;
     const a=adjOf(prog,ex.name);
+    const hb=l.some(x=>x&&x.secs)?heldBest(ex.name):0;
     l.forEach((st,i)=>out.push({ex:ex.name,bar:!!ex.bar,rest:ex.rest??60,cue:ex.cue||null,
       exNo:n,setNo:i+1,of:l.length,targetW:st.w!=null?Math.max(0,st.w+a):null,targetReps:st.reps??null,
-      targetRpe:st.rpe??null,secs:st.secs??null,perSide:!!st.perSide,warmup:ex.warmup,adj:a}))});return out}
+      targetRpe:st.rpe??null,secs:st.secs!=null?Math.max(st.secs,hb):null,perSide:!!st.perSide,warmup:ex.warmup,adj:a}))});return out}
 function validateProgram(p){const e=[];if(!p||typeof p!=='object')return["That isn't a program object."];
   if(!p.block)e.push('Missing a "block" name.');
   if(!(typeof p.weeks==='number'&&p.weeks>=1))e.push('"weeks" must be a number of at least 1.');
@@ -634,7 +645,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='5738d8';  // stamped by tools/build.py with the content hash
+const BUILD_ID='0ebd2a';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -904,7 +915,7 @@ function applyAdj(exName,delta,why,silent){
     S.sess.sets.forEach(st=>{if(st.ex===exName&&st.targetW!=null){st.targetW=Math.max(0,Math.round((st.targetW+delta)*4)/4);st.adj=(st.adj||0)+delta}});
     persistActive()}
   S.lastAdj={ex:exName,delta:delta};
-  if(!silent){vib(14);flash((delta>0?'+':'')+uwNum(delta)+' '+uwUnit()+' on '+exName.replace(/ — .*/,'')+(why?' — '+why:'')+'. Tap Undo in the header.')}
+  if(!silent){vib(14);flash((delta>0?'+':'')+uwNum(delta)+' '+uwUnit()+' on '+exName.replace(/ — .*/,'')+(why?' — '+why:'')+'. Undo is on the set screen.')}
   return true}
 function undoAdj(){if(!S.lastAdj)return;const a=S.lastAdj;S.lastAdj=null;applyAdj(a.ex,-a.delta,'reverted',true);flash('Reverted.');render()}
 
@@ -1011,6 +1022,10 @@ function regulate(rows,c,opts){
 
 function autoProgress(e,c){
   if(!S.sess||c.secs!=null||c.setNo!==c.of||c.targetW==null)return null;
+  /* rehab work is a physio's prescription, not Allena's to nudge —
+     barbell-increment logic on band work produced the "+2.5" that
+     baffled a rehab user (owner ruling, 6 Sep) */
+  try{if(isRehabSession())return null}catch(e9){}
   const rows=S.sess.log.filter(l=>l.ex===c.ex&&l.w);
   if(rows.length<c.of)return null;
   const prog=S.lib.programs.find(p=>p.id===S.sess.progId);
@@ -1662,13 +1677,16 @@ A.start=di=>{
     dp0:(function(){try{const d0=dataPoints();return{total:d0.total,lv:dpLevel(d0.total).lv}}catch(e){return null}})()};
   S.note={sleep:'',fatigue:'',knee:''};S.view='session';persistActive();wakeOn();render()};
 A.resume=()=>{S.view='session';wakeOn();render()};
-A.begin=()=>{audioInit();S.holdWait=false;const c=S.sess.sets[S.sess.idx];S.setStart=Date.now();
+A.begin=()=>{audioInit();S.holdWait=false;S.holdMet=null;const c=S.sess.sets[S.sess.idx];S.setStart=Date.now();
   if(c.secs){S.holdEnd=Date.now()+c.secs*1000;S.holdSide=1;S.sess.phase='hold'}
   else S.sess.phase='working';
   persistActive();render()};
 A.finish=()=>{S.holdWait=false;const c=S.sess.sets[S.sess.idx],p=lastFor(c.ex,c.setNo);
-  if(c.secs){S.holdEnd=null;
-    S.draft={w:'',r:'',secs:c.secs,rpe:null};S.sess.phase='logging'}
+  if(c.secs){
+    /* held past the target: log what actually happened, to the second */
+    const over=(!c.perSide&&S.holdEnd)?Math.max(0,Math.round((Date.now()-S.holdEnd)/1000)):0;
+    S.holdEnd=null;S.holdMet=null;
+    S.draft={w:'',r:'',secs:c.secs+over,rpe:null};S.sess.phase='logging'}
   else{
     /* prefill with the best honest guess so most sets are: check the
        numbers, tap RPE, Log (beta feedback, Sep 2026). Order: this
@@ -1686,7 +1704,12 @@ A.commit=(confirmed)=>{const s=S.sess,c=s.sets[s.idx],timed=!!c.secs;
   if(timed?!(+S.draft.secs>0):(S.draft.rpe==null||!S.draft.r))return;
   try{haptic('light')}catch(e){}
   const e={ex:c.ex,setNo:c.setNo,targetW:c.targetW,targetReps:c.targetReps,targetRpe:c.targetRpe};
-  if(timed){e.secs=+S.draft.secs;e.perSide=c.perSide;e.w=0;e.r=0;e.rpe=S.draft.rpe}
+  if(timed){e.secs=+S.draft.secs;e.perSide=c.perSide;e.w=0;e.r=0;e.rpe=S.draft.rpe;
+    /* a longer hold takes precedence RIGHT NOW: the remaining sets of
+       this exercise rise to match, and heldBest carries it into every
+       future session (owner law, 6 Sep) */
+    if(e.secs>(c.secs||0)&&e.secs<1200)s.sets.forEach(st=>{
+      if(st.secs&&st.secs<e.secs&&gBase(st.ex)===gBase(c.ex))st.secs=e.secs})}
   else{e.w=uwIn(+S.draft.w||0);e.r=+S.draft.r||0;e.rpe=S.draft.rpe}
   if(!confirmed&&!timed){const sn=entrySanity(e,c);
     if(sn){S.sanity=sn;S.sheet={t:'sanity'};render();return}}
@@ -1698,7 +1721,7 @@ A.commit=(confirmed)=>{const s=S.sess,c=s.sets[s.idx],timed=!!c.secs;
   if(s.idx>=s.sets.length-1){s.phase='done';S.restEnd=null;audioCancel();
     try{S.sessReveal=sessionReveal()}catch(e){S.sessReveal=null}}
   else{const r=c.rest||0;
-    if(r>5){audioCancel();S.restBeep=audioIn(r);S.restEnd=Date.now()+r*1000;s.phase='resting'}
+    if(r>5){audioCancel();S.restBeep=audioIn(r);S.restEnd=Date.now()+r*1000;S.restTotal=r;s.phase='resting'}
     else{s.idx++;s.phase='ready'}}
   const gHit=checkGoals(e);
   const auto=autoProgress(e,c);
@@ -1746,7 +1769,7 @@ A.skipSet=()=>A.adv(S.sess.idx+1);
 A.skipEx=()=>{S.sess.skipped=(S.sess.skipped||[]);if(S.sess.skipped.indexOf(S.sess.sets[S.sess.idx].exNo)<0)S.sess.skipped.push(S.sess.sets[S.sess.idx].exNo);const s=S.sess,no=s.sets[s.idx].exNo;let i=s.idx;
   while(i<s.sets.length&&s.sets[i].exNo===no)i++;A.adv(i)};
 A.skipRest=()=>{audioCancel();S.restEnd=null;S.sess.idx++;S.sess.phase='ready';persistActive();render()};
-A.addRest=()=>{S.restEnd=(S.restEnd||Date.now())+30000;audioCancel();S.restBeep=audioIn((S.restEnd-Date.now())/1000);render()};
+A.addRest=()=>{S.restEnd=(S.restEnd||Date.now())+30000;S.restTotal=(S.restTotal||((S.sess&&S.sess.sets[S.sess.idx])||{}).rest||30)+30;audioCancel();S.restBeep=audioIn((S.restEnd-Date.now())/1000);render()};
 A.saveExit=complete=>{const s=S.sess;if(!s)return;
   if(!s.log.length){ldel(K_A);S.sess=null;S.view='today';wakeOff();return flash('Nothing logged, so nothing saved.')}
   const rec=record(complete);
@@ -14737,7 +14760,9 @@ function viewSession(){
    '<div style="min-width:0;flex:1"><p class="eyebrow" style="color:'+acc+'">'+esc(s.block)+' · '+(prog.weeks>1?'Week '+s.week:'Day '+(s.dayIdx+1))+'</p>'+
    '<p class="disp" style="font-size:16px;font-weight:600;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(s.dayName)+'</p></div>'+
    '<div style="display:flex;gap:8px;flex:none;align-items:center">'+
-   (S.lastAdj?'<button data-a="undoAdj" style="padding:9px 10px;border-radius:11px;background:var(--raised);border:1px solid var(--amber);color:var(--amber);font-size:12px;white-space:nowrap">Undo '+(S.lastAdj.delta>0?'+':'')+S.lastAdj.delta+'</button>':'')+
+   /* the bare "Undo +2.5" header pill confused a rehab user with zero
+      context (owner ruling, 6 Sep: gone) — the undo now lives in a
+      plain sentence card in the body that names the exercise */
    '<button data-a="exNoteOpen" style="width:40px;height:40px;border-radius:13px;background:var(--raised);border:1px solid '+(((s.exNotes||{})[gBase(s.sets[Math.min(s.idx,s.sets.length-1)].ex)])?'var(--green)':'var(--line)')+';color:var(--dim);display:flex;align-items:center;justify-content:center;padding:0">'+
    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" style="width:19px;height:19px"><path d="M7 3h7l4 4v14H7z"/><path d="M14 3v4h4"/><path d="M10 12h5M10 16h5"/></svg></button>'+
    '<button data-a="coachOpen" style="width:40px;height:40px;border-radius:13px;background:var(--raised);border:1px solid var(--amber);display:flex;align-items:center;justify-content:center;padding:0"><img class="mk" src="'+MARK+'" alt="Allena" style="width:25px;height:25px;object-fit:contain"></button>'+
@@ -14745,7 +14770,7 @@ function viewSession(){
    '<div style="height:3px;background:var(--line)"><div style="height:3px;width:'+pct+'%;background:'+acc+';transition:width .3s"></div></div></div>';
 
   if(s.phase==='resting'){
-    const total=s.sets[s.idx].rest,left=Math.ceil((S.restEnd-Date.now())/1000),nx=s.sets[s.idx+1];
+    const total=S.restTotal||s.sets[s.idx].rest,left=Math.ceil((S.restEnd-Date.now())/1000),nx=s.sets[s.idx+1];
     let rb='<div style="display:flex;flex-direction:column;align-items:center">'+
      '<p class="eyebrow" id="restLbl">'+(left<=10?'Get ready':'Rest')+'</p>'+ringHtml('rest',left,total,left<=10?'var(--amber)':'var(--blue)');
     rb+=hintHtml('mt2');
@@ -14798,12 +14823,14 @@ function viewSession(){
        '<button data-a="finish" style="width:100%;padding:14px;color:var(--faint);font-size:12px;margin-top:8px">Log without the second side</button></div>';
       return h}
     const left=Math.ceil((S.holdEnd-Date.now())/1000);
+    const over=!!S.holdMet&&!cur.perSide;   // past the target, still holding
     h+='<div class="view pad" style="padding-top:14px;display:flex;flex-direction:column;align-items:center">'+
-     '<p class="eyebrow" style="color:'+acc+'" id="holdLbl">'+(cur.perSide?'Hold — side '+S.holdSide+' of 2':'Hold')+'</p>'+
+     '<p class="eyebrow" style="color:'+(over?'var(--green)':acc)+'" id="holdLbl">'+(over?'Target met — keep going if you can':(cur.perSide?'Hold — side '+S.holdSide+' of 2':'Hold'))+'</p>'+
      '<p class="disp" style="font-size:19px;font-weight:600;margin-top:6px;text-align:center">'+esc(cur.ex)+'</p>'+
-     ringHtml('hold',left,cur.secs,acc)+
-     (cur.cue?'<div class="cue mt2" style="border-left-color:'+acc+'">'+esc(cur.cue)+'</div>':'')+
-     '<button data-a="finish" class="btn disp mt3">End hold early</button></div>';
+     ringHtml('hold',Math.max(0,left),cur.secs,over?'var(--green)':acc)+
+     (over?'<p style="color:var(--dim);font-size:12.5px;line-height:1.5;margin-top:14px;text-align:center">Every extra second counts — a longer hold becomes your new default.</p>':'')+
+     (cur.cue&&!over?'<div class="cue mt2" style="border-left-color:'+acc+'">'+esc(cur.cue)+'</div>':'')+
+     '<button data-a="finish" class="'+(over?'big disp mt3':'btn disp mt3')+'"'+(over?' style="background:var(--green);color:var(--bg)"':'')+'>'+(over?'Done — log the hold':'End hold early')+'</button></div>';
     return h}
 
   const last=lastFor(cur.ex,cur.setNo);
@@ -14856,6 +14883,11 @@ function viewSession(){
     body+='</div>';
     foot+='<button data-a="commit" class="big disp" style="background:'+(ready?'var(--green)':'var(--raised)')+';color:'+(ready?'var(--bg)':'var(--faint)')+';font-size:17px">'+
      (s.idx>=s.sets.length-1?'Log and finish':(cur.rest>5?'Log and rest '+mmss(cur.rest):'Log — next'))+'</button>'}
+  /* a load change is a sentence, not a mystery pill: name the exercise,
+     the amount, and hand back the undo (replaces the header "Undo +2.5") */
+  if(S.lastAdj&&(s.phase==='ready'||s.phase==='resting'))body+='<div class="card mt" style="padding:12px 15px;display:flex;align-items:center;gap:10px">'+
+    '<span style="flex:1;min-width:0;font-size:12.5px;line-height:1.5;color:var(--dim)">Allena adjusted <b style="color:var(--text)">'+esc(String(S.lastAdj.ex).replace(/ — .*/,''))+'</b> by '+(S.lastAdj.delta>0?'+':'')+uwNum(S.lastAdj.delta)+' '+uwUnit()+' for next time.</span>'+
+    '<button data-a="undoAdj" class="mono" style="color:var(--amber);font-size:11px;flex:none">Undo</button></div>';
   if(isRehabSession()&&s.phase==='ready')body+='<button data-a="flagOpen" class="btn mt" style="border-color:var(--red);color:var(--red);font-size:12.5px">Flag this for my physio</button>';
   if(s.log.length&&s.phase==='ready')body+='<div class="mt2"><p class="eyebrow">Done so far — tap to fix</p><div style="margin-top:8px">'+logLines(s.log,'editLive')+'</div></div>';
   if(s.phase==='ready')foot+='<button data-a="begin" class="big disp" style="background:'+acc+';color:var(--bg)">'+
@@ -18469,7 +18501,19 @@ document.addEventListener('click',e=>{if(S.boot!=null&&e.target&&e.target.closes
   let kbWas=false;
   const fit=function(){
     if(raf)return;raf=requestAnimationFrame(function(){raf=null;
-      if(window.__kbNativeOn)return; // the wrapper reports the keyboard itself
+      if(window.__kbNativeOn){
+        /* wrapper mode: CSS lifts the composer via --kb, but WebKit
+           STILL pans the layout viewport to "reveal" the focused
+           input it thinks is hidden — the pan stacked on the lift
+           shoved the whole chat to the top of the screen (owner-
+           caught, 6 Sep). Undo the pan; the lift is the only shift
+           the chat needs. */
+        const w9=document.querySelector('.chatwrap');
+        if(w9){
+          if(window.scrollY)window.scrollTo(0,0);
+          const vt=window.visualViewport?window.visualViewport.offsetTop:0;
+          w9.style.transform=vt>1?'translateY('+vt+'px)':''}
+        return}
       const w=document.querySelector('.chatwrap');
       const kb=Math.max(0,window.innerHeight-vv.height-vv.offsetTop);
       const closing=kbWas&&kb<=40;kbWas=kb>40;
@@ -18505,9 +18549,8 @@ document.addEventListener('click',e=>{if(S.boot!=null&&e.target&&e.target.closes
      220ms shot fired before it settled and never again. */
   document.addEventListener('focusin',function(e){
     const t=e.target;if(!t||!(t.matches&&t.matches('.chatwrap textarea, .chatwrap input')))return;
-    if(window.__kbNativeOn)return;
     let n=0;const iv=setInterval(function(){
-      fit();if(++n===3){try{t.scrollIntoView({block:'center'})}catch(e2){}}
+      fit();if(++n===3&&!window.__kbNativeOn){try{t.scrollIntoView({block:'center'})}catch(e2){}}
       if(n>=8)clearInterval(iv)},130)});
   // vv 'scroll' fires on ordinary page scrolls too — only the chat's
   // pinned composer needs it; everywhere else it must never run
@@ -20246,8 +20289,15 @@ setInterval(()=>{
     if(left<=0){
       if(cur.perSide&&S.holdSide===1){S.holdEnd=null;S.holdWait=true;
         audioIn(.05,600);vib(120);render();return}
-      audioIn(.05);vib([220,90,220]);S.holdEnd=null;
-      S.draft={w:'',r:'',secs:cur.secs,rpe:null};s.phase='logging';persistActive();render();return}
+      if(cur.perSide){audioIn(.05);vib([220,90,220]);S.holdEnd=null;
+        S.draft={w:'',r:'',secs:cur.secs,rpe:null};s.phase='logging';persistActive();render();return}
+      /* single-side hold: the target is a floor, not a ceiling — chime
+         at the mark, then count UP. The athlete decides when it ends,
+         and the extra seconds become the new default (owner law, 6 Sep). */
+      if(!S.holdMet){S.holdMet=1;audioIn(.05);vib([220,90,220]);render();return}
+      const oEl=document.getElementById('holdTime');
+      if(oEl)oEl.textContent='+'+mmss(-left);
+      return}
     const tEl=document.getElementById('holdTime'),ring=document.getElementById('holdRing');
     if(tEl)tEl.textContent=mmss(left);
     if(ring){const c=2*Math.PI*92;ring.setAttribute('stroke-dashoffset',c*(1-Math.max(0,Math.min(1,left/Math.max(1,cur.secs)))))}
@@ -20265,7 +20315,7 @@ setInterval(()=>{
   const tEl=document.getElementById('restTime'),ring=document.getElementById('restRing'),lbl=document.getElementById('restLbl');
   if(tEl)tEl.textContent=mmss(left);
   if(lbl)lbl.textContent=left<=10?'Get ready':'Rest';
-  if(ring){const total=s.sets[s.idx].rest,c=2*Math.PI*92;
+  if(ring){const total=S.restTotal||s.sets[s.idx].rest,c=2*Math.PI*92;
     ring.setAttribute('stroke-dashoffset',c*(1-Math.max(0,Math.min(1,left/Math.max(1,total)))));
     ring.setAttribute('stroke',left<=10?'var(--amber)':'var(--blue)')}
 },250);
