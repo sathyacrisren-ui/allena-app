@@ -645,7 +645,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='fa729d';  // stamped by tools/build.py with the content hash
+const BUILD_ID='ce3a9a';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -12532,7 +12532,9 @@ function analyseCard(){
               '<div style="margin-top:10px;display:flex;flex-direction:column;gap:8px">'+
               ['epic','rare','uncommon','common'].map(rr=>{const r=rarityOf(rr);
                 return grp(rr,r[2].toUpperCase(),r[1],old.filter(d=>d.rar===rr),dCard)}).join('')+'</div>'}
-          return out2})()+watchCard()
+          /* the Still-working-it-out list is gone from this lens (owner
+             ruling, 6 Sep) — its thresholds live on Today's unlock track */
+          return out2})()
         :'<p style="color:var(--dim);font-size:12.5px;line-height:1.6;margin-top:12px">Nothing in your data contradicts anything else in it. Keep logging and this gets sharper.</p>')+
       '</div>'}
   const s2=anStats();
@@ -18859,6 +18861,11 @@ function runAction(a,v,t,e){
       const tick=()=>{S.anStep=(S.anStep||0)+1;
         if(S.anStep>=AN_STEPS.length){S.anState='done';markPatternsSeen();vib(12);
           S.discShow=newDiscoveries().map(d=>d.id);   // keep the NEW flags for this reveal
+          /* the reveal SHOWS the discoveries, so it marks them seen —
+             this call never existed, so the red badge counted finds the
+             user had already been shown, forever (owner-caught, 6 Sep).
+             S.discShow above keeps the NEW chips visible for the render. */
+          try{markDiscoveries()}catch(e9){}
           render();setTimeout(function(){markDiscoveries()},2500);return}
         render();setTimeout(tick,620+Math.random()*260)};
       setTimeout(tick,700);break}
