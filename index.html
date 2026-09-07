@@ -666,7 +666,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='55823c';  // stamped by tools/build.py with the content hash
+const BUILD_ID='fbf053';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -1533,6 +1533,9 @@ function snapshotData(){
      first name — score card still, nothing else. Activation = 3 live
      sessions inside the first tracked week, computed on-device. */
   if(!S._snapLegacy){
+    if(!S._snapNoPrev){
+      out.prev_week_live=d.prevWeekLive||0;
+      try{out.prev_week_key=dayKey(new Date(new Date(questWeekKey()+'T12:00').getTime()-7*864e5))}catch(e){}}
     out.week_live=d.weekLive||0;out.week_sessions=d.weekSessions||0;
     out.display=(String((S.prof&&S.prof.name)||'').split(' ')[0]
       ||String((acct()||{}).email||'').split('@')[0]).slice(0,12)||null;
@@ -1549,7 +1552,8 @@ async function acctSync(loud){
     if(ok9)setTimeout(function(){S.acctSynced=0;try{render()}catch(e){}},2200)}};
   const tok=await acctToken();if(!tok){if(loud)flash('Sign in first.');done(false);return false}
   const c=acctClaims(tok);if(!c||!c.sub){done(false);return false}
-  const legacyRetry=async r=>{ // server predates social.sql: shrink and retry once
+  const legacyRetry=async r=>{ // graduated: drop prev-week fields first, then all social fields
+    if(r&&r.status===400&&!S._snapNoPrev){S._snapNoPrev=1;return acctSync(loud)}
     if(r&&r.status===400&&!S._snapLegacy){S._snapLegacy=1;return acctSync(loud)}
     return false};
   try{
@@ -1584,9 +1588,11 @@ async function frLoad(force){
     const ids=(S.frRows||[]).filter(x=>x.linked_at)
       .map(x=>x.owner_id===S.frMe?x.friend_id:x.owner_id).filter(Boolean);
     if(ids.length){
-      const r2=await fetch(CLOUD.url+'/rest/v1/snapshots?select=user_id,display,week_live,week_sessions,live_points,tier&user_id=in.('+ids.map(encodeURIComponent).join(',')+')',{headers:h});
+      let r2=await fetch(CLOUD.url+'/rest/v1/snapshots?select=user_id,display,week_live,week_sessions,live_points,tier,prev_week_live,prev_week_key&user_id=in.('+ids.map(encodeURIComponent).join(',')+')',{headers:h});
+      if(!r2.ok)r2=await fetch(CLOUD.url+'/rest/v1/snapshots?select=user_id,display,week_live,week_sessions,live_points,tier&user_id=in.('+ids.map(encodeURIComponent).join(',')+')',{headers:h});
       S.frSnaps=r2.ok?await r2.json():[]}
     else S.frSnaps=[];
+    try{duelVerdict()}catch(e9){}
     /* the link ceremony (owner call, 7 Sep): a new link gets the full
        scene, once, on WHICHEVER side sees it first — the joiner right
        away, the inviter the next time the app looks and finds the
@@ -1704,6 +1710,32 @@ function socialJoinKick(){
     if(acctReady()&&acct())setTimeout(function(){frJoin(S.frIn||'')},600);
     else flash('Sign in, then tap Link up \u2014 the code is filled in.');
     render()}catch(e){}}
+function duelVerdict(){
+  /* the win pays in the app's real currency (owner asked for +500 data
+     points — declined per the owner's own laws: points pay for data,
+     social never mints; quest-precedent epic instead). Verdicts only
+     when BOTH sides have synced their settled last-week final. */
+  try{
+    const a9=acct()||{};const hist=a9.duelHist||{};
+    const pvKey=dayKey(new Date(new Date(questWeekKey()+'T12:00').getTime()-7*864e5));
+    if(hist[pvKey]!=null)return;
+    const mine=(dataPoints().prevWeekLive)||0;
+    const rows=(S.frSnaps||[]).filter(s9=>s9.prev_week_key===pvKey);
+    if(!rows.length)return;
+    const best=rows.slice().sort((x,y)=>(y.prev_week_live||0)-(x.prev_week_live||0))[0];
+    const theirs=best.prev_week_live||0;
+    if(mine===0&&theirs===0)return;               // an empty week verdicts nothing
+    const nm=(function(){const f=frLinked().find(x=>x.id===best.user_id);return (f&&f.name)||best.display||'your friend'})();
+    hist[pvKey]=mine>theirs?'w':mine<theirs?'l':'d';
+    lset(K_ACCT,Object.assign({},a9,{duelHist:hist}));
+    if(hist[pvKey]==='w'){
+      const bank=discBank();const id='duel:'+pvKey;
+      if(!bank[id]){bank[id]={t:'Week won \u2014 '+mine+' to '+theirs,
+        d:'You out-showed '+nm+' across the week \u2014 '+mine+' witnessed points to '+theirs+'. Won by turning up, the only way this race can be won.',
+        rar:'epic',tag:'duel',found:today()};bankSave()}
+      S.signalReveal={e:'\u2726 THE WEEK, WON',c:'#E0A458',id:id,kind:'epic',
+        t:'You took the week',d:mine+' \u2013 '+theirs+' over '+nm+'. Banked for good \u2014 the new week starts level.'};
+      try{hapticRun('finish')}catch(e9){}}}catch(e){}}
 function viewSocial(){
   /* Social gets its own room (owner call, 7 Sep): the duel, the
      friends list, invites — everything head-to-head lives here. */
@@ -4320,8 +4352,10 @@ function dpPlausible(h){
   return bad<=Math.max(1,Math.round((h.log||[]).length*0.1))}
 function dataPoints(){
   const B={sets:0,effort:0,sessions:0,runs:0,zones:0,readiness:0,bodyweight:0,scans:0,rehab:0,notes:0};
-  let live=0,byDay={},weekLive=0,weekSess=0;
-  let wkStart='';try{wkStart=questWeekKey()}catch(e){}
+  let live=0,byDay={},weekLive=0,weekSess=0,prevWeekLive=0;
+  let wkStart='',pvStart='';
+  try{wkStart=questWeekKey();
+    pvStart=dayKey(new Date(new Date(wkStart+'T12:00').getTime()-7*864e5))}catch(e){}
   (S.history||[]).forEach(h=>{
     if(!dpPlausible(h))return;                       // implausible sessions score nothing
     const day=(h.date||'').slice(0,10);
@@ -4350,7 +4384,8 @@ function dataPoints(){
       earned=sets+effort+notes+sess}
     byDay[day]=used+earned;
     if(sessionLive(h)){live+=earned;
-      if(wkStart&&day>=wkStart){weekLive+=earned;if(sess)weekSess++}}
+      if(wkStart&&day>=wkStart){weekLive+=earned;if(sess)weekSess++}
+      else if(pvStart&&day>=pvStart&&day<wkStart)prevWeekLive+=earned}
     B.sessions+=sess;B.sets+=sets;B.effort+=effort;B.notes+=notes});
   (S.runs||[]).forEach(r=>{
     /* cardio spends from the same day budget as sessions — typed runs
@@ -4389,7 +4424,7 @@ function dataPoints(){
   const total=Math.round(Object.keys(B).reduce((x,k)=>x+B[k],0)*10)/10;
   const todayEarned=Math.round((byDay[today()]||0)*10)/10;
   return{total:total,by:B,live:Math.round(Math.min(live,total)*10)/10,
-    weekLive:Math.round(weekLive),weekSessions:weekSess,
+    weekLive:Math.round(weekLive),weekSessions:weekSess,prevWeekLive:Math.round(prevWeekLive),
     today:todayEarned,room:Math.max(0,Math.round((dpDayCap()-todayEarned)*10)/10),
     livePct:total?Math.round(Math.min(live,total)/total*100):0}}
 /* the two clocks of motivation: LEVELS are the small wins — the first
@@ -15267,6 +15302,10 @@ function viewToday(){
       const myN=myFirst||'You';
       const myInit=(myFirst||myMail||'Y').slice(0,1).toUpperCase();
       const frKnown=!!top.named;
+      let crown='';
+      try{const pv=dayKey(new Date(new Date(questWeekKey()+'T12:00').getTime()-7*864e5));
+        const r9=((acct()||{}).duelHist||{})[pv];
+        if(r9==='w')crown='me';else if(r9==='l')crown='them'}catch(e9){}
       const frInit=frKnown?top.name.slice(0,1).toUpperCase():'?';
       const ava=(nm,init,ringCol,glow)=>'<div style="display:flex;flex-direction:column;align-items:center;gap:6px;flex:1;min-width:0">'+
         '<div style="width:58px;height:58px;border-radius:58px;background:var(--raised);border:2.5px solid '+ringCol+';display:flex;align-items:center;justify-content:center;font-size:23px;font-weight:700'+(glow?';box-shadow:0 0 16px 0 color-mix(in srgb, '+ringCol+' 45%, transparent)':'')+'">'+esc(init)+'</div>'+
@@ -15275,11 +15314,11 @@ function viewToday(){
       h+='<button data-a="nav" data-v="social" class="card mt" style="width:100%;text-align:center;padding:15px 16px;display:block">'+
         '<p class="mono" style="font-size:9px;letter-spacing:.12em;color:var(--faint)">THE WEEK\u2019S DUEL \u00b7 RESETS MONDAY</p>'+
         '<div style="display:flex;align-items:center;gap:8px;margin-top:11px">'+
-        ava(myN,myInit,lead>=0?'var(--green)':'var(--line)',lead>0)+
+        ava((crown==='me'?'\ud83d\udc51 ':'')+myN,myInit,lead>=0?'var(--green)':'var(--line)',lead>0)+
         '<div style="flex:none;display:flex;flex-direction:column;align-items:center;gap:2px;padding:0 4px">'+
         '<span class="mono disp grad" style="font-size:17px;font-weight:800;letter-spacing:.06em">VS</span>'+
         '<span class="mono" style="font-size:15px;font-weight:700">'+mine+'\u2009\u2013\u2009'+top.week+'</span></div>'+
-        ava(top.name,frInit,lead<=0&&top.week>0?'var(--green)':'var(--line)',lead<0)+
+        ava((crown==='them'?'\ud83d\udc51 ':'')+top.name,frInit,lead<=0&&top.week>0?'var(--green)':'var(--line)',lead<0)+
         '</div>'+
         '<div style="height:6px;border-radius:6px;background:var(--line);overflow:hidden;margin-top:12px;display:flex">'+
         '<div style="height:6px;width:'+Math.round(mine/tot*100)+'%;background:var(--green)"></div>'+
