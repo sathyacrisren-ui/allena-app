@@ -666,7 +666,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='07ac56';  // stamped by tools/build.py with the content hash
+const BUILD_ID='0434ac';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -9169,12 +9169,12 @@ function discoveries(){
     if(longest.minutes>=90)add('common','Longest session: '+longest.minutes+' minutes',
       esc(longest.dayTitle||'A session')+' on '+fmtDate(longest.date)+'. Anything past about 90 minutes is usually rest, not work.','session');
     const totalSets=H.reduce((a,h)=>a+h.log.length,0);
-    [100,250,500,1000,2500,5000].forEach(m=>{
-      if(totalSets>=m&&totalSets<m*1.08)add(m>=1000?'rare':'uncommon',totalSets.toLocaleString()+' sets logged',
-        'You have crossed '+m.toLocaleString()+'. Every one of them is in the model.','milestone')});
-    [10,25,50,100,200,365].forEach(m=>{
-      if(H.length>=m&&H.length<m+3)add(m>=100?'epic':'uncommon',H.length+' sessions',
-        'You have passed '+m+' logged sessions. Most people who start an app like this stop before ten.','milestone')})}
+    {const r9=[100,250,500,1000,2500,5000].filter(m=>totalSets>=m).pop();
+      if(r9)add(r9>=1000?'rare':'uncommon',r9.toLocaleString()+' sets logged',
+        'You have crossed '+r9.toLocaleString()+' \u2014 '+totalSets.toLocaleString()+' now. Every one of them is in the model.','milestone')}
+    {const r9=[10,25,50,100,200,365].filter(m=>H.length>=m).pop();
+      if(r9)add(r9>=100?'epic':'uncommon',r9+' sessions',
+        'You have passed '+r9+' logged sessions \u2014 '+H.length+' now. Most people who start an app like this stop before ten.','milestone')}}
 
   /* ── time of day ── */
   try{const byHr={};H.forEach(h=>{const hr=new Date(h.date).getHours();
@@ -9191,10 +9191,12 @@ function discoveries(){
 
   /* ── consistency and rhythm ── */
   try{const st=weekStreak(),ds=dayStreak();
-    if(ds>=7)add(ds>=30?'epic':ds>=14?'rare':'uncommon',ds+' days logging in a row',
-      'Not training every day — logging every day. That is what keeps the model honest.','streak');
-    if(st.weeks>=4)add(st.weeks>=12?'epic':'rare',st.weeks+' weeks without missing one',
-      'Consistency beats every programming decision you will ever make.','streak');
+    {const r9=[7,14,21,30,50,75,100,150,200,365].filter(x=>ds>=x).pop();
+      if(r9)add(r9>=30?'epic':r9>=14?'rare':'uncommon',r9+' days logging in a row',
+        'Not training every day \u2014 logging every day'+(ds>r9?' ('+ds+' now)':'')+'. That is what keeps the model honest.','streak')}
+    {const r9=[4,8,12,26,52].filter(x=>st.weeks>=x).pop();
+      if(r9)add(r9>=12?'epic':'rare',r9+' weeks without missing one',
+        'Consistency beats every programming decision you will ever make'+(st.weeks>r9?' \u2014 '+st.weeks+' weeks now':'')+'.','streak')}
     // gap analysis
     const days=[...new Set(H.map(h=>h.date.slice(0,10)))].sort();
     if(days.length>=8){let maxGap=0;
@@ -9265,8 +9267,8 @@ function discoveries(){
         'Past 80%, which is where running usually becomes reasonable.','rehab')}
     const ch=checkTrend(28).filter(c=>c.pain!=null);
     if(ch.length>=10){const noPain=ch.filter(c=>c.pain<=1).length;
-      if(noPain/ch.length>=0.7)add('rare',noPain+' near-painless days out of '+ch.length,
-        'Over the last four weeks. Worth telling your physio — it is as much a result as any test.','rehab')}}catch(e){}
+      if(noPain/ch.length>=0.7)add('rare','A near-painless month',
+        noPain+' of the last '+ch.length+' checked-in days at pain 1 or below. Worth telling your physio \u2014 it is as much a result as any test.','rehab')}}catch(e){}
 
 
   /* ── the first fortnight ─────────────────────────────────
@@ -9286,7 +9288,7 @@ function discoveries(){
       'Enough for Allena to start comparing like with like. From here the numbers begin to mean something.','first');
     if(nSets>=1&&sets.some(x=>x.l.rpe!=null))add('common','First effort recorded',
       'RPE is what turns a log into a coach. Without it Allena can see what you lifted but not what it cost.','first');
-    if(nSets>=25)add('common',nSets+' sets logged','Every one of them feeding the recovery and progression model.','first');
+    if(nSets>=25)add('common','25 sets in','Every set feeds the recovery and progression model \u2014 '+nSets+' so far.','first');
     // first repeat of an exercise
     const repeated=lifts.filter(b=>new Set(byLift[b].map(x=>x.h.id)).size>=2);
     if(repeated.length)add('common','First lift with history',
@@ -9462,6 +9464,21 @@ function ratioDupeSweep(){
       let n=0;Object.keys(bank).forEach(id=>{const e=bank[id];
         if(e&&e.tag==='ratio'&&/1RM past [\d.]+× bodyweight$/.test(String(e.t))&&cur[e.t]&&e.d!==cur[e.t]){e.d=cur[e.t];n++}});
       bank._bodyfix=1;bankSave()}}catch(e){}}
+function serialDupeSweep(){
+  /* repairs the daily-incrementing banks the live-number titles
+     created (owner-caught, 8 Sep: '13 becomes redundant'). Keeps each
+     family's single highest, runs once. */
+  try{
+    const bank=discBank();if(bank._serialfix)return;
+    const FAM=[/^([\d,]+) days logging in a row$/,/^([\d,]+) sets logged$/,
+      /^([\d,]+) sessions$/,/^([\d,]+) near-painless days out of [\d,]+$/,
+      /^([\d,]+) weeks without missing one$/];
+    FAM.forEach(rx=>{const L=[];
+      Object.keys(bank).forEach(id=>{const e=bank[id];if(!e||!e.t)return;
+        const m=String(e.t).match(rx);
+        if(m)L.push({id:id,v:parseFloat(String(m[1]).replace(/,/g,''))})});
+      L.sort((a,b)=>b.v-a.v).slice(1).forEach(x=>{delete bank[x.id]})});
+    bank._serialfix=1;bankSave()}catch(e){}}
 function markDiscoveries(){
   const seen=discoverySeen();
   discoveries().forEach(d=>{if(!seen[d.id])seen[d.id]=today()});
@@ -12651,8 +12668,8 @@ function viewCollection(){
       '<span style="display:block;color:var(--faint);font-size:11.5px;line-height:1.4">'+esc(mine.length?g[3]:g[4])+'</span></span>'+
       '<span class="mono" style="color:'+(mine.length?'var(--amber)':'var(--faint)')+';font-size:11px;flex:none">'+(mine.length||'\u2014')+'</span>'+
       '<span class="mono" style="color:var(--faint);font-size:13px;flex:none">'+(open?'\u2304':'\u203a')+'</span></button>'+
-      (open&&mine.length?'<div style="border-top:1px solid var(--line);padding:10px 14px;display:flex;flex-direction:column;gap:9px">'+
-        mine.map(d=>{const r=rarityOf(d.rar);
+      (open&&mine.length?(function(){
+        const row9=d=>{const r=rarityOf(d.rar);
           const hot=(d.found===today())&&(d.rar==='rare'||d.rar==='epic');
           return '<div class="'+(hot?'find-glow':'')+'"'+(hot?' style="position:relative;border-radius:12px;padding:7px 9px;margin:-2px -9px"':'')+'>'+
           '<div style="display:flex;align-items:baseline;gap:8px">'+
@@ -12660,7 +12677,21 @@ function viewCollection(){
           '<span class="mono" style="color:'+r[1]+';font-size:9px;letter-spacing:.06em">'+esc(r[2].toUpperCase())+'</span>'+
           '<span class="mono" style="color:var(--faint);font-size:9.5px">'+esc(fmtDate(d.found+'T12:00'))+'</span></div>'+
           '<p style="font-size:13.5px;font-weight:600;margin-top:3px">'+esc(d.t)+'</p>'+
-          '<p style="color:var(--dim);font-size:12px;line-height:1.55;margin-top:2px">'+esc(d.d)+'</p></div>'}).join('')+'</div>'
+          '<p style="color:var(--dim);font-size:12px;line-height:1.55;margin-top:2px">'+esc(d.d)+'</p></div>'};
+        /* last 3 days (and anything NEW) show straight away; the rest
+           folds behind Earlier so a drawer never spills its history */
+        const cut3=dayKey(new Date(Date.now()-3*864e5));
+        const recent9=mine.filter(d=>freshIds[d.id]||String(d.found||'')>=cut3);
+        const older9=mine.filter(d=>!(freshIds[d.id]||String(d.found||'')>=cut3));
+        const allOpen=!!S.openSec['grpall:'+g[0]];
+        return '<div style="border-top:1px solid var(--line);padding:10px 14px;display:flex;flex-direction:column;gap:9px">'+
+          recent9.map(row9).join('')+
+          (older9.length?'<button data-a="secToggle" data-v="grpall:'+g[0]+'" style="width:100%;text-align:left;display:flex;align-items:center;gap:8px;padding:5px 0'+(recent9.length?';border-top:1px solid var(--line);padding-top:11px':'')+'">'+
+            '<span class="mono" style="color:var(--faint);font-size:12px;flex:none">'+(allOpen?'\u2304':'\u203a')+'</span>'+
+            '<span style="flex:1;color:var(--dim);font-size:12.5px;font-weight:600">Earlier</span>'+
+            '<span class="mono" style="color:var(--faint);font-size:10.5px;flex:none">'+older9.length+' find'+(older9.length===1?'':'s')+'</span></button>'+
+            (allOpen?older9.map(row9).join(''):''):'')+
+          '</div>'})()
         :open?'<div style="border-top:1px solid var(--line);padding:13px 14px">'+
           '<p style="color:var(--faint);font-size:12px;line-height:1.55">Nothing here yet. '+esc(g[4])+'</p></div>':'')+
       '</div>';
@@ -14945,7 +14976,7 @@ function lensWord(k){
     const rows=ks.slice(0,6).map(id=>{const e2=B[id];
       const hot=(e2.found===today())&&(e2.rar==='rare'||e2.rar==='epic');
       return '<button data-a="findOpen" data-v="'+esc(id)+'" class="'+(hot?'find-glow':'')+'" style="width:100%;text-align:left;display:flex;gap:10px;align-items:baseline;margin-top:11px;position:relative;border-radius:10px'+(hot?';padding:7px 9px;margin-left:-9px;margin-right:-9px':'')+'">'+
-      '<span style="width:7px;height:7px;border-radius:7px;flex:none;background:'+rarityOf(e2.rar)[1]+';transform:translateY(-1px)"></span>'+
+      '<span style="width:7px;height:7px;border-radius:7px;flex:none;background:var(--faint);transform:translateY(-1px)"></span>'+
       '<span style="flex:1;min-width:0;font-size:14px;line-height:1.5">'+esc(e2.t)+'</span>'+
       '<span class="mono" style="color:var(--faint);font-size:10px;flex:none">'+esc(String(e2.found||'').slice(5))+'</span></button>'}).join('');
     const nR=ks.filter(id=>B[id].rar==='rare').length,nE=ks.filter(id=>B[id].rar==='epic').length;
@@ -21705,6 +21736,7 @@ function dayCheck(){
   try{if(typeof watchMetSweep==='function')watchMetSweep()}catch(e){}
   try{if(typeof expSettle==='function')expSettle()}catch(e){}
   try{if(typeof ratioDupeSweep==='function')ratioDupeSweep()}catch(e){}
+  try{if(typeof serialDupeSweep==='function')serialDupeSweep()}catch(e){}
   try{if(typeof socialJoinKick==='function')socialJoinKick()}catch(e){}
   try{if(typeof acctReady==='function'&&acctReady()&&typeof acct==='function'&&acct()&&S._syncDay!==today()){
     S._syncDay=today();acctSync(false)}}catch(e){}
