@@ -666,7 +666,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='ef735b';  // stamped by tools/build.py with the content hash
+const BUILD_ID='3c629a';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -14062,6 +14062,101 @@ function weekCard(){
   const c=weekClock();
   const col=c&&c.hard?'var(--red)':c&&(c.over||c.expired)?'var(--amber)':'var(--line)';
   return '<div class="card mt" style="padding:14px 16px;border-color:'+col+'">'+body+'</div>'}
+function weekBoard(){
+  /* the combined week's data: what happened, what is placed where,
+     and why. Lifting placement comes from rpCombinedWeek (leg work
+     held clear of the long run) when a run plan pins weekdays;
+     without one, remaining sessions spread over the free days.
+     Suggestions, never locks. */
+  try{
+    const p=activeProgSafe();
+    if(!p||p.empty||!p.days||!p.days.length)return null;
+    const DN7=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+    const wk=questWeekKey();
+    const t0=new Date(wk+'T12:00').getTime();
+    const tk=today();
+    const rp=S.runplan&&S.runplan.days&&S.runplan.days.length?S.runplan:null;
+    const rehabOn=(S.acl&&S.acl.on)||((typeof activeProtocols==='function')&&activeProtocols().length>0);
+    const rehabT=rehabOn&&typeof rehabWeekTarget==='function'?rehabWeekTarget():0;
+    // what actually happened, by day
+    const days=DN7.map((n,i)=>({n:n,key:dayKey(new Date(t0+i*864e5)),items:[]}));
+    const byKey={};days.forEach(d=>byKey[d.key]=d);
+    const isRehabSess=h=>{try{const p9=(S.lib.programs||[]).find(x=>x.id===h.progId);
+      return !!(p9&&(p9.acl||p9.rehabProto))}catch(e){return false}};
+    let rehabDone=0;const liftedNames={};
+    (S.history||[]).forEach(h=>{if(!h.complete)return;
+      const d=byKey[String(h.date).slice(0,10)];if(!d)return;
+      if(h.run){d.items.push({k:'run',l:'ran',done:1})}
+      else if(isRehabSess(h)){d.items.push({k:'rehab',l:'rehab',done:1});rehabDone++}
+      else{const nm=String(h.dayTitle||'lifted').split(' ')[0].slice(0,6);
+        d.items.push({k:'lift',l:nm.toLowerCase(),done:1});
+        if(h.dayTitle)liftedNames[String(h.dayTitle)]=1}});
+    // planned runs on their fixed days
+    let longIdx=-1;
+    if(rp){longIdx=DN7.indexOf(rp.longDay);
+      rp.days.forEach(dn=>{const i=DN7.indexOf(dn);if(i<0)return;
+        const d=days[i];
+        if(d.key<tk)return;
+        if(d.items.some(x=>x.k==='run'))return;
+        d.items.push({k:'run',l:i===longIdx?'long':'run',done:0,long:i===longIdx})})}
+    // remaining lifts: placed by the combined-week engine when runs pin
+    // the calendar; otherwise spread across the free days ahead
+    const c9=(typeof weekClock==='function')?weekClock():null;
+    const remaining=(c9&&c9.remaining?c9.remaining:[]).filter(r=>!liftedNames[r.name]);
+    let reason='';let conflict='';
+    const cw=rp?rpCombinedWeek(rp.days,rp.longDay):null;
+    if(cw&&cw.conflict)conflict=cw.conflict;
+    const remNames={};remaining.forEach(r=>remNames[String(r.name).replace(/ \u2014 .*/,'')]=r);
+    const placedNames={};
+    if(cw&&cw.template)cw.template.forEach(row=>{
+      const m=String(row).match(/^(\w{3}) \u2014 (.*)$/);if(!m)return;
+      const i=DN7.indexOf(m[1]);if(i<0)return;
+      const d=days[i];if(d.key<tk)return;
+      const raw=m[2];if(/run$/.test(raw))return;
+      const legs=/ \(legs\)$/.test(raw);
+      const base=raw.replace(/ \(legs\)$/,'');
+      const hit=Object.keys(remNames).find(n=>base.indexOf(n)>=0||n.indexOf(base)>=0);
+      if(!hit)return;
+      placedNames[hit]=1;
+      if(legs&&longIdx>=0&&!reason){
+        const dist=Math.min(Math.abs(i-longIdx),7-Math.abs(i-longIdx));
+        if(dist>1)reason='Legs on '+DN7[i]+'. Long run '+DN7[longIdx]+'. Kept '+dist+' days apart on purpose.'}
+      d.items.push({k:'lift',l:String(base).split(' ')[0].slice(0,6).toLowerCase(),done:0,legs:legs})});
+    const unplaced=Object.keys(remNames).filter(n=>!placedNames[n]);
+    if(unplaced.length){
+      const free=days.filter(d=>d.key>=tk&&!d.items.length);
+      unplaced.forEach((n,i)=>{const d=free[i];if(!d)return;
+        d.items.push({k:'lift',l:String(n).split(' ')[0].slice(0,6).toLowerCase(),done:0})})}
+    // remaining rehab fills the quietest days ahead
+    for(let r=rehabDone;r<rehabT;r++){
+      const cand=days.filter(d=>d.key>=tk&&d.items.length<2)
+        .sort((a,b)=>a.items.length-b.items.length)[0];
+      if(!cand)break;cand.items.push({k:'rehab',l:'rehab',done:0})}
+    if(!reason&&rehabT>rehabDone)reason=(rehabT-rehabDone)+' rehab session'+(rehabT-rehabDone===1?'':'s')+' still to fit. They sit on the quiet days.';
+    return{days:days,todayKey:tk,reason:conflict||reason,conflict:!!conflict,
+      hasRuns:!!rp,hasRehab:rehabT>0}}catch(e){return null}}
+function weekBoardCard(){
+  const B=weekBoard();if(!B)return '';
+  const chip=it=>{
+    const base='display:block;width:100%;box-sizing:border-box;text-align:center;border-radius:6px;padding:3px 1px;font-size:8px;letter-spacing:.02em;margin-top:3px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;';
+    if(it.k==='run')return '<span class="mono" style="'+base+(it.done?'background:#1E9BFF;color:var(--bg);font-weight:700':'border:1px solid #1E9BFF55;color:#1E9BFF'+(it.long?';font-weight:700':''))+'">'+esc(it.l)+'</span>';
+    if(it.k==='rehab')return '<span class="mono" style="'+base+(it.done?'background:var(--green);color:var(--bg);font-weight:700':'border:1px solid var(--greensoft);color:var(--green)')+'">'+esc(it.l)+'</span>';
+    return '<span class="mono" style="'+base+(it.done?'background:var(--text);color:var(--bg);font-weight:700':'border:1px solid var(--line);color:var(--dim)')+'">'+esc(it.l)+'</span>'};
+  return '<div class="card mt" style="padding:14px 16px">'+
+    '<div style="display:flex;align-items:baseline;gap:10px">'+
+    '<p class="eyebrow" style="flex:1">Your week</p>'+
+    '<span class="mono" style="font-size:9px;color:var(--faint);letter-spacing:.05em">LIFTS'+(B.hasRuns?' \u00b7 RUNS':'')+(B.hasRehab?' \u00b7 REHAB':'')+' \u00b7 ONE MODEL</span></div>'+
+    '<div style="display:flex;gap:4px;margin-top:11px;align-items:flex-start">'+
+    B.days.map(d=>{
+      const isToday=d.key===B.todayKey,past=d.key<B.todayKey;
+      return '<div style="flex:1;min-width:0">'+
+        '<p class="mono" style="text-align:center;font-size:9px;'+(isToday?'color:var(--amber);font-weight:700':'color:var(--faint)')+'">'+d.n.slice(0,1)+'</p>'+
+        (d.items.length?d.items.map(chip).join('')
+          :'<p style="text-align:center;color:'+(past?'var(--line)':'var(--faint)')+';font-size:10px;margin-top:4px">\u00b7</p>')+
+        '</div>'}).join('')+'</div>'+
+    (B.reason?'<p style="color:'+(B.conflict?'var(--amber)':'var(--dim)')+';font-size:12px;line-height:1.55;margin-top:10px">'+esc(B.reason)+'</p>':'')+
+    '<p style="color:var(--faint);font-size:10.5px;line-height:1.5;margin-top:7px">Filled means done. Outlined is the suggested shape \u2014 nothing is locked to a day.</p>'+
+    '</div>'}
 function weekChip(){
   /* the week clock, shrunk to an instrument reading (owner call,
      Sep 2026): a small timer chip beside the Program title. It
@@ -15442,6 +15537,7 @@ function viewHome(){
       '<button data-a="suOwn" class="btn" style="flex:1">Write your own</button>'+
       '</div></div></div>'}
   h+=recCard();
+  try{h+=(typeof weekBoardCard==='function'?weekBoardCard():'')}catch(e){}
   const render1={stats:()=>secStats(),program:()=>secProgram(p,ws),sessions:()=>secSessions(p,ws),
     goals:()=>secGoals(),habits:()=>secHabits(),support:()=>secSupport()};
   (S.lay.order||['stats','program','sessions','goals','habits','support']).forEach(k=>{
