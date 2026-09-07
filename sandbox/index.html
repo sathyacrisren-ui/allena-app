@@ -666,7 +666,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='5ef229';  // stamped by tools/build.py with the content hash
+const BUILD_ID='6c1cf5';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -1586,6 +1586,21 @@ async function frLoad(force){
       const r2=await fetch(CLOUD.url+'/rest/v1/snapshots?select=user_id,display,week_live,week_sessions,live_points,tier&user_id=in.('+ids.map(encodeURIComponent).join(',')+')',{headers:h});
       S.frSnaps=r2.ok?await r2.json():[]}
     else S.frSnaps=[];
+    /* the link ceremony (owner call, 7 Sep): a new link gets the full
+       scene, once, on WHICHEVER side sees it first — the joiner right
+       away, the inviter the next time the app looks and finds the
+       code claimed. */
+    try{
+      const a9=acct()||{};const celeb=a9.frCeleb||{};
+      const fresh9=(S.frRows||[]).find(x=>x.linked_at&&!celeb[x.code]);
+      if(fresh9){
+        (S.frRows||[]).forEach(x=>{if(x.linked_at)celeb[x.code]=1});
+        lset(K_ACCT,Object.assign({},a9,{frCeleb:celeb}));
+        const fid=fresh9.owner_id===S.frMe?fresh9.friend_id:fresh9.owner_id;
+        const sn=(S.frSnaps||[]).find(s9=>s9.user_id===fid)||{};
+        S.signalReveal={e:'\u2726 LINKED',c:'#30D158',t:'The race is on',
+          d:'You and '+(sn.display||'your friend')+' \u2014 live points, fresh every Monday. Showing up and honest logging is the whole game.'};
+        try{hapticRun('find')}catch(e9){}}}catch(e9){}
     render()}catch(e){}}
 async function frInvite(){
   try{const h=await frHeaders();if(!h||!S.frMe){flash('Sign in first.');return}
@@ -1614,7 +1629,7 @@ async function frJoin(code){
       {method:'PATCH',headers:Object.assign({Prefer:'return=representation'},h),
        body:JSON.stringify({friend_id:S.frMe,linked_at:new Date().toISOString()})});
     const rows=r.ok?await r.json():[];
-    if(rows.length){flash('Linked — the race is on. Resets every Monday.');try{hapticRun('find')}catch(e9){};acctSync(false);frLoad(true)}
+    if(rows.length){acctSync(false);frLoad(true)}
     else flash('That code did not match an open invite.')}catch(e){flash('No connection.')}}
 async function frRemove(code){
   try{const h=await frHeaders();if(!h)return;
