@@ -666,7 +666,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='7b3592';  // stamped by tools/build.py with the content hash
+const BUILD_ID='ee73c0';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -8430,14 +8430,14 @@ function notifPlan(){
   const dk=n=>dayKey(new Date(Date.now()+n*864e5));
   if(P.morning&&S.gar&&S.gar.on)for(let i=1;i<=3;i++)
     items.push({id:'am'+dk(i),ts:at(dk(i),7,30),title:'Allena',
-      body:'Log the morning and today’s call unlocks.'});
+      body:'Morning check-in. It sets up today\u2019s call.'});
   if(P.appt){const a=apptNext&&apptNext();
     if(a&&a.date){
       const before=dayKey(new Date(new Date(a.date+'T12:00')-864e5));
       if(before>=today())items.push({id:'ap1'+a.date,ts:at(before,18,0),title:'Allena',
-        body:'Physio tomorrow'+(a.time?' at '+a.time:'')+' — the report is ready to bring.'});
+        body:'Physio tomorrow'+(a.time?' at '+a.time:'')+'. Your report is ready to bring.'});
       items.push({id:'ap2'+a.date,ts:at(a.date,8,0),title:'Allena',
-        body:'Physio today'+(a.time?' at '+a.time:'')+' — the report is one tap away.'})}}
+        body:'Physio today'+(a.time?' at '+a.time:'')+'. Your report is ready.'})}}
   if(P.wrap){const now=new Date(),first=new Date(now.getFullYear(),now.getMonth()+1,1);
     if((first-now)/864e5<=7){
       const ym=today().slice(0,7);
@@ -8454,8 +8454,7 @@ function notifPlan(){
       const at730=new Date(tk9+'T19:30:00').getTime();
       if(at730>Date.now()+60000)
         items.push({id:'rv'+tk9,ts:Math.round(at730/1000),title:'Allena',
-          body:n===1?'One find surfaced today — tonight’s reveal is ready.'
-            :n+' finds surfaced today — tonight’s reveal is ready.'})}}catch(e){}}
+          body:n===1?'1 new find from today.':n+' new finds from today.'})}}catch(e){}}
   /* a ready deep read gets announced (owner-caught: it sat available
      and said nothing). Once per day, only while today's read is
      genuinely unlockable and unspent. */
@@ -8465,7 +8464,7 @@ function notifPlan(){
       const noon=new Date(today()+'T12:00:00').getTime();
       const ts9=Math.max(noon,Date.now()+45*60000);
       items.push({id:'dr'+today(),ts:Math.round(ts9/1000),title:'Allena',
-        body:'A deep read is ready \u2014 enough new training has landed since the last one.'})}}catch(e){}}
+        body:'Your deep read is ready.'})}}catch(e){}}
   /* the fuse (owner ruling, 3 Sep): when an analysis is ONE unit
      from unlocking, that is the most motivating true fact the app
      holds — it gets the 11:00 slot. Real threshold, filled by
@@ -8477,7 +8476,7 @@ function notifPlan(){
       const at11=new Date(today()+'T11:00:00').getTime();
       if(at11>Date.now()+60000)
         items.push({id:'fu'+today(),ts:Math.round(at11/1000),title:'Allena',
-          body:'One away: \u201c'+String(nr.t)+'\u201d \u2014 '+nr.have+' of '+nr.need+'. '+(nr.act||'Today\u2019s logging can light it.')})}}catch(e){}}
+          body:'One away from \u201c'+String(nr.t)+'\u201d: '+nr.have+' of '+nr.need+'.'})}}catch(e){}}
   /* the day's call — 16:30, only while today's session is still owed.
      A real prescription with its real reason, never a guilt ping;
      replanned away the moment the session is done (notifSync re-runs
@@ -8496,7 +8495,7 @@ function notifPlan(){
         const cue9=P.cueL?P.cueL+' \u2014 ':'';
         const body9=(v9&&v9.wait)
           ?cue9+'Today\u2019s call: recovery. '+String(v9.d||'').slice(0,140)
-          :cue9+'Today\u2019s call: '+String(rec.top.name)+' \u2014 '+String((v9&&v9.d)||rec.why||'').slice(0,120)+'.';
+          :cue9+'Today\u2019s call: '+String(rec.top.name)+'. '+String((v9&&v9.d)||rec.why||'').slice(0,120)+'.';
         if(at430>Date.now()+60000)
           items.push({id:'dc'+today(),ts:Math.round(at430/1000),title:'Allena',
             body:body9})}}}catch(e){}}
@@ -8519,38 +8518,34 @@ function notifPlan(){
      matter — application is continuous even when discovery is quiet */
   if(P.reveal){try{(typeof whisperGen==='function'?whisperGen():[]).forEach(w=>{
     if(w.slot*1000>Date.now()+60000)items.push({id:w.id,ts:w.slot,title:'Allena',body:w.body})})}catch(e){}}
-  /* the honest reachable-find nudge (owner call, 3 Sep, reframed): NOT
-     'go run to unlock' as blind bait — only when a find is genuinely
-     one action away, and it names the real thing. Fires at most one a
-     day, afternoon. */
-  if(P.reveal){try{
-    const W=(typeof watchList==='function')?watchList():[];
-    const near=W.find(w=>w.need-w.have===1);
-    if(near){const at=new Date(today()+'T15:30:00').getTime();
-      if(at>Date.now()+60000)
-        items.push({id:'nf'+today(),ts:Math.round(at/1000),title:'Allena',
-          body:'One session from unlocking \u201c'+String(near.t).slice(0,50)+'\u201d \u2014 today\u2019s the day.'})}}catch(e){}}
+  /* the 15:30 reachable-find ping was RETIRED (beta-caught, 7 Sep):
+     it restated the 11:00 fuse — the same one-away fact, twice a day. */
   /* the persistent Health nudge (owner call): if the wrapper is
      installed but nothing flows, remind every few days — this is the
      one that unlocks everything, so it earns the reminder */
   if(P.on&&typeof inWrapper==='function'&&inWrapper()&&typeof healthFlowing==='function'&&!healthFlowing()){
     const at=new Date(dayKey(new Date(Date.now()+2*864e5))+'T10:00:00').getTime();
     items.push({id:'hc'+dayKey(new Date(Date.now()+2*864e5)),ts:Math.round(at/1000),title:'Allena',
-      body:'Allena is still waiting on Apple Health — connect it and the finds no other app can make switch on.'})}
+      body:'Apple Health isn\u2019t connected yet. Most of the best finds need it.'})}
   if(P.quest){const d=new Date();const dow=(d.getDay()+6)%7;
     const mon=dayKey(new Date(Date.now()+(7-dow)*864e5));
     items.push({id:'q'+mon,ts:at(mon,9,0),title:'Allena',body:'A new quest is up for the week.'})}
-  /* scattered, capped, ranked: slots are spread across the day
-     (7:30 readiness \u00b7 11:00 fuse \u00b7 12:00 deep read \u00b7 15:30
-     reachable find \u00b7 16:30 the call \u00b7 18/8:00 physio \u00b7 19:30
-     reveal) and each day keeps its best FOUR at most — scatter is
-     texture, five pings is spam. */
-  const priOf=id=>/^ap/.test(id)?0:/^sc/.test(id)?1:/^am/.test(id)?1:/^dr/.test(id)?2:/^fu/.test(id)?3:/^nf/.test(id)?4:/^dc/.test(id)?5:/^wh/.test(id)?6:/^rv/.test(id)?7:/^q\d/.test(id)?8:/^wr/.test(id)?9:10;
+  /* THE PACE BUDGET (beta-caught, 7 Sep: testers reported dozens a
+     day). Appointment reminders are exempt — user-created, two per
+     visit at most. Everything else competes for a daily budget:
+     Quiet 1 / Standard 2 / Chatty 4, default Standard. Pings that
+     ALREADY FIRED today count against it, so an afternoon replan can
+     never top the day back up. */
+  const budget={quiet:1,standard:2,chatty:4}[P.pace||'standard']||2;
+  const priOf=id=>/^am/.test(id)?0:/^dc/.test(id)?1:/^reh/.test(id)?2:/^sc/.test(id)?3:/^dr/.test(id)?4:/^fu/.test(id)?5:/^rv/.test(id)?6:/^wh/.test(id)?7:/^q\d/.test(id)?8:/^wr/.test(id)?9:10;
+  const exempt=id=>/^(ap1|ap2|fl|restend)/.test(String(id));
+  let used=0;try{const now9=Math.round(Date.now()/1000);
+    used=(P.sched||[]).filter(x=>x.ts<=now9&&dayKey(new Date(x.ts*1000))===today()&&!exempt(x.id)).length}catch(e){}
   const byD={};
-  items.forEach(it=>{const d9=dayKey(new Date(it.ts*1000));(byD[d9]=byD[d9]||[]).push(it)});
-  const keep=[];
+  const keep=items.filter(it=>exempt(it.id));
+  items.filter(it=>!exempt(it.id)).forEach(it=>{const d9=dayKey(new Date(it.ts*1000));(byD[d9]=byD[d9]||[]).push(it)});
   Object.keys(byD).forEach(d9=>{byD[d9].sort((a,b)=>priOf(a.id)-priOf(b.id));
-    keep.push.apply(keep,byD[d9].slice(0,5))});
+    keep.push.apply(keep,byD[d9].slice(0,Math.max(0,budget-(d9===today()?used:0))))});
   return keep.filter(x=>x.ts*1000>Date.now())}
 function notifPreviewHtml(){
   /* the trust surface (owner-approved, 3 Sep): the exact pings iOS is
@@ -8858,12 +8853,12 @@ function sorceryOnArrival(kind){
         const effs=rides().map(x=>rideEff(x)).filter(x=>x!=null).sort((a,b)=>b-a);
         const e9=rideEff(r),rank=effs.indexOf(e9)+1;
         if(rank>0&&rank<=3&&effs.length>=5)sorceryQueue('workout',
-          'That ride: efficiency '+e9+' \u2014 your '+(rank===1?'best ever':rank===2?'second best':'third best')+' of '+effs.length+'. The engine is growing.')}
+          'That ride: efficiency '+e9+'. Your '+(rank===1?'best':rank===2?'second best':'third best')+' of '+effs.length+' rides.')}
       else if(isRunType(r.type)&&r.km>3&&r.mins>0){
         const paces=(S.runs||[]).filter(x=>isRunType(x.type)&&x.km>3&&x.mins>0).map(x=>x.mins/x.km).sort((a,b)=>a-b);
         const p9=r.mins/r.km,rank=paces.indexOf(p9)+1;
         if(rank>0&&rank<=3&&paces.length>=6)sorceryQueue('workout',
-          'That run: '+paceStr(p9)+'/km \u2014 '+(rank===1?'your fastest ever':'top three all-time')+' at this distance class. Logged and counted.')}
+          'That run: '+paceStr(p9)+'/km. '+(rank===1?'Your fastest yet':'Top three all-time')+'.')}
       return}
     if(kind==='steps'){
       /* today's PARTIAL steps already beat 90% of complete days */
@@ -8874,7 +8869,7 @@ function sorceryOnArrival(kind){
       if(hist.length<14)return;
       const p90=hist[Math.floor(hist.length*0.9)];
       if(cur>p90&&new Date().getHours()<=18)sorceryQueue('steps',
-        cur.toLocaleString()+' steps already \u2014 past 90% of your complete days with hours left. Legs will carry this into tomorrow\u2019s ledger.');
+        cur.toLocaleString()+' steps already. That beats 90% of your full days.');
       return}
     if(kind==='fuel'){
       /* a banked carb insight + a run planned tomorrow + today's carbs
@@ -8894,7 +8889,7 @@ function sorceryOnArrival(kind){
       if(cur==null||hist.length<7)return;
       const med=hist[Math.floor(hist.length/2)];
       if(cur<med*0.6)sorceryQueue('fuel',
-        'Tomorrow runs, and today sits at '+Math.round(cur)+'g carbs \u2014 your good run days usually land near '+Math.round(med)+'g. The window is this evening.');
+        'You run tomorrow and today sits at '+Math.round(cur)+'g carbs. Your good run days usually land near '+Math.round(med)+'g.');
       return}
   }catch(e){}}
 
@@ -10430,13 +10425,13 @@ function whisperGen(){
       if(runsTomorrow){
         const f=corr.find(c=>/^(carb|kcal|protein)/.test(c.sig)&&/(pace|beatkm)/.test(c.out)&&c.lag>=1);
         if(f)out.push({slot:at(14,0),id:'wh-fuel'+today(),
-          body:'Tomorrow has a run on it \u2014 and your own data says '+f.t.toLowerCase()+'. Today is when that meal happens.'})}}catch(e){}
+          body:'You run tomorrow. In your data: '+f.t.toLowerCase()+'.'})}}catch(e){}
     // 2. THE NIGHT BEFORE — sleep drives a lift outcome, and tomorrow has a session owed
     try{const c9=weekClock();
       if(c9&&c9.remaining&&c9.remaining.length){
         const f=corr.find(c=>/^sleep/.test(c.sig)&&/(topset|tonnage|benchtop|squattop|deadtop|ex:)/.test(c.out)&&c.lag>=1);
         if(f)out.push({slot:at(20,30),id:'wh-night'+today(),
-          body:'Training tomorrow \u2014 and in your data, '+f.t.toLowerCase()+'. Tonight is where that number comes from.'})}}catch(e){}
+          body:'Training tomorrow. In your data: '+f.t.toLowerCase()+'.'})}}catch(e){}
     // 3. THE EDGE — today's call includes a goal lift; replay the last PR's real context
     try{const rec=(typeof recommendToday==='function')?recommendToday():null;
       if(rec&&rec.top&&!rec.empty){
@@ -10454,7 +10449,7 @@ function whisperGen(){
           if(row.ready!=null)bits.push('readiness at '+Math.round(row.ready));
           if(bits.length){
             out.push({slot:at(10,30),id:'wh-edge'+today(),
-              body:'Your last '+hitEx+' PR came off '+bits.join(', ')+'. '+String(rec.top.name||'Today')+' is on the card \u2014 the recipe is in your own history.'});
+              body:'Your last '+hitEx+' PR came off '+bits.join(', ')+'. '+String(rec.top.name||'Today')+' is on today\u2019s card.'});
             /* the recipe BANKS as a find (owner-caught, 7 Sep: 'where
                is this finding? I can't find it' — it only existed as a
                notification). One per PR, stable id; a new PR writes a
@@ -10484,8 +10479,8 @@ function whisperGen(){
       if(echo){const ago=nowY-echo.y,agoTxt=ago===1?'A year ago this week':ago+' years ago this week';
         out.push({slot:at(12,30),id:'wh-echo'+today(),
           body:echo.kind==='run'
-            ?agoTxt+' you ran '+echo.km+' km at '+Math.floor(echo.pace)+':'+String(Math.round((echo.pace%1)*60)).padStart(2,'0')+'/km. The road remembers.'
-            :agoTxt+', your best '+echo.ex+' worked out to ~'+Math.round(echo.e1)+' kg. That lifter is still in there.'})}}catch(e){}
+            ?agoTxt+' you ran '+echo.km+' km at '+Math.floor(echo.pace)+':'+String(Math.round((echo.pace%1)*60)).padStart(2,'0')+'/km.'
+            :agoTxt+', your best '+echo.ex+' worked out to ~'+Math.round(echo.e1)+' kg.'})}}catch(e){}
     // 5. THE CHASE — an old PR, resurfaced ONLY when current form is
     //    provably within reach (no fake urgency, ever)
     try{
@@ -10504,7 +10499,7 @@ function whisperGen(){
         const ratio=rec/old.e1;
         if(ratio>=0.96&&ratio<1&&(!chase||ratio>chase.ratio))chase={ex:b2,old:old,rec:rec,ratio:ratio}});
       if(chase)out.push({slot:at(15,0),id:'wh-chase'+today(),
-        body:'Your all-time '+chase.ex+' works out to ~'+Math.round(chase.old.e1)+' kg ('+chase.old.w+'\u00d7'+chase.old.r+', '+chase.old.y+'). The last three weeks put you at ~'+Math.round(chase.rec)+' \u2014 that is '+Math.round((1-chase.ratio)*100)+'% away. It is in reach.'})}catch(e){}
+        body:'Your all-time '+chase.ex+' works out to ~'+Math.round(chase.old.e1)+' kg ('+chase.old.w+'\u00d7'+chase.old.r+', '+chase.old.y+'). The last three weeks put you at ~'+Math.round(chase.rec)+'. About '+Math.round((1-chase.ratio)*100)+'% off.'})}catch(e){}
   }catch(e){}
   return out.slice(0,3)}
 
@@ -16779,6 +16774,13 @@ function notifPageHtml(){
       '<span style="color:var(--faint);font-size:11px">'+k[2]+'</span></span>'+
       '<button data-a="notifKind" data-v="'+k[0]+'" class="pill'+(NP[k[0]]?' on':'')+'" style="width:56px;padding:8px 0;font-size:11px">'+(NP[k[0]]?'On':'Off')+'</button></div>').join(''):'')+
     '<p style="color:var(--faint);font-size:11px;line-height:1.5;margin-top:10px">Every notification carries a real fact tied to a real date. There is no “we miss you” — by design, there never will be.</p></div>'+
+    (NP.on?'<div class="card mt" style="padding:13px 15px">'+
+    '<p style="font-size:13.5px;font-weight:600">How often</p>'+
+    '<p style="color:var(--faint);font-size:11px;line-height:1.5;margin-top:3px">Rest timers and appointment reminders always come through. This caps everything else.</p>'+
+    '<div class="row" style="gap:6px;margin-top:10px">'+
+    [['quiet','Quiet','1 a day'],['standard','Standard','2 a day'],['chatty','Chatty','4 a day']].map(p9=>
+      '<button data-a="notifPace" data-v="'+p9[0]+'" class="pill'+((NP.pace||'standard')===p9[0]?' on':'')+'" style="flex:1;font-size:11.5px;padding:8px 0;line-height:1.35">'+p9[1]+'<br><span style="font-size:9.5px;color:var(--faint)">'+p9[2]+'</span></button>').join('')+
+    '</div></div>':'')+
     '<div class="card mt" style="padding:13px 15px">'+
     '<p style="font-size:13.5px;font-weight:600">When do you usually train?</p>'+
     '<p style="color:var(--faint);font-size:11px;line-height:1.5;margin-top:3px">The day\u2019s call lands at your moment, not the clock\u2019s \u2014 a plan tied to a cue you already have sticks about twice as well.</p>'+
@@ -20564,6 +20566,9 @@ function runAction(a,v,t,e){
     case 'availEqApply':{try{const r=equipRework();
       S.confirm={t:'Rework the block?',m:r.summary,yes:'availEqGo',v:''};render()}catch(e){flash('Nothing to rework.')}break}
     case 'availEqGo':{try{equipReworkApply();S.confirm=null;render();flash('Block reworked around your equipment.')}catch(e){S.confirm=null;flash('Could not rework.')}break}
+    case 'notifPace':{
+      const P=notifPrefs();P.pace=v;notifSave();
+      try{notifSync()}catch(e){}render();break}
     case 'cueTime':{const P9=notifPrefs();const pr9=String(v).split('|');
       P9.cueT=pr9[0];P9.cueL=pr9[1]||'';lset(K_NOTIF,P9);
       flash('Your call now lands at '+pr9[0]+' \u2014 '+(pr9[1]||'').toLowerCase()+'.');
