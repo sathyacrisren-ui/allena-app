@@ -666,7 +666,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='fa2f3e';  // stamped by tools/build.py with the content hash
+const BUILD_ID='3b4176';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -1658,8 +1658,8 @@ function friendsSection(){
     const mine=Math.round((dataPoints().weekLive)||0);
     const L=frLinked();
     const open=(S.frRows||[]).filter(x=>!x.linked_at&&x.owner_id===S.frMe);
-    return '<p class="eyebrow mt2">Friends — the weekly race</p>'+
-      '<p style="color:var(--faint);font-size:11.5px;line-height:1.55;margin-top:4px">Live points only, fresh every Monday. Showing up and honest logging is the whole game — rest days earn too.</p>'+
+    return '<p class="eyebrow mt2">The weekly race</p>'+
+      '<p style="color:var(--faint);font-size:11.5px;line-height:1.55;margin-top:4px">Live points only, fresh every Monday \u2014 rest days earn too.</p>'+
       (L.length?'<div class="card mt" style="padding:13px 15px">'+
         '<div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font-size:13px;font-weight:600">You</span><span class="mono" style="font-size:15px;font-weight:700">'+mine+'</span></div>'+
         L.map(f=>{const lead=mine-f.week;
@@ -1680,6 +1680,21 @@ function friendsSection(){
       '<div class="row mt" style="gap:8px">'+
       '<input data-in="frIn" placeholder="Friend\u2019s code" value="'+esc(S.frIn||'')+'" style="flex:2;min-height:44px;text-transform:uppercase">'+
       '<button data-a="frJoinGo" class="btn" style="flex:1;font-size:12.5px">Link up</button></div>'}catch(e){return ''}}
+function viewSocial(){
+  /* Social gets its own room (owner call, 7 Sep): the duel, the
+     friends list, invites — everything head-to-head lives here. */
+  let inner='';
+  if(!(acctReady()&&acct())){
+    inner='<div class="card mt2" style="padding:16px">'+
+      '<p style="font-size:14px;font-weight:600">Sign in to race</p>'+
+      '<p style="color:var(--dim);font-size:12.5px;line-height:1.6;margin-top:5px">An email and a code \u2014 then swap invite codes with a friend and race the week on live points. Fresh every Monday; showing up is the whole game.</p>'+
+      '<button data-a="nav" data-v="acct" class="big disp mt" style="background:var(--amber);color:var(--bg);font-size:14.5px">Sign in</button></div>'}
+  else inner=(typeof friendsSection==='function'?friendsSection():'');
+  return '<div class="view pad stg" style="padding-top:24px">'+
+    '<button data-a="back" class="btn" style="width:auto;padding:8px 14px;color:var(--dim);font-size:12.5px;margin-bottom:14px">\u2039 Back</button>'+
+    '<h1 class="disp" style="font-size:25px;font-weight:600">Social</h1>'+
+    '<p style="color:var(--dim);font-size:13px;line-height:1.6;margin-top:8px">Compete on showing up \u2014 never on output. Weekly live points, honest by construction.</p>'+
+    inner+'</div>'}
 let acctSyncT=null;
 function acctSyncSoon(){
   if(!acctReady()||!acct())return;
@@ -6300,16 +6315,7 @@ function viewPoints(){
      '<p class="mono" style="color:var(--faint);font-size:10.5px;margin-top:7px">'+(nx[0]-d.total).toLocaleString()+' more to '+esc(nx[1])+'</p>':
      '<p class="mono" style="color:var(--faint);font-size:10.5px;margin-top:10px">Top tier. There is nothing above this.</p>')+
    '<button data-a="treeShare" class="btn mt2" style="color:var(--amber);border-color:color-mix(in srgb, var(--text) 42%, transparent)">Share the tree</button>'+
-   /* add a friend where the currency lives (owner call, 7 Sep): the
-      full link-up section when signed in; a quiet door when not */
-   ((typeof friendsSection==='function')?(function(){
-     const fs=friendsSection();
-     if(fs)return fs;
-     if(typeof acctReady==='function'&&acctReady()&&!(typeof acct==='function'&&acct()))
-       return '<button data-a="nav" data-v="acct" class="card mt2" style="width:100%;text-align:left;padding:13px 15px;display:block">'+
-         '<p style="font-size:13.5px;font-weight:600">Add a friend — race the week</p>'+
-         '<p style="color:var(--faint);font-size:11.5px;line-height:1.5;margin-top:3px">Sign in with your email and swap invite codes. Live points, fresh every Monday.</p></button>';
-     return ''})():'')+
+   '<button data-a="nav" data-v="social" class="btn mt" style="color:var(--dim);font-size:12.5px">Friends \u2014 the weekly race \u203a</button>'+
    '</div>';
   /* keep it climbing: what today could still earn, each row a door */
   {const room=d.room||0;
@@ -8277,9 +8283,17 @@ try{if(!svCapture())setTimeout(svAutoSync,4000)}catch(e){}
    server, no tokens. */
 const K_NOTIF='training-notif-v1';
 window.notifTapped=function(id){
-  /* the notification tap lands inside the moment (owner call, 7 Sep) —
-     wired natively in build 7; until then the echo card is the way in */
-  try{const P=notifPrefs();const x=(P.sched||[]).find(s9=>s9.id===id);
+  /* the tap routes by KIND (owner-caught: the rest timer got the full
+     constellation — a utility ping is a door, not a moment):
+     rest → the session, day's call/morning → Today, physio → Rehab;
+     only genuine moments earn the ceremony. */
+  try{
+    id=String(id||'');
+    if(/^(re$|restdone|restend|re\d)/.test(id)||(/^re/.test(id)&&!/^reh/.test(id))){
+      if(S.sess){S.sheet=null;S.view='session';render()}return}
+    if(/^(am|dc)/.test(id)){S.sheet=null;S.view='today';render();return}
+    if(/^(ap|reh)/.test(id)){S.sheet=null;S.view='acl';render();return}
+    const P=notifPrefs();const x=(P.sched||[]).find(s9=>s9.id===id);
     if(!x)return;
     P.echoSeen=P.echoSeen||{};P.echoSeen[id]=1;lset(K_NOTIF,P);
     S.signalReveal={e:'\u2726 '+notifEchoKind(id),c:'#30D158',t:'While you were away',d:String(x.body)};
@@ -15232,7 +15246,7 @@ function viewToday(){
         '<div style="width:58px;height:58px;border-radius:58px;background:var(--raised);border:2.5px solid '+ringCol+';display:flex;align-items:center;justify-content:center;font-size:23px;font-weight:700'+(glow?';box-shadow:0 0 16px 0 color-mix(in srgb, '+ringCol+' 45%, transparent)':'')+'">'+esc(init)+'</div>'+
         '<span style="font-size:12px;font-weight:600;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(nm)+'</span></div>';
       const tot=Math.max(1,mine+top.week);
-      h+='<button data-a="nav" data-v="acct" class="card mt" style="width:100%;text-align:center;padding:15px 16px;display:block">'+
+      h+='<button data-a="nav" data-v="social" class="card mt" style="width:100%;text-align:center;padding:15px 16px;display:block">'+
         '<p class="mono" style="font-size:9px;letter-spacing:.12em;color:var(--faint)">THE WEEK\u2019S DUEL \u00b7 RESETS MONDAY</p>'+
         '<div style="display:flex;align-items:center;gap:8px;margin-top:11px">'+
         ava(myN,myInit,lead>=0?'var(--green)':'var(--line)',lead>0)+
@@ -16701,7 +16715,7 @@ function viewAcct(){
    '<button data-a="back" style="width:42px;height:42px;border-radius:42px;background:var(--surface);border:1px solid var(--line);color:var(--dim);display:flex;align-items:center;justify-content:center;flex:none;font-size:16px">\u2039</button>'+
    '<h1 class="disp" style="font-size:19px;font-weight:600;flex:1;text-align:center;margin:0">Account &amp; sync</h1>'+
    '<span style="width:42px;flex:none"></span></div>'+
-   accountSection()+((typeof friendsSection==='function')?friendsSection():'')+'</div>'}
+   accountSection()+'</div>'}
 function reportPageHtml(){
   return '<p style="color:var(--dim);font-size:13px;line-height:1.6;margin-top:8px">Something broken, confusing, or just not right? One tap opens an email to the developer — Allena fills in what build you are on so you do not have to.</p>'+
     '<button data-a="reportEmail" class="big disp mt" style="background:var(--amber);color:var(--bg);font-size:15px">Email the developer</button>'+
@@ -18458,6 +18472,7 @@ function render(){
   else if(S.view==='signals')body=viewSignals();
   else if(S.view==='guide')body=viewGuide();
   else if(S.view==='acct')body=viewAcct();
+  else if(S.view==='social')body=viewSocial();
   else if(S.view==='today'&&typeof arrivalDue==='function'&&arrivalDue())body=viewArrival();
   else if(S.view==='sigdetail')body=viewSigDetail();
   else if(S.view==='ride')body=viewRide();
@@ -18481,7 +18496,7 @@ function render(){
   const DOT={acl:unseenRehab(),findings:unseenPatterns()+unseenDiscoveries(),run:unseenRun(),
     signals:(typeof unseenSignals==='function'?unseenSignals():0),
     collection:(typeof collFreshN==='function'?collFreshN():0)};
-  const isOn=k=>S.view===k||(k==='today'&&(S.view==='points'||S.view==='collection'||S.view==='findings'||S.view==='territory'))||(k==='home'&&S.view==='quick')||(k==='acl'&&(S.view==='proto'||S.view==='aclpath'||S.view==='diary'||S.view==='report'));
+  const isOn=k=>S.view===k||(k==='today'&&(S.view==='points'||S.view==='collection'||S.view==='findings'||S.view==='territory'))||(k==='social'&&S.view==='social')||(k==='home'&&S.view==='quick')||(k==='acl'&&(S.view==='proto'||S.view==='aclpath'||S.view==='diary'||S.view==='report'));
   const I2=SET_ICONS;
   const drow=(k,label,ic,a,v)=>'<button data-a="'+(a||'drawerNav')+'" data-v="'+(v||k)+'" class="drow'+(isOn(k)?' on':'')+'">'+
     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">'+ic+'</svg>'+
@@ -18514,6 +18529,7 @@ function render(){
       (hasColl?drow('collection','The collection',I2.star):'')+
       (hasStand?drow('standing','Where you stand',I2.trend):'')+
       (hasHealth?drow('signals','Health data',I2.heart):'')+
+      drow('social','Social','<circle cx="8" cy="9" r="3.4"/><circle cx="16" cy="9" r="3.4"/><path d="M3.5 19c.6-3 2.3-4.6 4.5-4.6S12 16 12.5 19"/><path d="M11.5 19c.6-3 2.3-4.6 4.5-4.6s3.9 1.6 4.5 4.6"/>')+
       (hasFinds?drow('history','History',I2.save):'')+
       drow('history','Import your data',I2.load,'intakeOpen')+
       drow('data','Report a problem',I2.bug,'drawerReport','')+
