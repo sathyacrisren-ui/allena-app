@@ -663,7 +663,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='757075';  // stamped by tools/build.py with the content hash
+const BUILD_ID='a75781';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -8113,6 +8113,40 @@ try{if(!svCapture())setTimeout(svAutoSync,4000)}catch(e){}
    real events; the native side schedules them locally. No
    server, no tokens. */
 const K_NOTIF='training-notif-v1';
+window.notifTapped=function(id){
+  /* the notification tap lands inside the moment (owner call, 7 Sep) —
+     wired natively in build 7; until then the echo card is the way in */
+  try{const P=notifPrefs();const x=(P.sched||[]).find(s9=>s9.id===id);
+    if(!x)return;
+    P.echoSeen=P.echoSeen||{};P.echoSeen[id]=1;lset(K_NOTIF,P);
+    S.signalReveal={e:'\u2726 '+notifEchoKind(id),c:'#30D158',t:'While you were away',d:String(x.body)};
+    try{hapticRun('find')}catch(e9){}
+    render()}catch(e){}};
+function notifEchoSave(items){
+  /* a notification must never be the only copy (owner ruling, 7 Sep:
+     the coolest line of the day lived in a dismissible banner). Every
+     scheduled item is kept; fired ones from earlier plans survive the
+     replan for 48h so the app can greet you with them. */
+  try{
+    const P=notifPrefs();const now=Math.round(Date.now()/1000);
+    const keep={};(P.sched||[]).forEach(x=>{if(x.ts<=now&&x.ts>now-48*3600)keep[x.id]=x});
+    (items||[]).forEach(x=>{keep[x.id]={id:x.id,ts:x.ts,body:x.body}});
+    P.sched=Object.keys(keep).map(k=>keep[k]).sort((a,b)=>b.ts-a.ts).slice(0,30);
+    P.echoSeen=P.echoSeen||{};
+    Object.keys(P.echoSeen).forEach(id=>{if(!keep[id])delete P.echoSeen[id]});
+    lset(K_NOTIF,P)}catch(e){}}
+function notifEchoes(){
+  /* fired, unseen, echo-worthy — rest timers, the morning nag, the
+     day's call and appointment reminders stay out (each already has a
+     louder in-app home) */
+  try{
+    const P=notifPrefs();const now=Math.round(Date.now()/1000);
+    return (P.sched||[]).filter(x=>x.ts<=now&&x.ts>now-48*3600&&!(P.echoSeen||{})[x.id]&&
+      !/^(re|am|dc|ap1|ap2)/.test(String(x.id)))}catch(e){return []}}
+function notifEchoKind(id){
+  const M={ap:'YOUR PHYSIO',dr:'A DEEP READ IS READY',fu:'ONE AWAY',nf:'A REACHABLE FIND',rv:'THE EVENING REVEAL',q:'A NEW QUEST',wr:'THE MONTHLY WRAP',hc:'HEALTH LINK',reh:'YOUR PHYSIO\u2019S PLAN'};
+  for(const k of ['reh','ap','dr','fu','nf','rv','wr','hc','q'])if(String(id).slice(0,k.length)===k)return M[k];
+  return 'FROM YOUR OWN HISTORY'}
 function notifPrefs(){return S.notifP||(S.notifP=lget(K_NOTIF,{on:true,morning:true,appt:true,wrap:true,quest:true,reveal:true}))}
 function notifSave(){lset(K_NOTIF,S.notifP)}
 function notifPlan(){
@@ -8315,7 +8349,8 @@ function restNotifSync(){
     const ri=restNotifItem();if(ri)items.unshift(ri) /* FIRST in line — the native side takes only the plan's head, and a full week of items pushed the rest alert off the end */;
     S._notifSent={t:new Date().toTimeString().slice(0,8),n:items.length,rest:items.some(x=>x.id==='restend')?'YES':'no',via:'restNotifSync'};
     window.webkit.messageHandlers.allena.postMessage(JSON.stringify(
-      {type:'notif',on:!!P.on,items:items,badge:(typeof unseenFindings==='function')?unseenFindings():0}))
+      {type:'notif',on:!!P.on,items:items,badge:(typeof unseenFindings==='function')?unseenFindings():0}));
+    notifEchoSave(items)
   }catch(e){S._notifSent={t:new Date().toTimeString().slice(0,8),err:String(e&&e.message||e),via:'restNotifSync'}}
   restLiveSync()}
 function restLiveSync(){
@@ -8346,7 +8381,8 @@ function notifSync(){
     const ri=restNotifItem();if(ri)items.unshift(ri) /* FIRST in line — the native side takes only the plan's head, and a full week of items pushed the rest alert off the end */; // a re-sync mid-rest must never wipe the pending rest alert
     S._notifSent={t:new Date().toTimeString().slice(0,8),n:items.length,rest:items.some(x=>x.id==='restend')?'YES':'no',via:'notifSync'};
     window.webkit.messageHandlers.allena.postMessage(JSON.stringify(
-      {type:'notif',on:!!P.on,items:items,badge:P.on?badge:0}))
+      {type:'notif',on:!!P.on,items:items,badge:P.on?badge:0}));
+    notifEchoSave(items)
   }catch(e){S._notifSent={t:new Date().toTimeString().slice(0,8),err:String(e&&e.message||e),via:'notifSync'}}}
 try{setTimeout(notifSync,5000);
   document.addEventListener('visibilitychange',function(){
@@ -14941,6 +14977,15 @@ function viewToday(){
      unlocks the whole engine, so it is the FIRST thing a fresh
      account sees (owner call, 3 Sep) */
   try{if(typeof healthConnectCard==='function')h+=healthConnectCard()}catch(e){}
+  try{const ec=(typeof notifEchoes==='function')?notifEchoes():[];
+    if(ec.length){
+      h+='<div class="card mt find-glow" style="padding:14px 16px;position:relative;border-radius:20px">'+dustF(4)+
+        '<div style="display:flex;align-items:baseline;gap:10px"><p class="eyebrow" style="color:var(--green);flex:1">While you were away</p>'+
+        '<button data-a="echoSeen" class="mono" style="color:var(--faint);font-size:10px;flex:none">DISMISS</button></div>'+
+        ec.slice(0,3).map(x=>'<button data-a="echoOpen" data-v="'+esc(x.id)+'" style="display:block;width:100%;text-align:left;margin-top:9px">'+
+          '<p class="mono" style="font-size:8.5px;letter-spacing:.08em;color:var(--faint)">'+notifEchoKind(x.id)+'</p>'+
+          '<p style="font-size:13px;line-height:1.55;margin-top:2px">'+esc(String(x.body).slice(0,180))+'</p></button>').join('')+
+        (ec.length>3?'<p class="mono" style="color:var(--faint);font-size:9.5px;margin-top:7px">and '+(ec.length-3)+' more</p>':'')+'</div>'}}catch(e){}
   h+=verdictCard();
   h+=todayOrder().join('');
   return h+'</div>'}
@@ -20051,6 +20096,18 @@ function runAction(a,v,t,e){
     case 'hcStuckHide':{S.hcStuck=0;const P=notifPrefs();P.hcDismissed=1;notifSave();render();break}
     case 'healthConnectLater':{const P=notifPrefs();P.hcDismissed=1;notifSave();render();
       flash('No rush — the reminder will nudge you. It is the one thing that changes everything.');break}
+    case 'echoOpen':{
+      try{const P=notifPrefs();const x=(P.sched||[]).find(s9=>s9.id===v);
+        if(x){P.echoSeen=P.echoSeen||{};P.echoSeen[x.id]=1;lset(K_NOTIF,P);
+          S.signalReveal={e:'\u2726 '+notifEchoKind(x.id),c:'#30D158',
+            t:'While you were away',d:String(x.body)};
+          try{hapticRun('find')}catch(e9){}}}catch(e){}
+      render();break}
+    case 'echoSeen':{
+      try{const P=notifPrefs();P.echoSeen=P.echoSeen||{};
+        (typeof notifEchoes==='function'?notifEchoes():[]).forEach(x=>P.echoSeen[x.id]=1);
+        lset(K_NOTIF,P)}catch(e){}
+      render();break}
     case 'signalOpen':{const sg=signalDue();if(sg){S.signalReveal=sg;render()}break}
     case 'signalKeep':{const sg=S.signalReveal;
       if(sg&&sg.kind==='epic'){const seen=lget('training-revealseen-v1',{})||{};seen[sg.id]=1;lset('training-revealseen-v1',seen)}
