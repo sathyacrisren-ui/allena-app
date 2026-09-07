@@ -666,7 +666,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='9b4bef';  // stamped by tools/build.py with the content hash
+const BUILD_ID='c6c435';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -10452,8 +10452,18 @@ function whisperGen(){
           if(row.sleep!=null)bits.push(Math.round(row.sleep/6)/10+'h of sleep');
           if(row.carb!=null)bits.push(Math.round(row.carb)+'g of carbs the day before');
           if(row.ready!=null)bits.push('readiness at '+Math.round(row.ready));
-          if(bits.length)out.push({slot:at(10,30),id:'wh-edge'+today(),
-            body:'Your last '+hitEx+' PR came off '+bits.join(', ')+'. '+String(rec.top.name||'Today')+' is on the card \u2014 the recipe is in your own history.'})}}}catch(e){}
+          if(bits.length){
+            out.push({slot:at(10,30),id:'wh-edge'+today(),
+              body:'Your last '+hitEx+' PR came off '+bits.join(', ')+'. '+String(rec.top.name||'Today')+' is on the card \u2014 the recipe is in your own history.'});
+            /* the recipe BANKS as a find (owner-caught, 7 Sep: 'where
+               is this finding? I can't find it' — it only existed as a
+               notification). One per PR, stable id; a new PR writes a
+               new recipe. Lives in the collection with everything else. */
+            try{
+              const rid='recipe:'+hitEx+':'+String(hit.date).slice(0,10);
+              if(!bank[rid]){bank[rid]={t:'The '+hitEx+' PR recipe',
+                d:'Your PR on '+fmtDate(String(hit.date).slice(0,10)+'T12:00')+' came off '+bits.join(', ')+'. Not proof of cause \u2014 but it is the one day the recipe provably worked. Worth recreating on the next attempt.',
+                rar:'rare',tag:'insight',found:today()};bankSave()}}catch(e8){}}}}}catch(e){}
     // 4. THE ECHO — this week, a year or more ago, something real happened
     try{
       const now=new Date(),doy=k=>{const d=new Date(String(k).slice(0,10)+'T12:00');return{y:d.getFullYear(),m:d.getMonth(),day:d.getDate(),t:d.getTime()}};
