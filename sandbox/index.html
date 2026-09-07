@@ -666,7 +666,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='3c629a';  // stamped by tools/build.py with the content hash
+const BUILD_ID='2493a1';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -1592,6 +1592,19 @@ async function frLoad(force){
       if(!r2.ok)r2=await fetch(CLOUD.url+'/rest/v1/snapshots?select=user_id,display,week_live,week_sessions,live_points,tier&user_id=in.('+ids.map(encodeURIComponent).join(',')+')',{headers:h});
       S.frSnaps=r2.ok?await r2.json():[]}
     else S.frSnaps=[];
+    try{
+      /* repair (7 Sep): the first Monday judged the week BEFORE the
+         links existed. Any verdict for a week that ended on or before
+         the earliest link is deleted, its banked duel find with it. */
+      const a8=acct()||{};const hist8=a8.duelHist||{};
+      const first8=(S.frRows||[]).filter(x=>x.linked_at)
+        .map(x=>String(x.linked_at).slice(0,10)).sort()[0];
+      let cut8=0;
+      Object.keys(hist8).forEach(k=>{
+        const end8=dayKey(new Date(new Date(k+'T12:00').getTime()+7*864e5));
+        if(!first8||end8<=first8){delete hist8[k];cut8++;
+          try{const b8=discBank();if(b8['duel:'+k]){delete b8['duel:'+k];bankSave()}}catch(e8){}}});
+      if(cut8)lset(K_ACCT,Object.assign({},a8,{duelHist:hist8}))}catch(e9){}
     try{duelVerdict()}catch(e9){}
     /* the link ceremony (owner call, 7 Sep): a new link gets the full
        scene, once, on WHICHEVER side sees it first — the joiner right
@@ -1738,12 +1751,23 @@ function duelVerdict(){
     if(hist[pvKey]!=null)return;
     const mine=(dataPoints().prevWeekLive)||0;
     const linked=frLinked();
-    const rows=(S.frSnaps||[]).filter(s9=>s9.prev_week_key===pvKey);
+    /* you cannot lose a race that had not started (owner-caught,
+       7 Sep): only rivals whose link began BEFORE the judged week
+       ended are in that week's field. A fresh link races from its
+       first full Monday. */
+    const wk0=questWeekKey();
+    const eligible={};
+    (S.frRows||[]).forEach(x=>{if(x.linked_at&&String(x.linked_at).slice(0,10)<wk0){
+      const fid=x.owner_id===S.frMe?x.friend_id:x.owner_id;if(fid)eligible[fid]=1}});
+    const nEl=Object.keys(eligible).length;
+    if(!nEl)return;
+    const rows=(S.frSnaps||[]).filter(s9=>s9.prev_week_key===pvKey&&eligible[s9.user_id]);
     if(!rows.length)return;
-    /* the whole field verdicts together: wait for every rival's final,
-       or until Thursday for stragglers — then rank what arrived */
+    /* the whole field verdicts together: wait for every eligible
+       rival's final, or until Thursday for stragglers — then rank
+       what arrived */
     const dow=new Date().getDay()||7;
-    if(rows.length<linked.length&&dow<4)return;
+    if(rows.length<nEl&&dow<4)return;
     const named=rows.map(s9=>{const f=linked.find(x=>x.id===s9.user_id);
       return{nm:(f&&f.name)||s9.display||'a rival',v:s9.prev_week_live||0}})
       .sort((x,y)=>y.v-x.v);
@@ -7790,7 +7814,11 @@ function watchCorroborate(){
            session, the user hears it */
         try{livePill();flash('Your watch confirmed '+(String(h.date).slice(0,10)===today()?'today\u2019s':fmtDate(h.date)+'\u2019s')+' session \u2014 '+w.mins+' min at avg HR '+(w.hr||'?')+'. Witnessed live.');
           haptic('success')}catch(e9){}}});
-    if(dirty){saveHistory();lset(K_WG,watchGym())}
+    if(dirty){saveHistory();lset(K_WG,watchGym());
+      /* the corroboration can flip a session to LIVE after today's
+         sync already ran — push the corrected week to the race now,
+         not tomorrow (owner-caught via Angus, 7 Sep) */
+      try{if(typeof acctSync==='function')acctSync(false)}catch(e9){}}
   }catch(e){}}
 function watchGymCard(){
   /* an unmatched watch session from the last 3 days, offered once */
@@ -15492,18 +15520,23 @@ function viewToday(){
         const r9=((acct()||{}).duelHist||{})[pv];
         if(r9==='w')crown='me';else if(r9==='l')crown='them'}catch(e9){}
       const frInit=frKnown?top.name.slice(0,1).toUpperCase():'?';
-      const ava=(nm,init,ringCol,glow)=>'<div style="display:flex;flex-direction:column;align-items:center;gap:6px;flex:1;min-width:0">'+
-        '<div style="width:58px;height:58px;border-radius:58px;background:var(--raised);border:2.5px solid '+ringCol+';display:flex;align-items:center;justify-content:center;font-size:23px;font-weight:700'+(glow?';box-shadow:0 0 16px 0 color-mix(in srgb, '+ringCol+' 45%, transparent)':'')+'">'+esc(init)+'</div>'+
+      /* last week's winner wears a small drawn crown above the ring —
+         vector, epic-gold, on-identity (owner ruled the emoji out) */
+      const CROWN='<svg width="20" height="13" viewBox="0 0 20 13" style="position:absolute;top:-15px;left:50%;transform:translateX(-50%)" aria-hidden="true">'+
+        '<path d="M2.2 12 L1.4 3.6 L6 7.2 L10 1.2 L14 7.2 L18.6 3.6 L17.8 12 Z" fill="#E0A458"/>'+
+        '<circle cx="1.4" cy="3" r="1.2" fill="#E0A458"/><circle cx="10" cy="1.2" r="1.3" fill="#E0A458"/><circle cx="18.6" cy="3" r="1.2" fill="#E0A458"/></svg>';
+      const ava=(nm,init,ringCol,glow,crowned)=>'<div style="display:flex;flex-direction:column;align-items:center;gap:6px;flex:1;min-width:0">'+
+        '<div style="position:relative;width:58px;height:58px;border-radius:58px;background:var(--raised);border:2.5px solid '+ringCol+';display:flex;align-items:center;justify-content:center;font-size:23px;font-weight:700'+(glow?';box-shadow:0 0 16px 0 color-mix(in srgb, '+ringCol+' 45%, transparent)':'')+'">'+(crowned?CROWN:'')+esc(init)+'</div>'+
         '<span style="font-size:12px;font-weight:600;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(nm)+'</span></div>';
       const tot=Math.max(1,mine+top.week);
       h+='<button data-a="nav" data-v="social" class="card mt" style="width:100%;text-align:center;padding:15px 16px;display:block">'+
         '<p class="mono" style="font-size:9px;letter-spacing:.12em;color:var(--faint)">THE WEEK\u2019S DUEL \u00b7 RESETS MONDAY</p>'+
         '<div style="display:flex;align-items:center;gap:8px;margin-top:11px">'+
-        ava((crown==='me'?'\ud83d\udc51 ':'')+myN,myInit,lead>=0?'var(--green)':'var(--line)',lead>0)+
+        ava(myN,myInit,lead>=0?'var(--green)':'var(--line)',lead>0,crown==='me')+
         '<div style="flex:none;display:flex;flex-direction:column;align-items:center;gap:2px;padding:0 4px">'+
         '<span class="mono disp grad" style="font-size:17px;font-weight:800;letter-spacing:.06em">VS</span>'+
         '<span class="mono" style="font-size:15px;font-weight:700">'+mine+'\u2009\u2013\u2009'+top.week+'</span></div>'+
-        ava((crown==='them'?'\ud83d\udc51 ':'')+top.name,frInit,lead<=0&&top.week>0?'var(--green)':'var(--line)',lead<0)+
+        ava(top.name,frInit,lead<=0&&top.week>0?'var(--green)':'var(--line)',lead<0,crown==='them')+
         '</div>'+
         '<div style="height:6px;border-radius:6px;background:var(--line);overflow:hidden;margin-top:12px;display:flex">'+
         '<div style="height:6px;width:'+Math.round(mine/tot*100)+'%;background:var(--green)"></div>'+
