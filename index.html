@@ -663,7 +663,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='7ad5ad';  // stamped by tools/build.py with the content hash
+const BUILD_ID='19aad2';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -8364,7 +8364,7 @@ function restNotifSync(){
     const ri=restNotifItem();if(ri)items.unshift(ri) /* FIRST in line — the native side takes only the plan's head, and a full week of items pushed the rest alert off the end */;
     S._notifSent={t:new Date().toTimeString().slice(0,8),n:items.length,rest:items.some(x=>x.id==='restend')?'YES':'no',via:'restNotifSync'};
     window.webkit.messageHandlers.allena.postMessage(JSON.stringify(
-      {type:'notif',on:!!P.on,items:items,badge:(typeof unseenFindings==='function')?unseenFindings():0}));
+      {type:'notif',on:!!P.on,items:items,badge:(typeof appBadgeN==='function')?appBadgeN():0}));
     notifEchoSave(items)
   }catch(e){S._notifSent={t:new Date().toTimeString().slice(0,8),err:String(e&&e.message||e),via:'restNotifSync'}}
   restLiveSync()}
@@ -8391,7 +8391,7 @@ function notifSync(){
     if(!inWrapper())return;
     const P=notifPrefs();
     if(!P.asked){return}                 // the card asks first — no cold iOS prompt
-    const badge=(typeof unseenFindings==='function')?unseenFindings():0;
+    const badge=(typeof appBadgeN==='function')?appBadgeN():0;
     let items=[];try{items=notifPlan()||[]}catch(e){items=[]} /* the plan engine may NEVER take the rest alarm down with it */
     const ri=restNotifItem();if(ri)items.unshift(ri) /* FIRST in line — the native side takes only the plan's head, and a full week of items pushed the rest alert off the end */; // a re-sync mid-rest must never wipe the pending rest alert
     S._notifSent={t:new Date().toTimeString().slice(0,8),n:items.length,rest:items.some(x=>x.id==='restend')?'YES':'no',via:'notifSync'};
@@ -12129,6 +12129,14 @@ const DISC_CATALOG=[
  ['rehab','Rehab','Symmetry, symptoms and gates cleared.','Keep up the check-ins and testing.']];
 function discBank(){return S.discBank||(S.discBank=lget('training-bank-v1',{}))}
 function bankSave(){lset('training-bank-v1',S.discBank)}
+function collFreshN(){
+  /* fresh (never-viewed-in-collection) banked finds — the number the
+     drawer row and app badge carry (owner ruling, 7 Sep: 'there should
+     be a full route to what they're referencing') */
+  try{
+    const seen=(lget('training-collseen-v1',{})||{}).ids||{};
+    const bank=discBank();
+    return Object.keys(bank).filter(id=>bank[id]&&bank[id].t&&!seen[id]).length}catch(e){return 0}}
 function bankDiscoveries(){
   // returns the ones newly banked by this call
   try{bankLiveTier()}catch(e){}
@@ -12238,7 +12246,7 @@ function viewCollection(){
       return fb-fa||String(b.found||'').localeCompare(String(a.found||''))});
     const open=!!S.openSec['grp:'+g[0]];
     const frN=freshBy[g[0]]||0;
-    if(frN)h+='<div style="position:relative;border-radius:20px" class="find-glow">'+dustF()+
+    if(frN)h+='<div style="position:relative;border-radius:20px" class="find-glow">'+
       '<span style="position:absolute;top:-6px;right:-4px;min-width:19px;height:19px;border-radius:19px;background:#FF453A;color:#fff;font-size:10.5px;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 5px;z-index:6;box-shadow:0 2px 8px rgba(0,0,0,.4)">'+frN+'</span>';
     h+='<div class="card mt" id="grp-'+g[0]+'" style="padding:0;overflow:hidden'+(open?';border-color:var(--text);border-width:2px':(frN?';border-color:var(--greensoft)':''))+(mine.length?'':';opacity:.55')+'">'+
       '<button data-a="secToggle" data-v="grp:'+g[0]+'" style="width:100%;text-align:left;padding:13px 15px;display:flex;align-items:center;gap:11px">'+
@@ -14240,6 +14248,9 @@ function muscleChips(ex){
       '</div>'}catch(e){return ''}}
 
 function unseenFindings(){try{return unseenPatterns()+unseenDiscoveries()}catch(e){return 0}}
+function appBadgeN(){
+  /* the icon badge = everything genuinely unseen along the route */
+  try{return unseenFindings()+(typeof collFreshN==='function'?collFreshN():0)}catch(e){return 0}}
 function aiLockHtml(what){
   /* the honest gate: greyed, locked, and one tap from the fix */
   return '<button data-a="drawerAi" style="width:100%;display:flex;align-items:center;gap:10px;margin-top:10px;padding:12px 14px;border-radius:12px;background:var(--surface);border:1px dashed var(--line);text-align:left">'+
@@ -18267,13 +18278,15 @@ function render(){
   // the dot must sit on the row that actually holds the new thing —
   // patterns/discoveries live behind 'Patterns in your data', not
   // Progress (beta-caught by Dafydd: dot on Progress, nothing there)
-  const DOT={acl:unseenRehab(),findings:unseenPatterns()+unseenDiscoveries(),run:unseenRun(),signals:(typeof unseenSignals==='function'?unseenSignals():0)};
+  const DOT={acl:unseenRehab(),findings:unseenPatterns()+unseenDiscoveries(),run:unseenRun(),
+    signals:(typeof unseenSignals==='function'?unseenSignals():0),
+    collection:(typeof collFreshN==='function'?collFreshN():0)};
   const isOn=k=>S.view===k||(k==='today'&&(S.view==='points'||S.view==='collection'||S.view==='findings'||S.view==='territory'))||(k==='home'&&S.view==='quick')||(k==='acl'&&(S.view==='proto'||S.view==='aclpath'||S.view==='diary'||S.view==='report'));
   const I2=SET_ICONS;
   const drow=(k,label,ic,a,v)=>'<button data-a="'+(a||'drawerNav')+'" data-v="'+(v||k)+'" class="drow'+(isOn(k)?' on':'')+'">'+
     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">'+ic+'</svg>'+
     '<span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+label+'</span>'+
-    (DOT[k]?'<span style="width:7px;height:7px;border-radius:7px;background:var(--red);flex:none"></span>':'')+'</button>';
+    (DOT[k]?'<span style="min-width:18px;height:18px;border-radius:18px;background:var(--red);color:#fff;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 5px;flex:none">'+DOT[k]+'</span>':'')+'</button>';
   const drawerHtml=()=>{
     if(!S.drawerOpen)return '';
     /* the drawer grows with the data (beta-caught by William, 6 Sep:
