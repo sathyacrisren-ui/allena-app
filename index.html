@@ -663,7 +663,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='e27ec0';  // stamped by tools/build.py with the content hash
+const BUILD_ID='7ad5ad';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -9051,20 +9051,31 @@ function discoveries(){
   lset('training-walkfix-v1',1)}catch(e){}})();
 function discoverySeen(){return S.discSeen||(S.discSeen=lget('training-disc-v1',{}))}
 function ratioDupeSweep(){
-  /* repairs the duplicate '1RM at X× bodyweight' banks the unstable
-     title created (owner-caught, 7 Sep). Keeps the highest per lift,
-     runs once. */
+  /* v2 (owner: 'how many bench 1RMs are we calculating? this needs to
+     stop'): every old live-number ratio entry MIGRATES into the
+     threshold-rung system — one entry per lift, its rung, its ORIGINAL
+     found date, already marked seen so nothing re-announces. Future
+     entries appear only on genuinely crossing the next rung, exactly
+     like the symmetry 80/90 milestones. Runs once. */
   try{
-    const bank=discBank();if(bank._ratiofix)return;
+    const bank=discBank();if(bank._ratiofix2)return;
     const by={};
     Object.keys(bank).forEach(id=>{const e=bank[id];if(!e||!e.t)return;
       const m=String(e.t).match(/^(.*) — estimated 1RM at ([\d.]+)× bodyweight$/);
-      if(m)(by[m[1]]=by[m[1]]||[]).push({id:id,v:parseFloat(m[2])})});
-    let cut=0;
-    Object.keys(by).forEach(k=>{const L=by[k].sort((a,b)=>b.v-a.v);
-      L.slice(1).forEach(x=>{delete bank[x.id];cut++})});
-    try{if(bank['undefined']&&bank['undefined'].t==='While you were away')delete bank['undefined']}catch(e9){}
-    bank._ratiofix=1;if(cut||1)bankSave()}catch(e){}}
+      if(m)(by[m[1]]=by[m[1]]||[]).push({id:id,v:parseFloat(m[2]),found:e.found,d:e.d,rar:e.rar})});
+    const seen=discoverySeen();let dirty=false;
+    Object.keys(by).forEach(k=>{
+      const L=by[k].sort((a,b)=>b.v-a.v),top=L[0];
+      L.forEach(x=>{delete bank[x.id]});dirty=true;
+      const rung=[2,1.75,1.5,1.25,1].find(x=>top.v>=x);
+      if(!rung)return;
+      const nid=k+' — 1RM past '+rung+'× bodyweight';
+      const older=bank[nid]&&String(bank[nid].found||'9')<String(top.found||'9');
+      if(!older)bank[nid]={t:nid,d:top.d,rar:rung>=1.5?'epic':'rare',tag:'ratio',found:top.found||today()};
+      if(!seen[nid])seen[nid]=seen[top.id]||today()});
+    try{if(bank['undefined'])delete bank['undefined']}catch(e9){}
+    try{lset('training-disc-v1',seen)}catch(e9){}
+    bank._ratiofix2=1;if(dirty||1)bankSave()}catch(e){}}
 function markDiscoveries(){
   const seen=discoverySeen();
   discoveries().forEach(d=>{if(!seen[d.id])seen[d.id]=today()});
@@ -14331,7 +14342,7 @@ function discCard(){
       if(show.length){
         h+='<p class="eyebrow" style="margin-top:12px;color:var(--amber)">New — just found</p>'+
           show.map(d=>{const r=rarityOf(d.rar);
-            return '<div class="card an-pop" style="padding:14px 16px;margin-top:8px;border-color:'+r[1]+'">'+
+            return '<div class="card an-pop find-glow" style="padding:14px 16px;margin-top:8px;position:relative;border-color:'+r[1]+'">'+dustF(3)+
             '<p class="mono" style="font-size:8.5px;letter-spacing:.08em;color:'+r[1]+'">'+esc(r[2].toUpperCase())+'</p>'+
             '<p style="font-size:14px;font-weight:600;line-height:1.35;margin-top:4px">'+esc(d.t)+'</p>'+
             (d.d?'<p style="color:var(--dim);font-size:12px;line-height:1.55;margin-top:5px">'+esc(String(d.d).slice(0,220))+'</p>':'')+'</div>'}).join('');
@@ -14348,7 +14359,7 @@ function viewFindings(){
   /* the glow shadow lives on this wrapper \u2014 it must share the card's
      20px radius or the pulse traces a sharp-cornered RECTANGLE around
      the rounded pill (owner-caught, 6 Sep: "dark rectangle artefact") */
-  const wrapF=(html,fresh,n)=>html?'<div style="position:relative;border-radius:20px" class="'+(fresh?'find-glow':'')+'">'+(fresh?dot9(n||'\u25cf')+dustF():'')+html+'</div>':'';
+  const wrapF=(html,fresh,n)=>html?'<div style="position:relative;border-radius:20px">'+(fresh?dot9(n||'\u25cf'):'')+html+'</div>':'';
   let deepFresh=false;try{deepFresh=!!deepReadyInfo()}catch(e){}
   let patN=0,discN=0;try{patN=unseenPatterns()}catch(e){}try{discN=unseenDiscoveries()}catch(e){}
   /* the tier ladder is the page's geography (owner call, 5 Sep):
