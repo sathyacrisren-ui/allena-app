@@ -666,7 +666,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='031fc5';  // stamped by tools/build.py with the content hash
+const BUILD_ID='18b326';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -1609,16 +1609,23 @@ async function frInvite(){
     /* one open invite at a time (owner-caught: five taps, five codes)
        — an existing open code is COPIED, not duplicated */
     const openNow=(S.frRows||[]).find(x=>!x.linked_at&&x.owner_id===S.frMe);
-    if(openNow){return frCopy(openNow.code)}
+    if(openNow){return frShare(openNow.code)}
     const code=Math.random().toString(36).slice(2).replace(/[^a-z0-9]/g,'').slice(0,6).toUpperCase();
     const r=await fetch(CLOUD.url+'/rest/v1/friends',{method:'POST',headers:h,
       body:JSON.stringify([{code:code,owner_id:S.frMe}])});
-    if(r.ok){
-      let copied=false;
-      try{await navigator.clipboard.writeText(code);copied=true}catch(e9){}
-      flash(copied?('Code '+code+' copied — paste it to your friend.'):('Invite code '+code+' — tap it below to copy.'));
-      frLoad(true)}
+    if(r.ok){await frShare(code);frLoad(true)}
     else flash('Could not make a code ('+r.status+').')}catch(e){flash('No connection.')}}
+async function frShare(code){
+  /* the invite is a LINK (owner call, 7 Sep): the share sheet carries
+     a join URL that pre-fills the other side; the code rides in the
+     text for anyone opening it inside the app instead. */
+  const link=(CLOUD.site||'https://sathyacrisren-ui.github.io/allena-app/')+'?join='+encodeURIComponent(code);
+  const txt='Race me week-for-week on Allena \u2014 tap to link up: '+link+'  (or in the app: Social \u2192 code '+code+')';
+  try{
+    if(navigator.share){await navigator.share({text:txt});flash('Invite sent.');return}
+  }catch(e){if(e&&e.name==='AbortError')return}
+  try{await navigator.clipboard.writeText(txt);flash('Invite link copied \u2014 paste it to your friend.')}catch(e){
+    flash('Code '+code+' \u2014 tap it below to copy.')}}
 async function frCopy(code){
   try{await navigator.clipboard.writeText(String(code));
     flash('Copied '+code+' — send it to your friend.')}catch(e){
@@ -1675,11 +1682,27 @@ function friendsSection(){
           '<button data-a="frCopy" data-v="'+esc(x.code)+'" class="pill mono" style="font-size:12px;letter-spacing:.08em;padding:7px 12px">'+esc(x.code)+' \u29c9</button>'+
           '<button data-a="frRemove" data-v="'+esc(x.code)+'" style="color:var(--faint);font-size:13px;padding:4px 6px">\u2715</button></span>').join('')+'</div>':'')+
       '<div class="row mt" style="gap:8px">'+
-      '<button data-a="frInvite" class="btn" style="flex:1;font-size:12.5px;color:var(--amber);border-color:var(--amber)">Make an invite code</button>'+
+      '<button data-a="frInvite" class="btn" style="flex:1;font-size:12.5px;color:var(--amber);border-color:var(--amber)">Share an invite link</button>'+
       '</div>'+
       '<div class="row mt" style="gap:8px">'+
       '<input data-in="frIn" placeholder="Friend\u2019s code" value="'+esc(S.frIn||'')+'" style="flex:2;min-height:44px;text-transform:uppercase">'+
       '<button data-a="frJoinGo" class="btn" style="flex:1;font-size:12.5px">Link up</button></div>'}catch(e){return ''}}
+(function(){
+  /* arrival by invite link: stash the code, land on Social, auto-link
+     when signed in — else it waits pre-filled in the box */
+  try{
+    const m=/[?&]join=([A-Za-z0-9]{4,12})/.exec(location.search||'');
+    if(m){S.frIn=m[1].toUpperCase();S._joinArr=1;
+      try{history.replaceState(null,'',location.pathname)}catch(e9){}}}catch(e){}})();
+function socialJoinKick(){
+  /* runs once after boot: signed-in arrivals link immediately; the
+     rest see Social with the code waiting */
+  try{
+    if(!S._joinArr||S._joinKicked)return;S._joinKicked=1;
+    S.view='social';S.sheet=null;
+    if(acctReady()&&acct())setTimeout(function(){frJoin(S.frIn||'')},600);
+    else flash('Sign in, then tap Link up \u2014 the code is filled in.');
+    render()}catch(e){}}
 function viewSocial(){
   /* Social gets its own room (owner call, 7 Sep): the duel, the
      friends list, invites — everything head-to-head lives here. */
@@ -21324,6 +21347,7 @@ function dayCheck(){
   try{if(typeof watchMetSweep==='function')watchMetSweep()}catch(e){}
   try{if(typeof expSettle==='function')expSettle()}catch(e){}
   try{if(typeof ratioDupeSweep==='function')ratioDupeSweep()}catch(e){}
+  try{if(typeof socialJoinKick==='function')socialJoinKick()}catch(e){}
   try{if(typeof acctReady==='function'&&acctReady()&&typeof acct==='function'&&acct()&&S._syncDay!==today()){
     S._syncDay=today();acctSync(false)}}catch(e){}
   try{if(typeof frLoad==='function'&&S._frDay!==today()){S._frDay=today();
