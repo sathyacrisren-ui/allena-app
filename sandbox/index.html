@@ -528,7 +528,14 @@ const mmss=s=>{s=Math.max(0,Math.round(s));return Math.floor(s/60)+':'+String(s%
    the formula is validated for). A set without an RPE reads as before. */
 const e1rm=(w,r,rpe)=>{if(!(r>0&&w>0))return 0;
   const p=parseFloat(rpe),rir=isFinite(p)?Math.min(4,Math.max(0,10-p)):0;
-  return w*(1+(r+rir)/30)};
+  let eff=r+rir;
+  /* the heavy near-limit set governs (owner-caught, 7 Sep: 87.5×8@8
+     was outbidding 102.5×3@9). Rep-max formulas are validated to
+     roughly nine effective reps and degrade beyond — so effective
+     reps taper hard past nine, and a volume set can never outbid a
+     true top set again. */
+  if(eff>9)eff=9+(eff-9)*0.3;
+  return w*(1+eff/30)};
 const fmtDate=i=>new Date(i).toLocaleDateString(undefined,{day:'numeric',month:'short',year:'2-digit'});
 const rir=v=>{const n=parseFloat(v);return isFinite(n)?Math.max(0,10-n):null};
 const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -656,7 +663,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='7f461b';  // stamped by tools/build.py with the content hash
+const BUILD_ID='9acbf5';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
