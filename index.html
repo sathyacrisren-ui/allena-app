@@ -666,7 +666,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='85f1f2';  // stamped by tools/build.py with the content hash
+const BUILD_ID='07ac56';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -5523,10 +5523,17 @@ function viewRehabHub(){
      '<span style="color:var(--faint);font-size:11.5px">'+((S.acl&&S.acl.on&&!physioLeads)?'Given different work than the pathway shows? Theirs leads — bring it in':'Hand them the phone at your appointment, or type it in')+'</span></span>'+
      '<span class="mono" style="color:var(--amber);font-size:13px;flex:none">›</span></button>';
    const nx=apptNext();
-   h+=setGroup('Your physio',[
+   const pg9=[
      navRow(I.cal,'Appointments',null,'apptsOpen',null,
        {sub:nx?('Next: '+fmtDate(nx.date+'T12:00')+(nx.time?' · '+apptTime(nx):'')+(nx.who?' · '+nx.who:'')):'Add the next one and Allena reminds you'}),
-     navRow(I.doc,'Physio report','','reportOpen',null,{sub:'Written from your record, ready to bring'})])}
+     navRow(I.doc,'Physio report','','reportOpen',null,{sub:'Written from your record, ready to bring'})];
+   if((window.__wrapperBuild||0)>=9){
+     const last9=(typeof romStore==='function'?romStore().list:[]).slice(-1)[0];
+     const s9=last9&&(typeof romSummary==='function')?romSummary(last9):null;
+     pg9.push(navRow('<path d="M4 20h16"/><path d="M4 20A16 16 0 0 1 20 4"/><path d="M4 20L15 9"/>',
+       'Measure knee bend',null,'romOpen',null,
+       {sub:s9?('Last: L '+(s9.l!=null?s9.l+'\u00b0':'\u2014')+' · R '+(s9.r!=null?s9.r+'\u00b0':'\u2014')+(s9.sym!=null?' · '+s9.sym+'% even':'')):'The camera reads both knees in degrees'}))}
+   h+=setGroup('Your physio',pg9)}
   {const tr=checkTrend(28).filter(x=>x.pain!=null);
    if(tr.length>=3)h+='<div class="card mt" style="padding:14px 16px">'+
      '<p class="eyebrow">Symptoms · 28 days</p>'+
@@ -8450,6 +8457,48 @@ try{if(!svCapture())setTimeout(svAutoSync,4000)}catch(e){}
    a 'we miss you'. The web side plans the next few days from
    real events; the native side schedules them locally. No
    server, no tokens. */
+const K_ROM='training-rom-v1';
+function romStore(){return lget(K_ROM,{list:[]})||{list:[]}}
+window.romResult=function(res){
+  /* the camera hands back its captures (build 9). Keeps the raw
+     captures — per side, the deepest bend (max flexion) and the
+     straightest (extension) are what physios track. */
+  try{
+    if(res&&res.denied){flash('Camera access is off. Settings \u2192 Allena \u2192 Camera turns it on.');return}
+    const caps=(res&&res.caps||[]).filter(c=>c&&(c.l!=null||c.r!=null));
+    if(!caps.length){flash('No readings captured.');return}
+    const st=romStore();
+    st.list.push({d:today(),t:Date.now(),caps:caps});
+    st.list=st.list.slice(-60);lset(K_ROM,st);
+    const mx=s9=>{const v=caps.map(c=>c[s9]).filter(x=>x!=null);return v.length?Math.round(Math.max.apply(null,v)):null};
+    const l=mx('l'),r=mx('r');
+    flash('Measured \u2014 deepest bend'+(l!=null?' L '+l+'\u00b0':'')+(r!=null?' R '+r+'\u00b0':'')+'.');
+    try{haptic('success')}catch(e9){}
+    S.sheet={t:'rom'};render()}catch(e){}};
+function romSummary(e9){
+  const mx=s9=>{const v=(e9.caps||[]).map(c=>c[s9]).filter(x=>x!=null);return v.length?Math.round(Math.max.apply(null,v)):null};
+  const mn=s9=>{const v=(e9.caps||[]).map(c=>c[s9]).filter(x=>x!=null);return v.length?Math.round(Math.min.apply(null,v)):null};
+  const l=mx('l'),r=mx('r');
+  const sym=(l!=null&&r!=null&&Math.max(l,r)>0)?Math.round(Math.min(l,r)/Math.max(l,r)*100):null;
+  return{l:l,r:r,el:mn('l'),er:mn('r'),sym:sym}}
+function watchStatePush(){
+  /* the wrist mirror (build 9): a compact copy of the live session,
+     pushed on every meaningful change; the watch shows it and can
+     press the one button that matters. The phone stays the brain. */
+  try{
+    if(typeof inWrapper!=='function'||!inWrapper()||(window.__wrapperBuild||0)<9)return;
+    const s=S.sess;let st;
+    if(!s||s.phase==='done'||s.phase==='review')st={on:false};
+    else{const cur=(s.sets||[])[s.idx]||{};
+      st={on:true,phase:String(s.phase||''),
+        ex:String(cur.ex||'').slice(0,40),
+        set:+cur.setNo||0,of:+cur.of||0,
+        target:cur.secs?(cur.secs+'s hold'):(cur.targetW!=null?uwStr(cur.targetW)+(cur.targetReps?' \u00d7 '+cur.targetReps:''):''),
+        restEnd:(s.phase==='resting'&&S.restEnd)?S.restEnd:0,
+        name:String(s.dayName||'').slice(0,40)}}
+    const j=JSON.stringify(st);
+    if(S._watchJ===j)return;S._watchJ=j;
+    webkit.messageHandlers.allena.postMessage(JSON.stringify({type:'watch',state:st}))}catch(e){}}
 const K_NOTIF='training-notif-v1';
 window.notifTapped=function(id){
   /* the tap routes by KIND (owner-caught: the rest timer got the full
@@ -18006,6 +18055,19 @@ function sheetHtml(){
       '<p style="color:var(--dim);font-size:12.5px;line-height:1.6;margin-top:4px">You know who this is \u2014 give them the name you use. Yours to see; it wins over whatever their account sends.</p>'+
       '<input data-in="frNm" placeholder="Their name" value="'+esc(S.frNm||'')+'" style="width:100%;min-height:48px;margin-top:12px">'+
       '<button data-a="frNameGo" class="big disp mt" style="background:var(--amber);color:var(--bg)">Save</button>')}
+  if(S.sheet.t==='rom'){
+    const L9=(typeof romStore==='function'?romStore().list:[]).slice(-8).reverse();
+    return wrapSheet('The knee protractor',
+      '<p style="color:var(--dim);font-size:13px;line-height:1.65;margin-top:6px">Prop the phone so your whole body is in frame \u2014 side-on works best. Bend and straighten slowly. Capture at the deepest bend and again at full straight. Both knees read at once, in degrees.</p>'+
+      '<button data-a="romStart" class="big disp mt2" style="background:var(--amber);color:var(--bg);font-size:15px">Start the camera</button>'+
+      (L9.length?'<p class="eyebrow" style="margin-top:16px">Measured so far</p>'+
+        L9.map(e9=>{const s9=romSummary(e9);
+          return '<div style="display:flex;align-items:baseline;gap:10px;margin-top:9px">'+
+          '<span class="mono" style="color:var(--faint);font-size:10px;flex:none">'+esc(String(e9.d).slice(5))+'</span>'+
+          '<span style="flex:1;font-size:13px">Deepest bend L '+(s9.l!=null?s9.l+'\u00b0':'\u2014')+' \u00b7 R '+(s9.r!=null?s9.r+'\u00b0':'\u2014')+'</span>'+
+          (s9.sym!=null?'<span class="mono" style="font-size:10.5px;color:'+(s9.sym>=90?'var(--green)':'var(--amber)')+';flex:none">'+s9.sym+'%</span>':'')+
+          '</div>'}).join(''):'')+
+      '<p style="color:var(--faint);font-size:11px;line-height:1.55;margin-top:14px">A phone estimate, not a clinic goniometer \u2014 your physio\u2019s measurement is the judge. This tracks the trend between visits, and nothing leaves the phone.</p>')}
   if(S.sheet.t==='find'){
     const e=discBank()[S.sheet.id];
     if(!e)return wrapSheet('A find','<p style="color:var(--dim);font-size:13px;margin-top:6px">This one is in the collection.</p>');
@@ -18975,6 +19037,7 @@ function render(){
     try{if(!S.tour&&!S._tourChecked&&S.view==='today'&&S.boot==null&&!S.sheet&&!S.sess){
       S._tourChecked=1;
       if(!lget('training-tour-v1',null)){S.tour={i:0};setTimeout(function(){try{render()}catch(e9){}},60)}}}catch(e){}
+    try{if(typeof watchStatePush==='function')watchStatePush()}catch(e){}
     try{const lo=document.getElementById('lensouter');
       if(lo){const r9=lo.querySelector('.swrow');
         const c9=r9&&r9.children[Math.max(0,Math.min(3,S.lensIdx||0))];
@@ -20718,6 +20781,10 @@ function runAction(a,v,t,e){
     case 'hcStuckHide':{S.hcStuck=0;const P=notifPrefs();P.hcDismissed=1;notifSave();render();break}
     case 'healthConnectLater':{const P=notifPrefs();P.hcDismissed=1;notifSave();render();
       flash('No rush — the reminder will nudge you. It is the one thing that changes everything.');break}
+    case 'romOpen':{S.sheet={t:'rom'};render();break}
+    case 'romStart':{
+      try{webkit.messageHandlers.allena.postMessage(JSON.stringify({type:'rom'}))}catch(e){flash('The camera needs the Allena app.')}
+      break}
     case 'findOpen':{S.sheet={t:'find',id:v};render();break}
     case 'echoOpen':{
       try{const P=notifPrefs();const x=(P.sched||[]).find(s9=>s9.id===v);
