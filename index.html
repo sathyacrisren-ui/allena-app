@@ -666,7 +666,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='46c372';  // stamped by tools/build.py with the content hash
+const BUILD_ID='b30018';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -1534,7 +1534,8 @@ function snapshotData(){
      sessions inside the first tracked week, computed on-device. */
   if(!S._snapLegacy){
     out.week_live=d.weekLive||0;out.week_sessions=d.weekSessions||0;
-    out.display=String((S.prof&&S.prof.name)||'').split(' ')[0].slice(0,12)||null;
+    out.display=(String((S.prof&&S.prof.name)||'').split(' ')[0]
+      ||String((acct()||{}).email||'').split('@')[0]).slice(0,12)||null;
     try{
       const L=(S.history||[]).filter(h=>h.complete&&sessionLive(h))
         .map(h=>String(h.date).slice(0,10)).sort();
@@ -1600,7 +1601,8 @@ async function frLoad(force){
         const sn=(S.frSnaps||[]).find(s9=>s9.user_id===fid)||{};
         S.signalReveal={e:'\u2726 LINKED',c:'#30D158',t:'The race is on',
           d:'You and '+(sn.display||'your friend')+' \u2014 live points, fresh every Monday. Showing up and honest logging is the whole game.'};
-        try{hapticRun('find')}catch(e9){}}}catch(e9){}
+        try{hapticRun('find')}catch(e9){}
+        if(!sn.display){setTimeout(function(){frLoad(true)},30000);setTimeout(function(){frLoad(true)},120000)}}}catch(e9){}
     render()}catch(e){}}
 async function frInvite(){
   try{const h=await frHeaders();if(!h||!S.frMe){flash('Sign in first.');return}
@@ -1640,8 +1642,14 @@ function frLinked(){
   return (S.frRows||[]).filter(x=>x.linked_at).map(x=>{
     const fid=x.owner_id===me?x.friend_id:x.owner_id;
     const sn=(S.frSnaps||[]).find(s9=>s9.user_id===fid)||{};
-    return{code:x.code,id:fid,name:sn.display||'Your friend',
+    const local=((acct()||{}).frNames||{})[fid];
+    return{code:x.code,id:fid,name:local||sn.display||'Your friend',named:!!(local||sn.display),
       week:sn.week_live||0,sess:sn.week_sessions||0,tier:sn.tier||''}})}
+function frRename(id,nm){
+  try{const a9=acct()||{};const m=a9.frNames||{};
+    nm=String(nm||'').trim().slice(0,14);
+    if(nm)m[id]=nm;else delete m[id];
+    lset(K_ACCT,Object.assign({},a9,{frNames:m}));render()}catch(e){}}
 function friendsSection(){
   try{
     if(!acctReady()||!acct())return '';
@@ -1656,7 +1664,7 @@ function friendsSection(){
         '<div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font-size:13px;font-weight:600">You</span><span class="mono" style="font-size:15px;font-weight:700">'+mine+'</span></div>'+
         L.map(f=>{const lead=mine-f.week;
           return '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-top:9px;padding-top:9px;border-top:1px solid var(--line)">'+
-          '<span style="flex:1;min-width:0;font-size:13px">'+esc(f.name)+'</span>'+
+          '<button data-a="frNameOpen" data-v="'+esc(f.id)+'" style="flex:1;min-width:0;font-size:13px;text-align:left;padding:0">'+esc(f.name)+' <span style="color:var(--faint);font-size:10px">\u270e</span></button>'+
           '<span class="mono" style="color:'+(lead>=0?'var(--green)':'var(--amber)')+';font-size:10px">'+(lead>=0?'+'+lead+' you':'+'+(-lead)+' them')+'</span>'+
           '<span class="mono" style="font-size:15px;font-weight:700;flex:none">'+f.week+'</span>'+
           '<button data-a="frRemove" data-v="'+esc(f.code)+'" style="color:var(--faint);font-size:12px;flex:none;padding:0 4px">\u2715</button></div>'}).join('')+
@@ -15218,7 +15226,7 @@ function viewToday(){
       const myMail=(function(){try{return String((acct()||{}).email||'').split('@')[0]}catch(e){return ''}})();
       const myN=myFirst||'You';
       const myInit=(myFirst||myMail||'Y').slice(0,1).toUpperCase();
-      const frKnown=top.name&&top.name!=='Your friend';
+      const frKnown=!!top.named;
       const frInit=frKnown?top.name.slice(0,1).toUpperCase():'?';
       const ava=(nm,init,ringCol,glow)=>'<div style="display:flex;flex-direction:column;align-items:center;gap:6px;flex:1;min-width:0">'+
         '<div style="width:58px;height:58px;border-radius:58px;background:var(--raised);border:2.5px solid '+ringCol+';display:flex;align-items:center;justify-content:center;font-size:23px;font-weight:700'+(glow?';box-shadow:0 0 16px 0 color-mix(in srgb, '+ringCol+' 45%, transparent)':'')+'">'+esc(init)+'</div>'+
@@ -17660,6 +17668,11 @@ function sheetHtml(){
       '<p style="color:var(--dim);font-size:13px;line-height:1.6;margin-top:8px">Bring them into your history too? Allena reads them exactly, on this phone, and asks one date to anchor the weeks.</p>'+
       '<button data-a="progDataGo" class="big disp mt2" style="background:var(--amber);color:var(--bg);font-size:15px">Import the logged training</button>'+
       '<button data-a="progDataSkip" class="btn mt" style="color:var(--dim)">Just the program</button>')}
+  if(S.sheet.t==='frname'){
+    return wrapSheet('Name this friend',
+      '<p style="color:var(--dim);font-size:12.5px;line-height:1.6;margin-top:4px">You know who this is \u2014 give them the name you use. Yours to see; it wins over whatever their account sends.</p>'+
+      '<input data-in="frNm" placeholder="Their name" value="'+esc(S.frNm||'')+'" style="width:100%;min-height:48px;margin-top:12px">'+
+      '<button data-a="frNameGo" class="big disp mt" style="background:var(--amber);color:var(--bg)">Save</button>')}
   if(S.sheet.t==='find'){
     const e=discBank()[S.sheet.id];
     if(!e)return wrapSheet('A find','<p style="color:var(--dim);font-size:13px;margin-top:6px">This one is in the collection.</p>');
@@ -20714,6 +20727,8 @@ function runAction(a,v,t,e){
       if(typeof nx==='function')nx();else{S.sheet=null;render()}break}
     case 'frInvite':frInvite();break;
     case 'frCopy':frCopy(v);break;
+    case 'frNameOpen':{S.frNmId=v;S.frNm='';S.sheet={t:'frname'};render();break}
+    case 'frNameGo':{frRename(S.frNmId,S.frNm);S.sheet=null;flash('Saved.');break}
     case 'frJoinGo':frJoin(S.frIn||'');break;
     case 'frRemove':frRemove(v);break;
     case 'lensStep':{
