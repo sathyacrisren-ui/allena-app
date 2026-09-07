@@ -663,7 +663,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='a75781';  // stamped by tools/build.py with the content hash
+const BUILD_ID='1091dc';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -8743,7 +8743,12 @@ function discoveries(){
     // volume work was underselling the lifter)
     if(bw&&best.e>=bw&&/^(back |front |high-bar |low-bar )?squat|^bench|^deadlift|romanian|overhead press|barbell row/i.test(b)&&!/leg press|machine|hack|smith/i.test(b)){
       const em=Math.round(best.e/bw*100)/100;
-      if(em>=1.05)add(em>=1.6?'epic':'rare',b+' — estimated 1RM at '+em+'× bodyweight',
+      /* threshold-stable id (the found-date contract; owner-caught:
+         the RPE-aware e1RM change re-banked '1.41×' beside '1.39×') —
+         the title names the LADDER RUNG crossed, the live number stays
+         in the body */
+      const rung=[2,1.75,1.5,1.25,1].find(x=>em>=x);
+      if(rung)add(rung>=1.5?'epic':'rare',b+' — 1RM past '+rung+'× bodyweight',
         (best.l.r>1
           ?'Your best set ('+uwNum(best.l.w)+' '+uwUnit()+' × '+best.l.r+') works out to about '+uwNum(Math.round(best.e))+' '+uwUnit()+' — '
           :uwNum(best.l.w)+' '+uwUnit()+' straight up — ')+
@@ -9030,6 +9035,20 @@ function discoveries(){
   if(dirty)bankSave();
   lset('training-walkfix-v1',1)}catch(e){}})();
 function discoverySeen(){return S.discSeen||(S.discSeen=lget('training-disc-v1',{}))}
+function ratioDupeSweep(){
+  /* repairs the duplicate '1RM at X× bodyweight' banks the unstable
+     title created (owner-caught, 7 Sep). Keeps the highest per lift,
+     runs once. */
+  try{
+    const bank=discBank();if(bank._ratiofix)return;
+    const by={};
+    Object.keys(bank).forEach(id=>{const e=bank[id];if(!e||!e.t)return;
+      const m=String(e.t).match(/^(.*) — estimated 1RM at ([\d.]+)× bodyweight$/);
+      if(m)(by[m[1]]=by[m[1]]||[]).push({id:id,v:parseFloat(m[2])})});
+    let cut=0;
+    Object.keys(by).forEach(k=>{const L=by[k].sort((a,b)=>b.v-a.v);
+      L.slice(1).forEach(x=>{delete bank[x.id];cut++})});
+    bank._ratiofix=1;if(cut||1)bankSave()}catch(e){}}
 function markDiscoveries(){
   const seen=discoverySeen();
   discoveries().forEach(d=>{if(!seen[d.id])seen[d.id]=today()});
@@ -12197,7 +12216,7 @@ function viewCollection(){
       (open&&mine.length?'<div style="border-top:1px solid var(--line);padding:10px 14px;display:flex;flex-direction:column;gap:9px">'+
         mine.map(d=>{const r=rarityOf(d.rar);
           const hot=(d.found===today())&&(d.rar==='rare'||d.rar==='epic');
-          return '<div class="'+(hot?'find-glow':'')+'"'+(hot?' style="position:relative;border-radius:12px;padding:7px 9px;margin:-2px -9px"':'')+'>'+(hot?dustF(3):'')+
+          return '<div class="'+(hot?'find-glow':'')+'"'+(hot?' style="position:relative;border-radius:12px;padding:7px 9px;margin:-2px -9px"':'')+'>'+
           '<div style="display:flex;align-items:baseline;gap:8px">'+
           (freshIds[d.id]?'<span class="mono" style="color:var(--green);font-size:8.5px;letter-spacing:.06em">\u25cf NEW</span>':'')+
           '<span class="mono" style="color:'+r[1]+';font-size:9px;letter-spacing:.06em">'+esc(r[2].toUpperCase())+'</span>'+
@@ -14245,7 +14264,9 @@ function depthGlyph(d){
 function patMarkSoon(){
   try{if(S._patMarkT)return;
     S._patMarkT=setTimeout(function(){S._patMarkT=null;
-      try{markPatternsSeen();render()}catch(e9){}},2500)}catch(e){}}
+      /* no render() here — an innerHTML rebuild mid-swipe kills the
+         gesture (owner-caught); badges update on the next natural one */
+      try{markPatternsSeen()}catch(e9){}},2500)}catch(e){}}
 function patListCard(){
   /* the Patterns lens lists the patterns themselves (owner ruling,
      7 Sep: the Find-the-links animation ritual is retired — same
@@ -14271,7 +14292,7 @@ function discMarkSoon(){
     if(S._discMarkT)return;
     if(!(typeof newDiscoveries==='function'&&newDiscoveries().length))return;
     S._discMarkT=setTimeout(function(){S._discMarkT=null;
-      try{markDiscoveries();render()}catch(e9){}},2500)}catch(e){}}
+      try{markDiscoveries()}catch(e9){}},2500)}catch(e){}}
 function discCard(){
   const st=bankStats();
   const rareN=(st.rar&&((st.rar.rare||0)+(st.rar.epic||0)))||0;
@@ -14384,10 +14405,10 @@ function lensWord(k){
     ks.sort((a,b)=>String(B[b].found||'').localeCompare(String(B[a].found||'')));
     const rows=ks.slice(0,6).map(id=>{const e2=B[id];
       const hot=(e2.found===today())&&(e2.rar==='rare'||e2.rar==='epic');
-      return '<div class="'+(hot?'find-glow':'')+'" style="display:flex;gap:10px;align-items:baseline;margin-top:11px;position:relative;border-radius:10px'+(hot?';padding:7px 9px;margin-left:-9px;margin-right:-9px':'')+'">'+(hot?dustF(3):'')+
+      return '<button data-a="findOpen" data-v="'+esc(id)+'" class="'+(hot?'find-glow':'')+'" style="width:100%;text-align:left;display:flex;gap:10px;align-items:baseline;margin-top:11px;position:relative;border-radius:10px'+(hot?';padding:7px 9px;margin-left:-9px;margin-right:-9px':'')+'">'+
       '<span style="width:7px;height:7px;border-radius:7px;flex:none;background:'+rarityOf(e2.rar)[1]+';transform:translateY(-1px)"></span>'+
       '<span style="flex:1;min-width:0;font-size:14px;line-height:1.5">'+esc(e2.t)+'</span>'+
-      '<span class="mono" style="color:var(--faint);font-size:9px;flex:none">'+esc(String(e2.found||'').slice(5))+'</span></div>'}).join('');
+      '<span class="mono" style="color:var(--faint);font-size:10px;flex:none">'+esc(String(e2.found||'').slice(5))+'</span></button>'}).join('');
     const nR=ks.filter(id=>B[id].rar==='rare').length,nE=ks.filter(id=>B[id].rar==='epic').length;
     const first=String(B[ks[ks.length-1]].found||'');
     return wrap('THE LATEST FINDS',rows,
@@ -17408,6 +17429,16 @@ function sheetHtml(){
       '<p style="color:var(--dim);font-size:13px;line-height:1.6;margin-top:8px">Bring them into your history too? Allena reads them exactly, on this phone, and asks one date to anchor the weeks.</p>'+
       '<button data-a="progDataGo" class="big disp mt2" style="background:var(--amber);color:var(--bg);font-size:15px">Import the logged training</button>'+
       '<button data-a="progDataSkip" class="btn mt" style="color:var(--dim)">Just the program</button>')}
+  if(S.sheet.t==='find'){
+    const e=discBank()[S.sheet.id];
+    if(!e)return wrapSheet('A find','<p style="color:var(--dim);font-size:13px;margin-top:6px">This one is in the collection.</p>');
+    const r=rarityOf(e.rar);
+    return wrapSheet('',
+      '<p class="mono" style="font-size:9.5px;letter-spacing:.1em;color:'+r[1]+'">'+esc(r[2].toUpperCase())+' \u00b7 FOUND '+esc(fmtDate(String(e.found||today())+'T12:00'))+'</p>'+
+      '<p class="disp" style="font-size:21px;font-weight:650;line-height:1.2;margin-top:8px">'+esc(e.t)+'</p>'+
+      '<p style="color:var(--dim);font-size:13.5px;line-height:1.65;margin-top:10px">'+esc(e.d||'')+'</p>'+
+      '<p style="color:var(--faint);font-size:11px;line-height:1.5;margin-top:14px">Kept with the numbers it had the day it was found \u2014 beating it never erases it.</p>'+
+      '<button data-a="collOpen" class="btn mt2" style="color:var(--dim);font-size:12.5px">See it in the collection</button>')}
   if(S.sheet.t==='ledger'){
     /* the Proof Ledger (dossier idea 1): no consumer product scores its
        own predictions to the user — Allena does. Forecast research
@@ -20096,6 +20127,7 @@ function runAction(a,v,t,e){
     case 'hcStuckHide':{S.hcStuck=0;const P=notifPrefs();P.hcDismissed=1;notifSave();render();break}
     case 'healthConnectLater':{const P=notifPrefs();P.hcDismissed=1;notifSave();render();
       flash('No rush — the reminder will nudge you. It is the one thing that changes everything.');break}
+    case 'findOpen':{S.sheet={t:'find',id:v};render();break}
     case 'echoOpen':{
       try{const P=notifPrefs();const x=(P.sched||[]).find(s9=>s9.id===v);
         if(x){P.echoSeen=P.echoSeen||{};P.echoSeen[x.id]=1;lset(K_NOTIF,P);
@@ -20996,6 +21028,7 @@ let lastDay=today();
 function dayCheck(){
   try{if(typeof watchMetSweep==='function')watchMetSweep()}catch(e){}
   try{if(typeof expSettle==='function')expSettle()}catch(e){}
+  try{if(typeof ratioDupeSweep==='function')ratioDupeSweep()}catch(e){}
   const k=today();
   if(k!==lastDay){lastDay=k;S.garSkip=false}   // a new day: clear yesterday's skips
   if(!morningAsk())dailyFindAsk()}
