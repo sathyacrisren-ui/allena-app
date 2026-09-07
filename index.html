@@ -666,7 +666,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='0291f6';  // stamped by tools/build.py with the content hash
+const BUILD_ID='3795a9';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -1614,8 +1614,8 @@ async function frInvite(){
   try{const h=await frHeaders();if(!h||!S.frMe){flash('Sign in first.');return}
     /* one open invite at a time (owner-caught: five taps, five codes)
        — an existing open code is COPIED, not duplicated */
-    const openNow=(S.frRows||[]).find(x=>!x.linked_at&&x.owner_id===S.frMe);
-    if(openNow){return frShare(openNow.code)}
+    const openAll=(S.frRows||[]).filter(x=>!x.linked_at&&x.owner_id===S.frMe);
+    if(openAll.length>=3){return frShare(openAll[0].code)}
     const code=Math.random().toString(36).slice(2).replace(/[^a-z0-9]/g,'').slice(0,6).toUpperCase();
     const r=await fetch(CLOUD.url+'/rest/v1/friends',{method:'POST',headers:h,
       body:JSON.stringify([{code:code,owner_id:S.frMe}])});
@@ -1720,21 +1720,28 @@ function duelVerdict(){
     const pvKey=dayKey(new Date(new Date(questWeekKey()+'T12:00').getTime()-7*864e5));
     if(hist[pvKey]!=null)return;
     const mine=(dataPoints().prevWeekLive)||0;
+    const linked=frLinked();
     const rows=(S.frSnaps||[]).filter(s9=>s9.prev_week_key===pvKey);
     if(!rows.length)return;
-    const best=rows.slice().sort((x,y)=>(y.prev_week_live||0)-(x.prev_week_live||0))[0];
-    const theirs=best.prev_week_live||0;
-    if(mine===0&&theirs===0)return;               // an empty week verdicts nothing
-    const nm=(function(){const f=frLinked().find(x=>x.id===best.user_id);return (f&&f.name)||best.display||'your friend'})();
-    hist[pvKey]=mine>theirs?'w':mine<theirs?'l':'d';
+    /* the whole field verdicts together: wait for every rival's final,
+       or until Thursday for stragglers — then rank what arrived */
+    const dow=new Date().getDay()||7;
+    if(rows.length<linked.length&&dow<4)return;
+    const named=rows.map(s9=>{const f=linked.find(x=>x.id===s9.user_id);
+      return{nm:(f&&f.name)||s9.display||'a rival',v:s9.prev_week_live||0}})
+      .sort((x,y)=>y.v-x.v);
+    const top=named[0];
+    if(mine===0&&top.v===0)return;                // an empty week verdicts nothing
+    hist[pvKey]=mine>top.v?'w':mine<top.v?'l':'d';
     lset(K_ACCT,Object.assign({},a9,{duelHist:hist}));
     if(hist[pvKey]==='w'){
+      const field=named.slice(0,3).map(x=>x.nm+' ('+x.v+')').join(', ');
       const bank=discBank();const id='duel:'+pvKey;
-      if(!bank[id]){bank[id]={t:'Week won \u2014 '+mine+' to '+theirs,
-        d:'You out-showed '+nm+' across the week \u2014 '+mine+' witnessed points to '+theirs+'. Won by turning up, the only way this race can be won.',
+      if(!bank[id]){bank[id]={t:'Week won \u2014 '+mine+' on top',
+        d:'You out-showed '+(named.length===1?named[0].nm:'the field')+' \u2014 '+mine+' witnessed points ahead of '+field+'. Won by turning up, the only way this race can be won.',
         rar:'epic',tag:'duel',found:today()};bankSave()}
       S.signalReveal={e:'\u2726 THE WEEK, WON',c:'#E0A458',id:id,kind:'epic',
-        t:'You took the week',d:mine+' \u2013 '+theirs+' over '+nm+'. Banked for good \u2014 the new week starts level.'};
+        t:'You took the week',d:mine+' on top of '+(named.length===1?named[0].nm+' ('+top.v+')':named.length+' rivals \u2014 '+field)+'. The new week starts level.'};
       try{hapticRun('finish')}catch(e9){}}}catch(e){}}
 function viewSocial(){
   /* Social gets its own room (owner call, 7 Sep): the duel, the
@@ -15295,7 +15302,8 @@ function viewToday(){
          their place when the storage layer lands. */
       const d0=dataPoints();
       const mine=Math.round(d0.weekLive||0);
-      const top=L.slice().sort((a,b)=>b.week-a.week)[0];
+      const Ls=L.slice().sort((a,b)=>b.week-a.week);
+      const top=Ls[0];
       const lead=mine-top.week;
       const myFirst=String((S.prof&&S.prof.name)||'').split(' ')[0];
       const myMail=(function(){try{return String((acct()||{}).email||'').split('@')[0]}catch(e){return ''}})();
@@ -15324,7 +15332,12 @@ function viewToday(){
         '<div style="height:6px;width:'+Math.round(mine/tot*100)+'%;background:var(--green)"></div>'+
         '<div style="height:6px;flex:1;background:var(--dim);opacity:.45"></div></div>'+
         '<p style="color:var(--dim);font-size:11.5px;margin-top:9px">'+(lead>0?'You lead by '+lead+' \u2014 a logged session holds it.':lead<0?esc(top.name)+' leads by '+(-lead)+' \u2014 a session today overtakes.':'Dead level \u2014 the next honest log takes the lead.')+'</p>'+
-        (frKnown?'':'<p style="color:var(--faint);font-size:10px;margin-top:4px">Their name lands the next time they open Allena.</p>')+'</button>'}}catch(e){}
+        (frKnown?'':'<p style="color:var(--faint);font-size:10px;margin-top:4px">Their name lands the next time they open Allena.</p>')+
+        (Ls.length>1?'<div style="margin-top:10px;padding-top:9px;border-top:1px solid var(--line)">'+
+          Ls.slice(1,4).map(f=>'<div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-top:5px">'+
+            '<span style="flex:1;min-width:0;text-align:left;font-size:12px;color:var(--dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(f.name)+'</span>'+
+            '<span class="mono" style="font-size:12.5px;font-weight:600;color:'+(mine>=f.week?'var(--green)':'var(--amber)')+'">'+f.week+'</span></div>').join('')+
+          (Ls.length>4?'<p class="mono" style="color:var(--faint);font-size:9px;margin-top:5px;text-align:left">and '+(Ls.length-4)+' more racing</p>':'')+'</div>':'')+'</button>'}}catch(e){}
   h+=verdictCard();
   h+=todayOrder().join('');
   return h+'</div>'}
