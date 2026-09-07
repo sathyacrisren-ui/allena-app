@@ -666,7 +666,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='0434ac';  // stamped by tools/build.py with the content hash
+const BUILD_ID='921d12';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -1585,8 +1585,15 @@ async function frLoad(force){
     S._frCap=true;
     const tok=await acctToken();S.frMe=(acctClaims(tok)||{}).sub||null;
     S.frRows=await r.json();
+    let crewIds=[];
+    try{
+      const rc=await fetch(CLOUD.url+'/rest/v1/crew_members?select=crew_code,user_id',{headers:h});
+      if(rc.ok){S.crewCap=true;S.crewRows=await rc.json();
+        crewIds=(S.crewRows||[]).map(x=>x.user_id).filter(x=>x&&x!==S.frMe)}
+      else{S.crewCap=false;S.crewRows=[]}}catch(e9){S.crewRows=S.crewRows||[]}
     const ids=(S.frRows||[]).filter(x=>x.linked_at)
-      .map(x=>x.owner_id===S.frMe?x.friend_id:x.owner_id).filter(Boolean);
+      .map(x=>x.owner_id===S.frMe?x.friend_id:x.owner_id).filter(Boolean)
+      .concat(crewIds).filter(function(x,i,a){return a.indexOf(x)===i});
     if(ids.length){
       let r2=await fetch(CLOUD.url+'/rest/v1/snapshots?select=user_id,display,week_live,week_sessions,live_points,tier,prev_week_live,prev_week_key&user_id=in.('+ids.map(encodeURIComponent).join(',')+')',{headers:h});
       if(!r2.ok)r2=await fetch(CLOUD.url+'/rest/v1/snapshots?select=user_id,display,week_live,week_sessions,live_points,tier&user_id=in.('+ids.map(encodeURIComponent).join(',')+')',{headers:h});
@@ -1663,6 +1670,51 @@ async function frRemove(code){
   try{const h=await frHeaders();if(!h)return;
     await fetch(CLOUD.url+'/rest/v1/friends?code=eq.'+encodeURIComponent(code),{method:'DELETE',headers:h});
     frLoad(true)}catch(e){}}
+function raceField(){
+  /* everyone you race: pairwise links plus crewmates, deduped —
+     the leaderboard and the duel card both read this */
+  const seen={};const out=[];
+  try{frLinked().forEach(f=>{if(!seen[f.id]){seen[f.id]=1;out.push(f)}})}catch(e){}
+  try{(S.crewRows||[]).forEach(m=>{const id=m.user_id;
+    if(!id||id===S.frMe||seen[id])return;seen[id]=1;
+    const sn=(S.frSnaps||[]).find(s9=>s9.user_id===id)||{};
+    const local=((acct()||{}).frNames||{})[id];
+    out.push({crew:1,id:id,name:local||sn.display||'A racer',named:!!(local||sn.display),
+      week:sn.week_live||0,sess:sn.week_sessions||0,tier:sn.tier||''})})}catch(e){}
+  return out}
+async function crewMake(){
+  try{const h=await frHeaders();if(!h||!S.frMe){flash('Sign in first.');return}
+    const mine9=(S.crewRows||[]).find(x=>x.user_id===S.frMe);
+    if(mine9)return crewShare(mine9.crew_code);
+    const code='G'+Math.random().toString(36).slice(2).replace(/[^a-z0-9]/g,'').slice(0,5).toUpperCase();
+    const r=await fetch(CLOUD.url+'/rest/v1/crews',{method:'POST',headers:h,
+      body:JSON.stringify([{code:code,owner_id:S.frMe}])});
+    if(!r.ok){flash('Could not start a group ('+r.status+').');return}
+    await fetch(CLOUD.url+'/rest/v1/crew_members',{method:'POST',headers:h,
+      body:JSON.stringify([{crew_code:code,user_id:S.frMe}])});
+    await crewShare(code);frLoad(true)}catch(e){flash('No connection.')}}
+async function crewShare(code){
+  const link=(CLOUD.site||'https://sathyacrisren-ui.github.io/allena-app/')+'?crew='+encodeURIComponent(code);
+  const txt='Join our Allena group \u2014 everyone races the week together: '+link;
+  try{if(navigator.share){await navigator.share({text:txt});flash('Group link sent.');return}}
+  catch(e){if(e&&e.name==='AbortError')return}
+  try{await navigator.clipboard.writeText(txt);flash('Group link copied \u2014 send it to the crew.')}
+  catch(e){flash('Group code '+code+'.')}}
+async function crewJoin(code){
+  try{code=String(code||'').trim().toUpperCase();
+    if(code.length<4){flash('That group link is missing its code.');return}
+    const h=await frHeaders();if(!h||!S.frMe){flash('Sign in first.');return}
+    const r=await fetch(CLOUD.url+'/rest/v1/crew_members',{method:'POST',headers:h,
+      body:JSON.stringify([{crew_code:code,user_id:S.frMe}])});
+    if(r.ok||r.status===409){flash('You\u2019re in \u2014 the group races together.');
+      acctSync(false);frLoad(true)}
+    else flash('That group link did not match ('+r.status+').')}catch(e){flash('No connection.')}}
+async function crewLeave(){
+  try{const h=await frHeaders();if(!h||!S.frMe)return;
+    const mine9=(S.crewRows||[]).find(x=>x.user_id===S.frMe);if(!mine9)return;
+    await fetch(CLOUD.url+'/rest/v1/crew_members?crew_code=eq.'+encodeURIComponent(mine9.crew_code)+'&user_id=eq.'+encodeURIComponent(S.frMe),
+      {method:'DELETE',headers:h});
+    flash('Left the group.');frLoad(true)}catch(e){}}
 function frLinked(){
   const me=S.frMe;
   return (S.frRows||[]).filter(x=>x.linked_at).map(x=>{
@@ -1682,20 +1734,54 @@ function friendsSection(){
     if(S._frCap==null){if(!S._frKick){S._frKick=1;setTimeout(function(){frLoad()},80)}return ''}
     if(S._frCap===false)return '';
     const mine=Math.round((dataPoints().weekLive)||0);
-    const L=frLinked();
+    const L=raceField();
     const open=(S.frRows||[]).filter(x=>!x.linked_at&&x.owner_id===S.frMe);
     return '<p class="eyebrow mt2">The weekly race</p>'+
       '<p style="color:var(--faint);font-size:11.5px;line-height:1.55;margin-top:4px">Live points only \u2014 sessions your phone or watch actually witnessed \u2014 fresh every Monday. Typed-in history never scores.'+iBtn('racelaw')+'</p>'+
-      iBody('racelaw','Every honest number in a witnessed session earns \u2014 each set\u2019s weight, reps and effort, plus one for finishing \u2014 capped per day. Witnessed means your watch overlapped the session at working heart rate, or the phone ran the clock and the sets spread like real training. Imported, typed-later and demo sessions earn regular points but never race. Your score uploads when your app opens; you see theirs as of their last open.')+
-      (L.length?'<div class="card mt" style="padding:13px 15px">'+
-        '<div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font-size:13px;font-weight:600">You</span><span class="mono" style="font-size:15px;font-weight:700">'+mine+'</span></div>'+
-        L.map(f=>{const lead=mine-f.week;
-          return '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-top:9px;padding-top:9px;border-top:1px solid var(--line)">'+
-          '<button data-a="frNameOpen" data-v="'+esc(f.id)+'" style="flex:1;min-width:0;font-size:13px;text-align:left;padding:0">'+esc(f.name)+' <span style="color:var(--faint);font-size:10px">\u270e</span></button>'+
-          '<span class="mono" style="color:'+(lead>=0?'var(--green)':'var(--amber)')+';font-size:10px">'+(lead>=0?'+'+lead+' you':'+'+(-lead)+' them')+'</span>'+
-          '<span class="mono" style="font-size:15px;font-weight:700;flex:none">'+f.week+'</span>'+
-          '<button data-a="frRemove" data-v="'+esc(f.code)+'" style="color:var(--faint);font-size:12px;flex:none;padding:0 4px">\u2715</button></div>'}).join('')+
-        '</div>':'')+
+      iBody('racelaw','Every honest number in a witnessed session earns \u2014 each set\u2019s weight, reps and effort, plus one for finishing \u2014 capped per day. Witnessed means your watch overlapped the session at working heart rate, or the phone ran the clock and the sets spread like real training. Imported, typed-later and demo sessions earn regular points but never race. Your score uploads when your app opens; you see theirs as of their last open. A group link races everyone who joins it on one board; weekly crowns still settle between directly linked friends.')+
+      (L.length?(function(){
+        const myFirst=String((S.prof&&S.prof.name)||'').split(' ')[0];
+        const myInit=(myFirst||String((acct()||{}).email||'Y').split('@')[0]||'Y').slice(0,1).toUpperCase();
+        const R=[{me:1,name:myFirst||'You',init:myInit,week:mine}]
+          .concat(L.map(f=>({me:0,id:f.id,code:f.code,name:f.name,
+            init:(f.named?String(f.name).slice(0,1).toUpperCase():'?'),week:f.week||0})));
+        R.sort((a,b)=>b.week-a.week||(a.me?-1:1));
+        R.forEach((x,i)=>{x.rank=i+1});
+        /* last week's crown rides above its holder's avatar */
+        let crownKey=null;
+        try{const a9=acct()||{};
+          const pv=dayKey(new Date(new Date(questWeekKey()+'T12:00').getTime()-7*864e5));
+          const r9=(a9.duelHist||{})[pv];
+          if(r9==='w')crownKey='me';
+          else if(r9==='l'){const rows=(S.frSnaps||[]).filter(s9=>s9.prev_week_key===pv)
+            .sort((x,y)=>(y.prev_week_live||0)-(x.prev_week_live||0));
+            if(rows[0])crownKey=rows[0].user_id}}catch(e9){}
+        const CROWN='<svg width="20" height="13" viewBox="0 0 20 13" style="position:absolute;top:-16px;left:50%;transform:translateX(-50%)" aria-hidden="true"><path d="M2.2 12 L1.4 3.6 L6 7.2 L10 1.2 L14 7.2 L18.6 3.6 L17.8 12 Z" fill="#E0A458"/><circle cx="1.4" cy="3" r="1.2" fill="#E0A458"/><circle cx="10" cy="1.2" r="1.3" fill="#E0A458"/><circle cx="18.6" cy="3" r="1.2" fill="#E0A458"/></svg>';
+        const hasCrown=x=>crownKey&&((x.me&&crownKey==='me')||(!x.me&&x.id===crownKey));
+        const pod=R.slice(0,3);
+        const order=[pod[1],pod[0],pod[2]].filter(Boolean);
+        const stepH={1:36,2:21,3:12};
+        const col=x=>{const first=x.rank===1;const size=first?60:44;
+          return '<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:6px;min-width:0">'+
+            '<div style="position:relative;width:'+size+'px;height:'+size+'px;border-radius:'+size+'px;background:var(--raised);border:2.5px solid '+(first?'var(--green)':'var(--line)')+';display:flex;align-items:center;justify-content:center;font-size:'+(first?23:17)+'px;font-weight:700'+(first?';box-shadow:0 0 16px 0 color-mix(in srgb, var(--green) 40%, transparent)':'')+'">'+(hasCrown(x)?CROWN:'')+esc(x.init)+'</div>'+
+            '<span style="font-size:11.5px;font-weight:600;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(x.me?'You':x.name)+'</span>'+
+            '<span class="mono" style="font-size:'+(first?15:12)+'px;font-weight:700;color:'+(first&&x.week>0?'var(--green)':'var(--text)')+'">'+x.week+'</span>'+
+            '<div style="width:100%;height:'+stepH[x.rank]+'px;border-radius:9px 9px 4px 4px;background:'+(first?'var(--green)':'var(--raised)')+';border:1px solid '+(first?'var(--green)':'var(--line)')+';display:flex;align-items:flex-start;justify-content:center">'+
+            '<span class="mono" style="font-size:10px;font-weight:800;margin-top:2px;color:'+(first?'var(--bg)':'var(--faint)')+'">'+x.rank+'</span></div></div>'};
+        let h9='<div class="card mt" style="padding:18px 14px 12px">'+
+          '<div style="display:flex;align-items:flex-end;gap:8px;padding:6px 4px 0">'+order.map(col).join('')+'</div>';
+        h9+='<div style="margin-top:12px;border-top:1px solid var(--line)">'+
+          R.map(x=>{const lead=mine-x.week;
+            return '<div style="display:flex;align-items:center;gap:10px;padding:10px 2px 0">'+
+            '<span class="mono" style="width:18px;flex:none;text-align:center;font-size:11px;font-weight:700;color:'+(x.rank===1?'var(--green)':'var(--faint)')+'">'+x.rank+'</span>'+
+            '<span style="width:26px;height:26px;border-radius:26px;background:var(--raised);border:1.5px solid '+(x.me?'var(--green)':'var(--line)')+';display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex:none">'+esc(x.init)+'</span>'+
+            (x.me?'<span style="flex:1;min-width:0;font-size:13px;font-weight:600">You</span>'
+              :'<button data-a="frNameOpen" data-v="'+esc(x.id)+'" style="flex:1;min-width:0;font-size:13px;text-align:left;padding:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(x.name)+' <span style="color:var(--faint);font-size:10px">\u270e</span></button>')+
+            (x.me?'':'<span class="mono" style="color:'+(lead>=0?'var(--green)':'var(--amber)')+';font-size:9.5px;flex:none">'+(lead>=0?'+'+lead+' you':'+'+(-lead)+' them')+'</span>')+
+            '<span class="mono" style="font-size:14px;font-weight:700;flex:none">'+x.week+'</span>'+
+            ((x.me||!x.code)?'':'<button data-a="frRemove" data-v="'+esc(x.code)+'" style="color:var(--faint);font-size:12px;flex:none;padding:0 4px">\u2715</button>')+
+            '</div>'}).join('')+'</div>';
+        return h9+'</div>'})():'')+
       (open.length?'<div style="display:flex;flex-wrap:wrap;align-items:center;gap:7px;margin-top:10px">'+
         '<span class="mono" style="color:var(--faint);font-size:10px">OPEN INVITE'+(open.length>1?'S':'')+' \u2014 tap to copy:</span>'+
         open.map(x=>'<span style="display:inline-flex;align-items:center;gap:2px">'+
@@ -1706,13 +1792,23 @@ function friendsSection(){
       '</div>'+
       '<div class="row mt" style="gap:8px">'+
       '<input data-in="frIn" placeholder="Friend\u2019s code" value="'+esc(S.frIn||'')+'" style="flex:2;min-height:44px;text-transform:uppercase">'+
-      '<button data-a="frJoinGo" class="btn" style="flex:1;font-size:12.5px">Link up</button></div>'}catch(e){return ''}}
+      '<button data-a="frJoinGo" class="btn" style="flex:1;font-size:12.5px">Link up</button></div>'+
+      (S.crewCap===true?(function(){
+        const mine9=(S.crewRows||[]).find(x=>x.user_id===S.frMe);
+        return '<div class="row mt" style="gap:8px">'+
+          (mine9?'<button data-a="crewShare" data-v="'+esc(mine9.crew_code)+'" class="btn" style="flex:2;font-size:12.5px">Share the group link</button>'+
+                 '<button data-a="crewLeave" class="btn" style="flex:1;font-size:12.5px;color:var(--faint)">Leave group</button>'
+                :'<button data-a="crewMake" class="btn" style="flex:1;font-size:12.5px">Start a group \u2014 one link races everyone</button>')+
+          '</div>'})():'')}catch(e){return ''}}
 (function(){
   /* arrival by invite link: stash the code, land on Social, auto-link
      when signed in — else it waits pre-filled in the box */
   try{
     const m=/[?&]join=([A-Za-z0-9]{4,12})/.exec(location.search||'');
     if(m){S.frIn=m[1].toUpperCase();S._joinArr=1;
+      try{history.replaceState(null,'',location.pathname)}catch(e9){}}
+    const c=/[?&]crew=([A-Za-z0-9]{4,12})/.exec(location.search||'');
+    if(c){S.crewIn=c[1].toUpperCase();S._joinArr=1;
       try{history.replaceState(null,'',location.pathname)}catch(e9){}}}catch(e){}})();
 function socialJoinKick(){
   /* runs once after boot: signed-in arrivals link immediately; the
@@ -1720,7 +1816,8 @@ function socialJoinKick(){
   try{
     if(!S._joinArr||S._joinKicked)return;S._joinKicked=1;
     S.view='social';S.sheet=null;
-    if(acctReady()&&acct())setTimeout(function(){frJoin(S.frIn||'')},600);
+    if(acctReady()&&acct())setTimeout(function(){
+      if(S.crewIn)crewJoin(S.crewIn);else frJoin(S.frIn||'')},600);
     else flash('Sign in, then tap Link up \u2014 the code is filled in.');
     render()}catch(e){}}
 function frClaimItems(){
@@ -15580,7 +15677,7 @@ function viewToday(){
           '<p style="font-size:13px;line-height:1.55;margin-top:2px">'+esc(String(x.body).slice(0,180))+'</p></button>').join('')+
         (ec.length>3?'<p class="mono" style="color:var(--faint);font-size:9.5px;margin-top:7px">and '+(ec.length-3)+' more</p>':'')+'</div>'}}catch(e){}
   try{
-    const L=(typeof frLinked==='function')?frLinked():[];
+    const L=(typeof raceField==='function')?raceField():((typeof frLinked==='function')?frLinked():[]);
     if(L.length){
       /* THE DUEL (owner call, 7 Sep): two corners, one week. Avatars
          are the app's initial-in-a-ring language — photos can take
@@ -20812,6 +20909,9 @@ function runAction(a,v,t,e){
     case 'hcStuckHide':{S.hcStuck=0;const P=notifPrefs();P.hcDismissed=1;notifSave();render();break}
     case 'healthConnectLater':{const P=notifPrefs();P.hcDismissed=1;notifSave();render();
       flash('No rush — the reminder will nudge you. It is the one thing that changes everything.');break}
+    case 'crewMake':{try{crewMake()}catch(e){}break}
+    case 'crewShare':{try{crewShare(v)}catch(e){}break}
+    case 'crewLeave':{try{crewLeave()}catch(e){}break}
     case 'romOpen':{S.sheet={t:'rom'};render();break}
     case 'romStart':{
       try{webkit.messageHandlers.allena.postMessage(JSON.stringify({type:'rom'}))}catch(e){flash('The camera needs the Allena app.')}
