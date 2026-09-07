@@ -666,7 +666,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='91aae8';  // stamped by tools/build.py with the content hash
+const BUILD_ID='db8d82';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -9368,6 +9368,13 @@ function discoveries(){
         noPain+' of the last '+ch.length+' checked-in days at pain 1 or below. Worth telling your physio \u2014 it is as much a result as any test.','rehab')}}catch(e){}
 
 
+  /* ── bloodwork on record (counts only, by design) ── */
+  try{const bd=(typeof bloodStore==='function')?bloodStore().list:[];
+    if(bd.length)add('uncommon','First bloodwork on record',
+      'Lab results now sit beside training, sleep and heart data. The trend is the point \u2014 single numbers rarely are.','body');
+    if(bd.length>=3)add('rare','Three blood draws tracked',
+      'Enough to see direction. Bring the trend to your next appointment.','body')}catch(e){}
+
   /* ── the first fortnight ─────────────────────────────────
      Everything above needs history to fire, which leaves a new
      account with nothing to find on exactly the days that
@@ -10056,6 +10063,7 @@ function viewSignals(){
       '<div style="position:relative;z-index:3">'+lineChart(pts,{min:Math.max(0,lo-pad),max:hi+pad,suffix:kind.u.trim(),color:'#1E9BFF',
         marks:[Math.round(lo),Math.round(hi)],newAfter:newAfter})+'</div>'+
       '<p class="mono" style="color:var(--faint);font-size:9px;letter-spacing:.05em;margin-top:6px">'+pts.length+' DAYS \u00b7 '+esc(kind.src.toUpperCase())+' \u00b7 TAP TO EXPLAIN</p></div>'});
+  h+=(typeof bloodCard==='function'?bloodCard():'');
   h+=(typeof tdeeCard==='function'?tdeeCard():'');
   h+=(typeof hkDumpCard==='function'?hkDumpCard():'');
   if(dry.length)h+='<div class="card mt2" style="padding:14px 16px"><p class="eyebrow">Not flowing yet</p>'+
@@ -10164,6 +10172,180 @@ function hkTiming(rows){
     if(n){lset(K_HKD,st);try{render()}catch(e){}}
   }catch(e){}}
 try{window.hkTiming=hkTiming}catch(e){}
+
+/* ══ BLOODWORK ═══════════════════════════════════════════════ */
+const K_BLOOD='training-blood-v1';
+const BLOOD_REF=[
+  /* key, name, expected unit, [loM,hiM,loF,hiF], alias regex, training note key */
+  ['ferr','Ferritin','ug/L',[30,300,15,200],/ferritin/i,'ferr'],
+  ['hb','Haemoglobin','g/L',[130,175,115,155],/h(?:a?)emoglobin|\bhgb\b|\bhb\b/i,null],
+  ['hct','Haematocrit','%',[40,52,36,47],/h(?:a?)ematocrit|\bhct\b/i,null],
+  ['iron','Iron','umol/L',[10,30,10,30],/^iron\b|serum iron/i,null],
+  ['b12','Vitamin B12','pmol/L',[138,652,138,652],/b\s?12|cobalamin/i,null],
+  ['fol','Folate','nmol/L',[10,45,10,45],/folate/i,null],
+  ['vitd','Vitamin D','nmol/L',[50,150,50,150],/vitamin d|25[\s-]?oh/i,'vitd'],
+  ['tsh','TSH','mIU/L',[0.4,4.0,0.4,4.0],/\btsh\b|thyroid stimulating/i,null],
+  ['test','Testosterone','nmol/L',[10,35,0.5,2.4],/testosterone/i,null],
+  ['crp','CRP','mg/L',[0,3,0,3],/\bcrp\b|c[\s-]?reactive/i,null],
+  ['hba1c','HbA1c','%',[4,5.6,4,5.6],/hba1c|\ba1c\b/i,null],
+  ['gluc','Fasting glucose','mmol/L',[3.9,5.5,3.9,5.5],/glucose/i,null],
+  ['chol','Total cholesterol','mmol/L',[0,5.2,0,5.2],/total cholesterol|cholesterol[,\s]+total|^cholesterol\b/i,null],
+  ['ldl','LDL','mmol/L',[0,3.4,0,3.4],/\bldl\b/i,null],
+  ['hdl','HDL','mmol/L',[1.0,3.0,1.2,3.0],/\bhdl\b/i,null],
+  ['trig','Triglycerides','mmol/L',[0,1.7,0,1.7],/triglyceride/i,null],
+  ['creat','Creatinine','umol/L',[60,110,45,90],/creatinine/i,null],
+  ['egfr','eGFR','mL/min',[90,250,90,250],/egfr/i,null],
+  ['alt','ALT','U/L',[0,40,0,40],/\balt\b|alanine amino/i,null],
+  ['ast','AST','U/L',[0,40,0,40],/\bast\b|aspartate amino/i,null],
+  ['ck','Creatine kinase','U/L',[40,320,30,200],/creatine kinase|\bck\b|\bcpk\b/i,'ck'],
+  ['mg','Magnesium','mmol/L',[0.7,1.1,0.7,1.1],/magnesium/i,null],
+  ['na','Sodium','mmol/L',[135,145,135,145],/sodium/i,null],
+  ['k','Potassium','mmol/L',[3.5,5.2,3.5,5.2],/potassium/i,null]];
+function bloodStore(){return lget(K_BLOOD,{list:[]})||{list:[]}}
+function bloodSaveDraw(date,markers){
+  /* one draw per date — a re-import replaces, never compounds */
+  try{
+    const st=bloodStore();
+    st.list=st.list.filter(x=>x.d!==date);
+    st.list.push({d:date,m:markers});
+    st.list.sort((a,b)=>String(a.d).localeCompare(String(b.d)));
+    st.list=st.list.slice(-40);lset(K_BLOOD,st)}catch(e){}}
+function bloodParseText(txt){
+  /* deterministic before AI: pasted results parse on-phone. Each
+     marker takes its first match: the alias, then the first number
+     after it, then whatever unit-looking token follows. */
+  const out={};
+  try{
+    String(txt||'').split(/\n+/).forEach(line=>{
+      BLOOD_REF.forEach(R=>{
+        if(out[R[0]])return;
+        const m=R[4].exec(line);if(!m)return;
+        /* '(25-OH)'-style parentheticals ride many lab names — strip
+           them before hunting the number or they ARE the number */
+        const rest=line.slice(m.index+m[0].length).replace(/^[\s:]*\([^)]*\)/,'');
+        const nm=/([\d]+\.?[\d]*)\s*([a-zA-Z%\/][a-zA-Z%\/0-9]*)?/.exec(rest);
+        if(!nm)return;
+        const v=parseFloat(nm[1]);if(!isFinite(v))return;
+        out[R[0]]={v:v,u:(nm[2]||'').trim()}})})}catch(e){}
+  return out}
+function bloodFlag(key,v,unit){
+  /* the lab's own adult reference band — checked ONLY when the unit
+     matches what the band is written in (or none was parsed); a
+     different unit shows the number and says the check was skipped */
+  try{
+    const R=BLOOD_REF.find(x=>x[0]===key);if(!R||v==null)return null;
+    const uu=String(unit||'').toLowerCase().replace(/\s/g,'');
+    if(uu&&uu!==R[2].toLowerCase().replace(/\s/g,''))return 'unit';
+    const male=String((S.prof&&S.prof.sex)||'')!=='female';
+    const lo=male?R[3][0]:R[3][2],hi=male?R[3][1]:R[3][3];
+    return v<lo?'low':v>hi?'high':'ok'}catch(e){return null}}
+function bloodNotes(draw){
+  /* deterministic training tie-ins — facts plus 'talk to your
+     doctor', never advice */
+  const out=[];
+  try{
+    const m=draw.m||{};
+    const f9=m.ferr&&bloodFlag('ferr',m.ferr.v,m.ferr.u)==='low';
+    if(f9){let km=0;(S.runs||[]).forEach(r=>{if(isRunType(r.type)&&(Date.now()-new Date(r.date+'T12:00'))<28*864e5)km+=r.km||0});
+      out.push('Ferritin is under the range'+(km>=40?' and the last four weeks held '+Math.round(km)+' km of running — a known pairing in endurance athletes':'')+'. One for your doctor.')}
+    if(m.vitd&&bloodFlag('vitd',m.vitd.v,m.vitd.u)==='low')
+      out.push('Vitamin D is under the range. Cheap to retest, worth the doctor conversation.');
+    if(m.ck&&bloodFlag('ck',m.ck.v,m.ck.u)==='high'){
+      const hard=(S.history||[]).some(h=>h.complete&&!h.run&&(h.log||[]).length>=10&&
+        Math.abs(new Date(String(h.date).slice(0,10)+'T12:00')-new Date(draw.d+'T12:00'))<3*864e5);
+      if(hard)out.push('Creatine kinase runs high for days after hard training — a draw this close to a session reads high without meaning trouble.')}}catch(e){}
+  return out}
+function bloodCard(){
+  try{
+    const L=bloodStore().list;
+    if(!L.length)return '<button data-a="bloodOpen" class="card mt2" style="width:100%;text-align:left;padding:14px 16px;display:flex;align-items:center;gap:11px;border-style:dashed">'+
+      '<span style="flex:1;min-width:0"><span style="font-size:14px;font-weight:600;display:block">Bloodwork</span>'+
+      '<span style="color:var(--faint);font-size:11.5px">Paste or photograph a result sheet — the trend starts here</span></span>'+
+      '<span class="mono" style="color:var(--amber);font-size:13px;flex:none">\u203a</span></button>';
+    const cur=L[L.length-1],prev=L.length>1?L[L.length-2]:null;
+    const rows=BLOOD_REF.filter(R=>cur.m[R[0]]).map(R=>{
+      const e9=cur.m[R[0]];const fl=bloodFlag(R[0],e9.v,e9.u);
+      const pv=prev&&prev.m[R[0]]?prev.m[R[0]].v:null;
+      const d9=pv!=null?Math.round((e9.v-pv)*10)/10:null;
+      return{R:R,e:e9,fl:fl,d:d9}});
+    rows.sort((a,b)=>((a.fl==='low'||a.fl==='high')?0:1)-((b.fl==='low'||b.fl==='high')?0:1));
+    const flagged=rows.filter(r=>r.fl==='low'||r.fl==='high').length;
+    const shown=rows.slice(0,flagged>0?Math.max(flagged,8):8);
+    const notes=bloodNotes(cur);
+    return '<div class="card mt2" style="padding:14px 16px">'+
+      '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px">'+
+      '<span style="font-size:14px;font-weight:600">Bloodwork</span>'+
+      '<span class="mono" style="color:var(--faint);font-size:10px">'+esc(fmtDate(cur.d+'T12:00'))+' \u00b7 '+rows.length+' markers</span></div>'+
+      shown.map(r=>'<div style="display:flex;align-items:baseline;gap:9px;margin-top:9px">'+
+        '<span style="flex:1;min-width:0;font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(r.R[1])+'</span>'+
+        (r.d!=null&&r.d!==0?'<span class="mono" style="color:var(--faint);font-size:9.5px;flex:none">'+(r.d>0?'+':'')+r.d+'</span>':'')+
+        '<span class="mono" style="font-size:12.5px;font-weight:700;flex:none">'+r.e.v+' '+esc(r.e.u||r.R[2])+'</span>'+
+        (r.fl==='low'||r.fl==='high'?'<span class="mono" style="color:var(--amber);font-size:9px;letter-spacing:.05em;flex:none">'+r.fl.toUpperCase()+'</span>'
+          :r.fl==='ok'?'<span style="width:6px;height:6px;border-radius:6px;background:var(--green);flex:none"></span>'
+          :r.fl==='unit'?'<span class="mono" style="color:var(--faint);font-size:9px;flex:none">UNIT?</span>':'')+
+        '</div>').join('')+
+      (rows.length>shown.length?'<p class="mono" style="color:var(--faint);font-size:10px;margin-top:8px">and '+(rows.length-shown.length)+' more in range</p>':'')+
+      notes.map(t9=>'<p style="color:var(--dim);font-size:12px;line-height:1.6;margin-top:9px">'+esc(t9)+'</p>').join('')+
+      '<button data-a="bloodOpen" class="btn mt" style="color:var(--dim);font-size:12.5px">Add results \u00b7 history ('+L.length+')</button>'+
+      '<p style="color:var(--faint);font-size:10.5px;line-height:1.5;margin-top:9px">Adult lab reference ranges, checked only when units match. Allena tracks the trend \u2014 your doctor is the judge.</p>'+
+      '</div>'}catch(e){return ''}}
+async function bloodPhotoRead(img){
+  /* photos are AI territory by law — the same gate the scan uses */
+  try{
+    if(!aiReady()){flash('Reading a photo needs the AI set up \u2014 paste the text instead, that reads on the phone.');return}
+    const m=String(img).match(/^data:(image\/[a-z]+);base64,(.+)$/i);
+    if(!m){flash('Unsupported image.');return}
+    if(!aiSpend('scan'))return;
+    S._bloodBusy=true;render();
+    const res=await claudeFetch({model:S.ai.model,max_tokens:600,
+      system:'Extract blood test results from the image. Reply with JSON only, no prose, no code fences: {"date":"YYYY-MM-DD if visible","markers":{key:{"v":number,"u":"unit"}}}. Allowed keys: '+BLOOD_REF.map(R=>R[0]+' ('+R[1]+')').join(', ')+'. Numbers exactly as printed; omit anything unreadable.',
+      messages:[{role:'user',content:[{type:'image',source:{type:'base64',media_type:m[1],data:m[2]}},{type:'text',text:'Extract the values.'}]}]});
+    const d=await res.json();
+    let t=d.content?d.content.map(x=>x.text||'').join(''):'';
+    const o=JSON.parse(t.replace(/```json|```/g,'').trim());
+    const mk={};Object.keys(o.markers||{}).forEach(k=>{
+      const e9=o.markers[k];if(BLOOD_REF.some(R=>R[0]===k)&&e9&&isFinite(+e9.v))mk[k]={v:+e9.v,u:String(e9.u||'')}});
+    const n=Object.keys(mk).length;
+    if(!n){flash('Could not read markers off that photo \u2014 try pasting the text.')}
+    else{
+      const dt=(o.date&&/^\d{4}-\d{2}-\d{2}$/.test(o.date))?o.date:(S.bloodDate||today());
+      bloodSaveDraw(dt,mk);
+      flash('Read '+n+' markers \u2014 saved for '+fmtDate(dt+'T12:00')+'. Check them against the sheet.')}
+  }catch(e){flash('Could not read that photo \u2014 paste the text instead.')}
+  S._bloodBusy=false;render()}
+async function dataPhotoRead(img){
+  /* a photo through the DATA door: decide what it is, then hand it to
+     the pipeline that owns it — Evolt/InBody scans to the scan form
+     (checked before saving), blood sheets to bloodwork */
+  try{
+    if(!aiReady()){flash('Reading a photo needs the AI set up. Body-scan photos also work from Progress \u2192 Body composition.');return}
+    const m=String(img).match(/^data:(image\/[a-z]+);base64,(.+)$/i);
+    if(!m){flash('Unsupported image.');return}
+    if(!aiSpend('scan'))return;
+    flash('Reading the photo\u2026');
+    const res=await claudeFetch({model:S.ai.model,max_tokens:600,
+      system:'Classify this photo of personal fitness data and extract it. Reply with JSON only, no prose, no code fences. If it is a BODY COMPOSITION scan (Evolt, InBody, DEXA summary): {"kind":"scan","date":"YYYY-MM-DD","w":kg,"bf":percent,"smm":kg,"vf":rating,"bmr":kcal,"tee":kcal} (omit unreadable keys). If it is a BLOOD TEST result sheet: {"kind":"blood","date":"YYYY-MM-DD","markers":{key:{"v":number,"u":"unit"}}} with keys from: '+BLOOD_REF.map(R=>R[0]).join(', ')+'. Anything else: {"kind":"other"}.',
+      messages:[{role:'user',content:[{type:'image',source:{type:'base64',media_type:m[1],data:m[2]}},{type:'text',text:'Classify and extract.'}]}]});
+    const d=await res.json();
+    let t=d.content?d.content.map(x=>x.text||'').join(''):'';
+    const o=JSON.parse(t.replace(/```json|```/g,'').trim());
+    if(o.kind==='scan'){
+      S.sform={date:(o.date&&/^\d{4}-\d{2}-\d{2}$/.test(o.date))?o.date:today(),
+        w:o.w!=null?+o.w:'',bf:o.bf!=null?+o.bf:'',smm:o.smm!=null?+o.smm:'',
+        vf:o.vf!=null?+o.vf:'',bmr:o.bmr!=null?+o.bmr:'',tee:o.tee!=null?+o.tee:'',
+        img:img,busy:false};
+      S.sheet={t:'scan'};
+      flash('That reads as a body scan \u2014 check the numbers, then save.');render();return}
+    if(o.kind==='blood'){
+      const mk={};Object.keys(o.markers||{}).forEach(k=>{
+        const e9=o.markers[k];if(BLOOD_REF.some(R=>R[0]===k)&&e9&&isFinite(+e9.v))mk[k]={v:+e9.v,u:String(e9.u||'')}});
+      if(Object.keys(mk).length){
+        const dt=(o.date&&/^\d{4}-\d{2}-\d{2}$/.test(o.date))?o.date:today();
+        bloodSaveDraw(dt,mk);S.sheet={t:'blood'};
+        flash('Bloodwork \u2014 '+Object.keys(mk).length+' markers saved for '+fmtDate(dt+'T12:00')+'.');render();return}}
+    flash('Could not tell what that photo is. Programs go in through \u201cA program to follow\u201d.')
+  }catch(e){flash('Could not read that photo.')}
+  render()}
 /* ══ the correlation discoverer (owner call, 3 Sep) ══════════
    The crank. Instead of hand-writing every relationship, this
    pairs EVERY daily signal against EVERY training outcome at
@@ -17921,7 +18103,7 @@ function sheetHtml(){
       '<p style="color:var(--dim);font-size:13.5px;line-height:1.6">Two different jobs, so say which one this is — then drop any file.</p>'+
       '<label class="big disp mt2" style="display:block;text-align:center;cursor:pointer;background:var(--amber);color:var(--bg);font-size:15px">My training history'+
       '<span style="display:block;font-size:11.5px;font-weight:400;color:var(--bg);opacity:.75;margin-top:2px">Runs, logged lifting, Health exports — it lands in your record</span>'+
-      '<input type="file" accept=".xlsx,.csv,.tsv,.txt,.gpx,.tcx,.xml,text/plain,text/csv,text/xml,application/xml,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" data-intakefile="data" style="display:none"></label>'+
+      '<input type="file" accept=".xlsx,.csv,.tsv,.txt,.gpx,.tcx,.xml,image/*,text/plain,text/csv,text/xml,application/xml,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" data-intakefile="data" style="display:none"></label>'+
       '<label class="big disp mt" style="display:block;text-align:center;cursor:pointer;background:var(--raised);border:1px solid var(--line);color:var(--text);font-size:15px">A program to follow'+
       '<span style="display:block;font-size:11.5px;font-weight:400;color:var(--dim);margin-top:2px">A plan or a photo of one — Allena converts and reviews it with you</span>'+
       '<input type="file" accept=".xlsx,.csv,.tsv,.txt,image/*,text/plain,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" data-intakefile="program" style="display:none"></label>'+
@@ -18189,6 +18371,22 @@ function sheetHtml(){
       '<p style="color:var(--dim);font-size:12.5px;line-height:1.6;margin-top:4px">You know who this is \u2014 give them the name you use. Yours to see; it wins over whatever their account sends.</p>'+
       '<input data-in="frNm" placeholder="Their name" value="'+esc(S.frNm||'')+'" style="width:100%;min-height:48px;margin-top:12px">'+
       '<button data-a="frNameGo" class="big disp mt" style="background:var(--amber);color:var(--bg)">Save</button>')}
+  if(S.sheet.t==='blood'){
+    const L9=bloodStore().list.slice().reverse();
+    return wrapSheet('Bloodwork',
+      '<p style="color:var(--dim);font-size:13px;line-height:1.65;margin-top:6px">Paste the results text and it reads on the phone \u2014 nothing leaves it. A photo of the sheet works too'+(aiReady()?'':' once the AI is set up')+'.</p>'+
+      '<p class="eyebrow" style="margin-top:14px">Draw date</p>'+
+      '<input type="date" data-bdate="1" value="'+esc(S.bloodDate||today())+'" style="width:100%;margin-top:6px;background:var(--surface);border:1px solid var(--line);border-radius:10px;color:var(--text);padding:11px;font-size:16px;outline:none">'+
+      '<textarea data-bpaste="1" placeholder="Paste the results here \u2014 e.g.  Ferritin  18 ug/L" style="width:100%;min-height:110px;margin-top:12px;background:var(--surface);border:1px solid var(--line);border-radius:10px;color:var(--text);padding:11px;font-size:14px;outline:none;font-family:inherit">'+esc(S.bloodIn||'')+'</textarea>'+
+      '<button data-a="bloodTextGo" class="big disp mt" style="background:var(--amber);color:var(--bg);font-size:15px">Read what I pasted</button>'+
+      (aiReady()?'<label class="btn mt" style="display:block;text-align:center;cursor:pointer;color:var(--amber);font-size:13px">'+(S._bloodBusy?'Reading the photo\u2026':'\ud83d\udcf7 Photo of the results \u2014 Allena reads it')+
+        '<input type="file" accept="image/*" data-bloodfile="1" style="display:none"></label>':aiLockHtml('Reading a results photo'))+
+      (L9.length?'<p class="eyebrow" style="margin-top:18px">On record</p>'+
+        L9.slice(0,10).map(x=>'<div style="display:flex;align-items:baseline;gap:10px;margin-top:9px">'+
+          '<span style="flex:1;font-size:13px">'+esc(fmtDate(x.d+'T12:00'))+'</span>'+
+          '<span class="mono" style="color:var(--faint);font-size:10.5px">'+Object.keys(x.m||{}).length+' markers</span>'+
+          '<button data-a="bloodDel" data-v="'+esc(x.d)+'" style="color:var(--red);font-size:11px;flex:none">Remove</button></div>').join(''):'')+
+      '<p style="color:var(--faint);font-size:11px;line-height:1.55;margin-top:14px">Reference ranges are the lab\u2019s own adult bands, checked only when units match. Trend over single numbers \u2014 and your doctor is the judge, always.</p>')}
   if(S.sheet.t==='rom'){
     const L9=(typeof romStore==='function'?romStore().list:[]).slice(-8).reverse();
     return wrapSheet('The knee protractor',
@@ -19607,10 +19805,20 @@ document.addEventListener('input',e=>{const d=e.target.dataset;
       S.hkRes=hkImport(parsed);vib([20,40,20]);render()});
     return}
   if(e.target.dataset.runsel){S.runGroup=e.target.value;render();return}
-  if(e.target.dataset.runsel){S.runGroup=e.target.value;render();return}
+  if(e.target.dataset.bdate){S.bloodDate=e.target.value;return}
+  if(e.target.dataset.bpaste){S.bloodIn=e.target.value;return}
+  if(e.target.dataset.bloodfile){const fl=e.target.files&&e.target.files[0];if(!fl)return;
+    const rd=new FileReader();rd.onload=function(){try{bloodPhotoRead(String(rd.result))}catch(e9){}};
+    rd.readAsDataURL(fl);e.target.value='';return}
   if(e.target.dataset.intakefile){const fl=e.target.files&&e.target.files[0];if(!fl)return;
     const nm=String(fl.name||'').toLowerCase();
     const kind=e.target.dataset.intakefile; // 'data' | 'program' — the user said which
+    /* a PHOTO through the data door (owner ask, 8 Sep): body scans and
+       blood sheets are data too — classified and routed, checked
+       before anything saves */
+    if(kind==='data'&&/^image\//.test(String(fl.type||''))){
+      const rd=new FileReader();rd.onload=function(){try{dataPhotoRead(String(rd.result))}catch(e9){}};
+      rd.readAsDataURL(fl);e.target.value='';return}
     const routeText=function(txt,raw,grid){
       if(kind==='both'){
         /* the user said the file is BOTH — the plan imports first, and
@@ -20919,6 +21127,16 @@ function runAction(a,v,t,e){
     case 'hcStuckHide':{S.hcStuck=0;const P=notifPrefs();P.hcDismissed=1;notifSave();render();break}
     case 'healthConnectLater':{const P=notifPrefs();P.hcDismissed=1;notifSave();render();
       flash('No rush — the reminder will nudge you. It is the one thing that changes everything.');break}
+    case 'bloodOpen':{S.sheet={t:'blood'};render();break}
+    case 'bloodTextGo':{
+      try{
+        const mk=bloodParseText(S.bloodIn||'');
+        const n=Object.keys(mk).length;
+        if(!n){flash('No markers recognised \u2014 one per line works best: name, number, unit.');break}
+        bloodSaveDraw(S.bloodDate||today(),mk);S.bloodIn='';
+        flash('Read '+n+' markers \u2014 saved.');render()}catch(e){}break}
+    case 'bloodDel':{
+      try{const st=bloodStore();st.list=st.list.filter(x=>x.d!==v);lset(K_BLOOD,st);render()}catch(e){}break}
     case 'crewMake':{try{crewMake()}catch(e){}break}
     case 'crewShare':{try{crewShare(v)}catch(e){}break}
     case 'crewLeave':{try{crewLeave()}catch(e){}break}
