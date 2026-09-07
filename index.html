@@ -666,7 +666,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='921d12';  // stamped by tools/build.py with the content hash
+const BUILD_ID='91aae8';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -9750,7 +9750,11 @@ function hkDaily(rows){
       if(r.bw!=null&&isFinite(+r.bw)&&+r.bw>20&&+r.bw<400){
         try{S.daily=S.daily||{on:true,days:{}};S.daily.days=S.daily.days||{};
           const dd=S.daily.days[k]=S.daily.days[k]||{};
-          if(dd.bw==null||dd.bw===''){dd.bw=Math.round(+r.bw*10)/10;lset(K_DAILY,S.daily);n++;
+          const echo=(function(){
+            const pk=Object.keys(S.daily.days).filter(k2=>k2<k&&S.daily.days[k2]&&S.daily.days[k2].bw!=null).sort().pop();
+            const pv=pk&&S.daily.days[pk];
+            return !!(pv&&pv.bwSrc==='hk'&&Math.abs(+pv.bw-Math.round(+r.bw*10)/10)<0.05)})();
+          if(!echo&&(dd.bw==null||dd.bw==='')){dd.bw=Math.round(+r.bw*10)/10;dd.bwSrc='hk';lset(K_DAILY,S.daily);n++;
             /* a task the scale completes must SAY so — a silently
                self-ticking checklist reads as a glitch (owner-caught) */
             if(k===today())try{const fw=lget('training-fuelwins-v1',{})||{};
@@ -12154,13 +12158,13 @@ function verdictCard(){
       '<div style="display:flex;align-items:center;gap:9px;margin-top:13px;padding-top:12px;border-top:1px solid var(--line)">'+dots+
       '<span class="mono" style="color:var(--faint);font-size:10.5px">'+(pr.done>=pr.total?'all done today':'core done \u2014 the rest is optional')+'</span></div>'}
   else if(done&&n){
-    inner+='<p class="disp gradhead" style="font-size:24px;line-height:1.18;margin-top:10px">All done today</p>'+
-      '<p style="color:var(--dim);font-size:13.5px;line-height:1.6;margin-top:5px">And Allena found something in your data.</p>'+
+    inner+='<p class="disp gradhead" style="font-size:24px;line-height:1.18;margin-top:10px">'+(pr.done>=pr.total?'All done today':'Check-ins done')+'</p>'+
+      '<p style="color:var(--dim);font-size:13.5px;line-height:1.6;margin-top:5px">'+(pr.done>=pr.total?'And Allena found something in your data.':'Training is optional today. Allena found something in your data.')+'</p>'+
       '<button data-a="noticedOpen" class="big disp mt" style="background:var(--amber);color:var(--bg);font-size:15px">See what Allena noticed</button>'+
       '<div style="display:flex;align-items:center;gap:9px;margin-top:12px">'+dots+'</div>'}
   else if(done){
-    inner+='<p class="disp gradhead" style="font-size:24px;line-height:1.18;margin-top:10px">All done today</p>'+
-      '<p style="color:var(--dim);font-size:13.5px;line-height:1.6;margin-top:5px">Everything Allena asked for is logged. Tomorrow it will have something new to say.</p>'+
+    inner+='<p class="disp gradhead" style="font-size:24px;line-height:1.18;margin-top:10px">'+(pr.done>=pr.total?'All done today':'Check-ins done')+'</p>'+
+      '<p style="color:var(--dim);font-size:13.5px;line-height:1.6;margin-top:5px">'+(pr.done>=pr.total?'Everything Allena asked for is logged. Tomorrow it will have something new to say.':'Everything asked for is logged \u2014 training is optional today.')+'</p>'+
       '<div style="display:flex;align-items:center;gap:9px;margin-top:12px">'+dots+'</div>'}
   else{
     const next=pr.tasks.filter(x=>!x.done)[0];
@@ -14932,7 +14936,8 @@ function patMarkSoon(){
     S._patMarkT=setTimeout(function(){S._patMarkT=null;
       /* no render() here — an innerHTML rebuild mid-swipe kills the
          gesture (owner-caught); badges update on the next natural one */
-      try{markPatternsSeen()}catch(e9){}},2500)}catch(e){}}
+      try{markPatternsSeen()}catch(e9){}
+      try{if(typeof notifSync==='function')notifSync()}catch(e9){}},2500)}catch(e){}}
 function patListCard(){
   /* the Patterns lens lists the patterns themselves (owner ruling,
      7 Sep: the Find-the-links animation ritual is retired — same
@@ -14942,7 +14947,7 @@ function patListCard(){
     const P=allPatterns();const seen=S.patSeen||{};
     if(!P.length)return '<div class="card mt" style="padding:14px 16px"><p style="color:var(--dim);font-size:12.5px;line-height:1.6">Nothing in your data contradicts anything else in it right now. Patterns appear here the moment two of your numbers cross — keep logging.</p></div>';
     const DOM9={lift:'LIFTING',run:'RUNNING',rehab:'REHAB',cross:'CROSS-TRAINING'};
-    if((S.lensIdx==null||S.lensIdx===1)&&P.some(p=>p.tone==='warn'&&!seen[p.t]))patMarkSoon();
+    if(P.some(p=>p.tone==='warn'&&!seen[p.t]))patMarkSoon();
     const row=(p,i)=>{const hot=p.tone==='warn'&&!seen[p.t];
       return '<button data-a="patOpen" data-v="'+esc(p.t)+'" class="card'+(hot?' find-glow':'')+'" style="width:100%;text-align:left;padding:14px 16px;margin-top:9px;display:block;position:relative'+(p.tone==='warn'?';border-color:var(--amber)':'')+'">'+(hot?dustF(3):'')+
       '<p class="mono" style="font-size:8.5px;letter-spacing:.08em;color:'+(p.tone==='good'?'var(--green)':p.tone==='warn'?'var(--amber)':'var(--faint)')+'">'+(DOM9[p.dom]||'PATTERN')+(hot?' · NEW':'')+'</p>'+
@@ -14958,7 +14963,8 @@ function discMarkSoon(){
     if(S._discMarkT)return;
     if(!(typeof newDiscoveries==='function'&&newDiscoveries().length))return;
     S._discMarkT=setTimeout(function(){S._discMarkT=null;
-      try{markDiscoveries()}catch(e9){}},2500)}catch(e){}}
+      try{markDiscoveries()}catch(e9){}
+      try{if(typeof notifSync==='function')notifSync()}catch(e9){}},2500)}catch(e){}}
 function discCard(){
   const st=bankStats();
   const rareN=(st.rar&&((st.rar.rare||0)+(st.rar.epic||0)))||0;
@@ -14981,7 +14987,7 @@ function discCard(){
             (d.d?'<p style="color:var(--dim);font-size:12px;line-height:1.55;margin-top:5px">'+esc(String(d.d).slice(0,220))+'</p>':'')+'</div>'}).join('');
         const more=S.discLensShow.length-show.length;
         if(more>0)h+='<p class="mono" style="color:var(--faint);font-size:10px;margin-top:7px">and '+more+' more new — filed in the collection below.</p>';
-        if(S.lensIdx==null||S.lensIdx===0)discMarkSoon()}}
+        discMarkSoon()}}
   }catch(e){}
   return h}
 function viewFindings(){
@@ -20184,7 +20190,11 @@ function runAction(a,v,t,e){
       /* a group key lands the tap on its shelf (owner-caught, 7 Sep:
          '6 GATES' dumped the reader at the top of everything found) */
       if(v){S.openSec['grp:'+v]=1;S.scrollTo='grp-'+v}
-      render();break}
+      render();
+      /* the visit itself baselines the fresh marks — push the cleared
+         count to the icon badge right behind it */
+      setTimeout(function(){try{if(typeof notifSync==='function')notifSync()}catch(e9){}},400);
+      break}
     case 'dpShare':{try{navigator.clipboard.writeText(dpShareText());flash('Copied — paste it wherever you like.')}
       catch(e){flash('Could not copy on this device.')}break}
     case 'sigBw':{S.sheet=null;S.daily.on=true;lset(K_DAILY,S.daily);
@@ -20200,7 +20210,7 @@ function runAction(a,v,t,e){
       {const kg9=uwIn(v2);
       if(!(kg9>20&&kg9<400)){flash('That does not look like a bodyweight.');break}
       S.daily.days[today()]=S.daily.days[today()]||{};
-      S.daily.days[today()].bw=Math.round(kg9*10)/10;lset(K_DAILY,S.daily);
+      S.daily.days[today()].bw=Math.round(kg9*10)/10;S.daily.days[today()].bwSrc='me';lset(K_DAILY,S.daily);
       S.gform=null;S.sheet=null;render();flash('Logged '+v2+' '+uwUnit()+'.')}break}
     case 'adhOpen':S.sheet={t:'adh'};render();break;
     case 'patOpen':{S.patView=v;S.patFrom=S.view;S.view='pattern';markPatternsSeen();render();break}
@@ -20226,7 +20236,7 @@ function runAction(a,v,t,e){
       chartOpen(kind,ex,TT[kind]||ex,'');break}
     case 'editptSave':{const e=S.sheet,val=+e.val;
       if(!(val>0)){flash('Enter a number.');break}
-      if(e.kind==='bw'){const k=e.id.slice(3);S.daily.days[k]=S.daily.days[k]||{};S.daily.days[k].bw=Math.round(uwIn(val)*10)/10;lset(K_DAILY,S.daily)}
+      if(e.kind==='bw'){const k=e.id.slice(3);S.daily.days[k]=S.daily.days[k]||{};S.daily.days[k].bw=Math.round(uwIn(val)*10)/10;S.daily.days[k].bwSrc='me';lset(K_DAILY,S.daily)}
       if(e.kind==='bb'){const k=e.id.slice(3);S.gar.days[k]=S.gar.days[k]||{};
         if(S.gar.days[k].am!=null)S.gar.days[k].am=val;else S.gar.days[k].day=val;garSave()}
       S.sheet=null;flash('Updated.');render();break}
@@ -21837,6 +21847,12 @@ function dayCheck(){
   try{if(typeof expSettle==='function')expSettle()}catch(e){}
   try{if(typeof ratioDupeSweep==='function')ratioDupeSweep()}catch(e){}
   try{if(typeof serialDupeSweep==='function')serialDupeSweep()}catch(e){}
+  try{
+    const dd9=(S.daily&&S.daily.days)||{};const tk9=today();const cur9=dd9[tk9];
+    if(cur9&&cur9.bw!=null&&cur9.bwSrc!=='me'){
+      const pks=Object.keys(dd9).filter(k2=>k2<tk9&&dd9[k2]&&dd9[k2].bw!=null).sort().slice(-2);
+      if(pks.length===2&&pks.every(k2=>Math.abs(+dd9[k2].bw-(+cur9.bw))<0.05)){
+        delete cur9.bw;delete cur9.bwSrc;lset(K_DAILY,S.daily)}}}catch(e){}
   try{if(typeof socialJoinKick==='function')socialJoinKick()}catch(e){}
   try{if(typeof acctReady==='function'&&acctReady()&&typeof acct==='function'&&acct()&&S._syncDay!==today()){
     S._syncDay=today();acctSync(false)}}catch(e){}
