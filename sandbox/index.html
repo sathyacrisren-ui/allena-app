@@ -663,7 +663,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='7b5975';  // stamped by tools/build.py with the content hash
+const BUILD_ID='0481b5';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -9075,7 +9075,17 @@ function ratioDupeSweep(){
       if(!seen[nid])seen[nid]=seen[top.id]||today()});
     try{if(bank['undefined'])delete bank['undefined']}catch(e9){}
     try{lset('training-disc-v1',seen)}catch(e9){}
-    bank._ratiofix2=1;if(dirty||1)bankSave()}catch(e){}}
+    bank._ratiofix2=1;if(dirty||1)bankSave()}catch(e){}
+  try{
+    const bank=discBank();
+    if(!bank._bodyfix){
+      /* the migrated rung entries carried the OLD formula's body text
+         (naming the volume set) — refresh bodies from the live
+         generator, keep found dates (owner-caught, 7 Sep) */
+      const cur={};discoveries().forEach(x=>{if(x.tag==='ratio')cur[x.t]=x.d});
+      let n=0;Object.keys(bank).forEach(id=>{const e=bank[id];
+        if(e&&e.tag==='ratio'&&/1RM past [\d.]+× bodyweight$/.test(String(e.t))&&cur[e.t]&&e.d!==cur[e.t]){e.d=cur[e.t];n++}});
+      bank._bodyfix=1;bankSave()}}catch(e){}}
 function markDiscoveries(){
   const seen=discoverySeen();
   discoveries().forEach(d=>{if(!seen[d.id])seen[d.id]=today()});
@@ -11882,7 +11892,7 @@ function fuseCard(){
     /* a rehab-gated item is never promoted as today's chase — telling
        a phase-2 knee it is 'one run away' is exactly the coaching
        error this app exists to not make (owner-caught, 3 Sep) */
-    const chase=W.filter(w=>!w.gated);
+    const chase=W.filter(w=>!w.gated&&!w.slow);   // slow = payoff weeks out, never a chase
     /* the chase ROTATES day to day among everything within striking
        distance (owner call, 4 Sep: the same entry every morning goes
        stale) — closest still leads the ranking, but each day fronts a
@@ -14412,8 +14422,9 @@ function viewFindings(){
     '<p style="color:var(--dim);font-size:13px;line-height:1.6;margin-top:8px">Four lenses, one body of data — each swipe goes deeper, and the deeper the lens, the rarer what it sees.</p>'+
     '<p class="mono" style="text-align:center;font-size:15px;letter-spacing:.35em;margin-top:12px">'+
     LENSES.map((x,i)=>'<span id="ldot-'+i+'" style="color:'+(i===(S.lensIdx||0)?'var(--text)':'color-mix(in srgb, var(--text) 22%, transparent)')+'">'+(i===(S.lensIdx||0)?'●':'○')+'</span>').join('')+'</p>'+
-    '<div id="lenswrap" style="display:flex;overflow-x:auto;overflow-y:hidden;scroll-snap-type:x mandatory;align-items:flex-start;gap:0;margin:2px -18px 0;padding:0 0 6px;-webkit-overflow-scrolling:touch;scrollbar-width:none">'+
-    LENSES.map((x,i)=>'<div id="lens-'+i+'" style="flex:0 0 100%;scroll-snap-align:start;scroll-snap-stop:always;min-width:0;padding:0 18px;box-sizing:border-box">'+
+    '<div id="lensouter" data-swipestep="1" data-swipeact="lensStep" style="overflow:hidden;margin:2px -18px 0;padding-bottom:6px">'+
+    '<div id="lenswrap" class="swrow" style="display:flex;align-items:flex-start;transform:translateX(-'+((S.lensIdx||0)*100)+'%);transition:transform .26s cubic-bezier(.22,1,.36,1)">'+
+    LENSES.map((x,i)=>'<div id="lens-'+i+'" style="flex:0 0 100%;min-width:0;padding:0 18px;box-sizing:border-box">'+
       '<div style="margin-top:14px;display:flex;align-items:flex-end;gap:14px">'+
       '<span class="disp gradhead" style="font-size:46px;font-weight:800;line-height:.9;flex:none">'+(i+1)+'</span>'+
       '<span style="flex:1;min-width:0">'+
@@ -14432,7 +14443,7 @@ function viewFindings(){
         '<span class="mono" style="color:var(--faint);font-size:8.5px;letter-spacing:.08em;flex:none;min-width:44px">'+r[0]+'</span>'+
         '<span style="flex:1;min-width:0;color:var(--dim);font-size:12px;line-height:1.5">'+r[1]+'</span></div>').join('')+
       '</div>')+'</div>').join('')+
-    '</div>'+
+    '</div></div>'+
     '</div>'}
 function lensWord(k){
  /* Each lens page shows the last thing it actually PRODUCED, plus its
@@ -16558,7 +16569,7 @@ function sheetHtml(){
       W.slice().sort((a,b)=>(a.gated?1:0)-(b.gated?1:0)||b.pct-a.pct).map(w=>'<div>'+
         '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px">'+
         '<span style="flex:1;min-width:0;font-size:13.5px;font-weight:600;color:'+(w.gated?'var(--faint)':w.pct>=75?'var(--text)':'var(--dim)')+'">'+esc(w.t)+'</span>'+
-        '<span class="mono" style="color:'+(w.gated?'var(--faint)':w.need-w.have===1?'var(--amber)':'var(--faint)')+';font-size:10px;flex:none">'+(w.gated?'GATED':w.need-w.have===1?'ONE AWAY \u00b7 ':'')+w.have+'/'+w.need+'</span></div>'+
+        '<span class="mono" style="color:'+(w.gated?'var(--faint)':(w.need-w.have===1&&!w.slow)?'var(--amber)':'var(--faint)')+';font-size:10px;flex:none">'+(w.gated?'GATED':(w.need-w.have===1&&!w.slow)?'ONE AWAY \u00b7 ':'')+w.have+'/'+w.need+'</span></div>'+
         '<div style="height:5px;border-radius:3px;background:var(--line);overflow:hidden;margin-top:6px">'+
         '<div style="height:5px;width:'+w.pct+'%;background:'+(w.gated?'var(--line)':w.need-w.have===1?'var(--amber)':'var(--dim)')+'"></div></div>'+
         '<p style="color:var(--faint);font-size:11.5px;line-height:1.5;margin-top:5px">'+esc(w.d)+'</p>'+
@@ -18440,13 +18451,10 @@ function render(){
     try{if(!S.tour&&!S._tourChecked&&S.view==='today'&&S.boot==null&&!S.sheet&&!S.sess){
       S._tourChecked=1;
       if(!lget('training-tour-v1',null)){S.tour={i:0};setTimeout(function(){try{render()}catch(e9){}},60)}}}catch(e){}
-    try{const lw=document.getElementById('lenswrap');
-      if(lw&&S.lensIdx>0&&!S.scrollTo)lw.scrollLeft=S.lensIdx*lw.clientWidth;
-      /* each lens page keeps its own height; the pager tracks the one
-         in view — a short page (the analyst) no longer trails the dead
-         space of the tallest (owner-caught, 6 Sep) */
-      if(lw){const c9=lw.children[Math.max(0,S.lensIdx||0)];
-        if(c9)lw.style.height=c9.offsetHeight+'px'}}catch(e){}
+    try{const lo=document.getElementById('lensouter');
+      if(lo){const r9=lo.querySelector('.swrow');
+        const c9=r9&&r9.children[Math.max(0,Math.min(3,S.lensIdx||0))];
+        if(c9)lo.style.height=c9.offsetHeight+'px'}}catch(e){}
     if(S.scrollTo)setTimeout(doScroll,30);
     try{const dr=document.getElementById('drawer');
       /* slide in only on a FRESH open — a re-render while the drawer is
@@ -18664,12 +18672,13 @@ setInterval(function(){try{
 /* step swiper (owner call, 3 Sep): drag horizontally through the
    guide's steps — the row follows the finger, snaps with animation,
    then the state catches up. */
-(function(){let x0=null,y0=null,row=null,idx=0,n=1,drag=false;
+(function(){let x0=null,y0=null,row=null,idx=0,n=1,drag=false,act='impgStep';
   document.addEventListener('touchstart',e=>{
     row=null;x0=null;drag=false;
     const w=e.target.closest&&e.target.closest('[data-swipestep]');
     if(!w)return;
     row=w.querySelector('.swrow');if(!row)return;
+    act=(w.dataset&&w.dataset.swipeact)||'impgStep';
     n=row.children.length;
     const m9=/-(\d+)%/.exec(row.style.transform||'');idx=m9?Math.round(+m9[1]/100):0;
     x0=e.touches[0].clientX;y0=e.touches[0].clientY},{passive:true});
@@ -18694,7 +18703,7 @@ setInterval(function(){try{
     r9.style.transition='transform .26s cubic-bezier(.22,1,.36,1)';
     r9.style.transform='translateX(-'+(to*100)+'%)';
     if(to!==idx){try{vib(6)}catch(e2){}
-      setTimeout(function(){try{runAction('impgStep',to-idx)}catch(e2){}},230)}},{passive:true});
+      setTimeout(function(){try{runAction(act,to-idx)}catch(e2){}},230)}},{passive:true});
 })();
 
 /* edge-swipe from the left opens the drawer (owner call, Sep 2026) —
@@ -18804,7 +18813,7 @@ document.addEventListener('change',e=>{ // any date input with a placeholder ove
     try{render()}catch(e2){}}},true);
 document.addEventListener('scroll',e=>{ // the findings carousel remembers its lens
   try{const t=e.target;
-    if(t&&t.id==='lenswrap'&&t.clientWidth>0){
+    if(t&&t.id==='__lenswrap_retired'&&t.clientWidth>0){
       S.lensIdx=Math.round(t.scrollLeft/Math.max(1,t.clientWidth));
       /* the position dots follow the swipe live — no re-render mid-drag
          (owner-caught, 6 Sep: dots never moved) */
@@ -20519,6 +20528,11 @@ function runAction(a,v,t,e){
       else histAliasApply(S.histImp&&S.histImp.weeks,ha.map,ha.r.canon);
       const nx=ha.next;S.halias=null;
       if(typeof nx==='function')nx();else{S.sheet=null;render()}break}
+    case 'lensStep':{
+      S.lensIdx=Math.max(0,Math.min(3,(S.lensIdx||0)+(+v||0)));
+      try{if(S.lensIdx===0&&typeof discMarkSoon==='function')discMarkSoon()}catch(e9){}
+      try{if(S.lensIdx===1&&typeof patMarkSoon==='function')patMarkSoon()}catch(e9){}
+      render();break}
     case 'tourNext':{if(!S.tour)break;S.tour.i++;
       if(S.tour.i>=5){S.tour=null;lset('training-tour-v1',{seen:today()});flash('Replay it any time \u2014 Settings \u2192 Show me around.')}
       render();break}
@@ -21104,12 +21118,11 @@ function doScroll(){
   try{const el=document.getElementById(id);
     if(!el)return;
     if(id.slice(0,5)==='lens-'){
-      /* horizontal ONLY: scroll the carousel by hand and pin the page
-         top — scrollIntoView's vertical component landed arrivals
-         below the pill (owner-caught, 6 Sep) */
+      /* the pager is a transform carousel now — arrivals set the index
+         and re-render; the page top is pinned */
       window.scrollTo(0,0);
-      const c9=el.parentElement;
-      if(c9)c9.scrollTo({left:el.offsetLeft-c9.offsetLeft,behavior:'smooth'})}
+      S.lensIdx=Math.max(0,Math.min(3,+id.slice(5)||0));
+      try{render()}catch(e9){}}
     else if(el.scrollIntoView)el.scrollIntoView({behavior:'smooth',block:'center'})}catch(e){}}
 try{navigator.storage&&navigator.storage.persist&&navigator.storage.persist().then(function(g){S.persisted=!!g})}catch(e){}
 try{sanityWeeks()}catch(e){}
