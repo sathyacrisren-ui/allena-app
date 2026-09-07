@@ -666,7 +666,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='ed6abe';  // stamped by tools/build.py with the content hash
+const BUILD_ID='aa1f95';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -1525,10 +1525,22 @@ function snapshotData(){
      server columns are int — the synced score card rounds; the
      precise figure lives on-device. (A future migration to numeric
      can carry decimals when competition needs them.) */
-  return{points:Math.round(d.total),live_points:Math.round(d.live),tier:t[1],
+  const out={points:Math.round(d.total),live_points:Math.round(d.live),tier:t[1],
     tree:{pts:tr.pts,sessions:tr.sessions,lifts:tr.liftCount,runs:tr.runs,
       km:tr.km,rare:tr.rare,found:tr.found,weeks:tr.weeks,days:tr.days},
-    collection_count:st.total}}
+    collection_count:st.total};
+  /* the race fields (Part 3, 7 Sep): weekly LIVE points + a chosen
+     first name — score card still, nothing else. Activation = 3 live
+     sessions inside the first tracked week, computed on-device. */
+  if(!S._snapLegacy){
+    out.week_live=d.weekLive||0;out.week_sessions=d.weekSessions||0;
+    out.display=String((S.prof&&S.prof.name)||'').split(' ')[0].slice(0,12)||null;
+    try{
+      const L=(S.history||[]).filter(h=>h.complete&&sessionLive(h))
+        .map(h=>String(h.date).slice(0,10)).sort();
+      if(L.length){const cut=dayKey(new Date(new Date(L[0]+'T12:00').getTime()+7*864e5));
+        out.activated=L.filter(k=>k<cut).length>=3}else out.activated=false}catch(e){out.activated=false}}
+  return out}
 async function acctSync(loud){
   if(!acctReady())return false;
   if(loud){S.acctBusy=true;render()}
@@ -1536,8 +1548,11 @@ async function acctSync(loud){
     if(ok9)setTimeout(function(){S.acctSynced=0;try{render()}catch(e){}},2200)}};
   const tok=await acctToken();if(!tok){if(loud)flash('Sign in first.');done(false);return false}
   const c=acctClaims(tok);if(!c||!c.sub){done(false);return false}
+  const legacyRetry=async r=>{ // server predates social.sql: shrink and retry once
+    if(r&&r.status===400&&!S._snapLegacy){S._snapLegacy=1;return acctSync(loud)}
+    return false};
   try{
-    const row=Object.assign({user_id:c.sub,updated_at:new Date().toISOString()},snapshotData());
+    let row=Object.assign({user_id:c.sub,updated_at:new Date().toISOString()},snapshotData());
     const r=await fetch(CLOUD.url+'/rest/v1/snapshots?on_conflict=user_id',{method:'POST',
       headers:{'content-type':'application/json',apikey:CLOUD.anon,
         Authorization:'Bearer '+tok,Prefer:'resolution=merge-duplicates,return=minimal'},
@@ -1545,9 +1560,87 @@ async function acctSync(loud){
     if(r.ok){lset(K_ACCT,Object.assign({},acct(),{lastSync:today()}));
       try{haptic('success')}catch(e9){}
       done(true);return true}
+    if(await legacyRetry(r))return true;
     let why='';try{why=(await r.text()).slice(0,120)}catch(e9){}
     if(loud)flash('Sync failed ('+r.status+')'+(why?' — '+why:'')+'.');
     done(false);return false}catch(e){if(loud)flash('No connection.');done(false);return false}}
+/* ══ friends & the weekly race (Part 3 step 1-2, 7 Sep) ══════
+   Self-detecting: until supabase/social.sql is pasted, every call
+   quietly no-ops and no UI appears. Compete on WEEKLY LIVE points —
+   Monday reset, live-only, never lifetime totals (recorded law). */
+async function frHeaders(){const tok=await acctToken();if(!tok)return null;
+  return{'content-type':'application/json',apikey:CLOUD.anon,Authorization:'Bearer '+tok}}
+async function frLoad(force){
+  try{
+    if(S._frCap===false&&!force)return;
+    if(!acctReady()||!acct())return;
+    const h=await frHeaders();if(!h)return;
+    const r=await fetch(CLOUD.url+'/rest/v1/friends?select=*',{headers:h});
+    if(!r.ok){S._frCap=false;return}
+    S._frCap=true;
+    const tok=await acctToken();S.frMe=(acctClaims(tok)||{}).sub||null;
+    S.frRows=await r.json();
+    const ids=(S.frRows||[]).filter(x=>x.linked_at)
+      .map(x=>x.owner_id===S.frMe?x.friend_id:x.owner_id).filter(Boolean);
+    if(ids.length){
+      const r2=await fetch(CLOUD.url+'/rest/v1/snapshots?select=user_id,display,week_live,week_sessions,live_points,tier&user_id=in.('+ids.map(encodeURIComponent).join(',')+')',{headers:h});
+      S.frSnaps=r2.ok?await r2.json():[]}
+    else S.frSnaps=[];
+    render()}catch(e){}}
+async function frInvite(){
+  try{const h=await frHeaders();if(!h||!S.frMe){flash('Sign in first.');return}
+    const code=Math.random().toString(36).replace(/[^a-z0-9]/g,'').slice(0,6).toUpperCase();
+    const r=await fetch(CLOUD.url+'/rest/v1/friends',{method:'POST',headers:h,
+      body:JSON.stringify([{code:code,owner_id:S.frMe}])});
+    if(r.ok){flash('Invite code '+code+' — send it to a friend.');frLoad(true)}
+    else flash('Could not make a code ('+r.status+').')}catch(e){flash('No connection.')}}
+async function frJoin(code){
+  try{code=String(code||'').trim().toUpperCase();
+    if(code.length<4){flash('Enter the code your friend sent.');return}
+    const h=await frHeaders();if(!h||!S.frMe){flash('Sign in first.');return}
+    const r=await fetch(CLOUD.url+'/rest/v1/friends?code=eq.'+encodeURIComponent(code)+'&friend_id=is.null',
+      {method:'PATCH',headers:Object.assign({Prefer:'return=representation'},h),
+       body:JSON.stringify({friend_id:S.frMe,linked_at:new Date().toISOString()})});
+    const rows=r.ok?await r.json():[];
+    if(rows.length){flash('Linked — the race is on. Resets every Monday.');try{hapticRun('find')}catch(e9){};acctSync(false);frLoad(true)}
+    else flash('That code did not match an open invite.')}catch(e){flash('No connection.')}}
+async function frRemove(code){
+  try{const h=await frHeaders();if(!h)return;
+    await fetch(CLOUD.url+'/rest/v1/friends?code=eq.'+encodeURIComponent(code),{method:'DELETE',headers:h});
+    frLoad(true)}catch(e){}}
+function frLinked(){
+  const me=S.frMe;
+  return (S.frRows||[]).filter(x=>x.linked_at).map(x=>{
+    const fid=x.owner_id===me?x.friend_id:x.owner_id;
+    const sn=(S.frSnaps||[]).find(s9=>s9.user_id===fid)||{};
+    return{code:x.code,id:fid,name:sn.display||'Your friend',
+      week:sn.week_live||0,sess:sn.week_sessions||0,tier:sn.tier||''}})}
+function friendsSection(){
+  try{
+    if(!acctReady()||!acct())return '';
+    if(S._frCap==null){if(!S._frKick){S._frKick=1;setTimeout(function(){frLoad()},80)}return ''}
+    if(S._frCap===false)return '';
+    const mine=Math.round((dataPoints().weekLive)||0);
+    const L=frLinked();
+    const open=(S.frRows||[]).filter(x=>!x.linked_at&&x.owner_id===S.frMe);
+    return '<p class="eyebrow mt2">Friends — the weekly race</p>'+
+      '<p style="color:var(--faint);font-size:11.5px;line-height:1.55;margin-top:4px">Live points only, fresh every Monday. Showing up and honest logging is the whole game — rest days earn too.</p>'+
+      (L.length?'<div class="card mt" style="padding:13px 15px">'+
+        '<div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font-size:13px;font-weight:600">You</span><span class="mono" style="font-size:15px;font-weight:700">'+mine+'</span></div>'+
+        L.map(f=>{const lead=mine-f.week;
+          return '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-top:9px;padding-top:9px;border-top:1px solid var(--line)">'+
+          '<span style="flex:1;min-width:0;font-size:13px">'+esc(f.name)+'</span>'+
+          '<span class="mono" style="color:'+(lead>=0?'var(--green)':'var(--amber)')+';font-size:10px">'+(lead>=0?'+'+lead+' you':'+'+(-lead)+' them')+'</span>'+
+          '<span class="mono" style="font-size:15px;font-weight:700;flex:none">'+f.week+'</span>'+
+          '<button data-a="frRemove" data-v="'+esc(f.code)+'" style="color:var(--faint);font-size:12px;flex:none;padding:0 4px">\u2715</button></div>'}).join('')+
+        '</div>':'')+
+      (open.length?'<p class="mono" style="color:var(--faint);font-size:10px;margin-top:8px">OPEN INVITE'+(open.length>1?'S':'')+': '+open.map(x=>esc(x.code)).join(' \u00b7 ')+' \u2014 waiting to be claimed</p>':'')+
+      '<div class="row mt" style="gap:8px">'+
+      '<button data-a="frInvite" class="btn" style="flex:1;font-size:12.5px;color:var(--amber);border-color:var(--amber)">Make an invite code</button>'+
+      '</div>'+
+      '<div class="row mt" style="gap:8px">'+
+      '<input data-in="frIn" placeholder="Friend\u2019s code" value="'+esc(S.frIn||'')+'" style="flex:2;min-height:44px;text-transform:uppercase">'+
+      '<button data-a="frJoinGo" class="btn" style="flex:1;font-size:12.5px">Link up</button></div>'}catch(e){return ''}}
 let acctSyncT=null;
 function acctSyncSoon(){
   if(!acctReady()||!acct())return;
@@ -4149,7 +4242,8 @@ function dpPlausible(h){
   return bad<=Math.max(1,Math.round((h.log||[]).length*0.1))}
 function dataPoints(){
   const B={sets:0,effort:0,sessions:0,runs:0,zones:0,readiness:0,bodyweight:0,scans:0,rehab:0,notes:0};
-  let live=0,byDay={};
+  let live=0,byDay={},weekLive=0,weekSess=0;
+  let wkStart='';try{wkStart=questWeekKey()}catch(e){}
   (S.history||[]).forEach(h=>{
     if(!dpPlausible(h))return;                       // implausible sessions score nothing
     const day=(h.date||'').slice(0,10);
@@ -4177,7 +4271,8 @@ function dataPoints(){
       notes=notes*f;sess=room>0?sess:0;
       earned=sets+effort+notes+sess}
     byDay[day]=used+earned;
-    if(sessionLive(h))live+=earned;
+    if(sessionLive(h)){live+=earned;
+      if(wkStart&&day>=wkStart){weekLive+=earned;if(sess)weekSess++}}
     B.sessions+=sess;B.sets+=sets;B.effort+=effort;B.notes+=notes});
   (S.runs||[]).forEach(r=>{
     /* cardio spends from the same day budget as sessions — typed runs
@@ -4216,6 +4311,7 @@ function dataPoints(){
   const total=Math.round(Object.keys(B).reduce((x,k)=>x+B[k],0)*10)/10;
   const todayEarned=Math.round((byDay[today()]||0)*10)/10;
   return{total:total,by:B,live:Math.round(Math.min(live,total)*10)/10,
+    weekLive:Math.round(weekLive),weekSessions:weekSess,
     today:todayEarned,room:Math.max(0,Math.round((dpDayCap()-todayEarned)*10)/10),
     livePct:total?Math.round(Math.min(live,total)/total*100):0}}
 /* the two clocks of motivation: LEVELS are the small wins — the first
@@ -15067,6 +15163,20 @@ function viewToday(){
           '<p class="mono" style="font-size:8.5px;letter-spacing:.08em;color:var(--faint)">'+notifEchoKind(x.id)+'</p>'+
           '<p style="font-size:13px;line-height:1.55;margin-top:2px">'+esc(String(x.body).slice(0,180))+'</p></button>').join('')+
         (ec.length>3?'<p class="mono" style="color:var(--faint);font-size:9.5px;margin-top:7px">and '+(ec.length-3)+' more</p>':'')+'</div>'}}catch(e){}
+  try{
+    const L=(typeof frLinked==='function')?frLinked():[];
+    if(L.length){
+      const mine=Math.round((dataPoints().weekLive)||0);
+      const top=L.slice().sort((a,b)=>b.week-a.week)[0];
+      const lead=mine-top.week;
+      h+='<button data-a="nav" data-v="acct" class="card mt" style="width:100%;text-align:left;padding:13px 16px;display:block">'+
+        '<p class="mono" style="font-size:9px;letter-spacing:.1em;color:var(--faint)">THE WEEK\u2019S RACE \u00b7 RESETS MONDAY</p>'+
+        '<div style="display:flex;align-items:baseline;gap:10px;margin-top:6px">'+
+        '<span class="mono" style="font-size:19px;font-weight:700">'+mine+'</span>'+
+        '<span style="color:var(--faint);font-size:11px;flex:1">you \u00b7 live points</span>'+
+        '<span class="mono" style="font-size:19px;font-weight:700;color:'+(lead>=0?'var(--green)':'var(--amber)')+'">'+top.week+'</span>'+
+        '<span style="color:var(--faint);font-size:11px">'+esc(top.name)+'</span></div>'+
+        '<p style="color:var(--dim);font-size:11.5px;margin-top:6px">'+(lead>0?'You lead by '+lead+' \u2014 a logged session holds it.':lead<0?esc(top.name)+' leads by '+(-lead)+' \u2014 a session today overtakes.':'Dead level \u2014 next honest log takes the lead.')+'</p></button>'}}catch(e){}
   h+=verdictCard();
   h+=todayOrder().join('');
   return h+'</div>'}
@@ -16522,7 +16632,7 @@ function viewAcct(){
    '<button data-a="back" style="width:42px;height:42px;border-radius:42px;background:var(--surface);border:1px solid var(--line);color:var(--dim);display:flex;align-items:center;justify-content:center;flex:none;font-size:16px">\u2039</button>'+
    '<h1 class="disp" style="font-size:19px;font-weight:600;flex:1;text-align:center;margin:0">Account &amp; sync</h1>'+
    '<span style="width:42px;flex:none"></span></div>'+
-   accountSection()+'</div>'}
+   accountSection()+((typeof friendsSection==='function')?friendsSection():'')+'</div>'}
 function reportPageHtml(){
   return '<p style="color:var(--dim);font-size:13px;line-height:1.6;margin-top:8px">Something broken, confusing, or just not right? One tap opens an email to the developer — Allena fills in what build you are on so you do not have to.</p>'+
     '<button data-a="reportEmail" class="big disp mt" style="background:var(--amber);color:var(--bg);font-size:15px">Email the developer</button>'+
@@ -20541,6 +20651,9 @@ function runAction(a,v,t,e){
       else histAliasApply(S.histImp&&S.histImp.weeks,ha.map,ha.r.canon);
       const nx=ha.next;S.halias=null;
       if(typeof nx==='function')nx();else{S.sheet=null;render()}break}
+    case 'frInvite':frInvite();break;
+    case 'frJoinGo':frJoin(S.frIn||'');break;
+    case 'frRemove':frRemove(v);break;
     case 'lensStep':{
       S.lensIdx=Math.max(0,Math.min(3,(S.lensIdx||0)+(+v||0)));
       try{if(S.lensIdx===0&&typeof discMarkSoon==='function')discMarkSoon()}catch(e9){}
@@ -21106,6 +21219,8 @@ function dayCheck(){
   try{if(typeof watchMetSweep==='function')watchMetSweep()}catch(e){}
   try{if(typeof expSettle==='function')expSettle()}catch(e){}
   try{if(typeof ratioDupeSweep==='function')ratioDupeSweep()}catch(e){}
+  try{if(typeof frLoad==='function'&&!S._frDay){S._frDay=today();frLoad()}
+    else if(typeof frLoad==='function'&&S._frDay!==today()){S._frDay=today();frLoad()}}catch(e){}
   const k=today();
   if(k!==lastDay){lastDay=k;S.garSkip=false}   // a new day: clear yesterday's skips
   if(!morningAsk())dailyFindAsk()}
