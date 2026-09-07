@@ -666,7 +666,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='aa1f95';  // stamped by tools/build.py with the content hash
+const BUILD_ID='f8073b';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -1592,8 +1592,16 @@ async function frInvite(){
     const code=Math.random().toString(36).replace(/[^a-z0-9]/g,'').slice(0,6).toUpperCase();
     const r=await fetch(CLOUD.url+'/rest/v1/friends',{method:'POST',headers:h,
       body:JSON.stringify([{code:code,owner_id:S.frMe}])});
-    if(r.ok){flash('Invite code '+code+' — send it to a friend.');frLoad(true)}
+    if(r.ok){
+      let copied=false;
+      try{await navigator.clipboard.writeText(code);copied=true}catch(e9){}
+      flash(copied?('Code '+code+' copied — paste it to your friend.'):('Invite code '+code+' — tap it below to copy.'));
+      frLoad(true)}
     else flash('Could not make a code ('+r.status+').')}catch(e){flash('No connection.')}}
+async function frCopy(code){
+  try{await navigator.clipboard.writeText(String(code));
+    flash('Copied '+code+' — send it to your friend.')}catch(e){
+    flash(String(code)+' — long-press to copy it from here.')}}
 async function frJoin(code){
   try{code=String(code||'').trim().toUpperCase();
     if(code.length<4){flash('Enter the code your friend sent.');return}
@@ -1634,7 +1642,9 @@ function friendsSection(){
           '<span class="mono" style="font-size:15px;font-weight:700;flex:none">'+f.week+'</span>'+
           '<button data-a="frRemove" data-v="'+esc(f.code)+'" style="color:var(--faint);font-size:12px;flex:none;padding:0 4px">\u2715</button></div>'}).join('')+
         '</div>':'')+
-      (open.length?'<p class="mono" style="color:var(--faint);font-size:10px;margin-top:8px">OPEN INVITE'+(open.length>1?'S':'')+': '+open.map(x=>esc(x.code)).join(' \u00b7 ')+' \u2014 waiting to be claimed</p>':'')+
+      (open.length?'<div style="display:flex;flex-wrap:wrap;align-items:center;gap:7px;margin-top:10px">'+
+        '<span class="mono" style="color:var(--faint);font-size:10px">OPEN INVITE'+(open.length>1?'S':'')+' \u2014 tap to copy:</span>'+
+        open.map(x=>'<button data-a="frCopy" data-v="'+esc(x.code)+'" class="pill mono" style="font-size:12px;letter-spacing:.08em;padding:7px 12px">'+esc(x.code)+' \u29c9</button>').join('')+'</div>':'')+
       '<div class="row mt" style="gap:8px">'+
       '<button data-a="frInvite" class="btn" style="flex:1;font-size:12.5px;color:var(--amber);border-color:var(--amber)">Make an invite code</button>'+
       '</div>'+
@@ -20652,6 +20662,7 @@ function runAction(a,v,t,e){
       const nx=ha.next;S.halias=null;
       if(typeof nx==='function')nx();else{S.sheet=null;render()}break}
     case 'frInvite':frInvite();break;
+    case 'frCopy':frCopy(v);break;
     case 'frJoinGo':frJoin(S.frIn||'');break;
     case 'frRemove':frRemove(v);break;
     case 'lensStep':{
