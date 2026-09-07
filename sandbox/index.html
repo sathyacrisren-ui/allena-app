@@ -663,7 +663,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='43222b';  // stamped by tools/build.py with the content hash
+const BUILD_ID='729a76';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -3944,9 +3944,23 @@ function noticedPool(){
         'The same day, week after week \u2014 scheduling is the strongest predictor of long-term progress there is.',2)})}catch(e){}
   return out}
 function noticedToday(){
-  const pool=noticedPool();
-  if(!pool.length)return null;
+  /* the boredom fuse (owner call, 7 Sep: 'reps fade by the end' every
+     day kills the moment): an observation shown three times sleeps for
+     a fortnight. When nothing genuinely fresh remains, the hero shows
+     what's BREWING — real near-answerable questions — and failing
+     that, says the quiet truth. Never a stale repeat, never filler. */
   const t=todayState();
+  let ntc={};try{S.daily.ntc=S.daily.ntc||{};ntc=S.daily.ntc}catch(e){}
+  const cut14=dayKey(new Date(Date.now()-14*864e5));
+  const tired=k9=>{const r=ntc[k9];return !!(r&&r.n>=3&&r.last>cut14)};
+  const pool=noticedPool().filter(p2=>!tired(p2.t));
+  if(!pool.length){
+    try{const B=(typeof brewingQs==='function')?brewingQs():[];
+      if(B.length){const b0=B[0];
+        return{t:'\u201c'+b0.q.replace(/^Does /,'Does ')+'\u201d',tier:1,brew:1,
+          d:'A real question, '+b0.have+' of 12 evidence days in \u2014 '+b0.left+' more and your own engine answers it.'+(B[1]?' Also brewing: \u201c'+B[1].q+'\u201d ('+B[1].left+' days out).':'')+' Nothing here is invented \u2014 the cool ones arrive when the data proves them.'}}}catch(e){}
+    return{t:'A quiet day \u2014 honestly',tier:3,brew:1,
+      d:'Nothing new is true about you today, and Allena does not invent. Log on \u2014 the next find is being earned right now.'}}
   if(t.noticedT){const f9=pool.find(p2=>p2.t===t.noticedT);if(f9)return f9}
   if(t.seenIdx!=null)return pool[Math.min(t.seenIdx,pool.length-1)];
   // stable for the day, different tomorrow — and "different tomorrow"
@@ -3975,6 +3989,8 @@ function noticedToday(){
   }catch(e){}
   const chosen=list[idx];
   t.seenIdx=pool.indexOf(chosen);t.noticedT=chosen.t;todaySave(t);
+  try{const r=ntc[chosen.t]||{n:0};
+    if(r.last!==today()){r.n=(r.n||0)+1;r.last=today();ntc[chosen.t]=r;lset(K_DAILY,S.daily)}}catch(e){}
   return chosen}
 
 /* ══ data points ════════════════════════════════════════════
@@ -8149,7 +8165,7 @@ function notifPlan(){
      holds — it gets the 11:00 slot. Real threshold, filled by
      logging, never by waiting. */
   if(P.reveal){try{
-    const W9=((typeof watchList==='function')?watchList():[]).filter(w=>!w.gated);
+    const W9=((typeof watchList==='function')?watchList():[]).filter(w=>!w.gated&&!w.slow);
     const nr=W9.slice().sort((a,b)=>(a.need-a.have)-(b.need-b.have)||b.pct-a.pct)[0];
     if(nr&&nr.need-nr.have===1){
       const at11=new Date(today()+'T11:00:00').getTime();
@@ -10208,6 +10224,30 @@ function expSettle(){
       bankSave();try{hapticRun('find')}catch(e8){}}
     st.lastExp={plan:st.exp.plan,applied:st.exp.applied,verdict:x.verdict,delta:x.delta};
     st.exp=null;lset('training-analyst-v1',st)}catch(e){}}
+function brewingQs(){
+  /* the honest trailer (owner call, 7 Sep: 'how do we relay that cool
+     insights are coming?'): the near-ready HYPOTHESES from the real
+     grid, named as QUESTIONS with real evidence counts. A question 3
+     days from answerable beats any progress bar — and it cannot lie,
+     because the count is the same one the engine will test. */
+  try{
+    const tk=today();
+    if(S._brewMemo&&S._brewMemo.day===tk)return S._brewMemo.v;
+    const days=corrDayData();const ks=Object.keys(days);
+    let v=[];
+    if(ks.length>=6){
+      const M=corrMaps(days);
+      Object.keys(M.sigs).forEach(sg=>{
+        if(typeof CORR_PRIOR==='object'&&CORR_PRIOR[sg]<0)return;
+        Object.keys(M.outs).forEach(ot=>{
+          if(M.outs[ot].exo)return;
+          let n=0;for(const k of ks){const d=days[k];if(d[sg]!=null&&d[ot]!=null)n++}
+          if(n>=7&&n<12)v.push({sig:sg,out:ot,have:n,left:12-n,
+            q:'Does '+M.sigs[sg].n+' move '+M.outs[ot].n+'?'})})});
+      v.sort((a,b)=>b.have-a.have);
+      const seenO={};
+      v=v.filter(x=>{if(seenO[x.out])return false;seenO[x.out]=1;return true}).slice(0,3)}
+    S._brewMemo={day:tk,v:v};return v}catch(e){return []}}
 function analystStore(){return lget('training-analyst-v1',null)}
 async function analystRun(){
   try{
@@ -11943,7 +11983,11 @@ function watchList(){
   {const blocks={};H.forEach(h=>{blocks[h.progId]=(blocks[h.progId]||0)+1});
    const done=Object.keys(blocks).filter(k=>blocks[k]>=6).length;
    add('How this block compares with the last',done,2,
-     'Six sessions in each of two blocks. Then Allena can tell you whether you are actually doing more.',done>=2)}
+     'Six sessions in each of two blocks. Then Allena can tell you whether you are actually doing more.',done>=2,
+     (function(){try{const p9=activeProgSafe();
+       /* the comparison pays off at block END — teasing it as 'one
+          away' mid-block is a promise weeks from cashable */
+       return(p9&&p9.weeks>1&&S.week<p9.weeks)?{slow:1}:null}catch(e9){return null}})())}
   return W.sort((a,b)=>b.pct-a.pct)}
 function watchCard(){
   const W=watchList();
