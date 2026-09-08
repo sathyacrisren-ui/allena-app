@@ -666,7 +666,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='004529';  // stamped by tools/build.py with the content hash
+const BUILD_ID='f35211';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -1698,6 +1698,7 @@ function snapshotData(){
       out.prev_week_live=d.prevWeekLive||0;
       try{out.prev_week_key=dayKey(new Date(new Date(questWeekKey()+'T12:00').getTime()-7*864e5))}catch(e){}}
     out.week_live=d.weekLive||0;out.week_sessions=d.weekSessions||0;
+    try{const av9=(acct()||{}).av;if(av9)out.av=String(av9).slice(0,5)}catch(e){}
     out.display=(String((S.prof&&S.prof.name)||'').split(' ')[0]
       ||String((acct()||{}).email||'').split('@')[0]).slice(0,12)||null;
     try{
@@ -1759,7 +1760,7 @@ async function frLoad(force){
       .map(x=>x.owner_id===S.frMe?x.friend_id:x.owner_id).filter(Boolean)
       .concat(crewIds).filter(function(x,i,a){return a.indexOf(x)===i});
     if(ids.length){
-      let r2=await fetch(CLOUD.url+'/rest/v1/snapshots?select=user_id,display,week_live,week_sessions,live_points,tier,prev_week_live,prev_week_key,updated_at&user_id=in.('+ids.map(encodeURIComponent).join(',')+')',{headers:h});
+      let r2=await fetch(CLOUD.url+'/rest/v1/snapshots?select=user_id,display,week_live,week_sessions,live_points,tier,prev_week_live,prev_week_key,av,updated_at&user_id=in.('+ids.map(encodeURIComponent).join(',')+')',{headers:h});
       if(!r2.ok)r2=await fetch(CLOUD.url+'/rest/v1/snapshots?select=user_id,display,week_live,week_sessions,live_points,tier,updated_at&user_id=in.('+ids.map(encodeURIComponent).join(',')+')',{headers:h});
       S.frSnaps=r2.ok?await r2.json():[]}
     else S.frSnaps=[];
@@ -1858,7 +1859,7 @@ function raceField(){
     const sn=(S.frSnaps||[]).find(s9=>s9.user_id===id)||{};
     const local=((acct()||{}).frNames||{})[id];
     out.push({crew:1,id:id,name:local||sn.display||'A racer',named:!!(local||sn.display),
-      week:sn.week_live||0,sess:sn.week_sessions||0,tier:sn.tier||'',allp:sn.live_points||0,seen:sn.updated_at||null})})}catch(e){}
+      week:sn.week_live||0,sess:sn.week_sessions||0,tier:sn.tier||'',allp:sn.live_points||0,av:sn.av||'',seen:sn.updated_at||null})})}catch(e){}
   return out}
 async function crewMake(nm){
   try{const h=await frHeaders();if(!h||!S.frMe){flash('Sign in first.');return}
@@ -1900,12 +1901,28 @@ function frLinked(){
     const sn=(S.frSnaps||[]).find(s9=>s9.user_id===fid)||{};
     const local=((acct()||{}).frNames||{})[fid];
     return{code:x.code,id:fid,name:local||sn.display||'Your friend',named:!!(local||sn.display),
-      week:sn.week_live||0,sess:sn.week_sessions||0,tier:sn.tier||'',allp:sn.live_points||0,seen:sn.updated_at||null}})}
+      week:sn.week_live||0,sess:sn.week_sessions||0,tier:sn.tier||'',allp:sn.live_points||0,av:sn.av||'',seen:sn.updated_at||null}})}
+const AV_COLS=['var(--line)','#30D158','#1E9BFF','#E0A458','#E8927C','#B8B4A8'];
+const AV_GLYPHS={
+  1:'<svg viewBox="0 0 24 24" width="55%" height="55%" fill="currentColor"><path d="M12 2c1 4-3 5-3 9a3 3 0 0 0 6 0c0-1.5-.8-2.6-1.4-3.6C15.8 8.6 19 10.5 19 15a7 7 0 0 1-14 0C5 8.5 10.5 6.5 12 2z"/></svg>',
+  2:'<svg viewBox="0 0 24 24" width="55%" height="55%" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 21v-8M12 13 7 6h10l-5 7zM12 13l-3.5-5M12 13l3.5-5"/></svg>',
+  3:'<svg viewBox="0 0 24 24" width="60%" height="60%" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 12h18M6 8v8M18 8v8M9 10v4M15 10v4"/></svg>',
+  4:'<svg viewBox="0 0 24 24" width="55%" height="55%" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 4 14h6l-1 8 9-12h-6l1-8z"/></svg>'};
+function avParse(av){const m=/^(\d):(\d)$/.exec(String(av||''));
+  return m?{c:Math.min(5,+m[1]),g:Math.min(4,+m[2])}:null}
+function avRing(av,def){const a=avParse(av);return a?AV_COLS[a.c]||def:def}
+function avInner(av,init,col){const a=avParse(av);
+  return (a&&a.g&&AV_GLYPHS[a.g])?'<span style="display:flex;align-items:center;justify-content:center;width:100%;height:100%;color:'+col+'">'+AV_GLYPHS[a.g]+'</span>':esc(init)}
+function avHtml(av,init,size,ringDefault,fs){
+  const a=avParse(av);
+  const ring=a?AV_COLS[a.c]||ringDefault:ringDefault;
+  const body=(a&&a.g&&AV_GLYPHS[a.g])?'<span style="display:flex;align-items:center;justify-content:center;width:100%;height:100%;color:'+(ring==='var(--line)'?'var(--dim)':ring)+'">'+AV_GLYPHS[a.g]+'</span>':esc(init);
+  return '<div style="position:relative;width:'+size+'px;height:'+size+'px;border-radius:'+size+'px;background:var(--raised);border:2.5px solid '+ring+';display:flex;align-items:center;justify-content:center;font-size:'+fs+'px;font-weight:700;flex:none">'+body+'</div>'}
 async function frProfileLoad(id){
   try{
     const tok=await acctToken();if(!tok)return null;
     const h={apikey:CLOUD.anon,Authorization:'Bearer '+tok};
-    const r=await fetch(CLOUD.url+'/rest/v1/snapshots?select=display,points,live_points,tier,tree,collection_count,week_live,week_sessions,updated_at&user_id=eq.'+encodeURIComponent(id),{headers:h});
+    const r=await fetch(CLOUD.url+'/rest/v1/snapshots?select=display,points,live_points,tier,tree,collection_count,week_live,week_sessions,av,updated_at&user_id=eq.'+encodeURIComponent(id),{headers:h});
     if(!r.ok)return null;
     const rows=await r.json();return rows&&rows[0]||null}catch(e){return null}}
 const NUDGE_MSGS=[
@@ -1972,7 +1989,7 @@ function friendsSection(){
       Object.keys(h9).filter(k=>/^\d{4}-/.test(k)).sort().reverse()
         .some(k=>{if(h9[k]==='w'){reignP++;return false}return true})}catch(e9){}
     const profCard='<div class="card mt2" style="padding:15px 16px;display:flex;align-items:center;gap:13px">'+
-      '<div style="width:52px;height:52px;border-radius:52px;background:var(--raised);border:2.5px solid var(--green);display:flex;align-items:center;justify-content:center;font-size:21px;font-weight:700;flex:none">'+esc(myInitP)+'</div>'+
+      '<button data-a="avOpen" style="width:52px;height:52px;border-radius:52px;background:var(--raised);border:2.5px solid '+avRing((acct()||{}).av,'var(--green)')+';display:flex;align-items:center;justify-content:center;font-size:21px;font-weight:700;flex:none;padding:0">'+avInner((acct()||{}).av,myInitP,'var(--text)')+'</button>'+
       '<div style="flex:1;min-width:0"><p style="font-size:15px;font-weight:600">'+esc(myFirstP||'You')+'</p>'+
       (reignP>=1?'<p class="mono" style="font-size:8.5px;letter-spacing:.1em;color:#E0A458;margin-top:2px">CROWN HELD '+reignP+' WEEK'+(reignP===1?'':'S')+'</p>'
         :'<p class="mono" style="font-size:9px;color:var(--faint);letter-spacing:.05em;margin-top:2px">THE WEEKLY RACE</p>')+'</div>'+
@@ -2009,7 +2026,7 @@ function friendsSection(){
         const stepH={1:36,2:22,3:15};
         const col=x=>{const first=x.rank===1;const size=first?60:44;
           return '<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:6px;min-width:0">'+
-            '<div style="position:relative;width:'+size+'px;height:'+size+'px;border-radius:'+size+'px;background:var(--raised);border:2.5px solid '+(first?'var(--green)':'var(--line)')+';display:flex;align-items:center;justify-content:center;font-size:'+(first?23:17)+'px;font-weight:700'+(first?';box-shadow:0 0 16px 0 color-mix(in srgb, var(--green) 40%, transparent)':'')+'">'+(hasCrown(x)?CROWN:'')+esc(x.init)+'</div>'+
+            '<div style="position:relative;width:'+size+'px;height:'+size+'px;border-radius:'+size+'px;background:var(--raised);border:2.5px solid '+(first?'var(--green)':'var(--line)')+';display:flex;align-items:center;justify-content:center;font-size:'+(first?23:17)+'px;font-weight:700'+(first?';box-shadow:0 0 16px 0 color-mix(in srgb, var(--green) 40%, transparent)':'')+'">'+(hasCrown(x)?CROWN:'')+avInner(x.av,x.init,first?'var(--green)':'var(--text)')+'</div>'+
             '<span style="font-size:11.5px;font-weight:600;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(x.me?'You':x.name)+'</span>'+
             '<span class="mono" data-cu="pod-'+esc(String(x.me?'me':x.id))+'" style="font-size:'+(first?15:12)+'px;font-weight:700;color:'+(first&&x.week>0?'var(--green)':'var(--text)')+'">'+x.week+'</span>'+
             '<div style="width:100%;height:'+stepH[x.rank]+'px;border-radius:9px 9px 4px 4px;background:'+(first?'var(--green)':'var(--raised)')+';border:1px solid '+(first?'var(--green)':'var(--line)')+';display:flex;align-items:center;justify-content:center;overflow:hidden">'+
@@ -2020,7 +2037,7 @@ function friendsSection(){
           R.map(x=>{const lead=mine-x.week;
             return '<div style="display:flex;align-items:center;gap:10px;padding:10px 2px 0">'+
             '<span class="mono" style="width:18px;flex:none;text-align:center;font-size:11px;font-weight:700;color:'+(x.rank===1?'var(--green)':'var(--faint)')+'">'+x.rank+'</span>'+
-            '<span style="width:26px;height:26px;border-radius:26px;background:var(--raised);border:1.5px solid '+(x.me?'var(--green)':'var(--line)')+';display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex:none">'+esc(x.init)+'</span>'+
+            '<span style="width:26px;height:26px;border-radius:26px;background:var(--raised);border:1.5px solid '+avRing(x.av,(x.me?'var(--green)':'var(--line)'))+';display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex:none">'+avInner(x.av,x.init,'var(--text)')+'</span>'+
             (x.me?'<span style="flex:1;min-width:0;font-size:13px;font-weight:600">You</span>'
               :'<button data-a="frOpen" data-v="'+esc(x.id)+'" style="flex:1;min-width:0;font-size:13px;text-align:left;padding:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(x.name)+' <span style="color:var(--faint);font-size:10px">\u203a</span></button>')+
             (x.me?'':(x.stale?'<span class="mono" style="color:var(--faint);font-size:9px;flex:none">as of '+x.stale+' ago</span>'
@@ -16757,14 +16774,14 @@ function viewToday(){
            8 Sep: 'more than 2 people in a group should show the
            podium, not the 1v1 pill'). A \u2694 pin still forces the
            head-to-head \u2014 an explicit choice outranks the default. */
-        const R9=[{me:1,name:myN,init:myInit,week:mine,id:'me'}]
-          .concat(Ls.map(f=>({name:f.named?f.name:'?',init:(f.named?String(f.name).slice(0,1):'?').toUpperCase(),week:f.week,id:f.id})));
+        const R9=[{me:1,name:myN,init:myInit,week:mine,id:'me',av:(acct()||{}).av||''}]
+          .concat(Ls.map(f=>({name:f.named?f.name:'?',init:(f.named?String(f.name).slice(0,1):'?').toUpperCase(),week:f.week,id:f.id,av:f.av||''})));
         R9.sort((x,y)=>y.week-x.week);R9.forEach((x,i)=>x.rank=i+1);
         const crowned=x=>(crown==='me'&&x.id==='me')||(crown==='them'&&x.id===top.id);
         const stepH9={1:32,2:19,3:13};
         const col9=x=>{const first=x.rank===1;const size=first?54:40;
           return '<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:5px;min-width:0">'+
-            '<div style="position:relative;width:'+size+'px;height:'+size+'px;border-radius:'+size+'px;background:var(--raised);border:2.5px solid '+(first?'var(--green)':'var(--line)')+';display:flex;align-items:center;justify-content:center;font-size:'+(first?21:15)+'px;font-weight:700'+(first?';box-shadow:0 0 14px 0 color-mix(in srgb, var(--green) 40%, transparent)':'')+'">'+(crowned(x)?CROWN:'')+esc(x.init)+'</div>'+
+            '<div style="position:relative;width:'+size+'px;height:'+size+'px;border-radius:'+size+'px;background:var(--raised);border:2.5px solid '+(first?'var(--green)':'var(--line)')+';display:flex;align-items:center;justify-content:center;font-size:'+(first?21:15)+'px;font-weight:700'+(first?';box-shadow:0 0 14px 0 color-mix(in srgb, var(--green) 40%, transparent)':'')+'">'+(crowned(x)?CROWN:'')+((typeof avInner==='function')?avInner(x.av,x.init,first?'var(--green)':'var(--text)'):esc(x.init))+'</div>'+
             '<span style="font-size:11px;font-weight:600;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(x.id==='me'?'You':x.name)+'</span>'+
             '<span class="mono" data-cu="tdy-'+esc(String(x.id))+'" style="font-size:'+(first?14:11.5)+'px;font-weight:700;color:'+(first&&x.week>0?'var(--green)':'var(--text)')+'">'+x.week+'</span>'+
             '<div style="width:100%;height:'+stepH9[x.rank]+'px;border-radius:8px 8px 4px 4px;background:'+(first?'var(--green)':'var(--raised)')+';border:1px solid '+(first?'var(--green)':'var(--line)')+';display:flex;align-items:center;justify-content:center;overflow:hidden">'+
@@ -19903,6 +19920,18 @@ function sheetHtml(){
     }else{
       inner+='<button data-a="prevGo" class="big disp mt2" style="background:var(--amber);color:var(--bg);font-size:16px">Start · '+totalSets+' sets</button>'}
     return wrapSheet('Before you start',inner)}
+  if(S.sheet.t==='avatar'){
+    const cur=avParse((acct()||{}).av)||{c:0,g:0};
+    const sel=S.avSel||cur;
+    const init=(String((S.prof&&S.prof.name)||'Y').slice(0,1)).toUpperCase();
+    return wrapSheet('Your mark',
+      '<p style="color:var(--dim);font-size:13px;line-height:1.6">Pick a ring and a mark \u2014 it shows beside your name on every board. No photos on purpose: nothing to upload, nothing to moderate.</p>'+
+      '<div style="display:flex;justify-content:center;margin-top:14px">'+avHtml(sel.c+':'+sel.g,init,64,'var(--line)',26)+'</div>'+
+      '<p class="eyebrow mt2">Ring</p>'+
+      '<div class="row mt" style="gap:8px">'+AV_COLS.map((c9,i)=>'<button data-a="avSetC" data-v="'+i+'" style="flex:1;height:34px;border-radius:10px;border:2.5px solid '+c9+';background:var(--raised);'+(sel.c===i?'box-shadow:0 0 0 2px var(--text)':'')+'"></button>').join('')+'</div>'+
+      '<p class="eyebrow mt2">Mark</p>'+
+      '<div class="row mt" style="gap:8px">'+[0,1,2,3,4].map(g9=>'<button data-a="avSetG" data-v="'+g9+'" style="flex:1;height:40px;border-radius:10px;border:1.5px solid '+(sel.g===g9?'var(--text)':'var(--line)')+';background:var(--raised);color:var(--text);display:flex;align-items:center;justify-content:center;font-weight:700">'+(g9===0?esc(init):AV_GLYPHS[g9])+'</button>').join('')+'</div>'+
+      '<button data-a="avSave" class="big disp mt2" style="background:var(--amber);color:var(--bg);font-size:15px">Wear it</button>')}
   if(S.sheet.t==='friend'){
     const f=S.frProf||{};const id=S.sheet.id;
     const local=((acct()||{}).frNames||{})[id];
@@ -19910,7 +19939,7 @@ function sheetHtml(){
     const stat=(v,l)=>'<div style="flex:1;text-align:center"><p class="disp" style="font-size:19px;font-weight:700">'+v+'</p><p class="mono" style="font-size:8px;color:var(--faint);letter-spacing:.06em;margin-top:2px">'+l+'</p></div>';
     const tr=f.tree||{};
     let inner='<div style="display:flex;align-items:center;gap:12px">'+
-      '<div style="width:46px;height:46px;border-radius:46px;background:var(--raised);border:2px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:19px;font-weight:700;flex:none">'+esc(String(nm).slice(0,1).toUpperCase())+'</div>'+
+      ((typeof avHtml==='function')?avHtml(f.av,String(nm).slice(0,1).toUpperCase(),46,'var(--line)',19):'')+
       '<div style="flex:1;min-width:0"><p style="font-size:16px;font-weight:600">'+esc(nm)+' <button data-a="frNameOpen" data-v="'+esc(id)+'" style="color:var(--faint);font-size:11px;padding:0 3px">\u270e</button></p>'+
       (f.tier?'<p class="mono" style="font-size:9px;color:var(--faint);letter-spacing:.08em;margin-top:2px">'+esc(String(f.tier).toUpperCase())+'</p>':'')+'</div></div>';
     if(f.__wait)inner+='<p style="color:var(--faint);font-size:12px;margin-top:12px">Fetching their card\u2026</p>';
@@ -21927,6 +21956,13 @@ function runAction(a,v,t,e){
       S.lib.programs.push(nb.prog);S.lib.activeId=nb.prog.id;saveLib();
       setWeek(1,nb.prog.id);S.nb=null;S.sheet=null;S.reviewProg=null;S.view='home';render();
       flash(nb.prog.block+' is ready — week 1.');break}
+    case 'avOpen':{S.avSel=avParse((acct()||{}).av)||{c:1,g:0};S.sheet={t:'avatar'};render();break}
+    case 'avSetC':{S.avSel=Object.assign({},S.avSel||{c:0,g:0},{c:+v});render();break}
+    case 'avSetG':{S.avSel=Object.assign({},S.avSel||{c:0,g:0},{g:+v});render();break}
+    case 'avSave':{const s9=S.avSel||{c:1,g:0};
+      lset(K_ACCT,Object.assign({},acct()||{},{av:s9.c+':'+s9.g}));
+      S.sheet=null;flash('Yours now \u2014 it syncs to every board.');
+      try{acctSync(false)}catch(e){}render();break}
     case 'frOpen':{S.sheet={t:'friend',id:v};S.frProf={__wait:1};render();
       frProfileLoad(v).then(p9=>{if(S.sheet&&S.sheet.t==='friend'&&S.sheet.id===v){S.frProf=p9||{};render()}});break}
     case 'nudgeOpen':{S.sheet={t:'nudge',id:v};render();break}
