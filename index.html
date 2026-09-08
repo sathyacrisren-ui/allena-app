@@ -666,7 +666,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='36cef8';  // stamped by tools/build.py with the content hash
+const BUILD_ID='499cc1';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -6291,7 +6291,14 @@ function timeStr(mins){
   if(mins==null)return '—';
   const h=Math.floor(mins/60),m=Math.floor(mins%60),s2=Math.round((mins%1)*60);
   return h?(h+':'+String(m).padStart(2,'0')+':'+String(s2).padStart(2,'0')):(m+':'+String(s2).padStart(2,'0'))}
-function riegel(t1,d1,d2){return t1*Math.pow(d2/d1,1.06)}
+function riegel(t1,d1,d2){
+  /* ^1.06 is well-calibrated to the half; the marathon runs long for
+     low-mileage runners, so its exponent inflates with less weekly km
+     (Vickers & Vertosick 2016, 2,303 recreational runners) */
+  let ex=1.06;
+  if(d2>=40){let wk=30;try{const w=weeklyKm(4);wk=w.reduce((a,x)=>a+x.km,0)/Math.max(1,w.length)}catch(e){}
+    ex=wk>=55?1.07:wk>=40?1.10:1.15}
+  return t1*Math.pow(d2/d1,ex)}
 function runGroups(R,mode){
   const list=R.slice().reverse();
   const sum=l=>({km:Math.round(l.reduce((a,r)=>a+(r.km||0),0)*10)/10,
@@ -6368,6 +6375,48 @@ function rpDescBuild(km,freq,days,pace,down){
   const lng=half(km*0.38),each=half((km-lng)/Math.max(1,freq-1));
   return days.map((d,i)=>i===days.length-1?(d+' '+udNum(lng)+' '+udUnit()+' long'):(d+' '+udNum(each)+' '+udUnit()+' easy')).join(' \u00b7 ')+
     ' \u2014 ~'+udNum(km)+' '+udUnit()+(pace?', all around '+pace+'/'+udUnit():'')+'.'}
+/* ══ the pace model (build of 8 Sep, after beta ridicule) ══
+   Daniels & Gilbert's published pair, the standard the whole
+   running world calibrates against:
+     oxygen cost of running   VO2(v) = -4.60 + 0.182258v + 0.000104v²   (v m/min)
+     sustainable fraction     frac(t) = 0.8 + 0.1894393e^(-0.012778t) + 0.2989558e^(-0.1932605t)
+   A race (or best hard effort) solves the pair → VDOT; inverting the
+   cost curve at a zone's %VO2max gives that zone's pace. This replaces
+   the old fixed multipliers (easy×0.90 = tempo), which are wrong
+   across ability levels — zone ratios change as runners get fitter. */
+function vdotCost(v){return -4.60+0.182258*v+0.000104*v*v}
+function vdotFrac(t){return 0.8+0.1894393*Math.exp(-0.012778*t)+0.2989558*Math.exp(-0.1932605*t)}
+function vdotFromRun(km,mins){
+  if(!(km>0&&mins>0))return null;
+  const v=km*1000/mins;                       // m/min
+  const vd=vdotCost(v)/vdotFrac(mins);
+  return (vd>15&&vd<90)?Math.round(vd*10)/10:null}
+function vdotPace(vdot,f){
+  /* pace (min/km) at fraction f of VDOT: solve the cost quadratic */
+  const t=vdot*f;                              // target VO2
+  const A=0.000104,B=0.182258,C=-4.60-t;
+  const v=(-B+Math.sqrt(B*B-4*A*C))/(2*A);     // m/min
+  return v>0?1000/v:null}
+function runZones(){
+  /* current zones from the runner's own best recent hard effort
+     (≥3 km, last 90 days, the highest implied VDOT). Training runs
+     are submaximal so this is a floor, honestly labelled an estimate;
+     a real race time entered on a goal replaces it. */
+  try{
+    const cut=Date.now()-90*864e5;let best=null;
+    runs().forEach(r=>{
+      if(!(r.km>=3&&r.mins>0))return;
+      if(new Date(r.date+(String(r.date).length<=10?'T12:00':'')).getTime()<cut)return;
+      const vd=vdotFromRun(r.km,r.mins);
+      if(vd&&(!best||vd>best.vd))best={vd:vd,km:r.km,mins:r.mins,date:String(r.date).slice(0,10)}});
+    if(!best)return null;
+    return zonesFromVdot(best.vd,'your best recent effort ('+udNum(best.km)+' '+udUnit()+', '+best.date+')')}catch(e){return null}}
+function zonesFromVdot(vd,src){
+  /* Daniels' zone fractions: E 59-74%, M ~80%, T 86%, I 97.5%, R 108% */
+  return{vdot:vd,src:src||'estimate',
+    easyLo:vdotPace(vd,0.62),easyHi:vdotPace(vd,0.72),
+    mar:vdotPace(vd,0.80),thr:vdotPace(vd,0.86),
+    int:vdotPace(vd,0.975),rep:vdotPace(vd,1.08)}}
 function runPlanScratch(freq,comfort){
   /* no history to read: build from the honest floor instead. comfort is
      'walkrun' or the km they can run comfortably today. */
@@ -6430,10 +6479,64 @@ function runPlanAdjust(){
       i.desc=rpDescBuild(i.km,rp.freq||3,rp.days||['Mon','Wed','Sat'],rp.pace||null,!!i.down)}});
     why='Load ran ahead of the plan ('+udNum(actual)+' '+udUnit()+' vs ~'+udNum(planned)+') \u2014 the remaining weeks eased 10% to keep the 0.8\u20131.3 band.';
   }
+  /* the fitness check (Runna's pace insights, better anchored): the
+     VDOT re-estimates weekly from the best recent effort; a real move
+     re-derives the zone paces and SAYS so — never silent churn */
+  try{if(rp.z&&rp.z.vdot){
+    const Z9=runZones();
+    if(Z9&&Math.abs(Z9.vdot-rp.z.vdot)>=1.5){
+      const up=Z9.vdot>rp.z.vdot;
+      const pS9=p=>{const m=Math.floor(p),s2=Math.round((p-m)*60);return m+':'+(s2<10?'0':'')+s2};
+      rp.z=Z9;
+      why=(why?why+' ':'')+'Fitness check: your best recent effort moved the model '+(up?'up':'down')+' \u2014 from here, easy is '+pS9(Z9.easyHi)+'\u2013'+pS9(Z9.easyLo)+', threshold '+pS9(Z9.thr)+', intervals '+pS9(Z9.int)+' /km.'}}}catch(e){}
   rp.adjWk=wk;
   if(why){rp.adjLog=(rp.adjLog||[]).slice(-5);rp.adjLog.push({wk:wk,why:why});}
   lset('training-runplan-v1',rp);S.runplan=rp;
   return why}
+function runQualityGate(){
+  /* is today fit for a QUALITY run? The evidence-backed gates:
+     48 h between heavy lower-body lifting and hard running (Doma &
+     Deakin — the gate Garmin famously cannot see), the morning
+     readiness, and the Vesterinen HRV rule (7-day rolling HRV vs the
+     runner's own 60-day band — quality only inside or above it; the
+     RCTs beat pre-planned training with FEWER hard days). Silent
+     when the data is absent. Returns null when clear, else {why},
+     and {free:true, note} when the never-spiral override speaks
+     (Garmin's documented failure: caution compounding into
+     detraining — 3+ eaten quality days in 14 while easy running
+     kept landing earns one moderate session anyway). */
+  try{
+    const cut48=Date.now()-48*36e5;
+    const heavyLegs=(S.history||[]).some(h=>{if(h.run||!h.complete)return false;
+      const t=new Date(h.date).getTime();if(!(t>=cut48&&t<=Date.now()))return false;
+      return (h.log||[]).some(l=>l.w>0&&MUSCLE_RULES.some(r=>(r[0]==='Quads'||r[0]==='Hamstrings'||r[0]==='Glutes')&&r[1].test(l.ex)))});
+    if(heavyLegs)return{why:'heavy legs in the last 48 h. Hard running and heavy lifting need two clear days between them, either order'};
+    const spiral=(function(){try{const rp=S.runplan;if(!rp)return false;
+      const q=(rp.qSupp||[]);const cut14=dayKey(new Date(Date.now()-14*864e5));
+      if(q.filter(d=>d>=cut14).length<3)return false;
+      const cut3=Date.now()-3*864e5;
+      return runs().some(r=>new Date(r.date+(String(r.date).length<=10?'T12:00':'')).getTime()>=cut3)}catch(e){return false}})();
+    const am=(S.gar&&S.gar.days&&S.gar.days[today()])||{};
+    if(am.am!=null&&am.am<40){
+      if(spiral)return{free:true,note:'readiness is low again, but two weeks of caution is enough — one moderate session, stop if it feels wrong'};
+      return{why:'readiness '+am.am+' this morning. Quality waits for a better day; the easy km still count'}}
+    if(typeof hkDailyStore==='function'){
+      const st=hkDailyStore(),days=(st&&st.days)||{};
+      const ks=Object.keys(days).filter(k=>days[k]&&+days[k].hrv>0).sort();
+      if(ks.length>=21){
+        const mean=a=>a.reduce((x,y)=>x+y,0)/a.length;
+        const base=ks.slice(-60).map(k=>Math.log(+days[k].hrv));
+        const m0=mean(base),sd=Math.sqrt(mean(base.map(x=>(x-m0)*(x-m0))));
+        const m7=mean(ks.slice(-7).map(k=>Math.log(+days[k].hrv)));
+        if(sd>0&&m7<m0-0.5*sd){
+          if(spiral)return{free:true,note:'HRV is still under your band, but two quiet weeks is enough caution — one moderate session, stop if it feels wrong'};
+          return{why:'your 7-day HRV is running below your own normal band. Easy running only until it comes back'}}}}
+    return null}catch(e){return null}}
+function runQualitySupp(){
+  /* record an eaten quality day so the never-spiral rule can count */
+  try{const rp=S.runplan;if(!rp)return;
+    rp.qSupp=(rp.qSupp||[]).filter(d=>d>=dayKey(new Date(Date.now()-21*864e5)));
+    if(rp.qSupp.indexOf(today())<0){rp.qSupp.push(today());lset('training-runplan-v1',rp)}}catch(e){}}
 function runPlanNudge(){
   /* the Garmin move: after EVERY run, the current week rebalances so
      the target stays reachable — remaining easy days flex the most,
@@ -6562,20 +6665,28 @@ function runPlanGoal(goal,dateStr,timeStr,daysPick,longPick){
       freq=Math.max(minD,Math.min(5,freqs[Math.floor(freqs.length/2)]||3));
       days=rpDefaultDays(freq)}
     const longDay=(longPick&&days.indexOf(longPick)>=0)?longPick:rpLongDayFor(days);
+    const pS=p=>{const m=Math.floor(p),s2=Math.round((p-m)*60);return m+':'+(s2<10?'0':'')+s2};
+    /* paces come from the VDOT model on the runner's own best recent
+       effort — zone ratios that change with ability, the way Daniels,
+       Garmin and every serious system derive them. The old fixed
+       multipliers survive only as the no-data fallback. */
+    let Z=runZones();
     const paced=R.filter(r=>r.km>1&&r.mins>0).slice(-20);
     const paces=paced.map(r=>r.mins/r.km).sort((a,b)=>a-b);
-    const easyP=paces.length?paces[Math.floor(paces.length/2)]*1.03:6.5;
-    const pS=p=>{const m=Math.floor(p),s2=Math.round((p-m)*60);return m+':'+(s2<10?'0':'')+s2};
-    const tempoP=easyP*0.90,intP=easyP*0.84;
-    // the time goal, and the honesty it demands
+    const medP=paces.length?paces[Math.floor(paces.length/2)]*1.03:6.5;
+    if(!Z)Z=zonesFromVdot(Math.max(20,Math.min(75,vdotFromRun(5,medP*5*0.93)||35)),'your recent training paces (log a hard effort to sharpen these)');
+    const easyP=Math.min(Z.easyLo,Math.max(Z.easyHi,medP)); // their habitual easy, clamped inside the honest band (easyLo is the slow bound)
+    const tempoP=Z.thr,intP=Z.int;
+    // the time goal, and the honesty it demands — VDOT vs VDOT, not pace ratios
     const goalMins=parseGoalTime(timeStr,G.race);
-    const raceP=goalMins?goalMins/G.race:easyP*0.93;
+    const raceP=goalMins?goalMins/G.race:Z.mar;
     let paceNote=null;
     if(goalMins){
-      const gap=easyP/raceP; // how much faster than easy the goal is
-      if(raceP>=easyP)paceNote='Your easy pace already beats this goal — it is banked before you start. Worth aiming higher.';
-      else if(gap>1.45)paceNote='Honest note: '+pS(raceP)+'/km is a long way under your current easy '+pS(easyP)+'/km. The plan trains toward it, but a goal this far out usually takes more than one block — hold it loosely.';
-      else if(gap>1.25)paceNote='The goal pace ('+pS(raceP)+'/km) is ambitious against your current training — reachable if the block goes cleanly.'}
+      const goalVd=vdotFromRun(G.race,goalMins);
+      const gap=goalVd&&Z.vdot?goalVd-Z.vdot:0;
+      if(gap<=0)paceNote='Your current fitness already covers this goal — it is banked before you start. Worth aiming higher.';
+      else if(gap>6)paceNote='Honest note: this goal sits about '+Math.round(gap)+' VDOT points above your current fitness (from '+Z.src+'). That is usually more than one block closes — the plan trains toward it, hold it loosely.';
+      else if(gap>3)paceNote='The goal is ambitious against your current fitness — reachable if the block goes cleanly.'}
     // weeks: from the race date when given, else a sensible default
     let weeks=G.race>=21?12:8;
     let taper=G.race>=21?2:1;
@@ -6583,37 +6694,67 @@ function runPlanGoal(goal,dateStr,timeStr,daysPick,longPick){
       const dd=Math.round((new Date(dateStr+'T12:00').getTime()-Date.now())/864e5);
       if(dd<28)return{block:'The race is under four weeks away \u2014 too close to build safely. Hold your current volume, sleep well, and taper the last '+(G.race>=21?'two weeks':'ten days')+'. A plan that promises fitness it cannot deliver would be lying to you.'};
       weeks=Math.max(6,Math.min(16,Math.floor(dd/7)))}
-    const longStart=Math.max(6,Math.round(base*0.35));
-    const longTarget=Math.min(G.long,Math.max(longStart,Math.round(G.long)));
+    /* THE SESSION CAP (Nielsen 2025, BJSM, 5,205 runners: a single run
+       10-30% past your 30-day longest carries +64% injury risk): the
+       long run grows at most 10% past the longest run of the trailing
+       month — seeded from the runner's real recent longest, and each
+       planned long run becomes the next week's reference. */
+    let longest30=0;
+    try{const cut30=Date.now()-30*864e5;
+      runs().forEach(r=>{if(r.km>longest30&&new Date(r.date+(String(r.date).length<=10?'T12:00':'')).getTime()>=cut30)longest30=r.km})}catch(e){}
     const half=x=>Math.max(1,Math.round(x*2)/2);
-    const items=[];let km=base;
+    const longStart=Math.max(4,Math.min(Math.round(base*0.35),longest30>0?half(longest30):Math.round(base*0.35)));
+    const longTarget=Math.min(G.long,Math.round(G.long));
+    const items=[];let km=base;let lngRef=Math.max(longStart,longest30||longStart);
     const buildEnd=weeks-taper;
+    let longNote=null;
+    /* the quality library: sessions PROGRESS week to week and shift
+       with the phase — threshold-weighted in the base, race-specific
+       at the peak (Filipas 2022: pyramidal→polarized beat every
+       static distribution). Doses respect Daniels' caps (threshold
+       ≤10% of the week at pace, intervals ≤8%). */
+    const qualFor=(phase,w,wkKm)=>{
+      const tCap=Math.max(3,wkKm*0.10),iCap=Math.max(2,wkKm*0.08);
+      const T=[[4,5],[3,8],[2,12],[1,25]];  // n × minutes at threshold
+      const I=[[5,2],[4,3],[5,3],[3,5]];    // n × minutes at interval pace
+      const ti=Math.min(3,Math.floor((w-1)/3)),ii=Math.min(3,Math.floor((w-1)/4));
+      if(phase==='peak'){
+        return G.race>=21
+          ?{d:half(Math.min(tCap,G.race>=40?10:6))+' km @ goal pace ('+pS(raceP)+'/km) inside the long run',inLong:true}
+          :{d:(G.race>=10?'3×2 km':'5×1 km')+' @ goal pace ('+pS(raceP)+'/km), 2-3 min jog between'}}
+      if(phase==='build'&&w%2===0){
+        const s9=I[ii];return{d:s9[0]+'×'+s9[1]+' min @'+pS(intP)+'/km (5K effort), equal jog recoveries'}}
+      const s9=T[ti];return{d:'tempo '+(s9[0]>1?s9[0]+'×'+s9[1]+' min':s9[1]+' min continuous')+' @'+pS(tempoP)+'/km (comfortably hard, never race effort), 60-90s jogs'}};
     for(let w=1;w<=weeks;w++){
       const inTaper=w>buildEnd;
       const down=(!inTaper&&w%4===0);
       const phase=inTaper?'taper':w<=2?'base':w>buildEnd-2?'peak':'build';
-      let wkKm=down?Math.round(km*0.7):inTaper?Math.round(km*(w===weeks?0.4:0.6)):Math.round(km);
-      /* every week keeps its long run \u2014 the anchor never disappears.
-         Down weeks and the taper carry a SHORTER one, never none. */
-      const growLng=half(longStart+(longTarget-longStart)*Math.min(1,(w-1)/Math.max(1,buildEnd-2)));
-      const lng=inTaper?(w===weeks?half(Math.min(8,wkKm*0.4)):half(wkKm*0.4))
-        :down?half(Math.max(4,growLng*0.6)):growLng;
-      const quality=(phase==='build'||phase==='peak')&&!down;
-      const sched=rpBuildSched(wkKm,days,longDay,lng,quality,pS,easyP);
-      const qualDesc=quality?(phase==='peak'
-        ?(G.race>=21?'@ goal pace ('+pS(raceP)+'/km)':'as 5\u00d73 min @'+pS(Math.min(intP,raceP*0.97))+'/km')
-        :(w%2?'tempo @'+pS(tempoP)+'/km':'as 6\u00d72 min @'+pS(intP)+'/km')):null;
-      let desc=rpSchedDesc(sched,pS,easyP,qualDesc?('quality '+qualDesc):null);
-      if(down)desc+=' \u2014 down week on purpose: shorter everything, the long run included; adaptation happens here';
-      if(w===weeks)desc+=' \u00b7 RACE: '+G.name+'. Nothing new on the day.';
-      items.push({week:w,km:wkKm,down:down,phase:phase,sched:sched,
-        desc:desc+' \u2014 ~'+wkKm+' km ('+phase+')'});
+      let wkKm=down?Math.round(km*0.65):inTaper?Math.round(km*(w===weeks?0.4:0.6)):Math.round(km);
+      /* every week keeps its long run — the anchor never disappears.
+         Growth: ≤10% past the rolling reference AND ≤30% of the week. */
+      let lng;
+      if(inTaper)lng=w===weeks?half(Math.min(8,wkKm*0.4)):half(wkKm*0.4);
+      else if(down)lng=half(Math.max(4,lngRef*0.6));
+      else{lng=half(Math.min(lngRef*1.10,Math.max(wkKm*0.30,longStart),longTarget));
+        lngRef=Math.max(lngRef,lng)}
+      const quality=(phase==='build'||phase==='peak'||(phase==='taper'&&w===buildEnd+1))&&!down;
+      const q9=quality?qualFor(phase==='taper'?'peak':phase,w,wkKm):null;
+      const sched=rpBuildSched(wkKm,days,longDay,lng,quality&&!(q9&&q9.inLong),pS,easyP);
+      let desc=rpSchedDesc(sched,pS,easyP,q9&&!q9.inLong?('quality: '+q9.d):null);
+      if(q9&&q9.inLong)desc+=' · long run carries '+q9.d;
+      if(down)desc+=' — down week on purpose: volume −35%, the long run included; adaptation happens here';
+      if(phase==='taper'&&w===buildEnd+1)desc+=' — taper: the volume drops, the sharpness stays';
+      if(w===weeks)desc+=' · RACE: '+G.name+'. Nothing new on the day.';
+      items.push({week:w,km:wkKm,down:down,phase:phase,sched:sched,q:q9?q9.d:null,
+        desc:desc+' — ~'+wkKm+' km ('+phase+')'});
       if(!down&&!inTaper)km=km*1.08}
+    if(G.race>=40&&lngRef<25)longNote='Straight talk: growing your long run safely from '+udNum(Math.max(longStart,longest30||longStart))+' '+udUnit()+' reaches about '+udNum(lngRef)+' '+udUnit()+' in this block — marathoners whose longest run stays under 25 km tend to run slower on the day. More weeks would serve this goal better.';
     const tStr=goalMins?(goalMins>=90?Math.floor(goalMins/60)+':'+String(Math.round(goalMins%60)).padStart(2,'0'):Math.floor(goalMins)+':'+String(Math.round((goalMins%1)*60)).padStart(2,'0')):null;
     const combined=rpCombinedWeek(days,longDay);
     return{goal:goal,goalName:G.name,date:dateStr||null,goalTime:tStr,goalPace:goalMins?pS(raceP):null,paceNote:paceNote,base:base,freq:freq,
       days:days,longDay:longDay,pace:pS(easyP),items:items,template:combined?combined.template:null,
-      note:(paceNote?paceNote+' ':'')+(combined&&combined.conflict?combined.conflict+' ':'')+'Weeks 1\u20132 are easy running plus strides only \u2014 pain-free volume is what earns the speed work (that is the intensity gate). Paces come from your own easy median: tempo \u224810% faster, intervals \u224816%. Tune by feel; the effort is the prescription. '+(S.acl&&S.acl.on?'With the knee in rehab, swap intervals for tempo until your physio clears sharp speed.':'')}}
+      z:{vdot:Z.vdot,src:Z.src,easyLo:Z.easyLo,easyHi:Z.easyHi,mar:Z.mar,thr:Z.thr,int:Z.int},
+      note:(paceNote?paceNote+' ':'')+(longNote?longNote+' ':'')+(combined&&combined.conflict?combined.conflict+' ':'')+'Weeks 1\u20132 are easy running plus strides only \u2014 pain-free volume is what earns the speed work (that is the intensity gate). Paces come from the standard VDOT model on '+Z.src+': easy '+pS(Z.easyHi)+'\u2013'+pS(Z.easyLo)+', threshold '+pS(Z.thr)+', intervals '+pS(Z.int)+' /km. They update as your fitness moves. Tune by feel; the effort is the prescription. '+(S.acl&&S.acl.on?'With the knee in rehab, swap intervals for tempo until your physio clears sharp speed.':'')}}
   catch(e){return{block:'Could not read the history.'}}}
 function rpMatchRun(r){
   /* the umbrella move (owner call, 2 Sep): whoever wrote the plan —
@@ -12628,10 +12769,21 @@ function dailyBrief(){
           const DN=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
           const todayD=DN[new Date().getDay()];
           const days=Array.isArray(rp.days)&&rp.days.length?rp.days:null;
-          const isRunDay=!days||days.indexOf(todayD)>=0;
-          const isLongDay=days&&days[days.length-1]===todayD&&!it.down;
-          if(left>0.5&&isLongDay){
-            const lng=Math.max(2,Math.round(it.km*0.38*2)/2);
+          const sit=(it.sched||[]).find(s9=>s9.d===todayD);
+          const isRunDay=sit?true:(!days||days.indexOf(todayD)>=0);
+          const isLongDay=sit?sit.kind==='long':(days&&days[days.length-1]===todayD&&!it.down);
+          if(left>0.5&&sit&&sit.kind==='quality'&&it.q){
+            /* the quality day, gated on the body (the layer a watch
+               that cannot see your lifting will never run) */
+            const g9=(typeof runQualityGate==='function')?runQualityGate():null;
+            if(g9&&!g9.free){
+              try{runQualitySupp()}catch(e9){}
+              out.push({tag:'RUN',hold:true,a:'nav',v:'run',key:'run-qgate',
+                line:'Quality was on the plan, but '+g9.why+' \u2014 run '+udNum(sit.km)+' '+udUnit()+' easy instead; the session moves, it does not vanish'})}
+            else out.push({tag:'RUN',a:'nav',v:'run',
+              line:'Quality day: '+it.q+(g9&&g9.note?' \u2014 '+g9.note:'')})}
+          else if(left>0.5&&isLongDay){
+            const lng=sit&&sit.km?sit.km:Math.max(2,Math.round(it.km*0.38*2)/2);
             out.push({tag:'RUN',a:'nav',v:'run',
               line:'The long one: ~'+udNum(Math.min(lng,Math.max(2,left)))+' '+udUnit()+' easy \u2014 the week\u2019s anchor, legs at '+Math.round(leg)+'%'})}
           else if(left>0.5&&isRunDay){
