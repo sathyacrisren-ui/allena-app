@@ -666,7 +666,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='49b65c';  // stamped by tools/build.py with the content hash
+const BUILD_ID='201137';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -15096,22 +15096,26 @@ function weekBoard(){
       hasRuns:!!rp,hasRehab:rehabT>0}}catch(e){return null}}
 function weekBoardCard(){
   const B=weekBoard();if(!B)return '';
+  /* readable at arm's length (owner-caught, 8 Sep: 'small and not
+     really readable') — bigger type, taller chips, a real legend,
+     today's column lifted on its own ground */
   const chip=it=>{
-    const base='display:block;width:100%;box-sizing:border-box;text-align:center;border-radius:6px;padding:3px 1px;font-size:8px;letter-spacing:.02em;margin-top:3px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;';
-    if(it.k==='run')return '<span class="mono" style="'+base+(it.done?'background:#1E9BFF;color:var(--bg);font-weight:700':'border:1px solid #1E9BFF55;color:#1E9BFF'+(it.long?';font-weight:700':''))+'">'+esc(it.l)+'</span>';
-    if(it.k==='rehab')return '<span class="mono" style="'+base+(it.done?'background:var(--green);color:var(--bg);font-weight:700':'border:1px solid var(--greensoft);color:var(--green)')+'">'+esc(it.l)+'</span>';
-    return '<span class="mono" style="'+base+(it.done?'background:var(--text);color:var(--bg);font-weight:700':'border:1px solid var(--line);color:var(--dim)')+'">'+esc(it.l)+'</span>'};
-  return '<div class="card mt" style="padding:14px 16px">'+
-    '<div style="display:flex;align-items:baseline;gap:10px">'+
+    const base='display:block;width:100%;box-sizing:border-box;text-align:center;border-radius:8px;padding:6px 2px;font-size:10px;line-height:1.2;letter-spacing:.02em;margin-top:5px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;';
+    if(it.k==='run')return '<span class="mono" style="'+base+(it.done?'background:#1E9BFF;color:var(--bg);font-weight:700':'border:1.5px solid #1E9BFF66;color:#1E9BFF'+(it.long?';font-weight:700':''))+'">'+esc(it.l)+'</span>';
+    if(it.k==='rehab')return '<span class="mono" style="'+base+(it.done?'background:var(--green);color:var(--bg);font-weight:700':'border:1.5px solid var(--greensoft);color:var(--green)')+'">'+esc(it.l)+'</span>';
+    return '<span class="mono" style="'+base+(it.done?'background:var(--text);color:var(--bg);font-weight:700':'border:1.5px solid var(--line);color:var(--dim)')+'">'+esc(it.l)+'</span>'};
+  const leg=(col,lab)=>'<span style="display:inline-flex;align-items:center;gap:4px"><span style="width:8px;height:8px;border-radius:8px;background:'+col+'"></span><span class="mono" style="font-size:9.5px;color:var(--faint)">'+lab+'</span></span>';
+  return '<div class="card mt" style="padding:15px 14px 13px">'+
+    '<div style="display:flex;align-items:baseline;gap:10px;padding:0 2px">'+
     '<p class="eyebrow" style="flex:1">Your week</p>'+
-    '<span class="mono" style="font-size:9px;color:var(--faint);letter-spacing:.05em">LIFTS'+(B.hasRuns?' \u00b7 RUNS':'')+(B.hasRehab?' \u00b7 REHAB':'')+' \u00b7 ONE MODEL</span></div>'+
-    '<div style="display:flex;gap:4px;margin-top:11px;align-items:flex-start">'+
+    '<span style="display:inline-flex;gap:10px">'+leg('var(--text)','Lift')+(B.hasRuns?leg('#1E9BFF','Run'):'')+(B.hasRehab?leg('var(--green)','Rehab'):'')+'</span></div>'+
+    '<div style="display:flex;gap:5px;margin-top:12px;align-items:stretch">'+
     B.days.map(d=>{
       const isToday=d.key===B.todayKey,past=d.key<B.todayKey;
-      return '<div style="flex:1;min-width:0">'+
-        '<p class="mono" style="text-align:center;font-size:9px;'+(isToday?'color:var(--amber);font-weight:700':'color:var(--faint)')+'">'+d.n.slice(0,1)+'</p>'+
+      return '<div style="flex:1;min-width:0;padding:4px 2px 6px;border-radius:11px'+(isToday?';background:var(--raised);border:1px solid var(--line)':'')+'">'+
+        '<p class="mono" style="text-align:center;font-size:10.5px;letter-spacing:.04em;'+(isToday?'color:var(--amber);font-weight:700':'color:var(--faint)')+'">'+d.n.slice(0,2).toUpperCase()+'</p>'+
         (d.items.length?d.items.map(chip).join('')
-          :'<p style="text-align:center;color:'+(past?'var(--line)':'var(--faint)')+';font-size:10px;margin-top:4px">\u00b7</p>')+
+          :'<p style="text-align:center;color:'+(past?'var(--line)':'var(--faint)')+';font-size:13px;margin-top:6px">\u00b7</p>')+
         '</div>'}).join('')+'</div>'+
     (B.reason?'<p style="color:'+(B.conflict?'var(--amber)':'var(--dim)')+';font-size:12px;line-height:1.55;margin-top:10px">'+esc(B.reason)+'</p>':'')+
     '<p style="color:var(--faint);font-size:10.5px;line-height:1.5;margin-top:7px">Filled means done. Outlined is the suggested shape \u2014 nothing is locked to a day.</p>'+
@@ -16495,6 +16499,10 @@ function viewToday(){
   /* the Health link outranks everything — it is the one tap that
      unlocks the whole engine, so it is the FIRST thing a fresh
      account sees (owner call, 3 Sep) */
+  try{if(localStorage.getItem('allena-demo-live'))
+    h+='<button data-a="demoExit" class="card mt" style="width:100%;text-align:left;padding:11px 15px;border-color:var(--amber);display:flex;align-items:center;gap:10px">'+
+      '<span class="mono" style="font-size:9px;letter-spacing:.1em;color:var(--amber);flex:none">DEMO MODE</span>'+
+      '<span style="flex:1;color:var(--dim);font-size:12px">Your real data is stashed safe \u2014 tap to exit and restore</span></button>'}catch(e){}
   try{if(typeof healthConnectCard==='function')h+=healthConnectCard()}catch(e){}
   try{const ec=(typeof notifEchoes==='function')?notifEchoes():[];
     if(ec.length){
@@ -17875,7 +17883,8 @@ function viewData(){
     setRow(I.prog,'Logged RIR instead of RPE?','one-tap repair','__rirfix')]);
   h+=setGroup('Beta testing',[
     setRow(I.bug,'Report a problem','','__report'),
-    setRow(I.demo,'Demo data',demoPresent()?'loaded':'','Demo data')]);
+    setRow(I.demo,'Demo data',demoPresent()?'loaded':'','Demo data'),
+    setRow(I.demo,'Demo mode for filming',localStorage.getItem('allena-demo-live')?'ON':'','__demomode')]);
   const KNOWN=['You','Account & sync','Program library','Your own block','Rehab pathway','Running','Daily check-in','Profile','Barbell weight','Available equipment','Units','Notifications','Report a problem','Allena — AI coach','Export','Restore','Demo data','Start fresh'];
   const left=Object.keys(byTitle).filter(k=>KNOWN.indexOf(k)<0);
   if(left.length)h+=setGroup('More',left.map(k=>setRow(I.prog,k,'',k)));
@@ -19682,6 +19691,14 @@ function sheetHtml(){
     }else{
       inner+='<button data-a="prevGo" class="big disp mt2" style="background:var(--amber);color:var(--bg);font-size:16px">Start · '+totalSets+' sets</button>'}
     return wrapSheet('Before you start',inner)}
+  if(S.sheet.t==='demo'){
+    const live=!!localStorage.getItem('allena-demo-live');
+    return wrapSheet('Demo mode',live
+      ?'<p style="color:var(--dim);font-size:13px;line-height:1.6">You are IN the demo account. Your real data is stashed untouched on this phone and comes back exactly as it was.</p>'+
+       '<button data-a="demoExit" class="big disp mt2" style="background:var(--amber);color:var(--bg);font-size:15px">Exit demo \u2014 restore my real data</button>'
+      :'<p style="color:var(--dim);font-size:13px;line-height:1.6">For filming: swaps in a fully populated demo account \u2014 program, runs, rehab mid-pathway, findings, readiness history. Your real data is stashed on this phone first and restored exactly when you exit. Do not export a backup while in demo mode.</p>'+
+       '<button data-a="demoEnter" class="big disp mt2" style="background:var(--amber);color:var(--bg);font-size:15px">Enter demo mode</button>'+
+       '<p style="color:var(--faint);font-size:11px;line-height:1.5;margin-top:10px">A banner stays on Today the whole time \u2014 one tap brings your account back.</p>')}
   if(S.sheet.t==='modify'){
     const s2=S.sess,cur=s2.sets[Math.min(s2.idx,s2.sets.length-1)];
     const row=(a,t2,sub,col)=>'<button data-a="'+a+'" class="card" style="width:100%;text-align:left;padding:13px 15px;display:flex;align-items:center;gap:12px">'+
@@ -21670,6 +21687,21 @@ function runAction(a,v,t,e){
       S.lib.programs.push(nb.prog);S.lib.activeId=nb.prog.id;saveLib();
       setWeek(1,nb.prog.id);S.nb=null;S.sheet=null;S.reviewProg=null;S.view='home';render();
       flash(nb.prog.block+' is ready — week 1.');break}
+    case 'demoEnter':{
+      if(S.sess){flash('Finish or discard the live session first.');break}
+      try{
+        const keep=[];for(let i9=0;i9<localStorage.length;i9++){const k9=localStorage.key(i9);if(/^training-/.test(k9))keep.push(k9)}
+        keep.forEach(k9=>{localStorage.setItem('demostash.'+k9,localStorage.getItem(k9));localStorage.removeItem(k9)});
+        localStorage.setItem('allena-demo-live','1');
+        location.reload()}catch(e){flash('Could not enter demo mode \u2014 nothing was changed.')}break}
+    case 'demoExit':{
+      try{
+        const kill=[];for(let i9=0;i9<localStorage.length;i9++){const k9=localStorage.key(i9);if(/^training-/.test(k9))kill.push(k9)}
+        kill.forEach(k9=>localStorage.removeItem(k9));
+        const back=[];for(let i9=0;i9<localStorage.length;i9++){const k9=localStorage.key(i9);if(/^demostash\./.test(k9))back.push(k9)}
+        back.forEach(k9=>{localStorage.setItem(k9.slice(10),localStorage.getItem(k9));localStorage.removeItem(k9)});
+        localStorage.removeItem('allena-demo-live');
+        location.reload()}catch(e){flash('Could not restore \u2014 your real data is still safe under its stash.')}break}
     case 'demoLoad':demoLoad();render();flash('Demo data loaded.');break;
     case 'demoClear':demoClear();break;
     case 'sheetClose':S.sheet=null;render();break;
@@ -22672,6 +22704,7 @@ function runAction(a,v,t,e){
     case 'meOpen':{S.prof=S.prof||{};lset(K_PROF,S.prof);S.backTo=S.view;S._navQuiet=1;S.view='you';render();break}
     case 'meSex':{S.prof=S.prof||{};S.prof.sex=v;lset(K_PROF,S.prof);vib(8);render();break}
     case 'dsetOpen':{if(v==='__beta'){S.betaFrom=S.view;S.sheet={t:'beta'};render();break}
+      if(v==='__demomode'){S.sheet={t:'demo'};render();break}
       if(v==='__report')v='Report a problem';   // the rows pass a token; the chunk key is the title
       if(v==='__setup'){S.sheet=null;runAction('setupOpen');break}
       if(v==='__hguide'){S.sheet=null;S.impgMode='health';S.impg='garmin';S.impgStep=0;
@@ -22772,8 +22805,11 @@ try{
 /* the silent boot-time demoLoad() for empty accounts was removed Aug 2026:
    a fresh or wiped install starts truly empty — the wizard, the importer
    and Settings → Demo data are the honest doors in. */
-/* ── sandbox seeding: a fully populated account to poke at ── */
-try{if(SANDBOX&&!lget('training-sandbox-v1',null)){
+/* ── sandbox seeding: a fully populated account to poke at ──
+   Wrapped as demoSeed() (8 Sep) so the NATIVE app can enter a demo
+   account for shooting content — the owner's real keys are stashed
+   under demostash.* first and restored exactly on exit. */
+function demoSeed(){
   lset('training-sandbox-v1',{seeded:today()});
   if(!S.prof||!S.prof.goal){
     S.prof={name:'Demo',sex:'male',age:31,exp:'experienced',years:6,days:4,mins:70,
@@ -22844,7 +22880,28 @@ try{if(SANDBOX&&!lget('training-sandbox-v1',null)){
   try{const p0=mainProgs()[0];if(p0){const wks=S.history.filter(h=>h.progId===p0.id&&h.week).map(h=>h.week);
     if(wks.length)setWeek(Math.max.apply(null,wks),p0.id)}}catch(e){}
   S.ai=S.ai||{};
-}}catch(e){}
+  if(typeof SANDBOX==='undefined'||!SANDBOX){
+    try{demoRuns()}catch(e9){}
+    lset('training-welcome-v1',1);
+    S.view='today'}
+}
+function demoRuns(){
+  /* the sandbox build splices its run seed at build time; the native
+     demo needs the same running story in the prod engine */
+  try{const plan=[[41,6,'easy'],[39,9,'long'],[37,6,'easy'],[34,11,'long'],[32,6,'tempo'],[30,6,'easy'],
+    [27,13,'long'],[25,6,'easy'],[23,7,'tempo'],[20,15,'long'],[18,6,'easy'],[16,6,'easy'],
+    [13,16,'long'],[11,8,'tempo'],[9,6,'easy'],[6,19,'long'],[4,10,'race'],[2,7,'easy']];
+   plan.forEach((x,i)=>{const hard=(x[2]==='tempo'||x[2]==='interval'||x[2]==='race');
+     const mins=Math.round(x[1]*(x[2]==='race'?4.3:x[2]==='tempo'?5.1:5.7));
+     runAdd({id:'dr'+i,date:dayKey(new Date(Date.now()-x[0]*864e5)),
+       type:x[2],km:x[1],mins:mins,rpe:({easy:4,long:5,tempo:7,interval:8,race:9})[x[2]],
+       hr:hard?162:141,elev:35,note:'',
+       z:hard?{z1:Math.round(mins*0.12),z2:Math.round(mins*0.22),z3:Math.round(mins*0.16),z4:Math.round(mins*0.4),z5:Math.round(mins*0.1)}
+             :{z1:Math.round(mins*0.2),z2:Math.round(mins*0.62),z3:Math.round(mins*0.16),z4:Math.round(mins*0.02),z5:0}})})}catch(e){}
+  S.runOn=true;lset('training-runon-v1',true);lset('training-lastopen-v1',0);
+  try{delete (S.gar.days||{})[today()];garSave()}catch(e){}}
+try{if(SANDBOX&&!lget('training-sandbox-v1',null))demoSeed();
+  else if((typeof SANDBOX==='undefined'||!SANDBOX)&&localStorage.getItem('allena-demo-live')&&!lget('training-sandbox-v1',null))demoSeed()}catch(e){}
 
 /* ══ the daily find ═════════════════════════════════════════
    Once a day, when there genuinely is one: Allena announces a
