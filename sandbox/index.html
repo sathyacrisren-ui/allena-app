@@ -666,7 +666,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='535afc';  // stamped by tools/build.py with the content hash
+const BUILD_ID='296f6b';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -16712,6 +16712,23 @@ function viewHome(){
       '</div></div></div>'}
   h+=recCard();
   try{h+=(typeof weekBoardCard==='function'?weekBoardCard():'')}catch(e){}
+  /* the learned-adjustments ledger (8 Sep, after Dafydd's backup
+     showed +12.5 on a skullcrusher and −5 on his key bench): what
+     regulation has moved is VISIBLE and reversible in one place —
+     never a mystery a user has to reverse-engineer from set screens */
+  try{const adj9=(p&&p.adj)||{};
+    const ks9=Object.keys(adj9).filter(k=>adj9[k]);
+    if(ks9.length){
+      h+='<div class="card mt" style="padding:14px 16px">'+
+        '<div style="display:flex;align-items:baseline;gap:10px">'+
+        '<p class="eyebrow" style="flex:1">Learned adjustments</p>'+
+        '<span class="mono" style="font-size:9px;color:var(--faint)">'+ks9.length+' LIFT'+(ks9.length===1?'':'S')+'</span></div>'+
+        ks9.slice(0,8).map(k=>'<div style="display:flex;justify-content:space-between;gap:10px;margin-top:7px">'+
+          '<span style="flex:1;min-width:0;font-size:12.5px;color:var(--dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(String(k).replace(/ \u2014 .*/,''))+'</span>'+
+          '<span class="mono" style="font-size:12.5px;font-weight:600;color:'+(adj9[k]>0?'var(--green)':'var(--red)')+'">'+(adj9[k]>0?'+':'')+uwNum(adj9[k])+' '+uwUnit()+'</span></div>').join('')+
+        (ks9.length>8?'<p class="mono" style="color:var(--faint);font-size:9.5px;margin-top:6px">and '+(ks9.length-8)+' more</p>':'')+
+        '<p style="color:var(--faint);font-size:10.5px;line-height:1.5;margin-top:9px">What the regulation engine has moved off the written program \u2014 earned from your logged sets, reversible any time.</p>'+
+        '<button data-a="adjResetAll" class="btn mt" style="font-size:12.5px;border-color:var(--amber);color:var(--amber)">Reset all to the written program</button></div>'}}catch(e){}
   const render1={stats:()=>secStats(),program:()=>secProgram(p,ws),sessions:()=>secSessions(p,ws),
     goals:()=>secGoals(),habits:()=>secHabits(),support:()=>secSupport()};
   (S.lay.order||['stats','program','sessions','goals','habits','support']).forEach(k=>{
@@ -21764,6 +21781,15 @@ function runAction(a,v,t,e){
       S.lib.programs.push(nb.prog);S.lib.activeId=nb.prog.id;saveLib();
       setWeek(1,nb.prog.id);S.nb=null;S.sheet=null;S.reviewProg=null;S.view='home';render();
       flash(nb.prog.block+' is ready — week 1.');break}
+    case 'adjResetAll':{
+      const p9=activeProgSafe();if(!p9||!p9.adj){break}
+      const n9=Object.keys(p9.adj).filter(k=>p9.adj[k]).length;
+      p9.adj={};p9.adjWkBy={};saveLib();
+      /* the live session's targets follow immediately — no stale set screens */
+      try{if(S.sess&&S.sess.progId===p9.id){const w9=S.week;
+        S.sess.sets.forEach(st=>{if(st.adj&&st.targetW!=null){st.targetW=Math.max(0,Math.round((st.targetW-st.adj)*4)/4);st.adj=0}});
+        persistActive()}}catch(e9){}
+      flash(n9+' adjustment'+(n9===1?'':'s')+' cleared \u2014 every lift is back to the written program.');render();break}
     case 'demoEnter':{
       if(S.sess){flash('Finish or discard the live session first.');break}
       try{
