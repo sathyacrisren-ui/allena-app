@@ -666,7 +666,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='91ace1';  // stamped by tools/build.py with the content hash
+const BUILD_ID='fe2b4d';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -8905,10 +8905,17 @@ function hkNutrition(rows){
     rows.forEach(r=>{
       if(!r||!r.date)return;
       const d=S.daily.days[r.date]=S.daily.days[r.date]||{};
-      if(r.protein!=null&&(d.pr==null||d.pr==='')){d.pr=Math.round(r.protein);n++}
-      if(r.kcal!=null&&d.kcal==null){d.kcal=Math.round(r.kcal);n++}
-      if(r.carb!=null&&d.carb==null){d.carb=Math.round(r.carb);n++}
-      if(r.fat!=null&&d.fat==null){d.fat=Math.round(r.fat);n++}});
+      /* the day's totals GROW as meals land — an only-if-missing merge
+         froze every day at its first sync, so breakfast was the whole
+         day forever (owner-caught, 8 Sep: 3,157 kcal logged, 300
+         reached Allena). The latest Health total is the truth; only a
+         value explicitly marked manual (nSrc 'me') outranks it. */
+      if(d.nSrc!=='me'){
+        if(r.protein!=null&&Math.round(r.protein)!==d.pr){d.pr=Math.round(r.protein);n++}
+        if(r.kcal!=null&&Math.round(r.kcal)!==d.kcal){d.kcal=Math.round(r.kcal);n++}
+        if(r.carb!=null&&Math.round(r.carb)!==d.carb){d.carb=Math.round(r.carb);n++}
+        if(r.fat!=null&&Math.round(r.fat)!==d.fat){d.fat=Math.round(r.fat);n++}
+        if(n)d.nSrc='hk'}});
     if(n){lset(K_DAILY,S.daily);try{hkPulse(n)}catch(e9){}
       flash('Nutrition synced from Health — '+rows.length+' days.');
       try{sorceryOnArrival('fuel')}catch(e9){}
