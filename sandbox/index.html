@@ -666,7 +666,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='10c1f9';  // stamped by tools/build.py with the content hash
+const BUILD_ID='1161bd';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -1595,8 +1595,8 @@ async function frLoad(force){
       .map(x=>x.owner_id===S.frMe?x.friend_id:x.owner_id).filter(Boolean)
       .concat(crewIds).filter(function(x,i,a){return a.indexOf(x)===i});
     if(ids.length){
-      let r2=await fetch(CLOUD.url+'/rest/v1/snapshots?select=user_id,display,week_live,week_sessions,live_points,tier,prev_week_live,prev_week_key&user_id=in.('+ids.map(encodeURIComponent).join(',')+')',{headers:h});
-      if(!r2.ok)r2=await fetch(CLOUD.url+'/rest/v1/snapshots?select=user_id,display,week_live,week_sessions,live_points,tier&user_id=in.('+ids.map(encodeURIComponent).join(',')+')',{headers:h});
+      let r2=await fetch(CLOUD.url+'/rest/v1/snapshots?select=user_id,display,week_live,week_sessions,live_points,tier,prev_week_live,prev_week_key,updated_at&user_id=in.('+ids.map(encodeURIComponent).join(',')+')',{headers:h});
+      if(!r2.ok)r2=await fetch(CLOUD.url+'/rest/v1/snapshots?select=user_id,display,week_live,week_sessions,live_points,tier,updated_at&user_id=in.('+ids.map(encodeURIComponent).join(',')+')',{headers:h});
       S.frSnaps=r2.ok?await r2.json():[]}
     else S.frSnaps=[];
     try{
@@ -1680,7 +1680,7 @@ function raceField(){
     const sn=(S.frSnaps||[]).find(s9=>s9.user_id===id)||{};
     const local=((acct()||{}).frNames||{})[id];
     out.push({crew:1,id:id,name:local||sn.display||'A racer',named:!!(local||sn.display),
-      week:sn.week_live||0,sess:sn.week_sessions||0,tier:sn.tier||''})})}catch(e){}
+      week:sn.week_live||0,sess:sn.week_sessions||0,tier:sn.tier||'',seen:sn.updated_at||null})})}catch(e){}
   return out}
 async function crewMake(){
   try{const h=await frHeaders();if(!h||!S.frMe){flash('Sign in first.');return}
@@ -1722,7 +1722,7 @@ function frLinked(){
     const sn=(S.frSnaps||[]).find(s9=>s9.user_id===fid)||{};
     const local=((acct()||{}).frNames||{})[fid];
     return{code:x.code,id:fid,name:local||sn.display||'Your friend',named:!!(local||sn.display),
-      week:sn.week_live||0,sess:sn.week_sessions||0,tier:sn.tier||''}})}
+      week:sn.week_live||0,sess:sn.week_sessions||0,tier:sn.tier||'',seen:sn.updated_at||null}})}
 function frRename(id,nm){
   try{const a9=acct()||{};const m=a9.frNames||{};
     nm=String(nm||'').trim().slice(0,14);
@@ -1742,9 +1742,13 @@ function friendsSection(){
       (L.length?(function(){
         const myFirst=String((S.prof&&S.prof.name)||'').split(' ')[0];
         const myInit=(myFirst||String((acct()||{}).email||'Y').split('@')[0]||'Y').slice(0,1).toUpperCase();
+        const staleT=x=>{try{if(!x)return null;
+          const h9=Math.round((Date.now()-new Date(x).getTime())/36e5);
+          if(h9<12)return null;
+          return h9<48?Math.round(h9)+'h':Math.round(h9/24)+'d'}catch(e9){return null}};
         const R=[{me:1,name:myFirst||'You',init:myInit,week:mine}]
           .concat(L.map(f=>({me:0,id:f.id,code:f.code,name:f.name,
-            init:(f.named?String(f.name).slice(0,1).toUpperCase():'?'),week:f.week||0})));
+            init:(f.named?String(f.name).slice(0,1).toUpperCase():'?'),week:f.week||0,stale:staleT(f.seen)})));
         R.sort((a,b)=>b.week-a.week||(a.me?-1:1));
         R.forEach((x,i)=>{x.rank=i+1});
         /* last week's crown rides above its holder's avatar */
@@ -1777,7 +1781,8 @@ function friendsSection(){
             '<span style="width:26px;height:26px;border-radius:26px;background:var(--raised);border:1.5px solid '+(x.me?'var(--green)':'var(--line)')+';display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex:none">'+esc(x.init)+'</span>'+
             (x.me?'<span style="flex:1;min-width:0;font-size:13px;font-weight:600">You</span>'
               :'<button data-a="frNameOpen" data-v="'+esc(x.id)+'" style="flex:1;min-width:0;font-size:13px;text-align:left;padding:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(x.name)+' <span style="color:var(--faint);font-size:10px">\u270e</span></button>')+
-            (x.me?'':'<span class="mono" style="color:'+(lead>=0?'var(--green)':'var(--amber)')+';font-size:9.5px;flex:none">'+(lead>=0?'+'+lead+' you':'+'+(-lead)+' them')+'</span>')+
+            (x.me?'':(x.stale?'<span class="mono" style="color:var(--faint);font-size:9px;flex:none">as of '+x.stale+' ago</span>'
+              :'<span class="mono" style="color:'+(lead>=0?'var(--green)':'var(--amber)')+';font-size:9.5px;flex:none">'+(lead>=0?'+'+lead+' you':'+'+(-lead)+' them')+'</span>'))+
             '<span class="mono" style="font-size:14px;font-weight:700;flex:none">'+x.week+'</span>'+
             ((x.me||!x.code)?'':'<button data-a="frRemove" data-v="'+esc(x.code)+'" style="color:var(--faint);font-size:12px;flex:none;padding:0 4px">\u2715</button>')+
             '</div>'}).join('')+'</div>';
