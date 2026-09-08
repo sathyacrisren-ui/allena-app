@@ -666,7 +666,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='442fe1';  // stamped by tools/build.py with the content hash
+const BUILD_ID='1f1900';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -8851,6 +8851,7 @@ function watchStatePush(){
         target:cur.secs?(cur.secs+'s hold'):(cur.targetW!=null?uwStr(cur.targetW)+(cur.targetReps?' \u00d7 '+cur.targetReps:''):''),
         restEnd:(s.phase==='resting'&&S.restEnd)?S.restEnd:0,
         name:String(s.dayName||'').slice(0,40),
+        last:s.idx>=(s.sets||[]).length-1,
         timed:!!cur.secs,restSecs:+cur.rest||0,
         wStep:(UNITS.w==='lb'?5:2.5),unit:uwUnit()};
       if(s.phase==='logging'&&S.draft&&!cur.secs){
@@ -11156,15 +11157,23 @@ function whisperGen(){
         const goals=(S.goals||[]).map(g=>gBase(g.ex).toLowerCase());
         let hit=null,hitEx='';
         (S.history||[]).slice().reverse().some(h=>{
+          /* COMPLETED sessions on SETTLED days only — an in-progress
+             session sits in history as an unfinished row, and a PR
+             today cites a day still being lived (owner-caught twice,
+             8 Sep) */
+          if(!h.complete)return false;
+          if(String(h.date).slice(0,10)>=today())return false;
           return (h.log||[]).slice().reverse().some(l=>{
             if(l.pr&&goals.some(g=>gBase(l.ex).toLowerCase().indexOf(g)>=0)){hit=h;hitEx=gBase(l.ex);return true}
             return false})});
         if(hit){
-          const row=corrDayData()[String(hit.date).slice(0,10)]||{};
+          const dk9=String(hit.date).slice(0,10);
+          const row=corrDayData()[dk9]||{};
+          const prev=corrDayData()[dayKey(new Date(new Date(dk9+'T12:00').getTime()-864e5))]||{};
           const bits=[];
-          if(row.sleep!=null)bits.push(Math.round(row.sleep/6)/10+'h of sleep');
-          if(row.carb!=null)bits.push(Math.round(row.carb)+'g of carbs the day before');
-          if(row.ready!=null)bits.push('readiness at '+Math.round(row.ready));
+          if(row.sleep!=null)bits.push(Math.round(row.sleep/6)/10+'h of sleep that night');
+          if(prev.carb!=null&&prev.carb>=30)bits.push(Math.round(prev.carb)+'g of carbs the day before');
+          if(row.ready!=null)bits.push('readiness at '+Math.round(row.ready)+' that morning');
           if(bits.length){
             out.push({slot:at(10,30),id:'wh-edge'+today(),
               body:'Your last '+hitEx+' PR came off '+bits.join(', ')+'. '+String(rec.top.name||'Today')+' is on today\u2019s card.'});
@@ -22572,7 +22581,20 @@ function dayCheck(){
   try{const b9=discBank();
     Object.keys(b9).forEach(k=>{const e9=b9[k];
       if(e9&&e9.t==='A PR while healing'&&/closed a door/.test(String(e9.d||''))){
-        delete b9[k];bankSave()}})}catch(e){}
+        delete b9[k];bankSave()}
+      /* a recipe banked the same day as its PR read an unsettled day
+         (owner-caught: '13g of carbs') — swept; the generator re-banks
+         from settled data if the PR stands */
+      const m9=/^recipe:(.+):(\d{4}-\d{2}-\d{2})$/.exec(String(k));
+      if(m9&&e9){
+        if(e9.found&&m9[2]>=String(e9.found)){delete b9[k];bankSave()}
+        else{
+          /* the find must still have its evidence: the cited PR day
+             must hold a completed session with that lift */
+          const alive=(S.history||[]).some(h9=>h9.complete&&
+            String(h9.date).slice(0,10)===m9[2]&&
+            (h9.log||[]).some(l9=>gBase(l9.ex)===m9[1]));
+          if(!alive){delete b9[k];bankSave()}}}})}catch(e){}
   try{
     const dd9=(S.daily&&S.daily.days)||{};const tk9=today();const cur9=dd9[tk9];
     if(cur9&&cur9.bw!=null&&cur9.bwSrc!=='me'){
