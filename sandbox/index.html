@@ -666,7 +666,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='3e1aad';  // stamped by tools/build.py with the content hash
+const BUILD_ID='c31809';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -1202,7 +1202,7 @@ function applyReadiness(level){
         s.sets.splice(i,1);dropped++;s.sets.forEach(x=>{if(x.exNo===+k)x.of=arr.length-1})}}});
   s.readinessAdj=level;persistActive();
   flash(level==='low'?'Eased: −10% load, RPE capped at 8, '+dropped+' set'+(dropped===1?'':'s')+' dropped.':'Eased: −5% load, RPE capped at 8.')}
-const SCAN_READ_SYS='Extract body-composition numbers from the scan image. Reply with JSON only, no prose, no code fences. Keys: w (weight kg), bf (total body fat percent), smm (skeletal muscle mass kg), vf (visceral fat level/rating), bmr (kcal), tee (total energy expenditure kcal), legL (LEFT leg lean mass kg from segmental analysis), legR (RIGHT leg lean mass kg), date (YYYY-MM-DD if visible), and an "ex" object with any of: lbm (lean body mass kg), protein (kg), mineral (kg), tbw (total body water kg), icf (kg), ecf (kg), subcut (subcutaneous fat kg), vfMass (visceral fat mass kg), vfArea (cm2), bioAge (years), abd (abdominal circumference cm), whr (waist-hip ratio), armL (left arm lean kg), armR (right arm lean kg), torso (torso lean kg). Omit anything unreadable. Numbers only, no units.';
+const SCAN_READ_SYS='Extract body-composition numbers from the scan image. Reply with JSON only, no prose, no code fences. Keys: w (weight kg), bf (total body fat percent), smm (skeletal muscle mass kg), vf (visceral fat level/rating), bmr (kcal), tee (total energy expenditure kcal), legL (LEFT leg lean mass kg from segmental analysis), legR (RIGHT leg lean mass kg), date (YYYY-MM-DD if visible), and an "ex" object with any of: lbm (lean body mass kg), protein (kg), mineral (kg), tbw (total body water kg), icf (kg), ecf (kg), subcut (subcutaneous fat kg), vfMass (visceral fat mass kg), vfArea (cm2), bioAge (years), abd (abdominal circumference cm), whr (waist-hip ratio), armL (left arm lean kg), armR (right arm lean kg), torso (torso lean kg). Omit anything unreadable. Numbers only, no units. TRAPS: bf is the TOTAL BODY FAT PERCENTAGE row (a percent, 3-60) — sheets also list BODY FAT MASS in kg as a separate row; never confuse them. In the segmental analysis every region prints LEAN MASS and FAT MASS side by side — armL, armR, torso, legL and legR are ALWAYS the LEAN MASS value, never the fat one. legL and legR are top-level keys, never inside ex.';
 const SCAN_FIELDS=[['w','Weight','kg',0.1],['bf','Body fat','%',0.1],['smm','Skeletal muscle','kg',0.1],
  ['vf','Visceral fat','level 1-20',1],['bmr','BMR','kcal',10],['tee','TEE','kcal',50]];
 /* the wedge fields: per-leg lean mass — the scan's own witness of a
@@ -1221,6 +1221,21 @@ function proteinTarget(sc){if(!sc||!sc.lbm)return null;
 function scanSave(){lset(K_SCAN,S.scans)}
 function daysSinceScan(){const l=scansSorted().slice(-1)[0];if(!l)return null;
   return Math.floor((Date.now()-new Date(l.date+'T12:00').getTime())/864e5)}
+function scanReadFix(o){
+  /* deterministic witnesses over the model's row-picking (owner-caught,
+     8 Sep: an Evolt read put fat MASS in the bf% field and stranded the
+     legs in extras). Arithmetic beats a misread row. */
+  try{
+    if(o&&o.ex&&typeof o.ex==='object'){
+      ['legL','legR'].forEach(k=>{
+        if(o[k]==null&&isFinite(+o.ex[k]))o[k]=+o.ex[k];
+        delete o.ex[k]});
+      const w9=+o.w,lbm9=+o.ex.lbm;
+      if(w9>0&&lbm9>0&&lbm9<w9){
+        const bf9=Math.round((w9-lbm9)/w9*1000)/10;
+        if(bf9>=3&&bf9<=60&&(!(+o.bf>0)||Math.abs(+o.bf-bf9)>2.5))o.bf=bf9}}
+    if(o&&+o.bf>60)delete o.bf}catch(e){}
+  return o}
 async function readScanWithAllena(){
   const f=S.sform;if(!f||!f.img||!aiReady())return;
   f.busy=true;render();
@@ -1228,13 +1243,13 @@ async function readScanWithAllena(){
   if(!m){f.busy=false;flash('Unsupported image.');render();return}
   try{
     if(!aiSpend('scan'))return;
-    const res=await claudeFetch({model:S.ai.model,max_tokens:300,
+    const res=await claudeFetch({model:'claude-sonnet-5',max_tokens:300,
         system:SCAN_READ_SYS,
         messages:[{role:'user',content:[{type:'image',source:{type:'base64',media_type:m[1],data:m[2]}},{type:'text',text:'Extract the values.'}]}]});
     const d=await res.json();
     let t=d.content?d.content.map(x=>x.text||'').join(''):'';
     t=t.replace(/```json|```/g,'').trim();
-    const o=JSON.parse(t);
+    const o=scanReadFix(JSON.parse(t));
     ['w','bf','smm','vf','bmr','tee','legL','legR'].forEach(k=>{if(o[k]!=null&&!isNaN(+o[k]))f[k]=+o[k]});
     if(o.ex&&typeof o.ex==='object'){f.ex={};Object.keys(o.ex).forEach(k=>{if(isFinite(+o.ex[k]))f.ex[k]=+o.ex[k]})}
     if(o.date&&/^\d{4}-\d{2}-\d{2}$/.test(o.date))f.date=o.date;
@@ -3988,8 +4003,8 @@ function scanSheet(){
     const XN={lbm:'Lean body mass',protein:'Protein',mineral:'Mineral',tbw:'Body water',icf:'ICF',ecf:'ECF',subcut:'Subcutaneous fat',vfMass:'Visceral fat mass',vfArea:'Visceral fat area',bioAge:'Bio age',abd:'Abdominal girth',whr:'Waist-hip ratio',armL:'Left arm lean',armR:'Right arm lean',torso:'Torso lean'};
     inner+='<p class="eyebrow" style="margin-top:18px">Also read from the sheet</p>'+
       '<div class="card" style="padding:11px 14px;margin-top:8px">'+
-      Object.keys(f.ex).map(k=>'<div style="display:flex;justify-content:space-between;gap:10px;padding:4px 0">'+
-        '<span style="color:var(--dim);font-size:12px">'+esc(XN[k]||k)+'</span>'+
+      Object.keys(f.ex).filter(k=>XN[k]).map(k=>'<div style="display:flex;justify-content:space-between;gap:10px;padding:4px 0">'+
+        '<span style="color:var(--dim);font-size:12px">'+esc(XN[k])+'</span>'+
         '<span class="mono" style="font-size:12px">'+f.ex[k]+'</span></div>').join('')+
       '</div><p style="color:var(--faint);font-size:10.5px;line-height:1.5;margin-top:6px">Saved with the scan \u2014 trends surface as more scans land.</p>'}
   inner+='<button data-a="scanSave" class="big disp mt" style="background:var(--amber);color:var(--bg);font-size:16px">Save scan</button>'+
@@ -8832,6 +8847,22 @@ function romSummary(e9){
   const l=mx('l'),r=mx('r');
   const sym=(l!=null&&r!=null&&Math.max(l,r)>0)?Math.round(Math.min(l,r)/Math.max(l,r)*100):null;
   return{l:l,r:r,el:mn('l'),er:mn('r'),sym:sym}}
+window.watchAct=function(a){
+  /* the wrist's action door (build 12). The locked phone sleeps
+     through rest-end: the per-second UI tick that flips resting to
+     ready never runs, so a wrist 'Start set' arrived at a phone
+     still claiming 'resting' and was silently dropped — while Skip
+     rest worked, because resting was the one state the frozen phone
+     still believed (owner-caught, 8 Sep, on build 11). Normalize the
+     clock before honouring the tap. */
+  try{
+    const s=S.sess;if(!s)return;
+    if(s.phase==='resting'&&S.restEnd&&S.restEnd-Date.now()<=1500){
+      audioCancel();S.restEnd=null;s.idx++;s.phase='ready';persistActive()}
+    if(a==='begin'&&s.phase==='ready')runAction('begin','');
+    else if(a==='finish'&&s.phase==='working'){S._watchFin=Date.now();runAction('finish','')}
+    else if(a==='skiprest'&&s.phase==='resting')runAction('skipRest','')
+  }catch(e){}};
 window.watchLog=function(r,w,rpe){
   try{
     const s=S.sess;if(!s||s.phase!=='logging')return;
@@ -10606,7 +10637,7 @@ async function bloodPhotoRead(img){
     if(!m){flash('Unsupported image.');return}
     if(!aiSpend('scan'))return;
     S._bloodBusy=true;render();
-    const res=await claudeFetch({model:S.ai.model,max_tokens:600,
+    const res=await claudeFetch({model:'claude-sonnet-5',max_tokens:600,
       system:'Extract blood test results from the image. Reply with JSON only, no prose, no code fences: {"date":"YYYY-MM-DD if visible","markers":{key:{"v":number,"u":"unit"}}}. Allowed keys: '+BLOOD_REF.map(R=>R[0]+' ('+R[1]+')').join(', ')+'. Numbers exactly as printed; omit anything unreadable.',
       messages:[{role:'user',content:[{type:'image',source:{type:'base64',media_type:m[1],data:m[2]}},{type:'text',text:'Extract the values.'}]}]});
     const d=await res.json();
@@ -10632,13 +10663,14 @@ async function dataPhotoRead(img){
     if(!m){flash('Unsupported image.');return}
     if(!aiSpend('scan'))return;
     flash('Reading the photo\u2026');
-    const res=await claudeFetch({model:S.ai.model,max_tokens:900,
-      system:'Classify this photo of personal fitness data and extract it. Reply with JSON only, no prose, no code fences. If it is a BODY COMPOSITION scan (Evolt, InBody, DEXA summary): {"kind":"scan","date":"YYYY-MM-DD","w":kg,"bf":percent,"smm":kg,"vf":rating,"bmr":kcal,"tee":kcal,"legL":left leg lean kg,"legR":right leg lean kg,"ex":{lbm,protein,mineral,tbw,subcut,vfMass,vfArea,bioAge,abd,whr,armL,armR,torso}} (omit unreadable keys). If it is a BLOOD TEST result sheet: {"kind":"blood","date":"YYYY-MM-DD","markers":{key:{"v":number,"u":"unit"}}} with keys from: '+BLOOD_REF.map(R=>R[0]).join(', ')+'. Anything else: {"kind":"other"}.',
+    const res=await claudeFetch({model:'claude-sonnet-5',max_tokens:900,
+      system:'Classify this photo of personal fitness data and extract it. Reply with JSON only, no prose, no code fences. If it is a BODY COMPOSITION scan (Evolt, InBody, DEXA summary): {"kind":"scan","date":"YYYY-MM-DD","w":kg,"bf":percent,"smm":kg,"vf":rating,"bmr":kcal,"tee":kcal,"legL":left leg lean kg,"legR":right leg lean kg,"ex":{lbm,protein,mineral,tbw,subcut,vfMass,vfArea,bioAge,abd,whr,armL,armR,torso}} (omit unreadable keys; bf is the TOTAL BODY FAT PERCENTAGE row, a percent, NEVER body fat mass in kg; in the segmental analysis armL/armR/torso/legL/legR are ALWAYS the LEAN MASS value, never the fat mass printed beside it; legL/legR are top-level, never inside ex). If it is a BLOOD TEST result sheet: {"kind":"blood","date":"YYYY-MM-DD","markers":{key:{"v":number,"u":"unit"}}} with keys from: '+BLOOD_REF.map(R=>R[0]).join(', ')+'. Anything else: {"kind":"other"}.',
       messages:[{role:'user',content:[{type:'image',source:{type:'base64',media_type:m[1],data:m[2]}},{type:'text',text:'Classify and extract.'}]}]});
     const d=await res.json();
     let t=d.content?d.content.map(x=>x.text||'').join(''):'';
     const o=JSON.parse(t.replace(/```json|```/g,'').trim());
     if(o.kind==='scan'){
+      scanReadFix(o);
       S.sform={date:(o.date&&/^\d{4}-\d{2}-\d{2}$/.test(o.date))?o.date:today(),
         w:o.w!=null?+o.w:'',bf:o.bf!=null?+o.bf:'',smm:o.smm!=null?+o.smm:'',
         vf:o.vf!=null?+o.vf:'',bmr:o.bmr!=null?+o.bmr:'',tee:o.tee!=null?+o.tee:'',
