@@ -666,7 +666,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='ca0136';  // stamped by tools/build.py with the content hash
+const BUILD_ID='0e20f1';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -13537,7 +13537,7 @@ function sessionReveal(){
 function viewCollection(){
   const st=bankStats(),l=bankList();
   const GROUPS=[
-    ['insights','Insights',['signal','insight','call'],'What the engine found between your numbers.','Sync a watch and train \u2014 the links surface on their own.'],
+    ['insights','Insights',['signal','insight','call','unlock'],'What the engine found between your numbers.','Sync a watch and train \u2014 the links surface on their own.'],
     ['bests','Records & bests',['record','reps','session','round'],'Bests, biggest days, rep records and the plates that mean something.','Keep logging weights and reps.'],
     ['firsts','Firsts & milestones',['first','first-up','milestone','streak'],'The early ones, the running totals, and the not-missing.','Log a session.'],
     ['compare','Ratios & comparisons',['ratio','balance','timing','block'],'You against bodyweight, lifts against each other, block against block.','Log your bodyweight and a main lift.'],
@@ -13815,6 +13815,34 @@ function sinceLines(){
    8/8 and nothing happened"). Crossing a threshold banks a rare find
    through the normal announcement machinery — dot, NEW, collection.
    First-ever sweep baselines silently: no retroactive flood. */
+function unlockAnswer(title){
+  /* an 'analysis unlocked' card must carry the ANSWER, not an
+     announcement (owner-caught, 9 Sep: 'where are the answers?').
+     Deterministic current-state per analysis family; honest when the
+     honest answer is 'nothing proven yet'. */
+  try{
+    const t=String(title||'').toLowerCase();
+    const hkD=(typeof hkDailyStore==='function')?((hkDailyStore()||{}).days||{}):{};
+    const med=a=>{if(!a.length)return null;const b=a.slice().sort((x,y)=>x-y);return b[Math.floor(b.length/2)]};
+    if(/resting.?heart/.test(t)){
+      const v=med(Object.keys(hkD).sort().slice(-30).map(k=>+hkD[k].rhr).filter(x=>x>0));
+      if(v)return 'Your baseline: '+Math.round(v)+' bpm (median of the last 30 mornings). Mornings that stray well above it now get flagged.'}
+    if(/readiness baseline/.test(t)){
+      const g=(S.gar&&S.gar.days)||{};
+      const v=med(Object.keys(g).sort().slice(-30).map(k=>+g[k].am).filter(x=>x>0));
+      if(v)return 'Your baseline: '+Math.round(v)+'/100. Days under it read as harder days, honestly.'}
+    if(/weight.*moving|scale/.test(t)){
+      const d9=(S.daily&&S.daily.days)||{};
+      const ks=Object.keys(d9).filter(k=>d9[k]&&+d9[k].bw>0).sort();
+      const a=med(ks.slice(-14,-7).map(k=>+d9[k].bw)),b=med(ks.slice(-7).map(k=>+d9[k].bw));
+      if(a&&b){const df=Math.round((b-a)*10)/10;
+        return 'Right now: '+(Math.abs(df)<0.2?'flat \u2014 your weight is holding steady week over week.':(df>0?'up ':'down ')+Math.abs(df)+' kg week over week.')}}
+    if(/mornings or evenings/.test(t)){
+      const H=(S.history||[]).filter(h=>h.complete&&!h.run);
+      let m=0,e=0;H.forEach(h=>{const hr=new Date(h.date).getHours();if(hr<12)m++;else if(hr>=16)e++});
+      return 'So far: '+m+' morning vs '+e+' evening sessions logged \u2014 the verdict lands as an insight once one side proves stronger.'}
+    if(/sleep/.test(t))return 'So far: no sleep\u2013strength link has cleared the evidence bar \u2014 which is the honest answer until one does. The day it clears, it lands here as an insight.';
+    return ''}catch(e){return ''}}
 function watchMetSweep(){
   try{
     const W=watchList();
@@ -13826,9 +13854,10 @@ function watchMetSweep(){
       if(seen[m.t])return;
       seen[m.t]=1;dirty=true;
       try{const bank=discBank(),id='unlock:'+m.t;
-        if(!bank[id]){bank[id]={t:'Unlocked: '+m.t.toLowerCase(),
-          d:'The data bar is full \u2014 this analysis now runs on every new day. What it finds surfaces as insights the moment the evidence clears the bar, and when it finds nothing yet, that silence is honest too.',
-          rar:'rare',tag:'record',found:today()};bankSave()}}catch(e9){}});
+        if(!bank[id]){const ans=unlockAnswer(m.t);
+          bank[id]={t:'Unlocked: '+m.t.toLowerCase(),
+          d:(ans?ans+' ':'')+'This analysis now runs on every new day.',
+          rar:'rare',tag:'unlock',found:today()};bankSave()}}catch(e9){}});
     if(dirty)lset('training-watchmet-v1',seen)
   }catch(e){}}
 
@@ -23085,6 +23114,13 @@ function dayCheck(){
          into an ACL story (owner-caught, 8 Sep: injury was 7 Aug 26,
          the cited walks were 2025) — insights telling a rehab story
          on year-less MM-DD dates came from that leaky context and go */
+      /* upgrade old 'Unlocked' boilerplate in place: same find, same
+         date — the body gains its answer and the right shelf
+         (owner-caught, 9 Sep: four identical paragraphs, no answers) */
+      if(/^unlock:/.test(String(k))&&e9&&/data bar is full/.test(String(e9.d||''))){
+        try{const ans=(typeof unlockAnswer==='function')?unlockAnswer(String(k).slice(7)):'';
+          e9.d=(ans?ans+' ':'')+'This analysis now runs on every new day.';
+          e9.tag='unlock';bankSave()}catch(e8){}}
       if(/^insight:/.test(String(k))&&e9&&/ACL|rehab/i.test(String(e9.t||'')+' '+String(e9.d||''))
          &&/\b(0[1-9]|1[0-2])-[0-3]\d\b/.test(String(e9.d||''))){
         delete b9[k];bankSave()}
