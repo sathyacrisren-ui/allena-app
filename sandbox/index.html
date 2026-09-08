@@ -666,7 +666,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='f0d0f3';  // stamped by tools/build.py with the content hash
+const BUILD_ID='66d371';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -1690,7 +1690,7 @@ async function acctSync(loud){
       headers:{'content-type':'application/json',apikey:CLOUD.anon,
         Authorization:'Bearer '+tok,Prefer:'resolution=merge-duplicates,return=minimal'},
       body:JSON.stringify([row])});
-    if(r.ok){lset(K_ACCT,Object.assign({},acct(),{lastSync:today()}));
+    if(r.ok){lset(K_ACCT,Object.assign({},acct(),{lastSync:today(),lastWL:+row.week_live||0}));
       try{haptic('success')}catch(e9){}
       done(true);return true}
     if(await legacyRetry(r))return true;
@@ -9507,6 +9507,10 @@ function hkHR(id,res){
             saveHistory();
             try{livePill();flash('Your watch carried a working-heart-rate block that day \u2014 avg '+h.hr.avg+'. The typed session checks out. Recorded live.');
               haptic('success')}catch(e9){}
+            /* a retro-witness flips the session LIVE after the day's
+               sync already ran — push the corrected week to the race
+               NOW (owner-caught via Angus, twice: 7 and 8 Sep) */
+            try{if(typeof acctSync==='function')acctSync(false)}catch(e9){}
             render()}}}
       return}
     if(!res||!(res.n>0))return;
@@ -9522,7 +9526,10 @@ function hkHR(id,res){
       livePill();
       const sl9=strainLine(h);
       flash('Your watch was listening \u2014 avg HR '+h.hr.avg+'. '+(sl9||'Heart-witnessed.'));
-      haptic('success')}}catch(e9){}
+      haptic('success');
+      /* the witness changes the score — the race hears it now, not
+         at tomorrow's sync (owner-caught via Angus, 8 Sep) */
+      try{if(typeof acctSync==='function')acctSync(false)}catch(e8){}}}catch(e9){}
     render()
   }catch(e){}}
 try{window.hkHR=hkHR}catch(e){}
@@ -22878,6 +22885,11 @@ function dayCheck(){
   try{if(typeof socialJoinKick==='function')socialJoinKick()}catch(e){}
   try{if(typeof acctReady==='function'&&acctReady()&&typeof acct==='function'&&acct()&&S._syncDay!==today()){
     S._syncDay=today();acctSync(false)}}catch(e){}
+  try{if(typeof acctReady==='function'&&acctReady()&&typeof acct==='function'&&acct()){
+    const a9=acct();
+    if(a9&&a9.lastWL!=null&&(!S._wlSyncT||Date.now()-S._wlSyncT>30*60000)){
+      const wl9=Math.round((dataPoints().weekLive)||0);
+      if(Math.abs(wl9-(+a9.lastWL||0))>=1){S._wlSyncT=Date.now();acctSync(false)}}}}catch(e){}
   try{if(typeof frLoad==='function'&&S._frDay!==today()){S._frDay=today();
     setTimeout(function(){frLoad()},1200)}}catch(e){}
   const k=today();
