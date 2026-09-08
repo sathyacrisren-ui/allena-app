@@ -666,7 +666,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='664b1a';  // stamped by tools/build.py with the content hash
+const BUILD_ID='368a5c';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -1165,6 +1165,25 @@ function autoProgress(e,c){
   if(!r)return null;
   S.exVerdict=r;
   learnStep(prog,c.ex,r.outcome);
+  /* ONE INCREASE, NEVER TWO (beta-caught via Dafydd, 8 Sep: a clean
+     week earned regulation's +2.5 AND the authored program stepped
+     +2.5 the same week — the user saw a 5 kg jump nobody wrote).
+     When the written program raises this exercise itself next week,
+     regulation stands down and says so. Cuts are safety and always
+     apply. */
+  if(r.delta>0){try{
+    let exDef=null;
+    ((prog&&prog.days)||[]).some(d9=>(d9.exercises||[]).some(x9=>{
+      if(x9.name===c.ex){exDef=x9;return true}return false}));
+    if(exDef){
+      const wk9=(typeof weekFor==='function'&&prog?weekFor(prog.id):S.week)||1;
+      const wOf=l9=>{const st9=(l9||[]).find(x9=>x9&&x9.w!=null);return st9?+st9.w:null};
+      const cw=wOf(setsForWeek(exDef,wk9)),nw=wOf(setsForWeek(exDef,wk9+1));
+      if(cw!=null&&nw!=null&&nw>cw){
+        S.exVerdict=Object.assign({},r,{delta:0,outcome:'held',
+          msg:'Every set at the top of the range on target effort \u2014 and the written program already steps this up next week. One increase, never two.',
+          why:'the program steps itself; regulation stands down'});
+        return null}}}catch(e9){}}
   if(r.delta){applyAdj(c.ex,r.delta,r.why);return r.delta>0?'up':'down'}
   return null}
 
