@@ -666,7 +666,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='c31809';  // stamped by tools/build.py with the content hash
+const BUILD_ID='576e16';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -2082,7 +2082,7 @@ function viewSocial(){
     ((acctReady()&&acct())?'<button data-a="addFriendOpen" style="width:40px;height:40px;border-radius:40px;background:var(--raised);border:1.5px solid var(--line);display:flex;align-items:center;justify-content:center;flex:none">'+
       '<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="10" cy="8.5" r="3.6"/><path d="M4 19.5c.7-3.4 2.9-5.3 6-5.3s5.3 1.9 6 5.3"/><path d="M18.5 6.5v6M15.5 9.5h6"/></svg></button>':'')+
     '</div>'+
-    '<p style="color:var(--dim);font-size:13px;line-height:1.6;margin-top:8px">Compete on showing up \u2014 never on output. Weekly live points, honest by construction.</p>'+
+    '<p style="color:var(--dim);font-size:13px;line-height:1.6;margin-top:8px">Compete on showing up \u2014 never on output. Weekly live points from workouts AND device-witnessed runs; a run and a session on the same day both count.</p>'+
     inner+'</div>'}
 let acctSyncT=null;
 function acctSyncSoon(){
@@ -4672,6 +4672,15 @@ function sessionLiveWhy(h){
       return{live:false,why:maxBurst+' sets logged inside one minute — a superset is quick, a whole block at once is typing'};}
   return{live:true,why:'witnessed — this phone ran the clock and the sets spread like a real session'}}
 function sessionLive(h){return sessionLiveWhy(h).live}
+function runLive(r){
+  /* a run competes when a DEVICE witnessed it (owner ruling, 8 Sep:
+     'a run and a workout compounds in points in social'): the Health
+     pipeline recorded it (hk id), or a heart rate stands behind the
+     distance. A typed km figure never competes — same witness law as
+     lifting. */
+  try{if(!r)return false;
+    if(String(r.id||'').slice(0,2)==='hk')return true;
+    return (+r.hr>=80)&&(+r.km>0)}catch(e){return false}}
 function srpeStrain(){
   /* Foster 1998: illness and overtraining cluster after MONOTONOUS
      heavy weeks — load × sameness, not big load alone. Cross-domain by
@@ -4799,6 +4808,12 @@ function dataPoints(){
     const used=byDay[day]||0,room=Math.max(0,dpDayCap()-used);
     if(earn+zearn>room){const f=room/(earn+zearn||1);earn=earn*f;zearn=zearn*f}
     byDay[day]=(byDay[day]||0)+earn+zearn;
+    /* a witnessed run competes beside the lifting (owner ruling,
+       8 Sep) — run + workout COMPOUND: both land on the same weekly
+       score, and a run counts as showing up in the sessions line */
+    if(runLive(r)){live+=earn+zearn;
+      if(wkStart&&day>=wkStart){weekLive+=earn+zearn;weekSess++}
+      else if(pvStart&&day>=pvStart&&day<wkStart)prevWeekLive+=earn+zearn}
     B.runs+=earn;B.zones+=zearn});
   const g=(S.gar&&S.gar.days)||{};
   Object.keys(g).forEach(k=>{const d=g[k]||{};
