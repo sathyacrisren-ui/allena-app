@@ -666,7 +666,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='0e20f1';  // stamped by tools/build.py with the content hash
+const BUILD_ID='f880b1';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -15192,7 +15192,28 @@ function weekBoard(){
         const dist=Math.min(Math.abs(i-longIdx),7-Math.abs(i-longIdx));
         if(dist>1)reason='Legs on '+DN7[i]+'. Long run '+DN7[longIdx]+'. Kept '+dist+' days apart on purpose.'}
       d.items.push({k:'lift',l:String(base).split(' ')[0].slice(0,6).toLowerCase(),done:0,legs:legs})});
-    const unplaced=Object.keys(remNames).filter(n=>!placedNames[n]);
+    let unplaced=Object.keys(remNames).filter(n=>!placedNames[n]);
+    /* THE VERDICT IS THE BRAIN (owner-caught, 9 Sep: the card said
+       Heavy Press + Back while the board put Technique on today).
+       If the verdict recommends a session and today is still open,
+       today's cell carries THAT day — and if the board already
+       placed it later in the week, the two swap. The board never
+       argues with recommendToday. */
+    try{
+      const rec=(typeof recommendToday==='function')?recommendToday():null;
+      const di9=rec?(rec.dayIdx!=null?rec.dayIdx:(rec.top&&rec.top.i)):null;
+      const recName=(di9!=null&&p.days[di9])?String(p.days[di9].name||'').replace(/ \u2014 .*/,''):null;
+      const tD=byKey[tk];
+      if(recName&&tD&&!tD.items.some(x=>x.k==='lift')){
+        const hit=unplaced.find(n=>n===recName||recName.indexOf(n)>=0||n.indexOf(recName)>=0);
+        if(hit){
+          unplaced=unplaced.filter(n=>n!==hit);
+          tD.items.unshift({k:'lift',l:String(hit).split(' ')[0].slice(0,6).toLowerCase(),done:0})}
+        else{
+          const dO=days.find(d2=>d2.key>tk&&d2.items.some(x=>x.k==='lift'&&!x.done&&(recName.toLowerCase().indexOf(x.l)>=0||x.l.indexOf(recName.slice(0,6).toLowerCase())>=0)));
+          if(dO){const it9=dO.items.find(x=>x.k==='lift'&&!x.done);
+            dO.items=dO.items.filter(x=>x!==it9);
+            tD.items.unshift(it9)}}}}catch(e){}
     let unfit=0;
     if(unplaced.length){
       /* same-block days share muscles — the board must never SUGGEST
