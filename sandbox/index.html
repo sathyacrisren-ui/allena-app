@@ -666,7 +666,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='922035';  // stamped by tools/build.py with the content hash
+const BUILD_ID='004529';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -1741,6 +1741,7 @@ async function frLoad(force){
     if(S._frCap===false&&!force)return;
     if(!acctReady()||!acct())return;
     const h=await frHeaders();if(!h)return;
+    try{nudgePull(tok,h)}catch(e9){}
     const r=await fetch(CLOUD.url+'/rest/v1/friends?select=*',{headers:h});
     if(!r.ok){S._frCap=false;return}
     S._frCap=true;
@@ -1857,7 +1858,7 @@ function raceField(){
     const sn=(S.frSnaps||[]).find(s9=>s9.user_id===id)||{};
     const local=((acct()||{}).frNames||{})[id];
     out.push({crew:1,id:id,name:local||sn.display||'A racer',named:!!(local||sn.display),
-      week:sn.week_live||0,sess:sn.week_sessions||0,tier:sn.tier||'',seen:sn.updated_at||null})})}catch(e){}
+      week:sn.week_live||0,sess:sn.week_sessions||0,tier:sn.tier||'',allp:sn.live_points||0,seen:sn.updated_at||null})})}catch(e){}
   return out}
 async function crewMake(nm){
   try{const h=await frHeaders();if(!h||!S.frMe){flash('Sign in first.');return}
@@ -1899,7 +1900,57 @@ function frLinked(){
     const sn=(S.frSnaps||[]).find(s9=>s9.user_id===fid)||{};
     const local=((acct()||{}).frNames||{})[fid];
     return{code:x.code,id:fid,name:local||sn.display||'Your friend',named:!!(local||sn.display),
-      week:sn.week_live||0,sess:sn.week_sessions||0,tier:sn.tier||'',seen:sn.updated_at||null}})}
+      week:sn.week_live||0,sess:sn.week_sessions||0,tier:sn.tier||'',allp:sn.live_points||0,seen:sn.updated_at||null}})}
+async function frProfileLoad(id){
+  try{
+    const tok=await acctToken();if(!tok)return null;
+    const h={apikey:CLOUD.anon,Authorization:'Bearer '+tok};
+    const r=await fetch(CLOUD.url+'/rest/v1/snapshots?select=display,points,live_points,tier,tree,collection_count,week_live,week_sessions,updated_at&user_id=eq.'+encodeURIComponent(id),{headers:h});
+    if(!r.ok)return null;
+    const rows=await r.json();return rows&&rows[0]||null}catch(e){return null}}
+const NUDGE_MSGS=[
+  'One session flips it. Tonight?',
+  'The week is watching. Get one in.',
+  'You are clear of me and I do not like it. Respect.',
+  'That was a real week. Seen.'];
+async function nudgeSend(toId,msgI){
+  try{
+    if(!acctReady())return flash('Sign in first.');
+    const a9=acct()||{};const sent=a9.nudgeSent||{};
+    if(sent[toId]===today())return flash('One nudge per mate per day \u2014 theirs is already on its way.');
+    if(Object.keys(sent).filter(k=>sent[k]===today()).length>=5)return flash('Five nudges a day is the cap \u2014 the rest is on them.');
+    const tok=await acctToken();if(!tok)return flash('Sign in first.');
+    const c=acctClaims(tok);if(!c||!c.sub)return;
+    const r=await fetch(CLOUD.url+'/rest/v1/nudges',{method:'POST',
+      headers:{'content-type':'application/json',apikey:CLOUD.anon,Authorization:'Bearer '+tok,Prefer:'return=minimal'},
+      body:JSON.stringify([{from_id:c.sub,to_id:toId,msg:+msgI||0}])});
+    if(r.ok){sent[toId]=today();lset(K_ACCT,Object.assign({},a9,{nudgeSent:sent}));
+      S.sheet=null;flash('Sent. It lands on their phone.');try{haptic('success')}catch(e9){}render()}
+    else if(r.status===404)flash('The nudge table is not set up yet \u2014 one SQL paste turns it on.');
+    else if(r.status===409||r.status===400){sent[toId]=today();lset(K_ACCT,Object.assign({},a9,{nudgeSent:sent}));flash('One nudge per mate per day \u2014 the server holds that line too.')}
+    else flash('Could not send \u2014 try again in a minute.')
+  }catch(e){flash('No connection.')}}
+async function nudgePull(tok,h){
+  /* ride frLoad: fetch unseen nudges, queue at most 3 as pings (the
+     proven claim/overtake path drains them), mark all seen */
+  try{
+    const c=acctClaims(tok);if(!c||!c.sub)return;
+    const r=await fetch(CLOUD.url+'/rest/v1/nudges?select=id,from_id,msg,created_at&to_id=eq.'+encodeURIComponent(c.sub)+'&seen=eq.false&order=created_at.asc&limit=10',{headers:h});
+    if(!r.ok)return;
+    const rows=await r.json();if(!Array.isArray(rows)||!rows.length)return;
+    const names={};try{raceField().forEach(f=>names[f.id]=f.name)}catch(e9){}
+    const a9=acct()||{};const q=a9.ovQueue||[];
+    rows.slice(0,3).forEach(x=>{
+      const nm=names[x.from_id]||'A mate';
+      const body=nm+': \u201c'+(NUDGE_MSGS[+x.msg]||NUDGE_MSGS[0])+'\u201d';
+      if(!q.some(y=>y.id==='ndg'+x.id))q.push({id:'ndg'+x.id,ts:Math.round(Date.now()/1000)+5,body:body});
+      try{if(document.visibilityState==='visible')flash(body)}catch(e9){}});
+    lset(K_ACCT,Object.assign({},a9,{ovQueue:q}));
+    try{if(typeof notifSync==='function')notifSync()}catch(e9){}
+    await fetch(CLOUD.url+'/rest/v1/nudges?to_id=eq.'+encodeURIComponent(c.sub)+'&id=in.('+rows.map(x=>x.id).join(',')+')',{method:'PATCH',
+      headers:Object.assign({},h,{'content-type':'application/json',Prefer:'return=minimal'}),
+      body:JSON.stringify({seen:true})})
+  }catch(e){}}
 function frRename(id,nm){
   try{const a9=acct()||{};const m=a9.frNames||{};
     nm=String(nm||'').trim().slice(0,14);
@@ -1971,7 +2022,7 @@ function friendsSection(){
             '<span class="mono" style="width:18px;flex:none;text-align:center;font-size:11px;font-weight:700;color:'+(x.rank===1?'var(--green)':'var(--faint)')+'">'+x.rank+'</span>'+
             '<span style="width:26px;height:26px;border-radius:26px;background:var(--raised);border:1.5px solid '+(x.me?'var(--green)':'var(--line)')+';display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex:none">'+esc(x.init)+'</span>'+
             (x.me?'<span style="flex:1;min-width:0;font-size:13px;font-weight:600">You</span>'
-              :'<button data-a="frNameOpen" data-v="'+esc(x.id)+'" style="flex:1;min-width:0;font-size:13px;text-align:left;padding:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(x.name)+' <span style="color:var(--faint);font-size:10px">\u270e</span></button>')+
+              :'<button data-a="frOpen" data-v="'+esc(x.id)+'" style="flex:1;min-width:0;font-size:13px;text-align:left;padding:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(x.name)+' <span style="color:var(--faint);font-size:10px">\u203a</span></button>')+
             (x.me?'':(x.stale?'<span class="mono" style="color:var(--faint);font-size:9px;flex:none">as of '+x.stale+' ago</span>'
               :'<span class="mono" style="color:'+(lead>=0?'var(--green)':'var(--amber)')+';font-size:9.5px;flex:none">'+(lead>=0?'+'+lead+' you':'+'+(-lead)+' them')+'</span>'))+
             '<span class="mono" data-cu="row-'+esc(String(x.me?'me':x.id))+'" style="font-size:14px;font-weight:700;flex:none">'+x.week+'</span>'+
@@ -9187,6 +9238,7 @@ const K_NOTIF='training-notif-v1';
 window.notifTapped=function(id){
   /* the PR-recipe whisper opens its evidence page directly (owner
      vision, 8 Sep) — the freshest recipe find is the subject */
+  try{if(/^ndg/.test(String(id))){S.sheet=null;S._navQuiet=1;S.view='social';render();return}}catch(e){}
   try{if(/^wh-edge/.test(String(id))){
     const ks=Object.keys(discBank()).filter(k=>/^recipe:/.test(k)).sort();
     if(ks.length){S.sheet=null;S.backTo='today';S.evidenceId=ks[ks.length-1];S.view='evidence';render();return}}}catch(e){}
@@ -9358,7 +9410,7 @@ function notifPlan(){
      never top the day back up. */
   const budget={quiet:1,standard:2,chatty:4}[P.pace||'standard']||2;
   const priOf=id=>/^am/.test(id)?0:/^dc/.test(id)?1:/^reh/.test(id)?2:/^sc/.test(id)?3:/^dr/.test(id)?4:/^fu/.test(id)?5:/^rv/.test(id)?6:/^wh/.test(id)?7:/^q\d/.test(id)?8:/^wr/.test(id)?9:10;
-  const exempt=id=>/^(ap1|ap2|fl|ov|restend)/.test(String(id));
+  const exempt=id=>/^(ap1|ap2|fl|ov|ndg|restend)/.test(String(id));
   let used=0;try{const now9=Math.round(Date.now()/1000);
     used=(P.sched||[]).filter(x=>x.ts<=now9&&dayKey(new Date(x.ts*1000))===today()&&!exempt(x.id)).length}catch(e){}
   const byD={};
@@ -19851,6 +19903,34 @@ function sheetHtml(){
     }else{
       inner+='<button data-a="prevGo" class="big disp mt2" style="background:var(--amber);color:var(--bg);font-size:16px">Start · '+totalSets+' sets</button>'}
     return wrapSheet('Before you start',inner)}
+  if(S.sheet.t==='friend'){
+    const f=S.frProf||{};const id=S.sheet.id;
+    const local=((acct()||{}).frNames||{})[id];
+    const nm=local||f.display||'Your mate';
+    const stat=(v,l)=>'<div style="flex:1;text-align:center"><p class="disp" style="font-size:19px;font-weight:700">'+v+'</p><p class="mono" style="font-size:8px;color:var(--faint);letter-spacing:.06em;margin-top:2px">'+l+'</p></div>';
+    const tr=f.tree||{};
+    let inner='<div style="display:flex;align-items:center;gap:12px">'+
+      '<div style="width:46px;height:46px;border-radius:46px;background:var(--raised);border:2px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:19px;font-weight:700;flex:none">'+esc(String(nm).slice(0,1).toUpperCase())+'</div>'+
+      '<div style="flex:1;min-width:0"><p style="font-size:16px;font-weight:600">'+esc(nm)+' <button data-a="frNameOpen" data-v="'+esc(id)+'" style="color:var(--faint);font-size:11px;padding:0 3px">\u270e</button></p>'+
+      (f.tier?'<p class="mono" style="font-size:9px;color:var(--faint);letter-spacing:.08em;margin-top:2px">'+esc(String(f.tier).toUpperCase())+'</p>':'')+'</div></div>';
+    if(f.__wait)inner+='<p style="color:var(--faint);font-size:12px;margin-top:12px">Fetching their card\u2026</p>';
+    else{
+      inner+='<div class="card mt" style="padding:13px 10px;display:flex">'+
+        stat(f.live_points!=null?f.live_points:'\u2014','ALL-TIME LIVE')+
+        stat(f.week_live!=null?f.week_live:'\u2014','THIS WEEK')+
+        stat(f.week_sessions!=null?f.week_sessions:'\u2014','SESSIONS')+
+        stat(f.collection_count!=null?f.collection_count:'\u2014','FINDS')+'</div>';
+      if(tr&&(tr.sessions||tr.km))inner+='<div class="card mt" style="padding:13px 10px;display:flex">'+
+        stat(tr.sessions||0,'SESSIONS EVER')+stat(tr.lifts||0,'LIFTS')+stat(Math.round(tr.km||0),'KM')+stat(tr.weeks||0,'WEEKS')+'</div>';
+      inner+='<p style="color:var(--faint);font-size:10.5px;line-height:1.5;margin-top:8px">The score card is all anyone can see \u2014 never sets, weights or health data.</p>'}
+    inner+='<button data-a="nudgeOpen" data-v="'+esc(id)+'" class="big disp mt2" style="background:var(--amber);color:var(--bg);font-size:15px">Send a nudge</button>';
+    return wrapSheet('Your mate',inner)}
+  if(S.sheet.t==='nudge'){
+    const id=S.sheet.id;
+    return wrapSheet('Send a nudge',
+      '<p style="color:var(--dim);font-size:13px;line-height:1.6">One tap, lands on their phone. One per mate per day \u2014 the server holds that line even if you don\u2019t.</p>'+
+      '<div style="margin-top:12px;display:flex;flex-direction:column;gap:8px">'+
+      NUDGE_MSGS.map((m9,i)=>'<button data-a="nudgeSendPick" data-v="'+i+'" class="card" style="width:100%;text-align:left;padding:13px 15px;font-size:13.5px">\u201c'+esc(m9)+'\u201d</button>').join('')+'</div>')}
   if(S.sheet.t==='demo'){
     const live=!!localStorage.getItem('allena-demo-live');
     return wrapSheet('Demo mode',live
@@ -21847,6 +21927,10 @@ function runAction(a,v,t,e){
       S.lib.programs.push(nb.prog);S.lib.activeId=nb.prog.id;saveLib();
       setWeek(1,nb.prog.id);S.nb=null;S.sheet=null;S.reviewProg=null;S.view='home';render();
       flash(nb.prog.block+' is ready — week 1.');break}
+    case 'frOpen':{S.sheet={t:'friend',id:v};S.frProf={__wait:1};render();
+      frProfileLoad(v).then(p9=>{if(S.sheet&&S.sheet.t==='friend'&&S.sheet.id===v){S.frProf=p9||{};render()}});break}
+    case 'nudgeOpen':{S.sheet={t:'nudge',id:v};render();break}
+    case 'nudgeSendPick':{const id9=S.sheet&&S.sheet.id;if(id9)nudgeSend(id9,+v);break}
     case 'adjResetAll':{
       const p9=activeProgSafe();if(!p9||!p9.adj){break}
       const n9=Object.keys(p9.adj).filter(k=>p9.adj[k]).length;
