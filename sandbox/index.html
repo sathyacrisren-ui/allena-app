@@ -666,7 +666,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='68c79e';  // stamped by tools/build.py with the content hash
+const BUILD_ID='66776c';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -1612,6 +1612,20 @@ async function frLoad(force){
         if(!first8||end8<=first8){delete hist8[k];cut8++;
           try{const b8=discBank();if(b8['duel:'+k]){delete b8['duel:'+k];bankSave()}}catch(e8){}}});
       if(cut8)lset(K_ACCT,Object.assign({},a8,{duelHist:hist8}))}catch(e9){}
+    try{
+      /* the overtake: their new total passed your current one */
+      const aOv=acct()||{};const seen=aOv.raceSeen||{};const ovQ=aOv.ovQueue||[];
+      const mine9=Math.round((dataPoints().weekLive)||0);
+      (typeof raceField==='function'?raceField():frLinked()).forEach(f=>{
+        const prev=seen[f.id];
+        if(prev!=null&&prev<=mine9&&f.week>mine9&&f.week>prev){
+          const id9='ov'+today()+String(f.id).slice(0,6);
+          if(!ovQ.some(x=>x.id===id9)){
+            ovQ.push({id:id9,ts:Math.round(Date.now()/1000)+5,
+              body:f.name+' just passed you \u2014 '+f.week+'\u2013'+mine9+'. A session tonight takes it back.'});
+            try{if(document.visibilityState==='visible')flash(f.name+' passed you \u2014 '+f.week+'\u2013'+mine9+'.')}catch(e8){}}}
+        seen[f.id]=f.week});
+      lset(K_ACCT,Object.assign({},aOv,{raceSeen:seen,ovQueue:ovQ.slice(-6)}))}catch(e9){}
     try{duelVerdict()}catch(e9){}
     /* the link ceremony (owner call, 7 Sep): a new link gets the full
        scene, once, on WHICHEVER side sees it first — the joiner right
@@ -8816,7 +8830,7 @@ function notifPlan(){
      never top the day back up. */
   const budget={quiet:1,standard:2,chatty:4}[P.pace||'standard']||2;
   const priOf=id=>/^am/.test(id)?0:/^dc/.test(id)?1:/^reh/.test(id)?2:/^sc/.test(id)?3:/^dr/.test(id)?4:/^fu/.test(id)?5:/^rv/.test(id)?6:/^wh/.test(id)?7:/^q\d/.test(id)?8:/^wr/.test(id)?9:10;
-  const exempt=id=>/^(ap1|ap2|fl|restend)/.test(String(id));
+  const exempt=id=>/^(ap1|ap2|fl|ov|restend)/.test(String(id));
   let used=0;try{const now9=Math.round(Date.now()/1000);
     used=(P.sched||[]).filter(x=>x.ts<=now9&&dayKey(new Date(x.ts*1000))===today()&&!exempt(x.id)).length}catch(e){}
   const byD={};
@@ -8922,6 +8936,10 @@ function notifSync(){
     const P=notifPrefs();
     if(!P.asked){return}                 // the card asks first — no cold iOS prompt
     try{if(typeof frClaimItems==='function')frClaimItems().forEach(x=>items.push(x))}catch(e9){}
+    try{const aOv=(typeof acct==='function'&&acct())||{};const q=(aOv.ovQueue||[]);
+      let dirty=false;
+      q.forEach(x=>{if(!x.sent){items.push({id:x.id,ts:x.ts,title:'Allena',body:x.body});x.sent=1;dirty=true}});
+      if(dirty)lset(K_ACCT,Object.assign({},aOv,{ovQueue:q}))}catch(e9){}
     const badge=(typeof appBadgeN==='function')?appBadgeN():0;
     let items=[];try{items=notifPlan()||[]}catch(e){items=[]} /* the plan engine may NEVER take the rest alarm down with it */
     const ri=restNotifItem();if(ri)items.unshift(ri) /* FIRST in line — the native side takes only the plan's head, and a full week of items pushed the rest alert off the end */; // a re-sync mid-rest must never wipe the pending rest alert
@@ -15953,7 +15971,10 @@ function viewToday(){
       let crown='';
       try{const pv=dayKey(new Date(new Date(questWeekKey()+'T12:00').getTime()-7*864e5));
         const r9=((acct()||{}).duelHist||{})[pv];
-        if(r9==='w')crown='me';else if(r9==='l')crown='them'}catch(e9){}
+        if(r9==='w')crown='me';else if(r9==='l')crown='them';
+        if(crown==='me'){const hist9=(acct()||{}).duelHist||{};
+          const ks9=Object.keys(hist9).filter(k9=>/^\d{4}-/.test(k9)).sort().reverse();
+          S._reign=0;for(const k9 of ks9){if(hist9[k9]==='w')S._reign++;else break}}}catch(e9){}
       const frInit=frKnown?top.name.slice(0,1).toUpperCase():'?';
       /* last week's winner wears a small drawn crown above the ring —
          vector, epic-gold, on-identity (owner ruled the emoji out) */
@@ -15973,10 +15994,22 @@ function viewToday(){
         '<span class="mono" style="font-size:15px;font-weight:700">'+mine+'\u2009\u2013\u2009'+top.week+'</span></div>'+
         ava(top.name,frInit,lead<=0&&top.week>0?'var(--green)':'var(--line)',lead<0,crown==='them')+
         '</div>'+
+        ((crown==='me'&&S._reign>=2)?'<p class="mono" style="font-size:8.5px;letter-spacing:.1em;color:#E0A458;margin-top:6px">CROWN HELD '+S._reign+' WEEKS</p>':'')+
         '<div style="height:6px;border-radius:6px;background:var(--line);overflow:hidden;margin-top:12px;display:flex">'+
         '<div style="height:6px;width:'+Math.round(mine/tot*100)+'%;background:var(--green)"></div>'+
         '<div style="height:6px;flex:1;background:var(--dim);opacity:.45"></div></div>'+
-        '<p style="color:var(--dim);font-size:11.5px;margin-top:9px">'+(lead>0?'You lead by '+lead+' \u2014 a logged session holds it.':lead<0?esc(top.name)+' leads by '+(-lead)+' \u2014 a session today overtakes.':'Dead level \u2014 the next honest log takes the lead.')+'</p>'+
+        '<p style="color:var(--dim);font-size:11.5px;margin-top:9px">'+(function(){
+          const dl=7-(new Date().getDay()||7); // whole days left after today
+          if(lead>0)return dl<=1?('Final '+(dl===0?'day':'days')+' \u2014 you lead by '+lead+'. Hold the door.')
+            :'You lead by '+lead+' \u2014 a logged session holds it.';
+          if(lead<0)return dl===0?('Last day \u2014 '+(-lead)+' behind. One session flips it.')
+            :dl<=2?(esc(top.name)+' leads by '+(-lead)+' with '+dl+' day'+(dl===1?'':'s')+' left \u2014 a session tonight flips it.')
+            :esc(top.name)+' leads by '+(-lead)+' \u2014 a session today overtakes.';
+          return 'Dead level \u2014 the next honest log takes the lead.'})()+'</p>'+
+        (function(){try{
+          const ms=Math.round((dataPoints().weekSessions)||0);
+          if(ms||top.sess)return '<p class="mono" style="color:var(--faint);font-size:9.5px;margin-top:5px;letter-spacing:.04em">SESSIONS '+ms+'\u2013'+(top.sess||0)+'</p>';
+          return ''}catch(e9){return ''}})()+
         (frKnown?'':'<p style="color:var(--faint);font-size:10px;margin-top:4px">Their name lands the next time they open Allena.</p>')+
         (Ls.length>1?'<div style="margin-top:10px;padding-top:9px;border-top:1px solid var(--line)">'+
           Ls.slice(1,4).map(f=>'<div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-top:5px">'+
