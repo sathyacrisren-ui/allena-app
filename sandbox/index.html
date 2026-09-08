@@ -666,7 +666,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='76a30f';  // stamped by tools/build.py with the content hash
+const BUILD_ID='3e1aad';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -8845,6 +8845,11 @@ window.watchLog=function(r,w,rpe){
     if(fin&&S.restEnd&&S.restEnd>Date.now()){
       S.restEnd-=(Date.now()-fin);
       if(S.restEnd<Date.now()+1000)S.restEnd=Date.now()+1000;
+      /* the lock-screen countdown was armed at commit with the
+         un-backdated end — retarget it to the corrected clock so
+         island, notification and watch all agree (owner-caught,
+         8 Sep: 'lockscreen one is off by around 10 seconds') */
+      try{restNotifSync()}catch(e9){}
       render()}
     S._watchFin=null}catch(e){}};
 function watchStatePush(){
@@ -11247,7 +11252,7 @@ function whisperGen(){
    mechanisms, investigate the backwards patterns, and design ONE
    two-week experiment the engine itself will verify. It may never
    invent a finding. Deterministic before AI, always. */
-const ANALYST_SYS='You are Allena\u2019s analyst pass \u2014 the premium lens over a training app\u2019s deterministic statistics engine. The CONTEXT lists every correlation the engine has PROVEN in this user\u2019s own data (plus faded links, forecast record, training summary). Rules, absolute: 1) Never state a finding that is not in the context \u2014 you synthesise and explain, the engine discovers. 2) Look for the STORY: which findings are one mechanism wearing three coats? Name the loop and its cheapest intervention point. 3) For any [BACKWARDS/CONFOUND] finding, propose the most likely confound and how the user could check it. 4) End with exactly one two-week experiment: a concrete, small protocol change, what daily data to keep logging, and which single number the engine should watch to verdict it. 5) Voice: plain, direct, a sharp coach who respects the reader \u2014 no hype, no hedging fog, cite the correlation numbers you lean on. Under 320 words, short paragraphs, no headers. 6) If \u2014 and only if \u2014 the experiment is a simple exercise addition, end with ONE final line exactly of the form PLAN|{"ex":"Bent-over row","anchor":"bench","sets":1,"reps":"5-8","pct":0.65} \u2014 ex = exercise to add, anchor = the lift whose program days receive it (lowercase substring), sets/reps per session, pct = load as a fraction of the anchor\u2019s working weight. Plain JSON, those keys only. If the experiment is not an exercise addition, end with PLAN|null. 7) CONTINUITY IS LAW: the context includes your PREVIOUS READ and any RUNNING EXPERIMENT. You are one analyst across sessions \u2014 never contradict a standing prescription without naming it and saying why it is superseded; if an experiment is running, today\u2019s read evaluates and continues it (or ends it with reasons), never ignores it; do not propose a new experiment while one is running. 8) DATA GAPS OUTRANK STORIES (beta-caught): if the window looks empty or a metric collapses between periods, the FIRST explanation is missing or unsynced data \u2014 say so as a possibility and stop; NEVER tell the user they did not show up or did not train, never infer intent, \u201cstrategy\u201d or motivation from the shape of the data, and never build a narrative on a gap. Walks are never runs \u2014 do not blend them.';
+const ANALYST_SYS='You are Allena\u2019s analyst pass \u2014 the premium lens over a training app\u2019s deterministic statistics engine. The CONTEXT lists every correlation the engine has PROVEN in this user\u2019s own data (plus faded links and a training summary). Rules, absolute: 1) Never state a finding that is not in the context \u2014 you synthesise and explain, the engine discovers. 2) Look for the STORY: which findings are one mechanism wearing three coats? Name the loop and its cheapest intervention point. 3) For any [BACKWARDS/CONFOUND] finding, propose the most likely confound and how the user could check it. 4) End with exactly one two-week experiment: a concrete, small protocol change, what daily data to keep logging, and which single number the engine should watch to verdict it. 5) Voice: plain, direct, a sharp coach who respects the reader \u2014 no hype, no hedging fog, cite the correlation numbers you lean on. Under 320 words, short paragraphs, no headers. 6) If \u2014 and only if \u2014 the experiment is a simple exercise addition, end with ONE final line exactly of the form PLAN|{"ex":"Bent-over row","anchor":"bench","sets":1,"reps":"5-8","pct":0.65} \u2014 ex = exercise to add, anchor = the lift whose program days receive it (lowercase substring), sets/reps per session, pct = load as a fraction of the anchor\u2019s working weight. Plain JSON, those keys only. If the experiment is not an exercise addition, end with PLAN|null. 7) CONTINUITY IS LAW: the context includes your PREVIOUS READ and any RUNNING EXPERIMENT. You are one analyst across sessions \u2014 never contradict a standing prescription without naming it and saying why it is superseded; if an experiment is running, today\u2019s read evaluates and continues it (or ends it with reasons), never ignores it; do not propose a new experiment while one is running. 8) DATA GAPS OUTRANK STORIES (beta-caught): if the window looks empty or a metric collapses between periods, the FIRST explanation is missing or unsynced data \u2014 say so as a possibility and stop; NEVER tell the user they did not show up or did not train, never infer intent, \u201cstrategy\u201d or motivation from the shape of the data, and never build a narrative on a gap. Walks are never runs \u2014 do not blend them.';
 function analystContext(){
   const L=[];
   try{const pr=S.prof||{};L.push('ATHLETE: '+(pr.sex||'?')+', age '+(pr.age||'?')+(pr.height?', '+pr.height+'cm':'')+'. Goal: '+(pr.goal||'general strength')+'.')}catch(e){}
@@ -11261,7 +11266,6 @@ function analystContext(){
     const gone=Object.keys(st).filter(k=>st[k].gone);
     if(gone.length)L.push('FADED LINKS (once held, no longer clear the bar): '+gone.join(' ; '));
   }catch(e){}
-  try{const d=predStats();if(d.n)L.push('FORECAST RECORD: of '+d.n+' daily calls, '+d.called+' matched and '+d.beat+' were beaten.')}catch(e){}
   try{
     const cut=dayKey(new Date(Date.now()-14*864e5));
     const hs=(S.history||[]).filter(h=>h.complete&&!h.run&&String(h.date).slice(0,10)>=cut);
@@ -11348,14 +11352,20 @@ function brewingQs(){
       v=v.filter(x=>{if(seenO[x.out])return false;seenO[x.out]=1;return true}).slice(0,3)}
     S._brewMemo={day:tk,v:v};return v}catch(e){return []}}
 function analystStore(){return lget('training-analyst-v1',null)}
-async function analystRun(){
+async function analystRun(auto){
+  /* auto=true: fired by the deep read as its second half (owner
+     ruling, 8 Sep — one button, weekly cadence). Quiet on every
+     refusal; at most one strategist pass per calendar week. */
   try{
-    if(!aiReady()){flash('Sign in first \u2014 the analyst runs through the Allena cloud.');return}
+    if(!aiReady()){if(!auto)flash('Sign in first \u2014 the strategist pass runs through the Allena cloud.');return}
     /* the evidence floor (beta-caught, Harry: the analyst lectured a
        new account about 'not showing up' when the truth was a sync
        gap): below real history the analyst refuses, plainly. */
     const sess9=(S.history||[]).filter(h=>h.complete&&!h.run).length;
-    if(sess9<8){flash('The analyst needs about '+(8-sess9)+' more logged sessions before it can say anything honest \u2014 the engine reads data, it never guesses.');return}
+    if(sess9<8){if(!auto)flash('The strategist needs about '+(8-sess9)+' more logged sessions before it can say anything honest \u2014 the engine reads data, it never guesses.');return}
+    {const prev0=analystStore();
+     if(prev0&&prev0.wk&&typeof questWeekKey==='function'&&prev0.wk===questWeekKey()){
+       if(!auto)flash('The strategist reads once a week \u2014 the next pass opens Monday.');return}}
     if(!aiSpend('analyst'))return;
     S.analystBusy=true;render();
     try{hapticRun('deep')}catch(e){}
@@ -11372,35 +11382,35 @@ async function analystRun(){
       const prev9=analystStore();
       const exp9=prev9&&(prev9.exp||(prev9.applied?{plan:prev9.plan,applied:prev9.applied}:null))||null;
       if(exp9)plan=null;   // one experiment at a time — a new proposal waits for the running one to settle
-      lset('training-analyst-v1',{day:today(),t:t,plan:plan,exp:exp9});
+      lset('training-analyst-v1',{day:today(),wk:(typeof questWeekKey==='function'?questWeekKey():''),t:t,plan:plan,exp:exp9,lastExp:(prev9&&prev9.lastExp)||null});
       try{hapticRun('find')}catch(e9){}}
-    else flash(d&&d.error&&d.error.message||'The analyst could not run \u2014 try again in a minute.');
+    else if(!auto)flash(d&&d.error&&d.error.message||'The strategist pass could not run \u2014 try again in a minute.');
     render()
-  }catch(e){S.analystBusy=false;flash('Couldn\u2019t reach the analyst \u2014 check your connection.');render()}}
-function analystCard(){
+  }catch(e){S.analystBusy=false;if(!auto)flash('Couldn\u2019t reach the strategist \u2014 check your connection.');render()}}
+function analystSection(){
+  /* the deep read's second half (owner ruling, 8 Sep: the separate
+     analyst page was confusing — one lens, one button). Renders the
+     last strategist pass and its experiment machinery inside the
+     deep-read card; the pass itself fires automatically with the
+     weekly deep read. */
   try{
     const st=analystStore();
-    let h='<div class="card mt" style="padding:16px;border-color:var(--amber)">'+
-      '<p class="mono" style="font-size:9px;color:var(--amber);letter-spacing:.1em">\u2726 THE ANALYST PASS \u00b7 PREMIUM LENS \u00b7 BETA PREVIEW</p>'+
-      '<p class="disp" style="font-size:17px;font-weight:600;margin-top:6px">One analyst. Everything the engine has proven.</p>';
-    if(S.analystBusy)h+='<p style="color:var(--dim);font-size:12.5px;margin-top:8px">Reading every finding, the faded links, the forecast record\u2026</p>'+
-      '<div class="tdots" style="margin-top:10px"><span></span><span></span><span></span></div>';
-    else if(st&&st.t){h+='<div style="color:var(--text);font-size:13.5px;line-height:1.65;margin-top:10px">'+md(st.t)+'</div>'+
+    if(!st||!st.t)return '';
+    let h='<div style="margin-top:14px;padding-top:13px;border-top:1px solid var(--line)">'+
+      '<p class="mono" style="font-size:9px;color:var(--amber);letter-spacing:.1em">\u2726 THE STRATEGIST \u00b7 THE SAME EVIDENCE, DEEPER \u00b7 WEEKLY</p>'+
+      '<div style="color:var(--text);font-size:13.5px;line-height:1.65;margin-top:10px">'+md(st.t)+'</div>'+
       '<p class="mono" style="color:var(--faint);font-size:9.5px;margin-top:10px">RUN '+esc(st.day)+' \u00b7 THE ENGINE VERIFIES THE EXPERIMENT AS THE DAYS LAND</p>';
-      const exp9=st.exp||(st.applied?{plan:st.plan,applied:st.applied}:null);
-      if(st.plan&&!exp9)h+='<button data-a="analystApply" class="big disp mt" style="background:var(--green);color:var(--bg);font-size:14.5px">Add \u201c'+esc(st.plan.ex)+'\u201d to my week</button>'+
-        '<p style="color:var(--faint);font-size:11px;line-height:1.5;margin-top:6px">Lands on every '+esc(st.plan.anchor)+' day, flagged as the analyst\u2019s, removable in one tap. Nothing changes until you say so.</p>';
-      if(exp9){const x9=(typeof expStatus==='function')?expStatus():null;
-        h+='<div class="card mt" style="padding:11px 14px;border-color:var(--greensoft)">'+
-        '<div style="display:flex;align-items:center;gap:10px">'+
-        '<span style="flex:1;font-size:12.5px">\u2697 Experiment \u2014 day '+(x9?x9.day:'?')+' of 14. '+esc(exp9.plan&&exp9.plan.ex||'The addition')+' rides your '+esc(exp9.plan&&exp9.plan.anchor||'anchor')+' days; the engine is watching '+esc(x9&&x9.watch||'the anchor')+' e1RM against the month before.</span>'+
-        '<button data-a="analystRemove" class="mono" style="color:var(--red);font-size:11px;flex:none">Remove</button></div>'+
-        (x9&&!x9.ripe&&x9.day>=14?'<p style="color:var(--faint);font-size:10.5px;margin-top:6px">Window done \u2014 needs '+Math.max(0,3-x9.n)+' more '+esc(x9.watch)+' session'+(3-x9.n===1?'':'s')+' to verdict honestly.</p>':'')+'</div>'}
-      const le9=st.lastExp;
-      if(!exp9&&le9&&le9.verdict)h+='<p class="mono" style="color:var(--faint);font-size:9.5px;letter-spacing:.05em;margin-top:8px">LAST EXPERIMENT \u00b7 '+esc(String(le9.plan&&le9.plan.ex||'').toUpperCase())+' \u00b7 '+(le9.verdict==='worked'?'WORKED (+'+le9.delta+'%)':le9.verdict==='hurt'?'COST '+Math.abs(le9.delta)+'%':'NO CLEAR EFFECT')+' \u00b7 BANKED IN THE COLLECTION</p>';
-      h+='<button data-a="analystRun" class="btn mt" style="font-size:12.5px">Run it again</button>'}
-    else h+='<p style="color:var(--dim);font-size:12.5px;line-height:1.6;margin-top:8px">The strongest model reads only what the statistics engine has proven in your data \u2014 finds the story across findings, interrogates the backwards patterns, and designs one two-week experiment your own engine will verdict.</p>'+
-      '<button data-a="analystRun" class="big disp mt" style="background:var(--amber);color:var(--bg);font-size:14.5px">Run the analyst pass</button>';
+    const exp9=st.exp||(st.applied?{plan:st.plan,applied:st.applied}:null);
+    if(st.plan&&!exp9)h+='<button data-a="analystApply" class="big disp mt" style="background:var(--green);color:var(--bg);font-size:14.5px">Add \u201c'+esc(st.plan.ex)+'\u201d to my week</button>'+
+      '<p style="color:var(--faint);font-size:11px;line-height:1.5;margin-top:6px">Lands on every '+esc(st.plan.anchor)+' day, flagged as the strategist\u2019s, removable in one tap. Nothing changes until you say so.</p>';
+    if(exp9){const x9=(typeof expStatus==='function')?expStatus():null;
+      h+='<div class="card mt" style="padding:11px 14px;border-color:var(--greensoft)">'+
+      '<div style="display:flex;align-items:center;gap:10px">'+
+      '<span style="flex:1;font-size:12.5px">\u2697 Experiment \u2014 day '+(x9?x9.day:'?')+' of 14. '+esc(exp9.plan&&exp9.plan.ex||'The addition')+' rides your '+esc(exp9.plan&&exp9.plan.anchor||'anchor')+' days; the engine is watching '+esc(x9&&x9.watch||'the anchor')+' e1RM against the month before.</span>'+
+      '<button data-a="analystRemove" class="mono" style="color:var(--red);font-size:11px;flex:none">Remove</button></div>'+
+      (x9&&!x9.ripe&&x9.day>=14?'<p style="color:var(--faint);font-size:10.5px;margin-top:6px">Window done \u2014 needs '+Math.max(0,3-x9.n)+' more '+esc(x9.watch)+' session'+(3-x9.n===1?'':'s')+' to verdict honestly.</p>':'')+'</div>'}
+    const le9=st.lastExp;
+    if(!exp9&&le9&&le9.verdict)h+='<p class="mono" style="color:var(--faint);font-size:9.5px;letter-spacing:.05em;margin-top:8px">LAST EXPERIMENT \u00b7 '+esc(String(le9.plan&&le9.plan.ex||'').toUpperCase())+' \u00b7 '+(le9.verdict==='worked'?'WORKED (+'+le9.delta+'%)':le9.verdict==='hurt'?'COST '+Math.abs(le9.delta)+'%':'NO CLEAR EFFECT')+' \u00b7 BANKED IN THE COLLECTION</p>';
     return h+'</div>'}catch(e){return ''}}
 
 /* ══ where you stand (Sep 2026) ══════════════════════════════
@@ -12630,30 +12640,11 @@ function verdictCard(){
   /* the hero must be the thing that is ALIVE today (owner call, Sep
      2026): once the noticed has been seen it goes stale — the live
      forecast takes the stage and the noticed drops to a quiet line. */
-  const pd=(typeof predToday==='function')?(function(){try{return predToday()}catch(e){return null}})():null;
-  const restDay=(function(){try{const v9=todayVerdict();return !!(v9&&v9.wait)}catch(e){return false}})();
-  const callLive=pd&&pd.ex&&!pd.outcome&&!restDay&&!pd.repeat;
   const noticedQuiet=n?'<button data-a="noticedShow" style="display:flex;align-items:center;gap:9px;width:100%;text-align:left;margin-top:11px;padding-top:11px;border-top:1px solid var(--line)">'+
     '<span class="mono" style="font-size:9px;color:var(--faint);letter-spacing:.06em;flex:none">NOTICED</span>'+
     '<span style="flex:1;min-width:0;color:var(--dim);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(n.t)+'</span>'+
     '<span class="mono" style="color:var(--faint);font-size:11px;flex:none">›</span></button>':'';
-  if(done&&n&&t.revealed&&callLive&&!S.noticedBig){
-    const exN=esc(String(pd.ex).replace(/ — .*/,''));
-    inner+='<div class="an-rise" style="margin-top:11px">'+
-      '<p class="mono" style="font-size:10px;color:var(--amber);letter-spacing:.08em">✦ THE FORECAST · '+esc(String(pd.day||'today').toUpperCase())+'</p>'+
-      '<p class="disp gradhead" style="font-size:26px;line-height:1.15;margin-top:7px">'+exN+' '+uwStr(pd.predW)+'×'+pd.predR+'</p>'+
-      '<p style="color:var(--dim);font-size:13.5px;line-height:1.6;margin-top:6px">What the model expects from your evidence \u2014 a forecast to beat, never the prescription. '+
-      (function(){try{
-        const rec9=recommendToday();if(!rec9||!rec9.top)return '';
-        const prog9=activeProgSafe();
-        const st9=buildSets(prog9,rec9.dayIdx!=null?rec9.dayIdx:rec9.top.i,S.week)
-          .find(x9=>x9.ex===pd.ex&&x9.targetW!=null);
-        return st9?('Your plan today: <b style="color:var(--text)">'+uwStr(st9.targetW)+(st9.targetReps?' \u00d7 '+st9.targetReps:'')+'</b>. The session screen is the judge.'):''}catch(e9){return ''}})()+'</p>'+
-      '<button data-a="predOpen" class="mono" style="color:var(--amber);font-size:11px;margin-top:8px;text-align:left">Why this call ›</button></div>'+
-      noticedQuiet+
-      '<div style="display:flex;align-items:center;gap:9px;margin-top:11px;padding-top:11px;border-top:1px solid var(--line)">'+dots+
-      '<span class="mono" style="color:var(--faint);font-size:10.5px">'+(pr.done>=pr.total?'all done today':'core done \u2014 the rest is optional')+'</span></div>'}
-  else if(done&&n&&t.revealed){
+  if(done&&n&&t.revealed){
     inner+='<div class="an-rise" style="margin-top:11px">'+
       '<p class="mono" style="font-size:10px;color:var(--amber);letter-spacing:.08em">✦ ALLENA NOTICED</p>'+
       '<p class="disp gradhead" style="font-size:24px;line-height:1.18;margin-top:7px">'+esc(n.t)+'</p>'+
@@ -12691,7 +12682,6 @@ function verdictCard(){
     inner+
     (typeof sinceLines==='function'?sinceLines():'')+
     briefLines()+
-    ((typeof predLine==='function'&&!(typeof callLive!=='undefined'&&callLive&&done&&n&&t.revealed&&!S.noticedBig))?predLine():'')+
     questLine()+
     (typeof deepLine==='function'?deepLine():'')+
     (typeof tmrwLine==='function'?tmrwLine():'')+
@@ -12996,16 +12986,8 @@ function watchList(){
      week-one account watches bars move every single day. The list is
      the roadmap of what is coming — anticipation is the honest half
      of the slot machine. */
-  {const lifts={};H.forEach(h=>h.log.forEach(l=>{if(l.w&&l.r)lifts[gBase(l.ex)]=(lifts[gBase(l.ex)]||0)+1}));
-   const most=Object.keys(lifts).sort((a,b)=>lifts[b]-lifts[a])[0];
-   const seen=most?Math.min(3,H.filter(h=>h.log.some(l=>gBase(l.ex)===most&&l.w>0)).length):0;
-   add('Your first forecast',seen,3,
-     'Three sessions with the same lift and Allena starts calling your top set before you train it.',seen>=3)}
   add('Your first patterns',Math.min(5,H.length),5,
     'Five sessions is where the pattern engines wake up — timing, balance, what costs you the most.',H.length>=5);
-  {const st9=(typeof predStats==='function')?predStats():{n:0};
-   if(st9.n>0||H.length>=3)add('The call ledger',Math.min(5,st9.n),5,
-     'Five settled forecasts and the ledger opens — how often Allena is right about you, in the open.',st9.n>=5)}
   try{if(typeof hkDailyStore==='function'){
     const st9=hkDailyStore();
     const nights=Object.keys(st9.days).filter(k=>st9.days[k].sleep!=null).length;
@@ -13137,7 +13119,6 @@ const DISC_CATALOG=[
  ['streak','Consistency','Runs of days and weeks without missing one.','Log something most days.'],
  ['quest','Quests','Weekly challenges taken on and finished.','Accept a weekly quest and see it through.'],
  ['insight','Deep reads','What the model found between your numbers.','Run a deep read from Findings.'],
- ['call','Called shots','Allena\'s forecasts, settled by what you did.','Train on a day Allena has made a call.'],
  ['signal','Insights','The patterns hiding between your numbers — heart, sleep, engine, and the links only your data reveals.','Sync a watch through Apple Health.'],
  ['timing','Timing','When in the day and week your training goes best.','Log effort across different days and times.'],
  ['block','Blocks','How one block compares with the last.','Finish a block and start another.'],
@@ -13209,7 +13190,7 @@ function sessionReveal(){
 function viewCollection(){
   const st=bankStats(),l=bankList();
   const GROUPS=[
-    ['insights','Insights & calls',['signal','insight','call'],'What the engine found between your numbers, and the forecasts it settled.','Sync a watch and train \u2014 the links surface on their own.'],
+    ['insights','Insights',['signal','insight','call'],'What the engine found between your numbers.','Sync a watch and train \u2014 the links surface on their own.'],
     ['bests','Records & bests',['record','reps','session','round'],'Bests, biggest days, rep records and the plates that mean something.','Keep logging weights and reps.'],
     ['firsts','Firsts & milestones',['first','first-up','milestone','streak'],'The early ones, the running totals, and the not-missing.','Log a session.'],
     ['compare','Ratios & comparisons',['ratio','balance','timing','block'],'You against bodyweight, lifts against each other, block against block.','Log your bodyweight and a main lift.'],
@@ -15602,35 +15583,23 @@ function viewFindings(){
   const wrapF=(html,fresh,n)=>html?'<div style="position:relative;border-radius:20px">'+(fresh?dot9(n||'\u25cf'):'')+html+'</div>':'';
   let deepFresh=false;try{deepFresh=!!deepReadyInfo()}catch(e){}
   let patN=0,discN=0;try{patN=unseenPatterns()}catch(e){}try{discN=unseenDiscoveries()}catch(e){}
-  /* the tier ladder is the page's geography (owner call, 5 Sep):
-     swiping right goes DEEPER — discoveries → patterns → deep read
-     → analyst — and every page teaches its lens instead of floating
-     one card in space. Fresh news auto-swipes the pager to its lens. */
+  /* TWO lenses (owner ruling, 8 Sep — four was confusing): what the
+     rules prove, then what the model reads into it. Discoveries and
+     patterns share the first page; the analyst rides inside the deep
+     read as its second half. */
   const LENSES=[
-    {k:'disc',name:'Discoveries',tag:'LENS 1 · THE RULES',f:discN>0,n:discN,
-     one:'Records and firsts the rules can prove — no model, no maybe.',
+    {k:'disc',name:'Discoveries & patterns',tag:'LENS 1 · THE ENGINES',f:(discN+patN)>0,n:(discN+patN)||'●',
+     one:'Records, firsts and patterns the rules can prove — no model, no maybe.',
      reads:'Every set, run, ride, scan and check-in you log',
-     speaks:'The moment a record falls — banked the same day, kept for good',
-     makes:'The collection: bests, firsts, milestones, streaks',
-     h:discCard()},
-    {k:'pat',name:'Patterns',tag:'LENS 2 · THE ENGINES',f:patN>0,n:patN,
-     one:'Four deterministic engines crossing lifting, running, rehab and recovery.',
-     reads:'Your whole history — all three sports against one recovery model',
-     speaks:'Whenever the numbers cross a real threshold — never on a schedule',
-     makes:'Patterns with a what-to-do line — a warning here always carries an action',
-     h:patListCard()},
-    {k:'deep',name:'The deep read',tag:'LENS 3 · THE NARRATOR',f:deepFresh,n:'●',
-     one:'A model reads what the engines proved and tells the story.',
+     speaks:'The moment a record falls or a real threshold is crossed — never on a schedule',
+     makes:'The collection, plus patterns that always carry a what-to-do line',
+     h:discCard()+patListCard()},
+    {k:'deep',name:'The deep read',tag:'LENS 2 · THE MODEL',f:deepFresh,n:'●',
+     one:'A model reads what the engines proved — the story, the mechanisms, and one experiment your own engine referees.',
      reads:'Everything the statistics found since the last read — and only that',
-     speaks:'Evidence-gated: about six new activities, or three quiet weeks',
-     makes:'A written read of where your training is actually going',
-     h:'<div id="deepcard" style="scroll-margin-top:14px">'+deepCard()+'</div>'},
-    {k:'an',name:'The analyst',tag:'LENS 4 · THE STRATEGIST',f:false,
-     one:'The strongest model, reading only what your engine has proven.',
-     reads:'Every stable insight, the faded links, your forecast record',
-     speaks:'Once a day at most — depth is the point, not frequency',
-     makes:'Mechanisms, confounds named, and one experiment your own engine referees',
-     h:(typeof analystCard==='function'?analystCard():'')}];
+     speaks:'About once a week — when enough new evidence has landed',
+     makes:'A written read of where your training is going, and the experiment to test it',
+     h:'<div id="deepcard" style="scroll-margin-top:14px">'+deepCard()+'</div>'}];
   const freshIdx=LENSES.findIndex(x=>x.f);
   if(S.lensIdx==null&&freshIdx>0){S.scrollTo='lens-'+freshIdx;S.lensIdx=freshIdx}
   const ladder=cur=>'<p class="mono" style="font-size:9px;letter-spacing:.08em;margin-top:4px;color:var(--faint)">'+
@@ -15638,7 +15607,7 @@ function viewFindings(){
   return '<div class="view pad stg" style="padding-top:24px">'+
     '<button data-a="back" class="btn" style="width:auto;padding:8px 14px;color:var(--dim);font-size:12.5px;margin-bottom:14px">‹ Back</button>'+
     '<h1 class="disp" style="font-size:25px;font-weight:600">Findings</h1>'+
-    '<p style="color:var(--dim);font-size:13px;line-height:1.6;margin-top:8px">Four lenses, one body of data — each swipe goes deeper, and the deeper the lens, the rarer what it sees.</p>'+
+    '<p style="color:var(--dim);font-size:13px;line-height:1.6;margin-top:8px">Two lenses, one body of data — what the rules prove, then what the model reads into it.</p>'+
     '<p class="mono" style="text-align:center;font-size:15px;letter-spacing:.35em;margin-top:12px">'+
     LENSES.map((x,i)=>'<span id="ldot-'+i+'" style="color:'+(i===(S.lensIdx||0)?'var(--text)':'color-mix(in srgb, var(--text) 22%, transparent)')+'">'+(i===(S.lensIdx||0)?'●':'○')+'</span>').join('')+'</p>'+
     '<div id="lensouter" data-swipestep="1" data-swipeact="lensStep" style="overflow:hidden;margin:2px -18px 0;padding-bottom:6px">'+
@@ -15700,19 +15669,6 @@ function lensWord(k){
       '<p style="font-size:13px;font-weight:600;line-height:1.4;margin-top:7px">'+esc(it.t||'')+'</p>'+
       (it.d?'<p style="color:var(--dim);font-size:12px;line-height:1.5;margin-top:5px">'+esc(String(it.d).slice(0,180))+'</p>':''),
       (nReads?nReads+' READ'+(nReads===1?'':'S')+' DELIVERED':'')+(ins.length?' · '+ins.length+' INSIGHTS KEPT FOR GOOD':''))}
-  if(k==='an'){
-    const a=analystStore();
-    const P=predStore();let n=0,on=0;
-    Object.keys(P.days||{}).forEach(d9=>{const o=P.days[d9]&&P.days[d9].outcome;
-      if(o){n++;if(o==='called'||o==='beat')on++}});
-    const rec=n>=3?'<button data-a="ledgerOpen" class="mono" style="color:var(--faint);font-size:9px;letter-spacing:.05em;padding:0">FORECASTS · '+n+' SETTLED · '+on+' ON OR ABOVE · OPEN THE LEDGER ›</button>':'';
-    if(!a||!a.t){return rec?wrap('THE FORECAST RECORD','<p style="color:var(--dim);font-size:12px;line-height:1.5;margin-top:7px">Every morning call is scored against what actually happened — the ledger is public to you.</p>',rec):''}
-    let head=String(a.t).split(/\n/).filter(x=>x.trim())[0]||'';
-    if(head.length>170)head=head.slice(0,167)+'…';
-    return wrap('FROM THE LAST PASS · '+esc(a.day||''),
-      '<p style="font-size:12.5px;line-height:1.55;margin-top:7px;color:var(--dim)">'+esc(head)+'</p>'+
-      (a.exp&&a.exp.applied?'<p class="mono" style="color:var(--amber);font-size:9px;letter-spacing:.06em;margin-top:8px">⚗ EXPERIMENT RUNNING · SINCE '+esc(a.exp.applied)+'</p>':''),
-      rec)}
   return ''}catch(e){return ''}}
 function nearRings(){
   /* the honest version of anticipation: analyses genuinely close to
@@ -15990,6 +15946,10 @@ async function deepRun(){
     bankSave();
     {const st0=deepStore();
      lset(K_DEEP,{last:today(),items:items,watches:st0.watches||[],n:(st0.n||0)+1})}
+    /* the strategist rides the same click (owner ruling, 8 Sep: one
+       button, weekly) — quiet if signed out, short on data, or
+       already run this week */
+    try{if(typeof analystRun==='function')analystRun(true)}catch(e9){}
     const doneAt=Date.now(),minRun=6800;
     const linger=S.deepAnim?Math.max(0,minRun-(doneAt-S.deepAnim.t0)):0;
     setTimeout(function(){S.deepAnim=null;S.deepBusy=false;try{hapticRun('deep')}catch(e8){};vib([25,45,25]);render()},linger);
@@ -16008,7 +15968,7 @@ function deepCard(){
       '</div>'+
       (function(){const w=deepStore().watches;if(!w.length)return '';
         return '<p class="mono" style="color:var(--blue);font-size:9.5px;letter-spacing:.04em;margin-top:9px">WATCHING: '+w.map(x=>esc(x.t)).join(' \u00b7 ')+' \u2014 the next read reports on '+(w.length===1?'it':'each')+'</p>'})()+
-      '<p class="mono" style="color:var(--faint);font-size:10px;margin-top:9px">Banked in your collection. The next read opens when it has something new to see — train, run or check in, and tomorrow it reads again.</p>';
+      '<p class="mono" style="color:var(--faint);font-size:10px;margin-top:9px">Banked in your collection. The next read opens when it has something new to see — train, run or check in, and it reads again.</p>';
   else if(!aiReady())
     inner='<p style="color:var(--dim);font-size:12.5px;line-height:1.6;margin-top:8px;opacity:.7">The rule engines find what was pre-imagined; the model finds the rest — lags, thresholds, relationships between your signals.</p>'+
       aiLockHtml('The deep read');
@@ -16036,7 +15996,11 @@ function deepCard(){
     '<div style="transform:scale(1.8);transform-origin:left center;width:80px;flex:none">'+depthGlyph(3)+'</div>'+
     '<span style="flex:1;min-width:0"><span class="disp gradhead" style="display:block;font-size:24px;line-height:1.1">The deep read</span>'+
     '<span class="mono" style="color:var(--faint);font-size:9px;letter-spacing:.08em;display:block;margin-top:4px">MODEL \u00b7 NOT RULES \u00b7 THE DEEPEST LENS</span></span></div>'+
-    inner+'</div>'}
+    inner+
+    /* the strategist's last pass and its running experiment live on
+       the card between reads — an applied experiment must never
+       vanish behind a gate */
+    (S.deepBusy?'':(typeof analystSection==='function'?analystSection():''))+'</div>'}
 /* ══ the ghost (prompt 15) ══════════════════════════════════
    Your best-ever week, racing quietly beside this one. A
    target, never a judge: no red, no "behind", hidden until a
@@ -16483,7 +16447,6 @@ function viewSession(){
           '<p class="disp gradhead" style="font-size:44px;line-height:1;margin-top:8px">'+lvN+'</p>'+
           '<p style="color:var(--dim);font-size:12.5px;margin-top:8px">'+dpLevel(dataPoints().total).left+' to the next — every point of it real.</p></div>';
         A._lv0=lvN}}catch(e){}
-    try{predResolvePending();h+=predSessionVerdict()}catch(e){}
     try{h+=tomorrowHook()}catch(e){}
     {const rev=S.sessReveal;
      if(rev&&rev.show){const r=rarityOf(rev.show.rar);
@@ -17778,7 +17741,7 @@ function dataRaw(){
 function notifPageHtml(){
   const NP=notifPrefs();
   const kinds=[['reveal','The evening reveal','Finds herald themselves at 7:30pm — never locked, always announced'],
-    ['morning','The morning call','Log the check-in, the forecast unlocks'],
+    ['morning','The morning check-in','A reminder to log how you slept and feel'],
     ['appt','Physio appointments','The day before and the morning of'],
     ['creatine','Creatine reminder','A gentle daily nudge to take it'],
     ['wrap','The monthly wrap','When it lands, on the 1st'],
@@ -21412,10 +21375,7 @@ function runAction(a,v,t,e){
     case 'gamSave':{const v2=+((S.gform||{}).am);if(!(v2>0)){flash('Pick a number first.');break}
       const hr2=new Date().getHours(),d3=garDay();
       if(hr2<12){d3.am=v2;garSave();S.sheet=null;
-        let fl='Logged — '+v2+'/100 this morning.';
-        try{const pd=predToday();
-          if(pd&&pd.ex&&!pd.outcome)fl='Logged. Today\u2019s call: '+String(pd.ex).replace(/ \u2014 .*/,'')+' '+uwStr(pd.predW)+'\u00d7'+pd.predR+'.'}catch(e){}
-        flash(fl)}
+        flash('Logged — '+v2+'/100 this morning.')}
       else{d3.day=v2;d3.dayHr=hr2;garSave();S.sheet=null;
         flash('Logged — '+v2+'/100. Read as a '+(hr2<17?'afternoon':'evening')+' number, not a fresh baseline.')}
       break}
@@ -21941,8 +21901,8 @@ function runAction(a,v,t,e){
     case 'modifyOpen':S.sheet={t:'modify'};render();break;
     case 'tuneOpen':S.sheet={t:'tune'};render();break;
     case 'tuneBy':{const cur=S.sess.sets[S.sess.idx];applyAdj(cur.ex,+v,'manual');render();break}
-    case 'tuneReset':{const cur=S.sess.sets[S.sess.idx],prog=S.lib.programs.find(p=>p.id===S.sess.progId);
-      applyAdj(cur.ex,-adjOf(prog,cur.ex),'reset');render();break}
+    case 'tuneReset':{const cur=S.sess.sets[Math.min(S.sess.idx,S.sess.sets.length-1)],prog=S.lib.programs.find(p=>p.id===S.sess.progId);
+      applyAdj(cur.ex,-adjOf(prog,cur.ex),'back to the written program');render();break}
     case 'undoAdj':undoAdj();break;
     case 'planOpen':S.sheet={t:'plan'};render();break;
     case 'planJump':A.jumpTo(v);break;
