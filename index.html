@@ -666,7 +666,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='d0287e';  // stamped by tools/build.py with the content hash
+const BUILD_ID='9c5456';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -1903,14 +1903,14 @@ function friendsSection(){
         const hasCrown=x=>crownKey&&((x.me&&crownKey==='me')||(!x.me&&x.id===crownKey));
         const pod=R.slice(0,3);
         const order=[pod[1],pod[0],pod[2]].filter(Boolean);
-        const stepH={1:36,2:21,3:12};
+        const stepH={1:36,2:22,3:15};
         const col=x=>{const first=x.rank===1;const size=first?60:44;
           return '<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:6px;min-width:0">'+
             '<div style="position:relative;width:'+size+'px;height:'+size+'px;border-radius:'+size+'px;background:var(--raised);border:2.5px solid '+(first?'var(--green)':'var(--line)')+';display:flex;align-items:center;justify-content:center;font-size:'+(first?23:17)+'px;font-weight:700'+(first?';box-shadow:0 0 16px 0 color-mix(in srgb, var(--green) 40%, transparent)':'')+'">'+(hasCrown(x)?CROWN:'')+esc(x.init)+'</div>'+
             '<span style="font-size:11.5px;font-weight:600;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(x.me?'You':x.name)+'</span>'+
             '<span class="mono" style="font-size:'+(first?15:12)+'px;font-weight:700;color:'+(first&&x.week>0?'var(--green)':'var(--text)')+'">'+x.week+'</span>'+
-            '<div style="width:100%;height:'+stepH[x.rank]+'px;border-radius:9px 9px 4px 4px;background:'+(first?'var(--green)':'var(--raised)')+';border:1px solid '+(first?'var(--green)':'var(--line)')+';display:flex;align-items:flex-start;justify-content:center">'+
-            '<span class="mono" style="font-size:10px;font-weight:800;margin-top:2px;color:'+(first?'var(--bg)':'var(--faint)')+'">'+x.rank+'</span></div></div>'};
+            '<div style="width:100%;height:'+stepH[x.rank]+'px;border-radius:9px 9px 4px 4px;background:'+(first?'var(--green)':'var(--raised)')+';border:1px solid '+(first?'var(--green)':'var(--line)')+';display:flex;align-items:center;justify-content:center;overflow:hidden">'+
+            '<span class="mono" style="font-size:10px;line-height:1;font-weight:800;color:'+(first?'var(--bg)':'var(--faint)')+'">'+x.rank+'</span></div></div>'};
         let h9='<div class="card mt" style="padding:18px 14px 12px">'+
           '<div style="display:flex;align-items:flex-end;gap:8px;padding:6px 4px 0">'+order.map(col).join('')+'</div>';
         h9+='<div style="margin-top:12px;border-top:1px solid var(--line)">'+
@@ -5745,13 +5745,28 @@ function openDoorsCard(){
     if(movers.length)h+=movers.slice(0,2).map(m=>
       '<p style="font-size:13px;line-height:1.6;margin-top:8px"><b>'+esc(m.b)+' +'+uwNum(m.d)+' '+uwUnit()+'</b> <span style="color:var(--dim)">since the rehab began. Progress never had to wait.</span></p>').join('');
     try{
-      const sc=scansSorted().filter(x=>x.legL>0&&x.legR>0);
-      if(sc.length){
+      /* THE BALANCE WITNESS (owner ruling, 8 Sep): every paired-limb
+         reading is rehab data for whichever side heals — knee, bicep
+         tendon, shoulder alike. The pair matching the injury speaks;
+         any pair drifting past 5% uneven speaks too. */
+      const scAll=scansSorted();
+      const pairLine=(label,getL,getR)=>{
+        const sc=scAll.filter(x=>+getL(x)>0&&+getR(x)>0);
+        if(!sc.length)return null;
         const cur=sc[sc.length-1],first=sc[0];
-        const sym=Math.round(Math.min(cur.legL,cur.legR)/Math.max(cur.legL,cur.legR)*100);
-        const dL=sc.length>1?Math.round((cur.legL-first.legL)*100)/100:null;
-        h+='<p style="font-size:13px;line-height:1.6;margin-top:8px"><b>The scan\u2019s word on the leg:</b> <span style="color:var(--dim)">left '+uwNum(cur.legL)+' \u00b7 right '+uwNum(cur.legR)+' '+uwUnit()+' lean \u2014 '+sym+'% even'+
-          (dL!=null?'; left '+(dL>=0?'+':'')+uwNum(dL)+' since '+fmtDate(first.date+'T12:00'):'')+'.</span></p>'}}catch(e9){}
+        const L=+getL(cur),R=+getR(cur);
+        const sym=Math.round(Math.min(L,R)/Math.max(L,R)*100);
+        const small=L<=R?'left':'right';
+        const d9=sc.length>1?Math.round(((L<=R?getL(cur)-getL(first):getR(cur)-getR(first)))*100)/100:null;
+        return{html:'<p style="font-size:13px;line-height:1.6;margin-top:8px"><b>The scan\u2019s word on your '+label+':</b> <span style="color:var(--dim)">left '+uwNum(L)+' \u00b7 right '+uwNum(R)+' '+uwUnit()+' lean \u2014 '+sym+'% even'+
+          (d9!=null?'; '+small+' '+(d9>=0?'+':'')+uwNum(d9)+' since '+fmtDate(first.date+'T12:00'):'')+'.</span></p>',sym:sym}};
+      const nm9=((typeof activeProtocols==='function'?activeProtocols():[])||[]).map(p=>String(p.n||'')).join(' ')+((S.acl&&S.acl.on)?' knee acl':'');
+      const legInj=/knee|acl|ankle|hamstring|calf|hip|quad|achilles|shin/i.test(nm9);
+      const armInj=/arm|elbow|shoulder|bicep|tricep|wrist|rotator|pec/i.test(nm9);
+      const legs9=pairLine('legs',x=>x.legL,x=>x.legR);
+      const arms9=pairLine('arms',x=>x.ex&&x.ex.armL,x=>x.ex&&x.ex.armR);
+      if(legs9&&(legInj||legs9.sym<95))h+=legs9.html;
+      if(arms9&&(armInj||arms9.sym<95))h+=arms9.html;}catch(e9){}
     if(!hasOpenGoal)h+='<button data-a="goalsOpen" class="btn mt" style="border-color:var(--green);color:var(--green);font-size:13px">Set a goal in the open rooms</button>';
     h+='<p style="color:var(--faint);font-size:11px;line-height:1.55;margin-top:10px">Running comes back with the gates, not the calendar \u2014 the climb above is the road. Everything here counts the whole way through.</p>';
     return h+'</div>'}catch(e){return ''}}
@@ -8807,6 +8822,21 @@ function romSummary(e9){
   const l=mx('l'),r=mx('r');
   const sym=(l!=null&&r!=null&&Math.max(l,r)>0)?Math.round(Math.min(l,r)/Math.max(l,r)*100):null;
   return{l:l,r:r,el:mn('l'),er:mn('r'),sym:sym}}
+window.watchLog=function(r,w,rpe){
+  try{
+    const s=S.sess;if(!s||s.phase!=='logging')return;
+    const cur=(s.sets||[])[s.idx]||{};if(cur.secs)return; // holds stay on the phone
+    S.draft=S.draft||{};
+    if(+r>0)S.draft.r=Math.round(+r);
+    if(+w>0)S.draft.w=Math.round(+w*10)/10;
+    if(+rpe>=1&&+rpe<=10)S.draft.rpe=Math.round(+rpe*2)/2;
+    const fin=S._watchFin;
+    runAction('commit','');
+    if(fin&&S.restEnd&&S.restEnd>Date.now()){
+      S.restEnd-=(Date.now()-fin);
+      if(S.restEnd<Date.now()+1000)S.restEnd=Date.now()+1000;
+      render()}
+    S._watchFin=null}catch(e){}};
 function watchStatePush(){
   /* the wrist mirror (build 9): a compact copy of the live session,
      pushed on every meaningful change; the watch shows it and can
@@ -8821,7 +8851,12 @@ function watchStatePush(){
         set:+cur.setNo||0,of:+cur.of||0,
         target:cur.secs?(cur.secs+'s hold'):(cur.targetW!=null?uwStr(cur.targetW)+(cur.targetReps?' \u00d7 '+cur.targetReps:''):''),
         restEnd:(s.phase==='resting'&&S.restEnd)?S.restEnd:0,
-        name:String(s.dayName||'').slice(0,40)}}
+        name:String(s.dayName||'').slice(0,40),
+        timed:!!cur.secs,restSecs:+cur.rest||0,
+        wStep:(UNITS.w==='lb'?5:2.5),unit:uwUnit()};
+      if(s.phase==='logging'&&S.draft&&!cur.secs){
+        st.dR=+S.draft.r||0;st.dW=+S.draft.w||0;
+        st.dRpe=S.draft.rpe!=null?+S.draft.rpe:0}}
     const j=JSON.stringify(st);
     if(S._watchJ===j)return;S._watchJ=j;
     webkit.messageHandlers.allena.postMessage(JSON.stringify({type:'watch',state:st}))}catch(e){}}
