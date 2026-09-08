@@ -666,7 +666,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='30a3b8';  // stamped by tools/build.py with the content hash
+const BUILD_ID='039e97';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -14732,10 +14732,21 @@ function weekBoard(){
         if(dist>1)reason='Legs on '+DN7[i]+'. Long run '+DN7[longIdx]+'. Kept '+dist+' days apart on purpose.'}
       d.items.push({k:'lift',l:String(base).split(' ')[0].slice(0,6).toLowerCase(),done:0,legs:legs})});
     const unplaced=Object.keys(remNames).filter(n=>!placedNames[n]);
+    let unfit=0;
     if(unplaced.length){
-      const free=days.filter(d=>d.key>=tk&&!d.items.length);
-      unplaced.forEach((n,i)=>{const d=free[i];if(!d)return;
+      /* same-block days share muscles — the board must never SUGGEST
+         them back to back (owner-caught, 8 Sep: 'wants me to hit
+         three bench sessions in a row'). One clear day between
+         suggested sessions, counting from the last trained day; what
+         cannot fit stays honestly unplaced. */
+      let lastIdx=-2;
+      days.forEach((d,i)=>{if(d.items.some(x=>x.k==='lift'&&x.done))lastIdx=i});
+      unplaced.forEach(n=>{
+        const d=days.find((d2,i2)=>d2.key>=tk&&!d2.items.length&&i2>lastIdx+1);
+        if(!d){unfit++;return}
+        lastIdx=days.indexOf(d);
         d.items.push({k:'lift',l:String(n).split(' ')[0].slice(0,6).toLowerCase(),done:0})})}
+    if(unfit&&!conflict&&!reason)reason=unfit+' session'+(unfit===1?'':'s')+' left over \u2014 a rest day belongs between them, so they place as days open.';
     // remaining rehab fills the quietest days ahead
     for(let r=rehabDone;r<rehabT;r++){
       const cand=days.filter(d=>d.key>=tk&&d.items.length<2)
@@ -15993,67 +16004,61 @@ function resumeCard(){
     '<p class="mono" style="color:var(--dim);font-size:12px;margin-top:4px">'+unf.log.length+' sets saved \u00b7 tap to pick it back up</p></button>';
   return ''}
 function todayOrder(){
-  /* the priority engine (owner call, Sep 2026): Today auto-arranges by
-     what is most pressing and most NEW, computed from real state — not
-     a curated order. The verdict hero stays anchored first (it already
-     picks the alive thing internally); everything under it earns its
-     position. Ties keep canonical order, so the page never shuffles
-     without a reason. */
+  /* ONE STORY AT A TIME (8 Sep, from the simplicity research: the
+     praised apps allow a hero, glance numbers, and ONE story slot —
+     Today had eight cards competing and testers called it "information
+     everywhere"). Functional cards still always show: they self-limit
+     and each is an action owed. Stories COMPETE for a single slot;
+     the losers are not stacked below — every one already has a
+     permanent home (wraps and the watchlist on Progress, finds in the
+     deeper rooms, the map on Points). Tomorrow the slot rotates by
+     state, which is honest novelty. */
   const out=[];
-  const add=(html,score)=>{if(html)out.push({h:html,s:score,i:out.length})};
   const hr=new Date().getHours();
 
-  // a running or unfinished session outranks everything — it's half-done work
-  add(resumeCard(),S.sess?95:94);
+  // ── functional: owed actions, always shown, all self-limiting
+  out.push(resumeCard());
+  try{out.push(typeof notifAskCard==='function'?notifAskCard():'')}catch(e){}
+  out.push(apptCard());
+  if(hr<12)out.push(garCard());
+  if(backupDue()&&backupDays()===null)
+    out.push('<button data-a="nav" data-v="data" class="card" style="width:100%;text-align:left;padding:12px 16px;margin-top:14px;display:flex;align-items:center;gap:10px;border-color:var(--amber)">'+
+      '<span style="width:8px;height:8px;border-radius:8px;background:var(--amber);flex:none"></span>'+
+      '<span style="font-size:12.5px;color:var(--dim)">Never backed up. Deleting the app would wipe everything \u2014 tap to save a file.</span></button>');
 
-  // the comeback's offer is an emotional moment — it goes high on arrival
-  try{const cb=cbState();add(comebackCard(),cb&&cb.state==='offered'?88:55)}catch(e){add(comebackCard(),55)}
+  // ── the glance numbers
+  out.push('<div class="row mt" style="gap:10px">'+dashTiles()+'</div>');
 
-  add((typeof notifAskCard==='function'?notifAskCard():''),86);
-  add(apptCard(),85);                                    // renders only day-before / day-of
-  add(garCard(),hr<12?82:50);                            // the morning ask fades after noon
-  add((typeof watchGymCard==='function'?watchGymCard():''),80);
-  add((typeof wrapCard==='function'?wrapCard():''),75);
-  add((typeof recapCard==='function'?recapCard():''),74);
-
-  // the race scores by tension: within one session (or beaten) = loud
-  try{const g=ghostData(),f=(typeof fghost==='function')?fghost():null;
-    /* the ghost card retired (owner ruling, 7 Sep) — the friend duel
-       is Today's rival surface now. ghostData/ghostBank remain: beating
-       your best week still banks its rare find quietly. */
-    let gs=40;
-    if(g&&g.now>g.best&&g.best>=2)try{ghostBank(g)}catch(e9){}
-    void gs}catch(e){}
-
-  // the next unlock rides HIGH — one-away outranks nearly everything
+  // ── THE SLOT: stories compete, the best one shows
+  const cand=[];
+  const bid=(html,score)=>{if(html)cand.push({h:html,s:score})};
+  try{const cb=cbState();bid(comebackCard(),cb&&cb.state==='offered'?88:55)}catch(e){}
   try{const W9=watchList().filter(w=>!w.gated);
     const nr=W9.slice().sort((a,b)=>(a.need-a.have)-(b.need-b.have)||b.pct-a.pct)[0];
-    add((typeof fuseCard==='function'?fuseCard():''),nr&&nr.need-nr.have===1?87:70)}catch(e){}
-  add(newFindsCard(),68);                                // renders only while genuinely new
-
-  // the session pill: the day's work when still owed, quiet once banked
-  try{const trained=(S.history||[]).some(x=>x.complete&&!x.run&&String(x.date).slice(0,10)===today());
-    add(sessionCard(),trained?30:65)}catch(e){add(sessionCard(),65)}
-
-  // the unlock ladder gets loud only when something is nearly there
-  add(unlockCard(),32);                                  // the full list stays, quiet — the fuse carries the heat
-
-  add('<div class="row mt" style="gap:10px">'+dashTiles()+'</div>',28);
-  add(calCard(),25);
-
-  // the map gets a lift when ground is about to fade
+    bid((typeof fuseCard==='function'?fuseCard():''),nr&&nr.need-nr.have===1?87:70)}catch(e){}
+  try{bid((typeof watchGymCard==='function'?watchGymCard():''),80)}catch(e){}
+  try{bid((typeof wrapCard==='function'?wrapCard():''),75)}catch(e){}
+  try{bid((typeof recapCard==='function'?recapCard():''),74)}catch(e){}
+  bid(newFindsCard(),68);
   try{const st=holdStates();
     const soon=HOLD_MUSCLES.some(m=>st[m]&&st[m].s==='held'&&(st[m].days||0)>=6);
-    add(holdCard(),soon?45:22)}catch(e){add(holdCard(),22)}
+    bid(holdCard(),soon?45:22)}catch(e){}
+  if(backupDue()&&backupDays()!==null)
+    bid('<button data-a="nav" data-v="data" class="card" style="width:100%;text-align:left;padding:12px 16px;margin-top:14px;display:flex;align-items:center;gap:10px;border-color:var(--amber)">'+
+      '<span style="width:8px;height:8px;border-radius:8px;background:var(--amber);flex:none"></span>'+
+      '<span style="font-size:12.5px;color:var(--dim)">It\u2019s been '+backupDays()+' days since your last backup \u2014 tap to do it now.</span></button>',44);
+  bid(unlockCard(),32);
+  bid(collectTeaser(),15);
+  cand.sort((a,b)=>b.s-a.s);
+  if(cand.length)out.push(cand[0].h);
 
-  add(collectTeaser(),15);
-  if(backupDue())add('<button data-a="nav" data-v="data" class="card" style="width:100%;text-align:left;padding:12px 16px;margin-top:14px;display:flex;align-items:center;gap:10px;border-color:var(--amber)">'+
-    '<span style="width:8px;height:8px;border-radius:8px;background:var(--amber);flex:none"></span>'+
-    '<span style="font-size:12.5px;color:var(--dim)">'+(backupDays()===null?"Never backed up. Deleting the app icon would wipe everything — tap to save a file.":"It's been "+backupDays()+" days since your last backup — tap to do it now.")+'</span></button>',
-    backupDays()===null?72:44);
-
-  out.sort((a,b)=>b.s-a.s||a.i-b.i);
-  return out.map(x=>x.h)}
+  // ── the day's work, then the record
+  try{const trained=(S.history||[]).some(x=>x.complete&&!x.run&&String(x.date).slice(0,10)===today());
+    out.push(sessionCard())}catch(e){out.push(sessionCard())}
+  try{if(typeof ghostData==='function'){const g=ghostData();
+    if(g&&g.now>g.best&&g.best>=2)try{ghostBank(g)}catch(e9){}}}catch(e){}
+  out.push(calCard());
+  return out.filter(Boolean)}
 function viewToday(){
   const dateLine=new Date().toLocaleDateString(undefined,{weekday:'long',day:'numeric',month:'long'});
   let h='<div class="view pad stg" style="padding-top:22px">';
