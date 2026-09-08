@@ -666,7 +666,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='59cfc6';  // stamped by tools/build.py with the content hash
+const BUILD_ID='36cef8';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -8862,7 +8862,10 @@ function romSummary(e9){
   const l=mx('l'),r=mx('r');
   const sym=(l!=null&&r!=null&&Math.max(l,r)>0)?Math.round(Math.min(l,r)/Math.max(l,r)*100):null;
   return{l:l,r:r,el:mn('l'),er:mn('r'),sym:sym}}
-window.watchAct=function(a){
+function wristMark(a,note){try{
+  S._wristLog=(S._wristLog||[]).slice(-9);
+  S._wristLog.push({t:new Date().toTimeString().slice(0,8),a:a,note:note})}catch(e){}}
+window.watchAct=function(a,ts){
   /* the wrist's action door (build 12). The locked phone sleeps
      through rest-end: the per-second UI tick that flips resting to
      ready never runs, so a wrist 'Start set' arrived at a phone
@@ -8871,17 +8874,33 @@ window.watchAct=function(a){
      still believed (owner-caught, 8 Sep, on build 11). Normalize the
      clock before honouring the tap. */
   try{
-    const s=S.sess;if(!s)return;
+    const s=S.sess;if(!s){wristMark(a,'no session');return}
+    const ph0=s.phase;let norm='';
+    if(s.phase==='resting'&&S.restEnd&&S.restEnd-Date.now()<=1500){
+      audioCancel();S.restEnd=null;s.idx++;s.phase='ready';persistActive();norm=' (rest normalized)'}
+    if(a==='begin'&&s.phase==='ready'){wristMark(a,ph0+'\u2192working'+norm);runAction('begin','');
+      if(+ts>0&&+ts<=Date.now())S.setStart=+ts}
+    else if(a==='finish'&&s.phase==='working'){wristMark(a,'working\u2192logging'+norm);S._watchFin=(+ts>0&&+ts<=Date.now())?+ts:Date.now();runAction('finish','')}
+    else if(a==='skiprest'&&s.phase==='resting'){wristMark(a,'resting\u2192ready');runAction('skipRest','')}
+    else wristMark(a,'DROPPED \u2014 phase was '+ph0+norm)
+  }catch(e){try{wristMark(a,'THREW '+String(e&&e.message||e).slice(0,40))}catch(e9){}}};
+window.watchLog=function(r,w,rpe,finTs,begTs){
+  try{
+    const s=S.sess;
+    try{wristMark('logset',s?('phase '+s.phase):'no session')}catch(e9){}
+    if(!s)return;
+    /* convergence: replay whatever the sleeping phone missed */
     if(s.phase==='resting'&&S.restEnd&&S.restEnd-Date.now()<=1500){
       audioCancel();S.restEnd=null;s.idx++;s.phase='ready';persistActive()}
-    if(a==='begin'&&s.phase==='ready')runAction('begin','');
-    else if(a==='finish'&&s.phase==='working'){S._watchFin=Date.now();runAction('finish','')}
-    else if(a==='skiprest'&&s.phase==='resting')runAction('skipRest','')
-  }catch(e){}};
-window.watchLog=function(r,w,rpe){
-  try{
-    const s=S.sess;if(!s||s.phase!=='logging')return;
+    if(s.phase==='ready'){const c0=(s.sets||[])[s.idx]||{};
+      if(!c0.secs){runAction('begin','');
+        if(+begTs>0&&+begTs<=Date.now())S.setStart=+begTs}}
+    if(s.phase==='working'){
+      S._watchFin=(+finTs>0&&+finTs<=Date.now())?+finTs:Date.now();
+      runAction('finish','')}
+    if(s.phase!=='logging')return;
     const cur=(s.sets||[])[s.idx]||{};if(cur.secs)return; // holds stay on the phone
+    if(+finTs>0&&+finTs<=Date.now()&&!S._watchFin)S._watchFin=+finTs;
     S.draft=S.draft||{};
     if(+r>0)S.draft.r=Math.round(+r);
     if(+w>0)S.draft.w=Math.round(+w*10)/10;
@@ -8918,7 +8937,13 @@ function watchStatePush(){
         wStep:(UNITS.w==='lb'?5:2.5),unit:uwUnit()};
       if(s.phase==='logging'&&S.draft&&!cur.secs){
         st.dR=+S.draft.r||0;st.dW=+S.draft.w||0;
-        st.dRpe=S.draft.rpe!=null?+S.draft.rpe:0}}
+        st.dRpe=S.draft.rpe!=null?+S.draft.rpe:0}
+      else if(!cur.secs){
+        /* best-guess prefills ride every push (build 13) so the wrist
+           can open its logging flow without waiting for a sleeping
+           phone to answer */
+        st.dR=parseInt(String(cur.targetReps||''),10)||0;
+        st.dW=+cur.targetW||0;st.dRpe=8}}
     const j=JSON.stringify(st);
     if(S._watchJ===j)return;S._watchJ=j;
     webkit.messageHandlers.allena.postMessage(JSON.stringify({type:'watch',state:st}))}catch(e){}}
@@ -9118,7 +9143,8 @@ function notifPreviewHtml(){
     const items=notifPlan().slice().sort((a,b)=>a.ts-b.ts).slice(0,8);
     if(!items.length)return '<div class="card mt" style="padding:13px 15px"><p class="eyebrow">Queued right now</p>'+
       '<p style="color:var(--dim);font-size:12px;line-height:1.6;margin-top:6px">Nothing \u2014 nothing is true to say yet. Quiet is honest; the queue fills as real facts arrive.</p></div>'+
-      (typeof notifDumpHtml==='function'?notifDumpHtml():'');
+      (typeof notifDumpHtml==='function'?notifDumpHtml():'')+
+      (typeof wristXrayHtml==='function'?wristXrayHtml():'');
     return '<div class="card mt" style="padding:13px 15px"><p class="eyebrow">Queued right now</p>'+
       '<div style="margin-top:8px">'+items.map((it,i)=>{
         const d=new Date(it.ts*1000);
@@ -9362,6 +9388,20 @@ function notifDumpAsk(){
   try{S._notifDump='waiting';render();
     window.webkit.messageHandlers.allena.postMessage(JSON.stringify({type:'notifdump'}))}catch(e){}}
 try{window.__notifDump=function(d){S._notifDump=d;try{render()}catch(e){}}}catch(e){}
+function wristXrayHtml(){
+  /* the wrist X-ray (8 Sep, after 'still doesn't work when locked'):
+     every wrist action that REACHES the engine is listed with the
+     state it found. Empty after a locked-phone test = the tap died in
+     the native/delivery layer, not here. */
+  if(!inWrapper())return '';
+  const L=S._wristLog||[];
+  return '<div class="card mt" style="padding:13px 15px">'+
+    '<p class="eyebrow">Wrist X-ray \u00b7 this app session</p>'+
+    '<p class="mono" style="font-size:10px;color:var(--faint);margin-top:4px">wrapper build '+(window.__wrapperBuild||'?')+' \u00b7 the watch fix needs 12+</p>'+
+    (L.length?'<p class="mono" style="font-size:10.5px;color:var(--dim);line-height:1.8;margin-top:6px">'+
+      L.slice().reverse().map(x=>x.t+' \u00b7 '+esc(x.a)+' \u00b7 '+esc(x.note)).join('<br>')+'</p>'
+    :'<p style="color:var(--faint);font-size:12px;margin-top:6px">No wrist actions have reached the engine since this launch. If you just tested from the watch, the taps are dying before the engine \u2014 that is the native layer, and it means the current build does not carry the fix.</p>')+
+    '</div>'}
 function notifDumpHtml(){
   if(!inWrapper())return '';
   let h='<div class="card mt" style="padding:13px 15px">'+
