@@ -666,7 +666,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='af55ae';  // stamped by tools/build.py with the content hash
+const BUILD_ID='3b61d8';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -1699,8 +1699,11 @@ function snapshotData(){
       try{out.prev_week_key=dayKey(new Date(new Date(questWeekKey()+'T12:00').getTime()-7*864e5))}catch(e){}}
     out.week_live=d.weekLive||0;out.week_sessions=d.weekSessions||0;
     try{const av9=(acct()||{}).av;if(av9)out.av=String(av9).slice(0,5)}catch(e){}
-    out.display=(String((S.prof&&S.prof.name)||'').split(' ')[0]
-      ||String((acct()||{}).email||'').split('@')[0]).slice(0,12)||null;
+    out.display=(function(){
+      const c9=nameClean(String((S.prof&&S.prof.name)||'').split(' ')[0]);
+      if(c9)return c9.slice(0,12);
+      const e9=nameClean(String((acct()||{}).email||'').split('@')[0]);
+      return (e9||'Racer').slice(0,12)})();
     try{
       const L=(S.history||[]).filter(h=>h.complete&&sessionLive(h))
         .map(h=>String(h.date).slice(0,10)).sort();
@@ -1862,6 +1865,9 @@ function raceField(){
       week:sn.week_live||0,sess:sn.week_sessions||0,tier:sn.tier||'',allp:sn.live_points||0,av:sn.av||'',seen:sn.updated_at||null})})}catch(e){}
   return out}
 async function crewMake(nm){
+  {const c9=nameClean(nm);
+   if(c9===null){flash('Pick a group name your gran could read.');return}
+   nm=c9||nm}
   try{const h=await frHeaders();if(!h||!S.frMe){flash('Sign in first.');return}
     const mine9=(S.crewRows||[]).find(x=>x.user_id===S.frMe);
     if(mine9)return crewShare(mine9.crew_code);
@@ -1918,6 +1924,21 @@ function avHtml(av,init,size,ringDefault,fs){
   const ring=a?AV_COLS[a.c]||ringDefault:ringDefault;
   const body=(a&&a.g&&AV_GLYPHS[a.g])?'<span style="display:flex;align-items:center;justify-content:center;width:100%;height:100%;color:'+(ring==='var(--line)'?'var(--dim)':ring)+'">'+AV_GLYPHS[a.g]+'</span>':esc(init);
   return '<div style="position:relative;width:'+size+'px;height:'+size+'px;border-radius:'+size+'px;background:var(--raised);border:2.5px solid '+ring+';display:flex;align-items:center;justify-content:center;font-size:'+fs+'px;font-weight:700;flex:none">'+body+'</div>'}
+function nameClean(s){
+  /* shared names are the one piece of free text mates see (owner
+     question, 9 Sep: 'don't we have to moderate names?'). Visibility
+     is invite-only + local rename + unlink already; this closes the
+     last gap: the worst words never sync. Normalizes cheap disguises
+     (0\u2192o, 3\u2192e, @\u2192a...). Imperfect on purpose \u2014 a
+     short honest list beats a censorship engine. */
+  try{
+    const raw=String(s||'').trim();if(!raw)return '';
+    const n=raw.toLowerCase().replace(/0/g,'o').replace(/1/g,'i').replace(/3/g,'e')
+      .replace(/4/g,'a').replace(/5/g,'s').replace(/7/g,'t').replace(/@/g,'a')
+      .replace(/\$/g,'s').replace(/[^a-z]/g,'');
+    const BAD=['fuck','shit','cunt','nigg','fagg','rape','nazi','hitler','kike','spic','chink','retard','whore','slut','pedo','cock','dick','pussy'];
+    if(BAD.some(w=>n.indexOf(w)>=0))return null;
+    return raw.slice(0,24)}catch(e){return String(s||'').slice(0,24)}}
 async function frProfileLoad(id){
   try{
     const tok=await acctToken();if(!tok)return null;
