@@ -666,7 +666,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='53b364';  // stamped by tools/build.py with the content hash
+const BUILD_ID='92aaba';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -16047,7 +16047,16 @@ function deepContext(){
   {const w=deepStore().watches;
    if(w&&w.length){L.push('STANDING WATCHES \u2014 the user pinned these earlier findings; address EACH in one finding: held, strengthened, or faded, citing this period\u2019s numbers:');
      w.forEach(x=>L.push('WATCH ('+x.since+'): '+x.t))}}
-  const H=(S.history||[]).filter(h=>h.complete&&!h.run);
+  /* THE WINDOW IS LAW (owner-caught, 8 Sep: a read stitched walks
+     from a YEAR BEFORE the injury into an 'ACL phase 2' story — the
+     context was unwindowed and array-ordered, so bulk imports
+     masqueraded as recent, with the years stripped off every date).
+     Everything below is date-sorted and hard-cut to 10 weeks. */
+  const cut10=Date.now()-70*864e5;
+  const inWin=d=>{try{return new Date(String(d).length<=10?d+'T12:00':d).getTime()>=cut10}catch(e){return false}};
+  const byDate=(a,b)=>String(a.date).localeCompare(String(b.date));
+  const H=(S.history||[]).filter(h=>h.complete&&!h.run&&inWin(h.date)).sort(byDate);
+  L.push('WINDOW: the last 10 weeks only, '+dayKey(new Date(cut10))+' to '+today()+'. Nothing older exists in this context.');
   // weekly series, last 10 weeks: sessions / tonnage / km / readiness / pain
   const wkOf=d=>questWeekKey(d);
   const wks={};
@@ -16068,7 +16077,7 @@ function deepContext(){
   H.forEach(h=>{let best={};
     h.log.forEach(l=>{if(!l.w||!l.r)return;const b=gBase(l.ex),e=e1rm(l.w,l.r,l.rpe);
       if(!best[b]||e>best[b])best[b]=e});
-    Object.keys(best).forEach(b=>{(lifts[b]=lifts[b]||[]).push([h.date.slice(5,10),Math.round(best[b])])})});
+    Object.keys(best).forEach(b=>{(lifts[b]=lifts[b]||[]).push([String(h.date).slice(0,10),Math.round(best[b])])})});
   Object.keys(lifts).filter(b=>lifts[b].length>=5).slice(0,6).forEach(b=>{
     L.push(b+' e1RM: '+lifts[b].slice(-8).map(p=>p[0]+'='+p[1]).join(' '))});
   // session timing
@@ -16078,19 +16087,19 @@ function deepContext(){
   L.push('Sessions by weekday Sun..Sat: '+dow.join(','));
   L.push('By time: morning '+hr.m+', midday '+hr.d+', evening '+hr.e);
   if(S.acl&&S.acl.on){const q=aclLatest('quad');
-    L.push('ACL phase '+S.acl.phase+'/5'+(q?', quad LSI '+Math.round(q.lsi)+'%':''))}
+    L.push('ACL phase '+S.acl.phase+'/5'+(S.acl.date?' (injury/surgery '+S.acl.date+' \u2014 nothing before this date is rehab)':'')+(q?', quad LSI '+Math.round(q.lsi)+'%':''))}
   // running: the other half of the interference story
-  {const R=(typeof runs==='function'?runs():[]);
+  {const R=(typeof runs==='function'?runs():[]).filter(r=>inWin(r.date)).sort(byDate);
    if(R.length){
      const a2=(typeof acwr==='function'?acwr():null);
-     L.push('Running: '+R.length+' runs total'+(a2!=null?', load '+a2+'x four-week average':''));
-     L.push('Recent runs (date km pace type hr): '+R.slice(-10).map(r=>
-       String(r.date).slice(5)+' '+r.km+'km '+paceStr(r.mins,r.km)+' '+(r.type||'')+(r.hr?' hr'+r.hr:'')).join('; '));
+     L.push('Running (in window): '+R.length+' entries'+(a2!=null?', load '+a2+'x four-week average':''));
+     L.push('Recent (date km pace type hr): '+R.slice(-10).map(r=>
+       String(r.date).slice(0,10)+' '+r.km+'km '+paceStr(r.mins,r.km)+' '+(r.type||'')+(r.hr?' hr'+r.hr:'')).join('; '));
      const easy=R.filter(r=>r.type==='easy'&&r.km>1);
      if(easy.length>=6){
        const p0=easy.slice(0,3).map(r=>r.mins/r.km),p1=easy.slice(-3).map(r=>r.mins/r.km);
        const m0=p0.reduce((x,y)=>x+y,0)/p0.length,m1=p1.reduce((x,y)=>x+y,0)/p1.length;
-       L.push('Easy pace drift: first-3 '+paceStr(m0,1)+' vs last-3 '+paceStr(m1,1)+')')}}}
+       L.push('Easy pace drift inside the window: first-3 '+paceStr(m0,1)+' vs last-3 '+paceStr(m1,1)+')')}}}
   return L.join('\n')}
 const DEEP_SYS='You are the analysis engine of a training app. You receive condensed weekly training data. '+
 'Find 2-4 NON-OBVIOUS findings: relationships BETWEEN signals (readiness vs load vs performance vs pain vs timing, and LIFTING vs RUNNING — km near leg work, pace vs tonnage weeks), lags, thresholds, divergences. '+
@@ -22827,6 +22836,13 @@ function dayCheck(){
   try{const b9=discBank();
     Object.keys(b9).forEach(k=>{const e9=b9[k];
       if(e9&&e9.t==='A PR while healing'&&/closed a door/.test(String(e9.d||''))){
+        delete b9[k];bankSave()}
+      /* a pre-window-fix deep read stitched year-old imported walks
+         into an ACL story (owner-caught, 8 Sep: injury was 7 Aug 26,
+         the cited walks were 2025) — insights telling a rehab story
+         on year-less MM-DD dates came from that leaky context and go */
+      if(/^insight:/.test(String(k))&&e9&&/ACL|rehab/i.test(String(e9.t||'')+' '+String(e9.d||''))
+         &&/\b(0[1-9]|1[0-2])-[0-3]\d\b/.test(String(e9.d||''))){
         delete b9[k];bankSave()}
       /* a recipe banked the same day as its PR read an unsettled day
          (owner-caught: '13g of carbs') — swept; the generator re-banks
