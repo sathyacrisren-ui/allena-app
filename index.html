@@ -666,7 +666,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='02f508';  // stamped by tools/build.py with the content hash
+const BUILD_ID='0926e4';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -1695,7 +1695,7 @@ async function crewMake(){
     await crewShare(code);frLoad(true)}catch(e){flash('No connection.')}}
 async function crewShare(code){
   const link=(CLOUD.site||'https://sathyacrisren-ui.github.io/allena-app/')+'?crew='+encodeURIComponent(code);
-  const txt='Join our Allena group \u2014 everyone races the week together: '+link;
+  const txt='Join our Allena group \u2014 everyone races the week together: '+link+'  (in the app: Social \u2192 code '+code+')';
   try{if(navigator.share){await navigator.share({text:txt});flash('Group link sent.');return}}
   catch(e){if(e&&e.name==='AbortError')return}
   try{await navigator.clipboard.writeText(txt);flash('Group link copied \u2014 send it to the crew.')}
@@ -1815,6 +1815,16 @@ function friendsSection(){
     const c=/[?&]crew=([A-Za-z0-9]{4,12})/.exec(location.search||'');
     if(c){S.crewIn=c[1].toUpperCase();S._joinArr=1;
       try{history.replaceState(null,'',location.pathname)}catch(e9){}}}catch(e){}})();
+window.deepLink=function(url){
+  try{
+    const s9=String(url||'');
+    const j=/[?&]join=([A-Za-z0-9]{4,12})/.exec(s9);
+    const c=/[?&]crew=([A-Za-z0-9]{4,12})/.exec(s9);
+    if(!j&&!c)return;
+    if(j)S.frIn=j[1].toUpperCase();
+    if(c)S.crewIn=c[1].toUpperCase();
+    S._joinArr=1;S._joinKicked=false;
+    socialJoinKick()}catch(e){}};
 function socialJoinKick(){
   /* runs once after boot: signed-in arrivals link immediately; the
      rest see Social with the code waiting */
@@ -1896,6 +1906,11 @@ function viewSocial(){
       '<p style="color:var(--dim);font-size:12.5px;line-height:1.6;margin-top:5px">An email and a code \u2014 then swap invite codes with a friend and race the week on live points. Fresh every Monday; showing up is the whole game.</p>'+
       '<button data-a="nav" data-v="acct" class="big disp mt" style="background:var(--amber);color:var(--bg);font-size:14.5px">Sign in</button></div>'}
   else inner=(typeof friendsSection==='function'?friendsSection():'');
+  try{const pend=(S.crewIn||S.frIn);
+    if(pend&&S._joinArr&&!(typeof inWrapper==='function'&&inWrapper()))
+      inner='<div class="card mt2" style="padding:13px 15px;border-color:var(--amber)">'+
+        '<p style="font-size:13px;font-weight:600">Got the Allena app?</p>'+
+        '<p style="color:var(--dim);font-size:12.5px;line-height:1.6;margin-top:4px">This link opened in the browser. Your training lives in the app \u2014 open it, go to Social, and enter code <b style="color:var(--text)">'+esc(pend)+'</b>. No app yet? Carry on right here, same race.</p></div>'+inner}catch(e){}
   return '<div class="view pad stg" style="padding-top:24px">'+
     '<button data-a="back" class="btn" style="width:auto;padding:8px 14px;color:var(--dim);font-size:12.5px;margin-bottom:14px">\u2039 Back</button>'+
     '<h1 class="disp" style="font-size:25px;font-weight:600">Social</h1>'+
@@ -21556,7 +21571,9 @@ function runAction(a,v,t,e){
     case 'frCopy':frCopy(v);break;
     case 'frNameOpen':{S.frNmId=v;S.frNm='';S.sheet={t:'frname'};render();break}
     case 'frNameGo':{frRename(S.frNmId,S.frNm);S.sheet=null;flash('Saved.');break}
-    case 'frJoinGo':frJoin(S.frIn||'');break;
+    case 'frJoinGo':{const c9=String(S.frIn||'').trim().toUpperCase();
+      if(/^G[A-Z0-9]{4,7}$/.test(c9)&&S.crewCap===true){crewJoin(c9);break}}
+    case '__frJoinGoPair':frJoin(S.frIn||'');break;
     case 'frRemove':frRemove(v);break;
     case 'lensStep':{
       S.lensIdx=Math.max(0,Math.min(3,(S.lensIdx||0)+(+v||0)));
