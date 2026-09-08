@@ -666,7 +666,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='181fc7';  // stamped by tools/build.py with the content hash
+const BUILD_ID='1f4082';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -8861,6 +8861,11 @@ function watchStatePush(){
     webkit.messageHandlers.allena.postMessage(JSON.stringify({type:'watch',state:st}))}catch(e){}}
 const K_NOTIF='training-notif-v1';
 window.notifTapped=function(id){
+  /* the PR-recipe whisper opens its evidence page directly (owner
+     vision, 8 Sep) — the freshest recipe find is the subject */
+  try{if(/^wh-edge/.test(String(id))){
+    const ks=Object.keys(discBank()).filter(k=>/^recipe:/.test(k)).sort();
+    if(ks.length){S.sheet=null;S.backTo='today';S.evidenceId=ks[ks.length-1];S.view='evidence';render();return}}}catch(e){}
   /* the tap routes by KIND (owner-caught: the rest timer got the full
      constellation — a utility ping is a door, not a moment):
      rest → the session, day's call/morning → Today, physio → Rehab;
@@ -15372,6 +15377,60 @@ function findingsBtn(){
     '<div style="transform:scale(.76);transform-origin:center;filter:drop-shadow(0 0 4px rgba(30,155,255,.8))">'+depthGlyph(3,true)+'</div>'+
     (n?'<span class="mono" style="position:absolute;top:-5px;right:-2px;min-width:17px;height:17px;padding:0 4px;border-radius:10px;background:var(--red);color:#fff;font-size:9.5px;font-weight:700;display:flex;align-items:center;justify-content:center">'+(n>9?'9+':n)+'</span>':'')+
     '</button>'}
+const EV_MECH={
+  sleep:'Sleep is when the repair happens \u2014 heavy sets the day after long nights tend to cost less.',
+  sleep2:'Two good nights in a row compound \u2014 recovery debt clears slowly.',
+  carb:'Carbs refill the fuel lifting actually burns. A fed day usually lifts better than a fasted one.',
+  kcal:'Total fuel matters \u2014 hard training on a big deficit is where strength leaks.',
+  protein:'Protein is the building material \u2014 strength tends to hold better after high-protein days.',
+  ready:'Readiness is your own morning signal \u2014 the high days are days the body already said yes.',
+  hrv:'Higher HRV usually means the nervous system has recovered \u2014 heavy work lands better.',
+  rhr:'A low resting heart rate that morning usually means you were recovered.'};
+function evidenceData(id){
+  /* what stands behind a linked find: the lift, the day, the signals */
+  try{
+    const m=/^recipe:(.+):(\d{4}-\d{2}-\d{2})$/.exec(String(id));
+    if(!m)return null;
+    const ex=m[1],date=m[2];
+    const row=(typeof corrDayData==='function'?corrDayData():{})[date]||{};
+    const sigs=[];
+    const addSig=(k,label,val,unit)=>{if(val==null)return;
+      const kind=(typeof SIG_KINDS!=='undefined')?SIG_KINDS.find(x=>x.hk===k||x.d===k):null;
+      sigs.push({k:k,label:label,val:val,unit:unit||'',kind:kind})};
+    if(row.sleep!=null)addSig('sleep','Sleep',Math.round(row.sleep/6)/10,'h');
+    if(row.carb!=null)addSig('carb','Carbs',Math.round(row.carb),'g');
+    if(row.protein!=null)addSig('protein','Protein',Math.round(row.protein),'g');
+    if(row.ready!=null)addSig('ready','Readiness',Math.round(row.ready),'');
+    if(row.hrv!=null)addSig('hrv','HRV',Math.round(row.hrv),' ms');
+    return{ex:ex,date:date,sigs:sigs}}catch(e){return null}}
+function viewEvidence(){
+  const id=S.evidenceId;
+  const e=discBank()[id]||{};
+  const ev=evidenceData(id);
+  let h='<div class="view pad stg" style="padding-top:24px">'+
+    '<button data-a="back" class="btn" style="width:auto;padding:8px 14px;color:var(--dim);font-size:12.5px;margin-bottom:14px">\u2039 Back</button>'+
+    '<p class="mono" style="font-size:9.5px;letter-spacing:.1em;color:var(--green)">THE EVIDENCE</p>'+
+    '<h1 class="disp" style="font-size:23px;font-weight:600;line-height:1.2;margin-top:6px">'+esc(e.t||'A linked find')+'</h1>'+
+    (e.d?'<p style="color:var(--dim);font-size:13.5px;line-height:1.65;margin-top:8px">'+esc(e.d)+'</p>':'');
+  if(!ev){return h+'<p style="color:var(--faint);font-size:12px;margin-top:14px">The charts behind this one are still assembling.</p></div>'}
+  // 1. the lift itself
+  try{const ch=liftChart(ev.ex,null);
+    if(ch)h+='<div class="card mt2" style="padding:14px 16px">'+
+      '<p class="eyebrow">'+esc(ev.ex)+' \u2014 your trend</p>'+ch+
+      '<p style="color:var(--faint);font-size:10.5px;margin-top:4px">The PR this recipe fed landed '+esc(fmtDate(ev.date+'T12:00'))+'.</p></div>'}catch(e9){}
+  // 2. each signal: that day's value, its own chart, the plain mechanism
+  ev.sigs.forEach(s9=>{
+    h+='<div class="card mt" style="padding:14px 16px">'+
+      '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px">'+
+      '<p class="eyebrow" style="margin:0">'+esc(s9.label)+'</p>'+
+      '<span class="mono" style="font-size:12px;color:var(--green)">'+s9.val+esc(s9.unit)+' that day</span></div>';
+    try{if(s9.kind){const pts=sigSeries(s9.kind);
+      if(pts.length>=3){const vs=pts.map(p=>p.v),lo=Math.min.apply(null,vs),hi=Math.max.apply(null,vs);
+        h+=lineChart(pts,{min:Math.floor(lo*0.9),max:Math.ceil(hi*1.05)||10,color:'#1E9BFF'})}}}catch(e9){}
+    if(EV_MECH[s9.k])h+='<p style="color:var(--dim);font-size:12.5px;line-height:1.6;margin-top:8px">'+EV_MECH[s9.k]+'</p>';
+    h+='</div>'});
+  h+='<p style="color:var(--faint);font-size:11.5px;line-height:1.6;margin-top:14px">Lined up, not proven \u2014 these are your own days set side by side. The honest test is recreating the recipe on the next attempt and seeing if it repeats.</p>';
+  return h+'</div>'}
 function newFindsCard(){
   /* the day's finds, in full, ON Today (owner ruling, 8 Sep) — no
      burrowing. Each row opens its detail; one link to the shelf. */
@@ -18783,6 +18842,8 @@ function sheetHtml(){
       '<p class="disp" style="font-size:21px;font-weight:650;line-height:1.2;margin-top:8px">'+esc(e.t)+'</p>'+
       '<p style="color:var(--dim);font-size:13.5px;line-height:1.65;margin-top:10px">'+esc(e.d||'')+'</p>'+
       '<p style="color:var(--faint);font-size:11px;line-height:1.5;margin-top:14px">Kept with the numbers it had the day it was found \u2014 beating it never erases it.</p>'+
+      ((typeof evidenceData==='function'&&evidenceData(S.sheet.id))
+        ?'<button data-a="evidenceOpen" data-v="'+esc(S.sheet.id)+'" class="big disp mt2" style="background:var(--amber);color:var(--bg);font-size:14.5px">See the evidence \u2014 the charts behind this</button>':'')+
       '<button data-a="collOpen" class="btn mt2" style="color:var(--dim);font-size:12.5px">See it in the collection</button>')}
   if(S.sheet.t==='ledger'){
     /* the Proof Ledger (dossier idea 1): no consumer product scores its
@@ -19552,6 +19613,7 @@ function render(){
   else if(S.view==='diary')body=viewDiary();
   else if(S.view==='run'){body=viewRun();markRunSeen()}
   else if(S.view==='pattern')body=patDetail(S.patView);
+  else if(S.view==='evidence')body=viewEvidence();
   else if(S.view==='rundetail')body=runDetail(S.runView);
   else if(S.view==='report')body=viewReport();
   else if(S.view==='standing')body=viewStanding();
@@ -21558,6 +21620,8 @@ function runAction(a,v,t,e){
     case 'crewMake':{try{crewMake()}catch(e){}break}
     case 'crewShare':{try{crewShare(v)}catch(e){}break}
     case 'crewLeave':{try{crewLeave()}catch(e){}break}
+    case 'evidenceOpen':{S.backTo=S.view;S.backDrawer=false;S.sheet=null;
+      S.evidenceId=v;S.view='evidence';render();break}
     case 'recentFindsOpen':{S.sheet={t:'recentfinds'};render();break}
     case 'romOpen':{S.sheet={t:'rom'};render();break}
     case 'romStart':{
