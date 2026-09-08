@@ -666,7 +666,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='296f6b';  // stamped by tools/build.py with the content hash
+const BUILD_ID='1d16aa';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -2332,7 +2332,8 @@ A.commit=(confirmed)=>{const s=S.sess,c=s.sets[s.idx],timed=!!c.secs;
   s.log.push(e);
   upsert(record(false));
   if(s.idx>=s.sets.length-1){s.phase='done';S.restEnd=null;audioCancel();
-    try{S.sessReveal=sessionReveal()}catch(e){S.sessReveal=null}}
+    try{S.sessReveal=sessionReveal()}catch(e){S.sessReveal=null}
+    try{if(typeof reviewMoment==='function')setTimeout(reviewMoment,2500)}catch(e){}}
   else{const r=c.rest||0;
     if(r>5){audioCancel();S.restBeep=audioIn(r);S.restEnd=Date.now()+r*1000;S.restTotal=r;s.phase='resting'}
     else{s.idx++;s.phase='ready'}}
@@ -9167,6 +9168,21 @@ function watchStatePush(){
     const j=JSON.stringify(st);
     if(S._watchJ===j)return;S._watchJ=j;
     webkit.messageHandlers.allena.postMessage(JSON.stringify({type:'watch',state:st}))}catch(e){}}
+function reviewMoment(){
+  /* Apple's own guidance: request at a moment of demonstrated
+     satisfaction. Ours is the find-reveal completion screen, gated on
+     \u22653 completed live sessions, at most once per 60 days, and only
+     through the system sheet (guideline 1.1.7 \u2014 no custom prompts,
+     no pre-prompt). iOS itself caps display at 3/year. */
+  try{
+    if(typeof inWrapper!=='function'||!inWrapper()||(window.__wrapperBuild||0)<15)return;
+    const st=lget('training-revask-v1',{});
+    if(st.t&&Date.now()-st.t<60*864e5)return;
+    const n=(S.history||[]).filter(h=>h.complete&&!h.run&&(typeof sessionLive==='function'?sessionLive(h):false)).length;
+    if(n<3)return;
+    lset('training-revask-v1',{t:Date.now(),n:n});
+    webkit.messageHandlers.allena.postMessage(JSON.stringify({type:'reqreview'}))
+  }catch(e){}}
 const K_NOTIF='training-notif-v1';
 window.notifTapped=function(id){
   /* the PR-recipe whisper opens its evidence page directly (owner
