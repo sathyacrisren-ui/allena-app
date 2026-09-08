@@ -666,7 +666,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='1bded1';  // stamped by tools/build.py with the content hash
+const BUILD_ID='d0287e';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -1198,14 +1198,19 @@ function applyReadiness(level){
         s.sets.splice(i,1);dropped++;s.sets.forEach(x=>{if(x.exNo===+k)x.of=arr.length-1})}}});
   s.readinessAdj=level;persistActive();
   flash(level==='low'?'Eased: −10% load, RPE capped at 8, '+dropped+' set'+(dropped===1?'':'s')+' dropped.':'Eased: −5% load, RPE capped at 8.')}
+const SCAN_READ_SYS='Extract body-composition numbers from the scan image. Reply with JSON only, no prose, no code fences. Keys: w (weight kg), bf (total body fat percent), smm (skeletal muscle mass kg), vf (visceral fat level/rating), bmr (kcal), tee (total energy expenditure kcal), legL (LEFT leg lean mass kg from segmental analysis), legR (RIGHT leg lean mass kg), date (YYYY-MM-DD if visible), and an "ex" object with any of: lbm (lean body mass kg), protein (kg), mineral (kg), tbw (total body water kg), icf (kg), ecf (kg), subcut (subcutaneous fat kg), vfMass (visceral fat mass kg), vfArea (cm2), bioAge (years), abd (abdominal circumference cm), whr (waist-hip ratio), armL (left arm lean kg), armR (right arm lean kg), torso (torso lean kg). Omit anything unreadable. Numbers only, no units.';
 const SCAN_FIELDS=[['w','Weight','kg',0.1],['bf','Body fat','%',0.1],['smm','Skeletal muscle','kg',0.1],
- ['vf','Visceral fat','rating',1],['bmr','BMR','kcal',10],['tee','TEE','kcal',50]];
+ ['vf','Visceral fat','level 1-20',1],['bmr','BMR','kcal',10],['tee','TEE','kcal',50]];
+/* the wedge fields: per-leg lean mass — the scan's own witness of a
+   rehabbing leg growing back (owner ruling, 8 Sep) */
+const SCAN_LEGS=[['legL','Left leg lean','kg',0.05],['legR','Right leg lean','kg',0.05]];
 function scansSorted(){return S.scans.slice().sort((a,b)=>a.date.localeCompare(b.date))}
 function scanDerive(x){const o=Object.assign({},x);
   if(o.w>0&&o.bf>0){o.fm=Math.round(o.w*o.bf/10)/10;o.lbm=Math.round((o.w-o.fm)*10)/10}
+  if(o.legL>0&&o.legR>0)o.legSym=Math.round(Math.min(o.legL,o.legR)/Math.max(o.legL,o.legR)*1000)/10;
   return o}
 function scanDelta(a,b){ // b newer
-  const d={};['w','bf','smm','fm','lbm','vf'].forEach(k=>{
+  const d={};['w','bf','smm','fm','lbm','vf','legL','legR'].forEach(k=>{
     if(a&&a[k]!=null&&b&&b[k]!=null)d[k]=Math.round((b[k]-a[k])*10)/10});return d}
 function proteinTarget(sc){if(!sc||!sc.lbm)return null;
   return{lo:Math.round(sc.lbm*2.0),hi:Math.round(sc.lbm*2.4)}}
@@ -1220,13 +1225,14 @@ async function readScanWithAllena(){
   try{
     if(!aiSpend('scan'))return;
     const res=await claudeFetch({model:S.ai.model,max_tokens:300,
-        system:'Extract body-composition numbers from the scan image. Reply with JSON only, no prose, no code fences. Keys: w (weight kg), bf (body fat percent), smm (skeletal muscle mass kg), vf (visceral fat rating), bmr (kcal), tee (total energy expenditure kcal), date (YYYY-MM-DD if visible). Omit any key you cannot read. Numbers only, no units.',
+        system:SCAN_READ_SYS,
         messages:[{role:'user',content:[{type:'image',source:{type:'base64',media_type:m[1],data:m[2]}},{type:'text',text:'Extract the values.'}]}]});
     const d=await res.json();
     let t=d.content?d.content.map(x=>x.text||'').join(''):'';
     t=t.replace(/```json|```/g,'').trim();
     const o=JSON.parse(t);
-    ['w','bf','smm','vf','bmr','tee'].forEach(k=>{if(o[k]!=null&&!isNaN(+o[k]))f[k]=+o[k]});
+    ['w','bf','smm','vf','bmr','tee','legL','legR'].forEach(k=>{if(o[k]!=null&&!isNaN(+o[k]))f[k]=+o[k]});
+    if(o.ex&&typeof o.ex==='object'){f.ex={};Object.keys(o.ex).forEach(k=>{if(isFinite(+o.ex[k]))f.ex[k]=+o.ex[k]})}
     if(o.date&&/^\d{4}-\d{2}-\d{2}$/.test(o.date))f.date=o.date;
     flash('Read the scan — check the numbers before saving.');
   }catch(e){flash("Couldn't read that automatically — type the numbers in.")}
@@ -3961,8 +3967,21 @@ function scanSheet(){
     :aiLockHtml('Reading the scan photo'));
   inner+='<p class="eyebrow" style="margin-top:18px">Date</p>'+
     '<input type="date" data-sdate="1" value="'+esc(f.date)+'" style="width:100%;margin-top:6px;background:var(--surface);border:1px solid var(--line);border-radius:10px;color:var(--text);padding:11px;font-size:16px;outline:none">';
-  inner+='<div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px;margin-top:14px">'+
+  inner+='<p class="eyebrow" style="margin-top:18px">The core six</p>'+
+    '<div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px;margin-top:10px">'+
     SCAN_FIELDS.map(x=>stepper('sform.'+x[0],x[1],f[x[0]],x[3],x[2]==='kg'?uwUnit():x[2])).join('')+'</div>';
+  inner+='<p class="eyebrow" style="margin-top:18px">Your legs</p>'+
+    '<p style="color:var(--faint);font-size:11px;line-height:1.5;margin-top:3px">Per-leg lean mass from the segmental section \u2014 the scan\u2019s own witness of a rehabbing leg growing back.</p>'+
+    '<div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px;margin-top:10px">'+
+    SCAN_LEGS.map(x=>stepper('sform.'+x[0],x[1],f[x[0]],x[3],uwUnit())).join('')+'</div>';
+  if(f.ex&&Object.keys(f.ex).length){
+    const XN={lbm:'Lean body mass',protein:'Protein',mineral:'Mineral',tbw:'Body water',icf:'ICF',ecf:'ECF',subcut:'Subcutaneous fat',vfMass:'Visceral fat mass',vfArea:'Visceral fat area',bioAge:'Bio age',abd:'Abdominal girth',whr:'Waist-hip ratio',armL:'Left arm lean',armR:'Right arm lean',torso:'Torso lean'};
+    inner+='<p class="eyebrow" style="margin-top:18px">Also read from the sheet</p>'+
+      '<div class="card" style="padding:11px 14px;margin-top:8px">'+
+      Object.keys(f.ex).map(k=>'<div style="display:flex;justify-content:space-between;gap:10px;padding:4px 0">'+
+        '<span style="color:var(--dim);font-size:12px">'+esc(XN[k]||k)+'</span>'+
+        '<span class="mono" style="font-size:12px">'+f.ex[k]+'</span></div>').join('')+
+      '</div><p style="color:var(--faint);font-size:10.5px;line-height:1.5;margin-top:6px">Saved with the scan \u2014 trends surface as more scans land.</p>'}
   inner+='<button data-a="scanSave" class="big disp mt" style="background:var(--amber);color:var(--bg);font-size:16px">Save scan</button>'+
     '<p style="color:var(--faint);font-size:11px;line-height:1.5;margin-top:10px">Only a small thumbnail of the image is kept, so backups stay light.</p>';
   return wrapSheet('Add a scan',inner)}
@@ -5725,6 +5744,14 @@ function openDoorsCard(){
       (names.length?': '+names.length+' of your own lifts, fully open.':'.')+'</p>';
     if(movers.length)h+=movers.slice(0,2).map(m=>
       '<p style="font-size:13px;line-height:1.6;margin-top:8px"><b>'+esc(m.b)+' +'+uwNum(m.d)+' '+uwUnit()+'</b> <span style="color:var(--dim)">since the rehab began. Progress never had to wait.</span></p>').join('');
+    try{
+      const sc=scansSorted().filter(x=>x.legL>0&&x.legR>0);
+      if(sc.length){
+        const cur=sc[sc.length-1],first=sc[0];
+        const sym=Math.round(Math.min(cur.legL,cur.legR)/Math.max(cur.legL,cur.legR)*100);
+        const dL=sc.length>1?Math.round((cur.legL-first.legL)*100)/100:null;
+        h+='<p style="font-size:13px;line-height:1.6;margin-top:8px"><b>The scan\u2019s word on the leg:</b> <span style="color:var(--dim)">left '+uwNum(cur.legL)+' \u00b7 right '+uwNum(cur.legR)+' '+uwUnit()+' lean \u2014 '+sym+'% even'+
+          (dL!=null?'; left '+(dL>=0?'+':'')+uwNum(dL)+' since '+fmtDate(first.date+'T12:00'):'')+'.</span></p>'}}catch(e9){}
     if(!hasOpenGoal)h+='<button data-a="goalsOpen" class="btn mt" style="border-color:var(--green);color:var(--green);font-size:13px">Set a goal in the open rooms</button>';
     h+='<p style="color:var(--faint);font-size:11px;line-height:1.55;margin-top:10px">Running comes back with the gates, not the calendar \u2014 the climb above is the road. Everything here counts the whole way through.</p>';
     return h+'</div>'}catch(e){return ''}}
@@ -10541,8 +10568,8 @@ async function dataPhotoRead(img){
     if(!m){flash('Unsupported image.');return}
     if(!aiSpend('scan'))return;
     flash('Reading the photo\u2026');
-    const res=await claudeFetch({model:S.ai.model,max_tokens:600,
-      system:'Classify this photo of personal fitness data and extract it. Reply with JSON only, no prose, no code fences. If it is a BODY COMPOSITION scan (Evolt, InBody, DEXA summary): {"kind":"scan","date":"YYYY-MM-DD","w":kg,"bf":percent,"smm":kg,"vf":rating,"bmr":kcal,"tee":kcal} (omit unreadable keys). If it is a BLOOD TEST result sheet: {"kind":"blood","date":"YYYY-MM-DD","markers":{key:{"v":number,"u":"unit"}}} with keys from: '+BLOOD_REF.map(R=>R[0]).join(', ')+'. Anything else: {"kind":"other"}.',
+    const res=await claudeFetch({model:S.ai.model,max_tokens:900,
+      system:'Classify this photo of personal fitness data and extract it. Reply with JSON only, no prose, no code fences. If it is a BODY COMPOSITION scan (Evolt, InBody, DEXA summary): {"kind":"scan","date":"YYYY-MM-DD","w":kg,"bf":percent,"smm":kg,"vf":rating,"bmr":kcal,"tee":kcal,"legL":left leg lean kg,"legR":right leg lean kg,"ex":{lbm,protein,mineral,tbw,subcut,vfMass,vfArea,bioAge,abd,whr,armL,armR,torso}} (omit unreadable keys). If it is a BLOOD TEST result sheet: {"kind":"blood","date":"YYYY-MM-DD","markers":{key:{"v":number,"u":"unit"}}} with keys from: '+BLOOD_REF.map(R=>R[0]).join(', ')+'. Anything else: {"kind":"other"}.',
       messages:[{role:'user',content:[{type:'image',source:{type:'base64',media_type:m[1],data:m[2]}},{type:'text',text:'Classify and extract.'}]}]});
     const d=await res.json();
     let t=d.content?d.content.map(x=>x.text||'').join(''):'';
@@ -10551,7 +10578,10 @@ async function dataPhotoRead(img){
       S.sform={date:(o.date&&/^\d{4}-\d{2}-\d{2}$/.test(o.date))?o.date:today(),
         w:o.w!=null?+o.w:'',bf:o.bf!=null?+o.bf:'',smm:o.smm!=null?+o.smm:'',
         vf:o.vf!=null?+o.vf:'',bmr:o.bmr!=null?+o.bmr:'',tee:o.tee!=null?+o.tee:'',
+        legL:o.legL!=null?+o.legL:'',legR:o.legR!=null?+o.legR:'',
         img:img,busy:false};
+      if(o.ex&&typeof o.ex==='object'){S.sform.ex={};
+        Object.keys(o.ex).forEach(k=>{if(isFinite(+o.ex[k]))S.sform.ex[k]=+o.ex[k]})}
       S.sheet={t:'scan'};
       flash('That reads as a body scan \u2014 check the numbers, then save.');render();return}
     if(o.kind==='blood'){
@@ -21091,11 +21121,13 @@ function runAction(a,v,t,e){
       if(v==='ask'){S.coach.thread=[];S.coach.sent=false;S.coach.input='Review the program I just loaded — anything you would change?';S.coachBack='home';S.view='coach';render()}
       else flash(ch.length?'Saved with '+ch.length+' adjustment'+(ch.length===1?'':'s')+'.':'Program saved.');
       break}
-    case 'scanNew':S.sform={date:today(),w:'',bf:'',smm:'',vf:'',bmr:'',tee:'',img:null,busy:false};S.sheet={t:'scan'};render();break;
+    case 'scanNew':S.sform={date:today(),w:'',bf:'',smm:'',vf:'',bmr:'',tee:'',legL:'',legR:'',img:null,busy:false};S.sheet={t:'scan'};render();break;
     case 'scanRead':readScanWithAllena();break;
     case 'scanSave':{const f=S.sform;if(!(+f.w>0)){flash('Weight is needed at minimum.');break}
       const rec3=scanDerive({id:'s'+Date.now().toString(36),date:f.date||today(),thumb:f.thumb||null});
       ['w','bf','smm','vf','bmr','tee'].forEach(k=>{if(+f[k]>0)rec3[k]=(k==='w'||k==='smm')?Math.round(uwIn(+f[k])*10)/10:+f[k]});
+      ['legL','legR'].forEach(k=>{if(+f[k]>0)rec3[k]=Math.round(uwIn(+f[k])*100)/100});
+      if(f.ex&&Object.keys(f.ex).length)rec3.ex=f.ex;
       const d2=scanDerive(rec3);S.scans.push(d2);scanSave();
       S.sform=null;S.sheet=null;S.view='scans';render();flash('Scan saved.');break}
     case 'scanDel':S.scans=S.scans.filter(x=>x.id!==v);scanSave();render();break;
