@@ -666,7 +666,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='f97a9f';  // stamped by tools/build.py with the content hash
+const BUILD_ID='40309b';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -16506,6 +16506,17 @@ function viewSession(){
     const prior=(S.history||[]).slice().reverse().find(h9=>h9.exNotes&&h9.exNotes[b0]&&new Date(h9.date).getTime()>cut0&&/hurt|pain|sharp|numb|swell|tweak|pinch/i.test(h9.exNotes[b0]));
     if(prior)body+='<div class="cue mt" style="border-left-color:var(--amber)">'+
       esc('Last time on this you noted \u201c'+prior.exNotes[b0]+'\u201d ('+fmtDate(prior.date)+'). How is it today? If it speaks up again, ease it or swap it out \u2014 recurring pain is form or an injury, and that\u2019s a health professional\u2019s call, not an app\u2019s.')+'</div>'}catch(e){}}
+  if(s.phase==='ready'&&!cur.secs&&!cur.adj){try{
+    const b9=gBase(cur.ex);const gaps9=[];
+    (S.history||[]).forEach(h9=>{if(!h9.complete)return;
+      if(Date.now()-new Date(h9.date).getTime()>28*864e5)return;
+      (h9.log||[]).forEach(l9=>{if(!(l9.w>0&&l9.r>0)||gBase(l9.ex)!==b9)return;
+        const r9=parseFloat(l9.rpe);if(isNaN(r9)||l9.targetRpe==null)return;
+        const t9=rpeHigh(l9.targetRpe);if(t9!=null)gaps9.push(r9-t9)})});
+    if(gaps9.length>=3){
+      const g9=gaps9.reduce((a,b2)=>a+b2,0)/gaps9.length;
+      if(g9<=-1)body+='<div class="cue mt" style="border-left-color:var(--green)">'+
+        esc('Your last '+gaps9.length+' sets here came in about '+(Math.round(-g9*10)/10)+' RPE under their targets. If today asks for effort, there is more in you.')+'</div>'}}catch(e9){}}
   if(s.phase==='ready')body+=hintHtml('mt');
   if(s.phase==='ready'){const wu=warmupPlan(s,cur);if(wu)body+=warmupHtml(wu,cur,s)}
   if(s.phase==='working')body+='<p class="mono" id="elapsed" style="text-align:center;color:var(--faint);font-size:13px;margin-top:20px">'+mmss((Date.now()-(S.setStart||Date.now()))/1000)+' under the bar</p>';
@@ -16806,24 +16817,35 @@ function chartFindings(kind,ex){
     const first=pts[0],last=pts[pts.length-1];
     const wks=Math.max(1,Math.round((last.t-first.t)/6048e5));
     const d=last.v-first.v,perWk=d/wks;
-    add(d>=0?'Up '+uwNum(Math.round(d))+' '+uwUnit()+' in '+wks+' weeks':'Down '+uwNum(Math.round(Math.abs(d)))+' '+uwUnit()+' in '+wks+' weeks',
+    const dd9=Math.abs(d)<2.5?Math.round(Math.abs(d)*10)/10:Math.round(Math.abs(d));
+    add((d>=0?'Up ':'Down ')+uwNum(dd9)+' '+uwUnit()+' in '+wks+' week'+(wks===1?'':'s'),
       uwNum(Math.round(first.v))+' → '+uwNum(Math.round(last.v))+' '+uwUnit()+' estimated 1RM, about '+(perWk>=0?'+':'')+uwNum(Math.round(perWk*10)/10)+' '+uwUnit()+' a week.',
       d>0?'good':d<0?'warn':'ok');
     const best=pts.reduce((a,p)=>p.v>a.v?p:a,pts[0]);
-    if(best!==last)add('Peak was '+fmtD(best.t),'Your best estimated 1RM was '+uwNum(Math.round(best.v))+' '+uwUnit()+' — you are '+uwNum(Math.round(best.v-last.v))+' '+uwUnit()+' under it now.','warn');
+    if(best!==last){const und9=best.v-last.v;
+      add('Peak was '+fmtD(best.t),'Your best estimated 1RM was '+uwNum(Math.round(best.v))+' '+uwUnit()+' — you are '+uwNum(und9<2.5?Math.round(und9*10)/10:Math.round(und9))+' '+uwUnit()+' under it now.','warn')}
     // plateau detection
     const recent=pts.filter(p=>Date.now()-p.t<28*864e5);
     if(recent.length>=3){
       const rd=recent[recent.length-1].v-recent[0].v;
       if(Math.abs(rd)<2.5)add('Flat for four weeks','Estimated 1RM has moved '+(rd>=0?'+':'')+uwNum(Math.round(rd))+' '+uwUnit()+' across '+recent.length+' sessions. That is a plateau, not noise.','warn')}
     // effort context
+    /* effort vs PRESCRIPTION, set by set: a technique set hitting its
+       prescribed 6 has zero spare room; only sets that came in under
+       what THEY asked count as room (owner-caught, 8 Sep) */
     const rows=[];S.history.forEach(h=>h.log.forEach(l=>{if(!l.w||!l.r)return;
       if(gBase(l.ex).toLowerCase()!==String(ex).toLowerCase()&&l.ex!==ex)return;
-      const r=parseFloat(l.rpe);if(!isNaN(r))rows.push({t:new Date(h.date).getTime(),r:r})}));
+      const r=parseFloat(l.rpe);if(isNaN(r))return;
+      const tgt=(l.targetRpe!=null&&typeof rpeHigh==='function')?rpeHigh(l.targetRpe):null;
+      rows.push({t:new Date(h.date).getTime(),r:r,gap:tgt!=null?r-tgt:null})}));
     const rec4=rows.filter(x=>Date.now()-x.t<28*864e5);
-    if(rec4.length>=3){const avg=rec4.reduce((a,x)=>a+x.r,0)/rec4.length;
-      if(avg>=9.2)add('Effort is at the ceiling','Average RPE over the last four weeks is '+(Math.round(avg*10)/10)+'. There is no room left to push, so progress has to come from more recovery or less load.','warn');
-      else if(avg<=7.5)add('There is room here','Average RPE is '+(Math.round(avg*10)/10)+' — comfortably inside target. This lift can take more weight.','good')}
+    const gaps=rec4.filter(x=>x.gap!=null);
+    if(gaps.length>=3){
+      const g=gaps.reduce((a,x)=>a+x.gap,0)/gaps.length;
+      if(g>=0.8)add('Effort is past the plan','Sets here are averaging '+(Math.round(g*10)/10)+' RPE over what they prescribe. Progress has to come from recovery or a lighter week, not more pushing.','warn');
+      else if(g<=-1)add('There is room here','Across '+gaps.length+' recent sets you came in about '+(Math.round(-g*10)/10)+' RPE under what each set asked for. On the days that ask for effort, this lift can take more weight.','good')}
+    else if(rec4.length>=3){const avg=rec4.reduce((a,x)=>a+x.r,0)/rec4.length;
+      if(avg>=9.2)add('Effort is at the ceiling','Average RPE over the last four weeks is '+(Math.round(avg*10)/10)+'. There is no room left to push, so progress has to come from more recovery or less load.','warn')}
   }
   if(kind==='tonnage'){
     const wk={};S.history.forEach(h=>{const k=isoWeek(h.date);wk[k]=(wk[k]||0)+h.log.reduce((a,l)=>a+(l.w||0)*(l.r||0),0)});
