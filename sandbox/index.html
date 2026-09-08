@@ -666,7 +666,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='66776c';  // stamped by tools/build.py with the content hash
+const BUILD_ID='97bb86';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -772,6 +772,109 @@ function dustF(){
 function iBtn(k){return '<button data-a="iTog" data-v="'+esc(k)+'" aria-label="More info" style="width:17px;height:17px;border-radius:17px;border:1px solid var(--line);background:none;color:var(--faint);font-size:10px;font-style:italic;font-family:Georgia,serif;line-height:1;display:inline-flex;align-items:center;justify-content:center;vertical-align:-2px;margin-left:7px;padding:0;flex:none">i</button>'}
 function iOn(k){return !!S.openSec['i:'+k]}
 function iBody(k,txt){return iOn(k)?'<p class="irev" style="color:var(--dim);font-size:11.5px;line-height:1.6;margin-top:7px">'+txt+'</p>':''}
+/* ── the QR encoder ─────────────────────────────────────────────
+   Hand-rolled, dependency-free (the one-file law): byte mode, EC
+   level L, versions 1-5 (single RS block), fixed mask 0 — enough for
+   an invite link, verified against Apple's Vision decoder. The
+   add-a-friend sheet draws it; the iPhone camera does the scanning. */
+function qrMatrix(text){
+  const bytes=[];for(let i=0;i<text.length;i++){const c=text.charCodeAt(i);
+    if(c>127)throw new Error('ascii only');bytes.push(c)}
+  // version table (EC level L, single block): [dataCodewords, ecCodewords, alignCenter]
+  const V=[[19,7,0],[34,10,18],[55,15,22],[80,20,26],[108,26,30]];
+  let ver=0;while(ver<5&&V[ver][0]<bytes.length+2)ver++;
+  if(ver>=5&&V[4][0]<bytes.length+2)throw new Error('too long');
+  const [dataCw,ecCw,alignC]=V[ver];ver+=1;
+  const size=17+4*ver;
+  // ── bit stream: mode 0100 · count(8) · bytes · terminator · pads
+  const bits=[];
+  const push=(v,n)=>{for(let i=n-1;i>=0;i--)bits.push((v>>i)&1)};
+  push(4,4);push(bytes.length,8);
+  bytes.forEach(b=>push(b,8));
+  const cap=dataCw*8;
+  push(0,Math.min(4,cap-bits.length));
+  while(bits.length%8)bits.push(0);
+  const pads=[0xEC,0x11];let pi=0;
+  while(bits.length<cap){push(pads[pi%2],8);pi++}
+  const data=[];for(let i=0;i<dataCw;i++){let b=0;for(let j=0;j<8;j++)b=(b<<1)|bits[i*8+j];data.push(b)}
+  // ── Reed-Solomon over GF(256), poly 0x11d
+  const EXP=new Array(512),LOG=new Array(256);
+  {let x=1;for(let i=0;i<255;i++){EXP[i]=x;LOG[x]=i;x<<=1;if(x&0x100)x^=0x11d}
+   for(let i=255;i<512;i++)EXP[i]=EXP[i-255]}
+  const gmul=(a,b)=>(a===0||b===0)?0:EXP[LOG[a]+LOG[b]];
+  let gen=[1];
+  for(let i=0;i<ecCw;i++){
+    const ng=new Array(gen.length+1).fill(0);
+    for(let j=0;j<gen.length;j++){ng[j]^=gen[j];ng[j+1]^=gmul(gen[j],EXP[i])}
+    gen=ng}
+  const ec=new Array(ecCw).fill(0);
+  data.forEach(d=>{
+    const f=d^ec[0];
+    for(let j=0;j<ecCw-1;j++)ec[j]=ec[j+1]^gmul(gen[j+1],f);
+    ec[ecCw-1]=gmul(gen[ecCw],f)});
+  const all=data.concat(ec);
+  // ── the matrix: null = unset data cell, 0/1 set, fn map marks function modules
+  const m=Array.from({length:size},()=>new Array(size).fill(null));
+  const fn=Array.from({length:size},()=>new Array(size).fill(false));
+  const set=(r,c,v)=>{m[r][c]=v?1:0;fn[r][c]=true};
+  const finder=(r,c)=>{for(let dr=-1;dr<=7;dr++)for(let dc=-1;dc<=7;dc++){
+    const rr=r+dr,cc=c+dc;if(rr<0||cc<0||rr>=size||cc>=size)continue;
+    const inF=dr>=0&&dr<=6&&dc>=0&&dc<=6;
+    const dark=inF&&(dr===0||dr===6||dc===0||dc===6||(dr>=2&&dr<=4&&dc>=2&&dc<=4));
+    set(rr,cc,dark)}};
+  finder(0,0);finder(0,size-7);finder(size-7,0);
+  for(let i=8;i<size-8;i++){if(!fn[6][i])set(6,i,i%2===0);if(!fn[i][6])set(i,6,i%2===0)}
+  if(alignC){const cs=[6,alignC];
+    cs.forEach(r=>cs.forEach(c=>{
+      if(fn[r][c])return; // overlaps a finder
+      for(let dr=-2;dr<=2;dr++)for(let dc=-2;dc<=2;dc++){
+        const dark=Math.max(Math.abs(dr),Math.abs(dc))!==1;
+        set(r+dr,c+dc,dark)}}))}
+  set(size-8,8,1); // the dark module
+  // format info areas reserved (filled after)
+  for(let i=0;i<9;i++){if(!fn[8][i])set(8,i,0);if(!fn[i][8])set(i,8,0)}
+  /* copy 2 areas: 8 cells in the right of row 8, 7 above the dark
+     module in column 8 (the spec reserves both full strips) */
+  for(let i=0;i<8;i++){if(!fn[8][size-1-i])set(8,size-1-i,0);if(!fn[size-1-i][8])set(size-1-i,8,0)}
+  // ── zigzag placement, mask 0 ((r+c)%2===0); direction toggles per pair
+  let bi=0;const total=all.length*8;let up=true;
+  const bitAt=k=>(all[k>>3]>>(7-(k&7)))&1;
+  for(let col=size-1;col>0;col-=2){
+    if(col===6)col--;
+    for(let i=0;i<size;i++){
+      const r=up?size-1-i:i;
+      for(let dc=0;dc<2;dc++){
+        const c=col-dc;
+        if(fn[r][c])continue;
+        let v=bi<total?bitAt(bi):0;bi++;
+        if((r+c)%2===0)v^=1;
+        m[r][c]=v}}
+    up=!up}
+  // ── format info: EC L (01), mask 0 → BCH(15,5), XOR 0x5412, LSB-first
+  let fmt=(0b01<<3)|0;
+  let rem=fmt<<10;
+  for(let i=14;i>=10;i--)if((rem>>i)&1)rem^=0b10100110111<<(i-10);
+  fmt=((fmt<<10)|rem)^0b101010000010010;
+  const bit=i=>(fmt>>i)&1;
+  /* layout solved empirically against CoreImage's own output:
+     copy 1 runs MSB-first from (8,0); copy 2 = b14..b8 up column 8
+     from the bottom, b7 at (8,size-8), b6..b0 along the top-right
+     row. The dark module keeps (size-8,8). */
+  const pos1=[[8,0],[8,1],[8,2],[8,3],[8,4],[8,5],[8,7],[8,8],[7,8],[5,8],[4,8],[3,8],[2,8],[1,8],[0,8]];
+  pos1.forEach((p,i)=>{m[p[0]][p[1]]=bit(14-i)});
+  for(let i=0;i<7;i++)m[size-1-i][8]=bit(14-i);
+  m[8][size-8]=bit(7);
+  for(let i=0;i<7;i++)m[8][size-7+i]=bit(6-i);
+  m[size-8][8]=1;
+  return m}
+function qrSvg(text,px){
+  /* quiet zone included; crisp squares; ink follows the theme */
+  try{
+    const m=qrMatrix(text);const n=m.length;const q=4;const s=px||236;
+    let d='';
+    for(let r=0;r<n;r++)for(let c=0;c<n;c++)if(m[r][c])d+='M'+(c+q)+' '+(r+q)+'h1v1h-1z';
+    return '<svg viewBox="0 0 '+(n+2*q)+' '+(n+2*q)+'" width="'+s+'" height="'+s+'" shape-rendering="crispEdges" style="display:block;background:#fff;border-radius:12px">'+
+      '<path d="'+d+'" fill="#111"/></svg>'}catch(e){return ''}}
 function rpeLow(v){const m=String(v==null?'':v).match(/(\d+(?:\.\d+)?)/);return m?parseFloat(m[1]):NaN}
 function rpeHigh(v){const m=String(v==null?'':v).match(/(\d+(?:\.\d+)?)\s*[-–—to]+\s*(\d+(?:\.\d+)?)/);
   return m?parseFloat(m[2]):rpeLow(v)}
@@ -1589,7 +1692,9 @@ async function frLoad(force){
     try{
       const rc=await fetch(CLOUD.url+'/rest/v1/crew_members?select=crew_code,user_id',{headers:h});
       if(rc.ok){S.crewCap=true;S.crewRows=await rc.json();
-        crewIds=(S.crewRows||[]).map(x=>x.user_id).filter(x=>x&&x!==S.frMe)}
+        crewIds=(S.crewRows||[]).map(x=>x.user_id).filter(x=>x&&x!==S.frMe);
+        try{const rn=await fetch(CLOUD.url+'/rest/v1/crews?select=code,name,owner_id',{headers:h});
+          S.crews=rn.ok?await rn.json():[]}catch(e8){S.crews=S.crews||[]}}
       else{S.crewCap=false;S.crewRows=[]}}catch(e9){S.crewRows=S.crewRows||[]}
     const ids=(S.frRows||[]).filter(x=>x.linked_at)
       .map(x=>x.owner_id===S.frMe?x.friend_id:x.owner_id).filter(Boolean)
@@ -1644,16 +1749,16 @@ async function frLoad(force){
         try{hapticRun('find')}catch(e9){}
         if(!sn.display){setTimeout(function(){frLoad(true)},30000);setTimeout(function(){frLoad(true)},120000)}}}catch(e9){}
     render()}catch(e){}}
-async function frInvite(){
+async function frInvite(silent){
   try{const h=await frHeaders();if(!h||!S.frMe){flash('Sign in first.');return}
     /* one open invite at a time (owner-caught: five taps, five codes)
        — an existing open code is COPIED, not duplicated */
     const openAll=(S.frRows||[]).filter(x=>!x.linked_at&&x.owner_id===S.frMe);
-    if(openAll.length>=3){return frShare(openAll[0].code)}
+    if(openAll.length>=3){return silent?null:frShare(openAll[0].code)}
     const code=Math.random().toString(36).slice(2).replace(/[^a-z0-9]/g,'').slice(0,6).toUpperCase();
     const r=await fetch(CLOUD.url+'/rest/v1/friends',{method:'POST',headers:h,
       body:JSON.stringify([{code:code,owner_id:S.frMe}])});
-    if(r.ok){await frShare(code);frLoad(true)}
+    if(r.ok){if(!silent)await frShare(code);frLoad(true)}
     else flash('Could not make a code ('+r.status+').')}catch(e){flash('No connection.')}}
 async function frShare(code){
   /* the invite is a LINK (owner call, 7 Sep): the share sheet carries
@@ -1696,13 +1801,13 @@ function raceField(){
     out.push({crew:1,id:id,name:local||sn.display||'A racer',named:!!(local||sn.display),
       week:sn.week_live||0,sess:sn.week_sessions||0,tier:sn.tier||'',seen:sn.updated_at||null})})}catch(e){}
   return out}
-async function crewMake(){
+async function crewMake(nm){
   try{const h=await frHeaders();if(!h||!S.frMe){flash('Sign in first.');return}
     const mine9=(S.crewRows||[]).find(x=>x.user_id===S.frMe);
     if(mine9)return crewShare(mine9.crew_code);
     const code='G'+Math.random().toString(36).slice(2).replace(/[^a-z0-9]/g,'').slice(0,5).toUpperCase();
     const r=await fetch(CLOUD.url+'/rest/v1/crews',{method:'POST',headers:h,
-      body:JSON.stringify([{code:code,owner_id:S.frMe}])});
+      body:JSON.stringify([{code:code,owner_id:S.frMe,name:String(nm||'').trim().slice(0,20)||null}])});
     if(!r.ok){flash('Could not start a group ('+r.status+').');return}
     await fetch(CLOUD.url+'/rest/v1/crew_members',{method:'POST',headers:h,
       body:JSON.stringify([{crew_code:code,user_id:S.frMe}])});
@@ -1750,7 +1855,21 @@ function friendsSection(){
     const mine=Math.round((dataPoints().weekLive)||0);
     const L=raceField();
     const open=(S.frRows||[]).filter(x=>!x.linked_at&&x.owner_id===S.frMe);
-    return '<p class="eyebrow mt2">The weekly race</p>'+
+    /* the profile card — who you are on the board */
+    const myFirstP=String((S.prof&&S.prof.name)||'').split(' ')[0];
+    const myInitP=(myFirstP||String((acct()||{}).email||'Y').split('@')[0]||'Y').slice(0,1).toUpperCase();
+    let reignP=0;
+    try{const h9=(acct()||{}).duelHist||{};
+      Object.keys(h9).filter(k=>/^\d{4}-/.test(k)).sort().reverse()
+        .some(k=>{if(h9[k]==='w'){reignP++;return false}return true})}catch(e9){}
+    const profCard='<div class="card mt2" style="padding:15px 16px;display:flex;align-items:center;gap:13px">'+
+      '<div style="width:52px;height:52px;border-radius:52px;background:var(--raised);border:2.5px solid var(--green);display:flex;align-items:center;justify-content:center;font-size:21px;font-weight:700;flex:none">'+esc(myInitP)+'</div>'+
+      '<div style="flex:1;min-width:0"><p style="font-size:15px;font-weight:600">'+esc(myFirstP||'You')+'</p>'+
+      (reignP>=1?'<p class="mono" style="font-size:8.5px;letter-spacing:.1em;color:#E0A458;margin-top:2px">CROWN HELD '+reignP+' WEEK'+(reignP===1?'':'S')+'</p>'
+        :'<p class="mono" style="font-size:9px;color:var(--faint);letter-spacing:.05em;margin-top:2px">THE WEEKLY RACE</p>')+'</div>'+
+      '<div style="text-align:right;flex:none"><p class="disp" style="font-size:22px;font-weight:700;color:'+(mine>0?'var(--green)':'var(--text)')+'">'+mine+'</p>'+
+      '<p class="mono" style="font-size:8.5px;color:var(--faint);letter-spacing:.06em">THIS WEEK</p></div></div>';
+    return profCard+'<p class="eyebrow mt2">The weekly race</p>'+
       '<p style="color:var(--faint);font-size:11.5px;line-height:1.55;margin-top:4px">Live points only \u2014 sessions your phone or watch actually witnessed \u2014 fresh every Monday. Typed-in history never scores.'+iBtn('racelaw')+'</p>'+
       iBody('racelaw','Every honest number in a witnessed session earns \u2014 each set\u2019s weight, reps and effort, plus one for finishing \u2014 capped per day. Witnessed means your watch overlapped the session at working heart rate, or the phone ran the clock and the sets spread like real training. Imported, typed-later and demo sessions earn regular points but never race. Your score uploads when your app opens; you see theirs as of their last open. A group link races everyone who joins it on one board; weekly crowns still settle between directly linked friends.')+
       (L.length?(function(){
@@ -1798,6 +1917,7 @@ function friendsSection(){
             (x.me?'':(x.stale?'<span class="mono" style="color:var(--faint);font-size:9px;flex:none">as of '+x.stale+' ago</span>'
               :'<span class="mono" style="color:'+(lead>=0?'var(--green)':'var(--amber)')+';font-size:9.5px;flex:none">'+(lead>=0?'+'+lead+' you':'+'+(-lead)+' them')+'</span>'))+
             '<span class="mono" style="font-size:14px;font-weight:700;flex:none">'+x.week+'</span>'+
+            (x.me?'':'<button data-a="duelPin" data-v="'+esc(x.id)+'" style="font-size:12px;flex:none;padding:0 3px;color:'+(((acct()||{}).duelPin)===x.id?'var(--green)':'var(--faint)')+'" title="Pin the head-to-head">\u2694</button>')+
             ((x.me||!x.code)?'':'<button data-a="frRemove" data-v="'+esc(x.code)+'" style="color:var(--faint);font-size:12px;flex:none;padding:0 4px">\u2715</button>')+
             '</div>'}).join('')+'</div>';
         return h9+'</div>'})():'')+
@@ -1806,19 +1926,29 @@ function friendsSection(){
         open.map(x=>'<span style="display:inline-flex;align-items:center;gap:2px">'+
           '<button data-a="frCopy" data-v="'+esc(x.code)+'" class="pill mono" style="font-size:12px;letter-spacing:.08em;padding:7px 12px">'+esc(x.code)+' \u29c9</button>'+
           '<button data-a="frRemove" data-v="'+esc(x.code)+'" style="color:var(--faint);font-size:13px;padding:4px 6px">\u2715</button></span>').join('')+'</div>':'')+
-      '<div class="row mt" style="gap:8px">'+
-      '<button data-a="frInvite" class="btn" style="flex:1;font-size:12.5px;color:var(--amber);border-color:var(--amber)">Share an invite link</button>'+
+      '<div class="row mt2" style="gap:8px">'+
+      '<button data-a="addFriendOpen" class="big disp" style="flex:1;background:var(--amber);color:var(--bg);font-size:14px">Add a friend</button>'+
+      (S.crewCap===true&&!(S.crewRows||[]).some(x=>x.user_id===S.frMe)
+        ?'<button data-a="crewNameOpen" class="big disp" style="flex:1;background:var(--raised);border:1px solid var(--line);color:var(--text);font-size:14px">Start a group</button>':'')+
       '</div>'+
+      (function(){try{
+        const mine9=(S.crewRows||[]).find(x=>x.user_id===S.frMe);
+        if(!mine9||S.crewCap!==true)return '';
+        const crew=(S.crews||[]).find(x=>x.code===mine9.crew_code)||{};
+        const nMem=(S.crewRows||[]).filter(x=>x.crew_code===mine9.crew_code).length;
+        return '<div class="card mt" style="padding:13px 15px">'+
+          '<div style="display:flex;align-items:baseline;gap:10px">'+
+          '<span style="flex:1;font-size:14px;font-weight:600">'+esc(crew.name||'The group')+'</span>'+
+          '<span class="mono" style="color:var(--faint);font-size:10px">'+nMem+' RACING</span></div>'+
+          '<div class="row mt" style="gap:8px">'+
+          '<button data-a="crewShare" data-v="'+esc(mine9.crew_code)+'" class="btn" style="flex:2;font-size:12px">Share the link</button>'+
+          '<button data-a="qrOpen" data-v="crew" class="btn" style="flex:1;font-size:12px">QR</button>'+
+          '<button data-a="crewLeave" class="btn" style="flex:1;font-size:12px;color:var(--faint)">Leave</button>'+
+          '</div></div>'}catch(e9){return ''}})()+
       '<div class="row mt" style="gap:8px">'+
       '<input data-in="frIn" placeholder="Friend\u2019s code" value="'+esc(S.frIn||'')+'" style="flex:2;min-height:44px;text-transform:uppercase">'+
       '<button data-a="frJoinGo" class="btn" style="flex:1;font-size:12.5px">Link up</button></div>'+
-      (S.crewCap===true?(function(){
-        const mine9=(S.crewRows||[]).find(x=>x.user_id===S.frMe);
-        return '<div class="row mt" style="gap:8px">'+
-          (mine9?'<button data-a="crewShare" data-v="'+esc(mine9.crew_code)+'" class="btn" style="flex:2;font-size:12.5px">Share the group link</button>'+
-                 '<button data-a="crewLeave" class="btn" style="flex:1;font-size:12.5px;color:var(--faint)">Leave group</button>'
-                :'<button data-a="crewMake" class="btn" style="flex:1;font-size:12.5px">Start a group \u2014 one link races everyone</button>')+
-          '</div>'})():'')}catch(e){return ''}}
+      ''}catch(e){return ''}}
 (function(){
   /* arrival by invite link: stash the code, land on Social, auto-link
      when signed in — else it waits pre-filled in the box */
@@ -15953,7 +16083,10 @@ function viewToday(){
           '<p style="font-size:13px;line-height:1.55;margin-top:2px">'+esc(String(x.body).slice(0,180))+'</p></button>').join('')+
         (ec.length>3?'<p class="mono" style="color:var(--faint);font-size:9.5px;margin-top:7px">and '+(ec.length-3)+' more</p>':'')+'</div>'}}catch(e){}
   try{
-    const L=(typeof raceField==='function')?raceField():((typeof frLinked==='function')?frLinked():[]);
+    let L=(typeof raceField==='function')?raceField():((typeof frLinked==='function')?frLinked():[]);
+    try{const pin=(acct()||{}).duelPin;
+      if(pin){const i9=L.findIndex(x=>x.id===pin);
+        if(i9>0){const p9=L.splice(i9,1)[0];L.unshift(p9)}}}catch(e9){}
     if(L.length){
       /* THE DUEL (owner call, 7 Sep): two corners, one week. Avatars
          are the app's initial-in-a-ring language — photos can take
@@ -18478,6 +18611,19 @@ function sheetHtml(){
       '<p style="color:var(--dim);font-size:12.5px;line-height:1.6;margin-top:4px">You know who this is \u2014 give them the name you use. Yours to see; it wins over whatever their account sends.</p>'+
       '<input data-in="frNm" placeholder="Their name" value="'+esc(S.frNm||'')+'" style="width:100%;min-height:48px;margin-top:12px">'+
       '<button data-a="frNameGo" class="big disp mt" style="background:var(--amber);color:var(--bg)">Save</button>')}
+  if(S.sheet.t==='qr'){
+    const q=S.sheet.q||{};
+    return wrapSheet(q.title||'Add a friend',
+      '<p style="color:var(--dim);font-size:13px;line-height:1.6;margin-top:4px">'+esc(q.sub||'')+'</p>'+
+      (q.link?'<div style="display:flex;justify-content:center;margin-top:14px">'+qrSvg(q.link,224)+'</div>':'<p style="color:var(--faint);font-size:12px;margin-top:14px">Making your code\u2026</p>')+
+      (q.code?'<p class="mono" style="text-align:center;font-size:19px;letter-spacing:.28em;font-weight:700;margin-top:12px">'+esc(q.code)+'</p>':'')+
+      '<p style="color:var(--faint);font-size:11.5px;line-height:1.6;text-align:center;margin-top:6px">Point an iPhone camera at the square \u2014 it opens the link. Or share it:</p>'+
+      '<button data-a="'+(q.kind==='crew'?'crewShare':'frShareGo')+'" data-v="'+esc(q.code||'')+'" class="big disp mt" style="background:var(--amber);color:var(--bg);font-size:15px">Share the link</button>')}
+  if(S.sheet.t==='crewname'){
+    return wrapSheet('Name the group',
+      '<p style="color:var(--dim);font-size:13px;line-height:1.6;margin-top:4px">What the crew sees at the top of the board. You can leave it blank.</p>'+
+      '<input data-crewnm="1" value="'+esc(S.crewNm||'')+'" maxlength="20" placeholder="e.g. Garage Gorillas" style="width:100%;margin-top:12px;background:var(--surface);border:1px solid var(--line);border-radius:10px;color:var(--text);padding:12px;font-size:16px;outline:none">'+
+      '<button data-a="crewMakeGo" class="big disp mt" style="background:var(--amber);color:var(--bg);font-size:15px">Start the group</button>')}
   if(S.sheet.t==='blood'){
     const L9=bloodStore().list.slice().reverse();
     return wrapSheet('Bloodwork',
@@ -19913,6 +20059,7 @@ document.addEventListener('input',e=>{const d=e.target.dataset;
     return}
   if(e.target.dataset.runsel){S.runGroup=e.target.value;render();return}
   if(e.target.dataset.bdate){S.bloodDate=e.target.value;return}
+  if(e.target.dataset.crewnm){S.crewNm=e.target.value;return}
   if(e.target.dataset.bpaste){S.bloodIn=e.target.value;return}
   if(e.target.dataset.bloodfile){const fl=e.target.files&&e.target.files[0];if(!fl)return;
     const rd=new FileReader();rd.onload=function(){try{bloodPhotoRead(String(rd.result))}catch(e9){}};
@@ -21244,6 +21391,36 @@ function runAction(a,v,t,e){
         flash('Read '+n+' markers \u2014 saved.');render()}catch(e){}break}
     case 'bloodDel':{
       try{const st=bloodStore();st.list=st.list.filter(x=>x.d!==v);lset(K_BLOOD,st);render()}catch(e){}break}
+    case 'addFriendOpen':{
+      try{
+        const open9=(S.frRows||[]).filter(x=>!x.linked_at&&x.owner_id===S.frMe);
+        const site=(CLOUD.site||'https://sathyacrisren-ui.github.io/allena-app/');
+        const sub9='One code, one friend \u2014 the week\u2019s race starts when they join.';
+        if(open9.length){const c9=open9[0].code;
+          S.sheet={t:'qr',q:{title:'Add a friend',kind:'join',code:c9,link:site+'?join='+encodeURIComponent(c9),sub:sub9}}}
+        else{S.sheet={t:'qr',q:{title:'Add a friend',kind:'join',sub:sub9}};
+          try{frInvite(true).then(function(){
+            const o2=(S.frRows||[]).filter(x=>!x.linked_at&&x.owner_id===S.frMe)[0];
+            if(o2&&S.sheet&&S.sheet.t==='qr'){
+              S.sheet.q.code=o2.code;S.sheet.q.link=site+'?join='+encodeURIComponent(o2.code);render()}})}catch(e9){}}
+        render()}catch(e){}break}
+    case 'frShareGo':{try{frShare(v)}catch(e){}break}
+    case 'qrOpen':{
+      try{const mine9=(S.crewRows||[]).find(x=>x.user_id===S.frMe);if(!mine9)break;
+        const site=(CLOUD.site||'https://sathyacrisren-ui.github.io/allena-app/');
+        const crew=(S.crews||[]).find(x=>x.code===mine9.crew_code)||{};
+        S.sheet={t:'qr',q:{title:crew.name||'The group',kind:'crew',code:mine9.crew_code,
+          link:site+'?crew='+encodeURIComponent(mine9.crew_code),
+          sub:'Anyone who scans joins the board \u2014 everyone races everyone.'}};
+        render()}catch(e){}break}
+    case 'crewNameOpen':{S.crewNm='';S.sheet={t:'crewname'};render();break}
+    case 'crewMakeGo':{S.sheet=null;try{crewMake(S.crewNm)}catch(e){}render();break}
+    case 'duelPin':{
+      try{const a9=acct()||{};
+        const nv=(a9.duelPin===v)?null:v;
+        lset(K_ACCT,Object.assign({},a9,{duelPin:nv}));
+        flash(nv?'Head-to-head pinned \u2014 the Today card leads with them.':'Pin cleared \u2014 closest rival leads the card.');
+        render()}catch(e){}break}
     case 'crewMake':{try{crewMake()}catch(e){}break}
     case 'crewShare':{try{crewShare(v)}catch(e){}break}
     case 'crewLeave':{try{crewLeave()}catch(e){}break}
