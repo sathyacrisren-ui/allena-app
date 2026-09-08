@@ -666,7 +666,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='1f4082';  // stamped by tools/build.py with the content hash
+const BUILD_ID='f107f8';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -17288,6 +17288,7 @@ function viewProgress(){
           (liftPts(g.ex).length===1?'One session logged. One more and the trend line and projection appear here.':'No '+esc(g.ex)+' sessions logged yet.')+'</p>')+
         '<p class="mono" style="font-size:11px;color:var(--faint);margin-top:4px">'+sub+'</p></button>'});
     return h2};
+  SECREF.standing=SEC.standing=()=>{try{return standingCard()}catch(e){return ''}};
   SECREF.form=SEC.form=()=>{
     const F=(typeof formModel==='function')?formModel():null;
     if(!F)return '';
@@ -17393,11 +17394,10 @@ function porderNow(){
   /* the one source of truth for Progress section order. Standing
      moved to its own page off the drawer (owner call, Sep 2026) —
      saved layouts that still carry it are filtered here. */
-  const po=(S.lay.porder||['goals','form','trends','tonnage','lifetime','bb','scan','recovery','bw','bests'])
-    .filter(k=>k!=='standing');
-  /* form joins saved layouts the way standing once did — appended in,
-     hideable from the rearrange sheet like any other section */
+  const po=(S.lay.porder||['goals','form','trends','tonnage','lifetime','standing','bb','scan','recovery','bw','bests']).slice();
+  /* appended into saved layouts, hideable from the rearrange sheet */
   if(po.indexOf('form')<0)po.splice(Math.min(1,po.length),0,'form');
+  if(po.indexOf('standing')<0)po.push('standing');
   return po}
 function weekRange(iso){
   const d=new Date(iso);
@@ -19682,9 +19682,8 @@ function render(){
       ((hasFinds||hasColl||hasStand||hasHealth)?'<div style="display:flex;align-items:center;gap:8px;margin:12px 13px 4px"><span style="flex:1;height:1px;background:var(--line)"></span><span class="mono" style="color:var(--faint);font-size:9px;letter-spacing:.12em">YOUR DATA</span><span style="flex:1;height:1px;background:var(--line)"></span></div>':'')+
       (hasFinds?drow('findings','Patterns in your data',I2.spark):'')+
       (hasColl?drow('collection','The collection',I2.star):'')+
-      (hasStand?drow('standing','Where you stand',I2.trend):'')+
-      (hasHealth?drow('signals','Health data',I2.heart):'')+
-      (hasFinds?drow('history','History',I2.save):'');
+      (hasHealth?drow('signals','Synced health data',I2.heart):'')+
+      (hasFinds?drow('history','Workout log',I2.save):'');
     const recents=(S.chats||[]).slice(0,6);
     if(recents.length)rows+='<p style="color:var(--faint);font-size:12.5px;margin:16px 13px 4px">Recents</p>'+
       recents.map(c=>'<div style="display:flex;align-items:center">'+
