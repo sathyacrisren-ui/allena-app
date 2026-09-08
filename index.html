@@ -666,7 +666,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='e862ad';  // stamped by tools/build.py with the content hash
+const BUILD_ID='a16db3';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -9571,7 +9571,7 @@ function discoveries(){
   try{const st=weekStreak(),ds=dayStreak();
     {const r9=[7,14,21,30,50,75,100,150,200,365].filter(x=>ds>=x).pop();
       if(r9)add(r9>=30?'epic':r9>=14?'rare':'uncommon',r9+' days logging in a row',
-        'Not training every day \u2014 logging every day'+(ds>r9?' ('+ds+' now)':'')+'. That is what keeps the model honest.','streak')}
+        'Not training every day \u2014 logging every day'+(ds>r9?' ('+ds+' now)':'')+'. The record stays complete.','streak')}
     {const r9=[4,8,12,26,52].filter(x=>st.weeks>=x).pop();
       if(r9)add(r9>=12?'epic':'rare',r9+' weeks without missing one',
         'Consistency beats every programming decision you will ever make'+(st.weeks>r9?' \u2014 '+st.weeks+' weeks now':'')+'.','streak')}
@@ -9634,7 +9634,7 @@ function discoveries(){
     if(sc.length>=2){const d=scanDelta(sc[0],sc[sc.length-1]);
       if(d.smm>0.5&&d.fm<-0.5)add('epic','Muscle up, fat down',
         'Skeletal muscle '+(d.smm>0?'+':'')+uwNum(d.smm)+' '+uwUnit()+' while fat mass '+uwNum(d.fm)+' '+uwUnit()+'. Doing both at once is the hardest outcome to get.','body');
-      else if(d.smm>1)add('rare','+'+uwNum(d.smm)+' '+uwUnit()+' of muscle','Since your first scan. That is the number that actually matters.','body')}}catch(e){}
+      else if(d.smm>1)add('rare','+'+uwNum(d.smm)+' '+uwUnit()+' of muscle','Skeletal muscle gained since your first scan.','body')}}catch(e){}
 
   /* ── rehab ── */
   try{const q=((S.acl&&S.acl.tests)||[]).filter(t=>t.kind==='quad');
@@ -9696,7 +9696,7 @@ function discoveries(){
       if(new Set(l.map(x=>x.h.id)).size<2)continue;
       const startW=l[0].l.w,endW=l[l.length-1].l.w;
       if(endW>startW){add('uncommon','First weight increase',
-        esc(b)+' has gone from '+uwNum(startW)+' to '+uwNum(endW)+' '+uwUnit()+'. That is the whole game, repeated.','first-up');break}}
+        esc(b)+' has gone from '+uwNum(startW)+' to '+uwNum(endW)+' '+uwUnit()+'. Weight on the bar, added and kept.','first-up');break}}
     // first full week
     if(dates.length>=3){
       const wk={};H.forEach(h=>{wk[isoWeek(h.date)]=(wk[isoWeek(h.date)]||0)+1});
@@ -10120,7 +10120,7 @@ function healthDiscoveries(){
       sl.forEach(x=>{run=x.v>=420?run+1:0;best=Math.max(best,run)});
       if(best>=5)add(best>=14?'epic':best>=7?'rare':'uncommon',
         best+' nights of 7+ hours running',
-        'Sleep is the recovery the model cannot see any other way — and '+best+' straight nights of it is rarer than any lifting streak.','signal')}catch(e){}
+        best+' straight nights of 7+ hours. Recovery the model can measure, night after night.','signal')}catch(e){}
     /* resting HR trend — the engine idling cheaper */
     try{
       const r=hkdSeries('rhr',60);
@@ -15406,6 +15406,13 @@ const EV_MECH={
 function evidenceData(id){
   /* what stands behind a linked find: the lift, the day, the signals */
   try{
+    const mc=/^corr:([a-z0-9]+):([a-z0-9:]+):(\d+)$/i.exec(String(id));
+    if(mc){
+      const sigKey=mc[1].replace(/[23]$/,''); // sleep3 charts as sleep
+      const kind=(typeof SIG_KINDS!=='undefined')?SIG_KINDS.find(x=>x.hk===sigKey||x.d===sigKey):null;
+      const base=mc[1].replace(/[23]$/,'');
+      if(!kind&&!EV_MECH[base])return null;
+      return{corr:1,sig:base,lag:+mc[3],sigs:[{k:base,label:(kind?kind.k:base),val:null,unit:'',kind:kind}]}}
     const m=/^recipe:(.+):(\d{4}-\d{2}-\d{2})$/.exec(String(id));
     if(!m)return null;
     const ex=m[1],date=m[2];
@@ -15430,6 +15437,21 @@ function viewEvidence(){
     '<h1 class="disp" style="font-size:23px;font-weight:600;line-height:1.2;margin-top:6px">'+esc(e.t||'A linked find')+'</h1>'+
     (e.d?'<p style="color:var(--dim);font-size:13.5px;line-height:1.65;margin-top:8px">'+esc(e.d)+'</p>':'');
   if(!ev){return h+'<p style="color:var(--faint);font-size:12px;margin-top:14px">The charts behind this one are still assembling.</p></div>'}
+  if(ev.corr){
+    ev.sigs.forEach(s9=>{
+      h+='<div class="card mt2" style="padding:14px 16px">'+
+        '<p class="eyebrow">'+esc(s9.label)+' \u2014 the last 90 days</p>';
+      try{if(s9.kind){const pts=sigSeries(s9.kind);
+        if(pts.length>=3){const vs=pts.map(p=>p.v),lo=Math.min.apply(null,vs),hi=Math.max.apply(null,vs);
+          h+=lineChart(pts,{min:Math.floor(lo*0.9),max:Math.ceil(hi*1.05)||10,color:'#1E9BFF'})}
+        else h+='<p style="color:var(--faint);font-size:11.5px;margin-top:6px">The chart draws once a few more days land.</p>'}}catch(e9){}
+      if(EV_MECH[s9.k])h+='<p style="color:var(--dim);font-size:12.5px;line-height:1.6;margin-top:8px">'+EV_MECH[s9.k]+'</p>';
+      h+='</div>'});
+    h+='<div class="card mt" style="padding:13px 15px">'+
+      '<p class="eyebrow">How this was found</p>'+
+      '<p style="color:var(--dim);font-size:12.5px;line-height:1.65;margin-top:6px">The engine lines up every '+esc(ev.sigs[0].label.toLowerCase())+' day against what followed'+(ev.lag?' '+ev.lag+' day'+(ev.lag===1?'':'s')+' later':' the same day')+'. This link cleared every statistical gate \u2014 strength, sample size, stability across halves of your data \u2014 before it was allowed to say a word.</p></div>';
+    h+='<p style="color:var(--faint);font-size:11.5px;line-height:1.6;margin-top:14px">A pattern in your own days, not proof of cause \u2014 worth testing on purpose.</p>';
+    return h+'</div>'}
   // 1. the lift itself
   try{const ch=liftChart(ev.ex,null);
     if(ch)h+='<div class="card mt2" style="padding:14px 16px">'+
