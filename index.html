@@ -666,7 +666,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='1e8266';  // stamped by tools/build.py with the content hash
+const BUILD_ID='f028da';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -16507,9 +16507,10 @@ function viewToday(){
         (ec.length>3?'<p class="mono" style="color:var(--faint);font-size:9.5px;margin-top:7px">and '+(ec.length-3)+' more</p>':'')+'</div>'}}catch(e){}
   try{
     let L=(typeof raceField==='function')?raceField():((typeof frLinked==='function')?frLinked():[]);
+    let pinned=false;
     try{const pin=(acct()||{}).duelPin;
       if(pin){const i9=L.findIndex(x=>x.id===pin);
-        if(i9>0){const p9=L.splice(i9,1)[0];L.unshift(p9)}}}catch(e9){}
+        if(i9>=0){pinned=true;if(i9>0){const p9=L.splice(i9,1)[0];L.unshift(p9)}}}}catch(e9){}
     if(L.length){
       /* THE DUEL (owner call, 7 Sep): two corners, one week. Avatars
          are the app's initial-in-a-ring language — photos can take
@@ -16540,6 +16541,44 @@ function viewToday(){
       const ava=(nm,init,ringCol,glow,crowned)=>'<div style="display:flex;flex-direction:column;align-items:center;gap:6px;flex:1;min-width:0">'+
         '<div style="position:relative;width:58px;height:58px;border-radius:58px;background:var(--raised);border:2.5px solid '+ringCol+';display:flex;align-items:center;justify-content:center;font-size:23px;font-weight:700'+(glow?';box-shadow:0 0 16px 0 color-mix(in srgb, '+ringCol+' 45%, transparent)':'')+'">'+(crowned?CROWN:'')+esc(init)+'</div>'+
         '<span style="font-size:12px;font-weight:600;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(nm)+'</span></div>';
+      const endLine=(function(){
+        const dl=7-(new Date().getDay()||7);
+        if(lead>0)return dl<=1?('Final '+(dl===0?'day':'days')+' \u2014 you lead by '+lead+'. Hold the door.')
+          :'You lead by '+lead+' \u2014 a logged session holds it.';
+        if(lead<0)return dl===0?('Last day \u2014 '+(-lead)+' behind. One session flips it.')
+          :dl<=2?(esc(top.name)+' leads by '+(-lead)+' with '+dl+' day'+(dl===1?'':'s')+' left \u2014 a session tonight flips it.')
+          :esc(top.name)+' leads by '+(-lead)+' \u2014 a session today overtakes.';
+        return 'Dead level \u2014 the next honest log takes the lead.'})();
+      if(!pinned&&Ls.length>=2){
+        /* THREE OR MORE RACING: the podium is the card (owner ruling,
+           8 Sep: 'more than 2 people in a group should show the
+           podium, not the 1v1 pill'). A \u2694 pin still forces the
+           head-to-head \u2014 an explicit choice outranks the default. */
+        const R9=[{me:1,name:myN,init:myInit,week:mine,id:'me'}]
+          .concat(Ls.map(f=>({name:f.named?f.name:'?',init:(f.named?String(f.name).slice(0,1):'?').toUpperCase(),week:f.week,id:f.id})));
+        R9.sort((x,y)=>y.week-x.week);R9.forEach((x,i)=>x.rank=i+1);
+        const crowned=x=>(crown==='me'&&x.id==='me')||(crown==='them'&&x.id===top.id);
+        const stepH9={1:32,2:19,3:13};
+        const col9=x=>{const first=x.rank===1;const size=first?54:40;
+          return '<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:5px;min-width:0">'+
+            '<div style="position:relative;width:'+size+'px;height:'+size+'px;border-radius:'+size+'px;background:var(--raised);border:2.5px solid '+(first?'var(--green)':'var(--line)')+';display:flex;align-items:center;justify-content:center;font-size:'+(first?21:15)+'px;font-weight:700'+(first?';box-shadow:0 0 14px 0 color-mix(in srgb, var(--green) 40%, transparent)':'')+'">'+(crowned(x)?CROWN:'')+esc(x.init)+'</div>'+
+            '<span style="font-size:11px;font-weight:600;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(x.id==='me'?'You':x.name)+'</span>'+
+            '<span class="mono" data-cu="tdy-'+esc(String(x.id))+'" style="font-size:'+(first?14:11.5)+'px;font-weight:700;color:'+(first&&x.week>0?'var(--green)':'var(--text)')+'">'+x.week+'</span>'+
+            '<div style="width:100%;height:'+stepH9[x.rank]+'px;border-radius:8px 8px 4px 4px;background:'+(first?'var(--green)':'var(--raised)')+';border:1px solid '+(first?'var(--green)':'var(--line)')+';display:flex;align-items:center;justify-content:center;overflow:hidden">'+
+            '<span class="mono" style="font-size:9.5px;line-height:1;font-weight:800;color:'+(first?'var(--bg)':'var(--faint)')+'">'+x.rank+'</span></div></div>'};
+        const pod9=R9.slice(0,3);
+        const ord9=[pod9[1],pod9[0],pod9[2]].filter(Boolean);
+        h+='<button data-a="nav" data-v="social" class="card mt" style="width:100%;text-align:center;padding:15px 16px;display:block">'+
+          '<p class="mono" style="font-size:9px;letter-spacing:.12em;color:var(--faint)">THE WEEK\u2019S RACE \u00b7 '+(Ls.length+1)+' RACING \u00b7 RESETS MONDAY</p>'+
+          '<div style="display:flex;align-items:flex-end;gap:8px;margin-top:12px;padding:0 2px">'+ord9.map(col9).join('')+'</div>'+
+          ((crown==='me'&&S._reign>=2)?'<p class="mono" style="font-size:8.5px;letter-spacing:.1em;color:#E0A458;margin-top:8px">CROWN HELD '+S._reign+' WEEKS</p>':'')+
+          (R9.length>3?'<div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--line)">'+
+            R9.slice(3).map(x=>'<div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-top:4px">'+
+              '<span style="flex:1;min-width:0;text-align:left;font-size:12px;color:var(--dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+x.rank+' \u00b7 '+esc(x.id==='me'?'You':x.name)+'</span>'+
+              '<span class="mono" data-cu="tdy-'+esc(String(x.id))+'" style="font-size:12.5px;font-weight:600;color:var(--dim)">'+x.week+'</span></div>').join('')+'</div>':'')+
+          '<p style="color:var(--dim);font-size:11.5px;margin-top:10px">'+endLine+'</p>'+
+          '</button>'}
+      else{
       const tot=Math.max(1,mine+top.week);
       h+='<button data-a="nav" data-v="social" class="card mt" style="width:100%;text-align:center;padding:15px 16px;display:block">'+
         '<p class="mono" style="font-size:9px;letter-spacing:.12em;color:var(--faint)">THE WEEK\u2019S DUEL \u00b7 RESETS MONDAY</p>'+
@@ -16554,14 +16593,7 @@ function viewToday(){
         '<div style="height:6px;border-radius:6px;background:var(--line);overflow:hidden;margin-top:12px;display:flex">'+
         '<div style="height:6px;width:'+Math.round(mine/tot*100)+'%;background:var(--green)"></div>'+
         '<div style="height:6px;flex:1;background:var(--dim);opacity:.45"></div></div>'+
-        '<p style="color:var(--dim);font-size:11.5px;margin-top:9px">'+(function(){
-          const dl=7-(new Date().getDay()||7); // whole days left after today
-          if(lead>0)return dl<=1?('Final '+(dl===0?'day':'days')+' \u2014 you lead by '+lead+'. Hold the door.')
-            :'You lead by '+lead+' \u2014 a logged session holds it.';
-          if(lead<0)return dl===0?('Last day \u2014 '+(-lead)+' behind. One session flips it.')
-            :dl<=2?(esc(top.name)+' leads by '+(-lead)+' with '+dl+' day'+(dl===1?'':'s')+' left \u2014 a session tonight flips it.')
-            :esc(top.name)+' leads by '+(-lead)+' \u2014 a session today overtakes.';
-          return 'Dead level \u2014 the next honest log takes the lead.'})()+'</p>'+
+        '<p style="color:var(--dim);font-size:11.5px;margin-top:9px">'+endLine+'</p>'+
         (function(){try{
           const ms=Math.round((dataPoints().weekSessions)||0);
           if(ms||top.sess)return '<p class="mono" style="color:var(--faint);font-size:9.5px;margin-top:5px;letter-spacing:.04em">SESSIONS '+ms+'\u2013'+(top.sess||0)+'</p>';
@@ -16571,7 +16603,7 @@ function viewToday(){
           Ls.slice(1,4).map(f=>'<div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-top:5px">'+
             '<span style="flex:1;min-width:0;text-align:left;font-size:12px;color:var(--dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(f.name)+'</span>'+
             '<span class="mono" style="font-size:12.5px;font-weight:600;color:'+(mine>=f.week?'var(--green)':'var(--amber)')+'">'+f.week+'</span></div>').join('')+
-          (Ls.length>4?'<p class="mono" style="color:var(--faint);font-size:9px;margin-top:5px;text-align:left">and '+(Ls.length-4)+' more racing</p>':'')+'</div>':'')+'</button>'}}catch(e){}
+          (Ls.length>4?'<p class="mono" style="color:var(--faint);font-size:9px;margin-top:5px;text-align:left">and '+(Ls.length-4)+' more racing</p>':'')+'</div>':'')+'</button>'}}}catch(e){}
   h+=verdictCard();
   h+=todayOrder().join('');
   return h+'</div>'}
