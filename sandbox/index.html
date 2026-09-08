@@ -666,7 +666,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='7c13ef';  // stamped by tools/build.py with the content hash
+const BUILD_ID='76a30f';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -1041,6 +1041,10 @@ function applyAdj(exName,delta,why,silent){
   saveLib();
   if(S.sess){
     S.sess.sets.forEach(st=>{if(st.ex===exName&&st.targetW!=null){st.targetW=Math.max(0,Math.round((st.targetW+delta)*4)/4);st.adj=(st.adj||0)+delta}});
+    /* every delta taught during THIS session is on the record — a
+       discarded session must unteach them (owner-caught, 8 Sep) */
+    S.sess.adjApplied=S.sess.adjApplied||{};
+    S.sess.adjApplied[exName]=Math.round(((S.sess.adjApplied[exName]||0)+delta)*4)/4;
     persistActive()}
   S.lastAdj={ex:exName,delta:delta};
   if(!silent){vib(14);flash((delta>0?'+':'')+uwNum(delta)+' '+uwUnit()+' on '+exName.replace(/ — .*/,'')+(why?' — '+why:'')+'. Undo is on the set screen.')}
@@ -2349,7 +2353,14 @@ A.saveExit=complete=>{const s=S.sess;if(!s)return;
   try{if(complete)setTimeout(function(){const h9=S.history[S.history.length-1];if(h9)hrWitnessAsk(h9)},1500)}catch(e){}
   flash(ok?(complete?'Session saved.':'Saved as unfinished \u2014 pick it back up from Today whenever.'):'Storage is full or blocked — export a backup from Data.');
   try{if(S.view!=='today'){S.view='today';render()}}catch(e){}};
-A.discardYes=()=>{if(S.sess){S.history=S.history.filter(h=>h.id!==String(S.sess.startedAt));saveHistory()}
+A.discardYes=()=>{if(S.sess){S.history=S.history.filter(h=>h.id!==String(S.sess.startedAt));saveHistory();
+    /* discard means it never happened — including what the session
+       taught the regulator */
+    try{const aa=S.sess.adjApplied;
+      if(aa){const prog=S.lib.programs.find(p=>p.id===S.sess.progId);
+        if(prog&&prog.adj){Object.keys(aa).forEach(ex=>{
+          prog.adj[ex]=Math.round(((prog.adj[ex]||0)-aa[ex])*4)/4;
+          if(!prog.adj[ex])delete prog.adj[ex]});saveLib()}}}catch(e){}}
   audioCancel();ldel(K_A);S.sess=null;S.restEnd=null;S.holdEnd=null;S.sheet=null;S.view='home';wakeOff();flash('Session discarded.')};
 A.resumeHist=id=>{const rec=S.history.find(h=>h.id===id);if(!rec)return;
   const prog=S.lib.programs.find(p=>p.id===rec.progId)||activeProg();
@@ -12629,9 +12640,15 @@ function verdictCard(){
   if(done&&n&&t.revealed&&callLive&&!S.noticedBig){
     const exN=esc(String(pd.ex).replace(/ — .*/,''));
     inner+='<div class="an-rise" style="margin-top:11px">'+
-      '<p class="mono" style="font-size:10px;color:var(--amber);letter-spacing:.08em">✦ THE CALL · '+esc(String(pd.day||'today').toUpperCase())+'</p>'+
+      '<p class="mono" style="font-size:10px;color:var(--amber);letter-spacing:.08em">✦ THE FORECAST · '+esc(String(pd.day||'today').toUpperCase())+'</p>'+
       '<p class="disp gradhead" style="font-size:26px;line-height:1.15;margin-top:7px">'+exN+' '+uwStr(pd.predW)+'×'+pd.predR+'</p>'+
-      '<p style="color:var(--dim);font-size:13.5px;line-height:1.6;margin-top:6px">That is what the model expects from your evidence. Match it and it learns you — beat it and it learns more.</p>'+
+      '<p style="color:var(--dim);font-size:13.5px;line-height:1.6;margin-top:6px">What the model expects from your evidence \u2014 a forecast to beat, never the prescription. '+
+      (function(){try{
+        const rec9=recommendToday();if(!rec9||!rec9.top)return '';
+        const prog9=activeProgSafe();
+        const st9=buildSets(prog9,rec9.dayIdx!=null?rec9.dayIdx:rec9.top.i,S.week)
+          .find(x9=>x9.ex===pd.ex&&x9.targetW!=null);
+        return st9?('Your plan today: <b style="color:var(--text)">'+uwStr(st9.targetW)+(st9.targetReps?' \u00d7 '+st9.targetReps:'')+'</b>. The session screen is the judge.'):''}catch(e9){return ''}})()+'</p>'+
       '<button data-a="predOpen" class="mono" style="color:var(--amber);font-size:11px;margin-top:8px;text-align:left">Why this call ›</button></div>'+
       noticedQuiet+
       '<div style="display:flex;align-items:center;gap:9px;margin-top:11px;padding-top:11px;border-top:1px solid var(--line)">'+dots+
