@@ -666,7 +666,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='afa1de';  // stamped by tools/build.py with the content hash
+const BUILD_ID='357d75';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -15722,7 +15722,11 @@ function dayCard(p,d,i,done,daily){
      nothing in them starts — the record lives in History */
   const locked=p.weeks>1&&weekClosed(p,S.week);
   const gated=!locked&&p.weeks>1&&!weekTrainable(p,S.week);
-  return '<button class="card" data-a="'+(locked?'weekLockedInfo':gated?'weekGateOpen':'prevOpen')+'" data-v="'+p.id+':'+i+'" style="width:100%;text-align:left;padding:16px;display:block">'+
+  /* a DIV, not a button: the expanded muscle breakdown nests its own
+     buttons ((i), the toggle) and HTML silently splits nested buttons
+     — the stats row was landing OUTSIDE the card with a void where
+     the card broke (beta-caught via Dafydd, 9 Sep) */
+  return '<div class="card" data-a="'+(locked?'weekLockedInfo':gated?'weekGateOpen':'prevOpen')+'" data-v="'+p.id+':'+i+'" style="width:100%;text-align:left;padding:16px;display:block;cursor:pointer">'+
     '<div style="display:flex;align-items:center;gap:8px">'+
     '<span style="width:9px;height:9px;border-radius:9px;background:'+dayCol(i)+';flex:none"></span>'+
     '<span class="eyebrow">'+(daily?'Daily':'Day '+(i+1))+'</span>'+
@@ -15736,7 +15740,7 @@ function dayCard(p,d,i,done,daily){
     (function(){const ab=((S.addback||{})[offloadKey(p)]||[]).filter(a=>a.day===i);
       return ab.length?'<p class="mono" style="color:var(--green);font-size:10.5px;margin-top:4px">+ '+ab.reduce((a2,x)=>a2+(x.sets||1),0)+' set'+(ab.length===1?'':'s')+' added back: '+ab.map(x=>esc(String(x.ex).replace(/ — .*/,''))).join(', ')+'</p>':''})()+
     '<div class="mono" style="display:flex;gap:14px;margin-top:12px;color:var(--faint);font-size:11px">'+
-    '<span>'+sets.length+' SETS</span><span>'+sets[sets.length-1].exNo+' EXERCISES</span><span>~'+Math.max(mins,5)+' MIN</span></div></button>'}
+    '<span>'+sets.length+' SETS</span><span>'+sets[sets.length-1].exNo+' EXERCISES</span><span>~'+Math.max(mins,5)+' MIN</span></div></div>'}
 function noteBrief(n){
   /* a day card carries one line of note; the full text lives inside the day */
   n=String(n||'');if(n.length<=140)return n;
