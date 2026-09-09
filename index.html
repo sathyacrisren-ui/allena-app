@@ -666,7 +666,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='04c173';  // stamped by tools/build.py with the content hash
+const BUILD_ID='293be6';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -1161,6 +1161,10 @@ function regulate(rows,c,opts){
   if(opts.eased&&out.delta<0){out.delta=0;out.outcome='held';
     out.msg='Rough day by your own readiness reading, so the numbers are not evidence the load is wrong. Nothing written to the program — repeat this weight when you are fresh.';
     out.why='low-readiness session, no permanent change'}
+  /* bests lead the verdict — stars in the log with a silent summary
+     read as the app not noticing (owner-caught, 9 Sep) */
+  try{const np=rows.filter(x=>x&&x.pr).length;
+    if(np)out.msg=(np===1?'A new best in there. ':np+' new bests in there. ')+out.msg}catch(e9){}
   return out}
 
 function autoProgress(e,c){
@@ -2497,8 +2501,10 @@ A.commit=(confirmed)=>{const s=S.sess,c=s.sets[s.idx],timed=!!c.secs;
   const gHit=checkGoals(e);
   const auto=autoProgress(e,c);
   persistActive();render();
-  if(auto){}
-  else if(gHit){vib([40,60,40,60,40,60,140]);flash('GOAL HIT · '+gHit.ex+' '+gHit.w+' × '+gHit.r,true)}
+  /* a PR or goal-hit flash paints OVER the regulator's note — the
+     old `if(auto){}` swallow meant an increase on the last set could
+     mute NEW BEST entirely (owner-caught, 9 Sep) */
+  if(gHit){vib([40,60,40,60,40,60,140]);flash('GOAL HIT · '+gHit.ex+' '+gHit.w+' × '+gHit.r,true)}
   else if(pr){vib([25,45,25,45,90]);flash('NEW BEST · '+c.ex+' · '+pr,true)}};
 A.adv=i=>{audioCancel();S.restEnd=null;S.holdEnd=null;S.holdWait=false;const s=S.sess;
   if(i>=s.sets.length){s.phase='done';try{S.sessReveal=sessionReveal()}catch(e){}}else{s.idx=i;s.phase='ready'}persistActive();render()};
@@ -17042,12 +17048,17 @@ function viewHome(){
 function sessionPRs(s2){
   if(!s2)return[];
   const out=[],seen={};
+  /* the session's own history row is id=String(startedAt) — s2.id
+     never existed, so the session compared against ITSELF and the
+     completion screen never showed a best (owner-caught, 9 Sep:
+     'said nothing about my 4 prs'). */
+  const sid=String(s2.id||s2.startedAt||'');
   s2.log.forEach(l=>{
     if(!l.w||!l.r)return;
     const b=gBase(l.ex);if(seen[b])return;
     const e=e1rm(l.w,l.r,l.rpe);
     let prior=0;
-    S.history.forEach(h=>{if(h.id===s2.id)return;
+    S.history.forEach(h=>{if(String(h.id)===sid)return;
       h.log.forEach(x=>{if(gBase(x.ex)===b&&x.w&&x.r)prior=Math.max(prior,e1rm(x.w,x.r,x.rpe))})});
     if(prior&&e>prior+0.5){seen[b]=1;out.push({ex:b,e:Math.round(e),prev:Math.round(prior)})}});
   return out}
