@@ -658,7 +658,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='5580c8';  // stamped by tools/build.py with the content hash
+const BUILD_ID='c1a1e9';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -1776,6 +1776,10 @@ async function frLoad(force){
       /* the overtake: their new total passed your current one */
       const aOv=acct()||{};const seen=aOv.raceSeen||{};const ovQ=aOv.ovQueue||[];
       const mine9=Math.round((dataPoints().weekLive)||0);
+      /* since-you-opened baseline (owner ask, 9 Sep): once per app
+         open (30-min rule, same as the boot screen) freeze the
+         pre-sync scores; the board marks movers against it */
+      if(!aOv.rowBaseT||Date.now()-aOv.rowBaseT>18e5){aOv.rowBase=Object.assign({},seen);aOv.rowBaseT=Date.now()}
       const mineP=aOv.myLastWk;
       (typeof raceField==='function'?raceField():frLinked()).forEach(f=>{
         const prev=seen[f.id];
@@ -2054,8 +2058,10 @@ function friendsSection(){
           const h9=Math.round((Date.now()-new Date(x).getTime())/36e5);
           if(h9<12)return null;
           return h9<48?Math.round(h9)+'h':Math.round(h9/24)+'d'}catch(e9){return null}};
+        const rb9=(acct()||{}).rowBase||{};
         const R=[{me:1,name:myFirst||'You',init:myInit,week:mine,av:(acct()||{}).av||''}]
           .concat(L.map(f=>({me:0,id:f.id,code:f.code,name:f.name,av:f.av||'',
+            d9:(rb9[f.id]!=null?Math.max(0,(f.week||0)-rb9[f.id]):0),
             init:(f.named?String(f.name).slice(0,1).toUpperCase():'?'),week:f.week||0,stale:staleT(f.seen)})));
         R.sort((a,b)=>b.week-a.week||(a.me?-1:1));
         R.forEach((x,i)=>{x.rank=i+1});
@@ -2091,7 +2097,8 @@ function friendsSection(){
               :'<button data-a="frOpen" data-v="'+esc(x.id)+'" style="flex:1;min-width:0;font-size:13px;text-align:left;padding:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(x.name)+' <span style="color:var(--faint);font-size:10px">\u203a</span></button>')+
             (x.me?'':(x.stale?'<span class="mono" style="color:var(--faint);font-size:9px;flex:none">as of '+x.stale+' ago</span>'
               :'<span class="mono" style="color:'+(lead>=0?'var(--green)':'var(--amber)')+';font-size:9.5px;flex:none">'+(lead>=0?'+'+lead+' you':'+'+(-lead)+' them')+'</span>'))+
-            '<span class="mono" data-cu="row-'+esc(String(x.me?'me':x.id))+'" style="font-size:14px;font-weight:700;flex:none">'+x.week+'</span>'+
+            '<span class="mono" data-cu="row-'+esc(String(x.me?'me':x.id))+'" style="font-size:14px;font-weight:700;flex:none'+(x.d9>0?';color:var(--green)':'')+'">'+x.week+'</span>'+
+            (x.d9>0?'<span class="mono" style="color:var(--green);font-size:9px;flex:none" title="Since you opened the app">▲'+x.d9+'</span>':'')+
             (x.me||!x.id?'':'<button data-a="nudgeOpen" data-v="'+esc(x.id)+'" class="mono" style="font-size:9px;letter-spacing:.08em;flex:none;padding:4px 7px;border:1px solid var(--line);border-radius:9px;color:var(--dim)">NUDGE</button>')+
             (x.me?'':'<button data-a="duelPin" data-v="'+esc(x.id)+'" style="font-size:12px;flex:none;padding:0 3px;color:'+(((acct()||{}).duelPin)===x.id?'var(--green)':'var(--faint)')+'" title="Pin the head-to-head">\u2694</button>')+
             ((x.me||!x.code)?'':'<button data-a="frRemove" data-v="'+esc(x.code)+'" style="color:var(--faint);font-size:12px;flex:none;padding:0 4px">\u2715</button>')+
