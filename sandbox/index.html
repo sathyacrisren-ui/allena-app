@@ -666,7 +666,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='286f6b';  // stamped by tools/build.py with the content hash
+const BUILD_ID='dbb846';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -16862,21 +16862,30 @@ function catchUpPlan(p){
   try{
     if(!p||!p.days)return [];
     const cut=Date.now()-45*864e5;
-    const byBase={};
+    /* relaxed key: 'Barbell Bench' / 'Bench Press' / 'Barbell Bench
+       Press' are one lift split three ways in imported plans
+       (Dafydd's sheet) — the fallback matcher strips the furniture
+       words and is used ONLY when the exact name finds no history */
+    const relax=n=>String(gBase(n)).toLowerCase().replace(/\b(barbell|bb|press)\b/g,' ').replace(/[^a-z]+/g,' ').trim();
+    const byBase={},byRelax={};
     (S.history||[]).forEach(h=>{
       if(!h.complete||h.run)return;
       if(new Date(h.date).getTime()<cut)return;
       const tops={};
       (h.log||[]).forEach(l=>{if(!(l.w>0&&l.r>0))return;
         const b=gBase(l.ex);if(l.w>(tops[b]||0))tops[b]=l.w});
-      Object.keys(tops).forEach(b=>{(byBase[b]=byBase[b]||[]).push({t:new Date(h.date).getTime(),w:tops[b]})})});
+      Object.keys(tops).forEach(b=>{
+        (byBase[b]=byBase[b]||[]).push({t:new Date(h.date).getTime(),w:tops[b]});
+        const r=relax(b);if(r)(byRelax[r]=byRelax[r]||[]).push({t:new Date(h.date).getTime(),w:tops[b]})})});
     const out=[];const seen={};
     p.days.forEach(d=>(d.exercises||[]).forEach(ex=>{
       if(seen[ex.name])return;seen[ex.name]=1;
       const l=setsForWeek(ex,(typeof weekFor==='function'?weekFor(p.id):S.week)||1);
       const st=(l||[]).find(x=>x&&x.w!=null);if(!st)return;
       const eff=Math.round((st.w+adjOf(p,ex.name))*4)/4;
-      const rows=(byBase[gBase(ex.name)]||[]).sort((a,b)=>a.t-b.t).slice(-3).map(x=>x.w).sort((a,b)=>a-b);
+      let pool=byBase[gBase(ex.name)]||[];
+      if(pool.length<2){const r=relax(ex.name);if(r&&byRelax[r])pool=byRelax[r]}
+      const rows=pool.slice().sort((a,b)=>a.t-b.t).slice(-3).map(x=>x.w).sort((a,b)=>a-b);
       if(rows.length<2)return;
       const med=rows[Math.floor(rows.length/2)];
       const to=Math.round(med*4)/4;
