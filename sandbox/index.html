@@ -666,7 +666,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='357d75';  // stamped by tools/build.py with the content hash
+const BUILD_ID='286f6b';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -16852,6 +16852,36 @@ function viewToday(){
   h+=verdictCard();
   h+=todayOrder().join('');
   return h+'</div>'}
+function catchUpPlan(p){
+  /* an imported plan's weights can be STALE while the user's logs
+     marched on (beta-caught via Dafydd's sheet, 9 Sep: his 'PLAN
+     frozen' column was week-1 numbers; weeks of real progress lived
+     in the log columns — the import was faithful, the plan wasn't).
+     For each program lift: median TOP working weight of the last 3
+     sessions (45 days) vs the effective prescription. */
+  try{
+    if(!p||!p.days)return [];
+    const cut=Date.now()-45*864e5;
+    const byBase={};
+    (S.history||[]).forEach(h=>{
+      if(!h.complete||h.run)return;
+      if(new Date(h.date).getTime()<cut)return;
+      const tops={};
+      (h.log||[]).forEach(l=>{if(!(l.w>0&&l.r>0))return;
+        const b=gBase(l.ex);if(l.w>(tops[b]||0))tops[b]=l.w});
+      Object.keys(tops).forEach(b=>{(byBase[b]=byBase[b]||[]).push({t:new Date(h.date).getTime(),w:tops[b]})})});
+    const out=[];const seen={};
+    p.days.forEach(d=>(d.exercises||[]).forEach(ex=>{
+      if(seen[ex.name])return;seen[ex.name]=1;
+      const l=setsForWeek(ex,(typeof weekFor==='function'?weekFor(p.id):S.week)||1);
+      const st=(l||[]).find(x=>x&&x.w!=null);if(!st)return;
+      const eff=Math.round((st.w+adjOf(p,ex.name))*4)/4;
+      const rows=(byBase[gBase(ex.name)]||[]).sort((a,b)=>a.t-b.t).slice(-3).map(x=>x.w).sort((a,b)=>a-b);
+      if(rows.length<2)return;
+      const med=rows[Math.floor(rows.length/2)];
+      const to=Math.round(med*4)/4;
+      if(Math.abs(to-eff)>=2.5)out.push({ex:ex.name,from:eff,to:to})}));
+    return out}catch(e){return []}}
 function viewHome(){
   const p=activeProgSafe();
   const ws=weekState(p,S.week);
@@ -16889,6 +16919,11 @@ function viewHome(){
         (ks9.length>8?'<p class="mono" style="color:var(--faint);font-size:9.5px;margin-top:6px">and '+(ks9.length-8)+' more</p>':'')+
         '<p style="color:var(--faint);font-size:10.5px;line-height:1.5;margin-top:9px">What the regulation engine has moved off the written program \u2014 earned from your logged sets, reversible any time.</p>'+
         '<button data-a="adjResetAll" class="btn mt" style="font-size:12.5px;border-color:var(--amber);color:var(--amber)">Reset all to the written program</button></div>'}}catch(e){}
+  try{const cu=catchUpPlan(p);
+    if(cu.length)h+='<button data-a="catchOpen" class="card mt" style="width:100%;text-align:left;padding:14px 16px;display:block;border-color:var(--amber)">'+
+      '<p class="eyebrow" style="color:var(--amber)">Your logs are ahead of the written program</p>'+
+      '<p style="color:var(--dim);font-size:12.5px;line-height:1.55;margin-top:5px">'+cu.length+' lift'+(cu.length===1?'':'s')+' where what you actually lift differs from what the plan says \u2014 common with imported spreadsheets whose plan column went stale. One tap catches the program up.</p>'+
+      '<p class="mono" style="color:var(--amber);font-size:11px;margin-top:7px">See the catch-up \u203a</p></button>'}catch(e){}
   const render1={stats:()=>secStats(),program:()=>secProgram(p,ws),sessions:()=>secSessions(p,ws),
     goals:()=>secGoals(),habits:()=>secHabits(),support:()=>secSupport()};
   (S.lay.order||['stats','program','sessions','goals','habits','support']).forEach(k=>{
@@ -19945,6 +19980,17 @@ function sheetHtml(){
     }else{
       inner+='<button data-a="prevGo" class="big disp mt2" style="background:var(--amber);color:var(--bg);font-size:16px">Start · '+totalSets+' sets</button>'}
     return wrapSheet('Before you start',inner)}
+  if(S.sheet.t==='catchup'){
+    const p9=activeProgSafe();const cu=(typeof catchUpPlan==='function')?catchUpPlan(p9):[];
+    if(!cu.length)return wrapSheet('Catch the program up',
+      '<p style="color:var(--dim);font-size:13px;line-height:1.6">Nothing to catch up \u2014 the program already matches your recent logs.</p>');
+    return wrapSheet('Catch the program up',
+      '<p style="color:var(--dim);font-size:13px;line-height:1.6">Each number comes from your own last few sessions (the median top working weight). Applied as visible adjustments \u2014 the ledger shows them, and one tap reverses them.</p>'+
+      '<div class="card mt" style="padding:13px 15px">'+
+      cu.map(x=>'<div style="display:flex;justify-content:space-between;gap:10px;padding:5px 0">'+
+        '<span style="flex:1;min-width:0;font-size:12.5px;color:var(--dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(String(x.ex).replace(/ \u2014 .*/,''))+'</span>'+
+        '<span class="mono" style="font-size:12.5px;flex:none"><span style="color:var(--faint)">'+uwNum(x.from)+'</span> \u2192 <b>'+uwNum(x.to)+' '+uwUnit()+'</b></span></div>').join('')+'</div>'+
+      '<button data-a="catchApply" class="big disp mt2" style="background:var(--amber);color:var(--bg);font-size:15px">Catch it up \u2014 '+cu.length+' lift'+(cu.length===1?'':'s')+'</button>')}
   if(S.sheet.t==='avatar'){
     const cur=avParse((acct()||{}).av)||{c:0,g:0};
     const sel=S.avSel||cur;
@@ -21981,6 +22027,11 @@ function runAction(a,v,t,e){
       S.lib.programs.push(nb.prog);S.lib.activeId=nb.prog.id;saveLib();
       setWeek(1,nb.prog.id);S.nb=null;S.sheet=null;S.reviewProg=null;S.view='home';render();
       flash(nb.prog.block+' is ready — week 1.');break}
+    case 'catchOpen':{S.sheet={t:'catchup'};render();break}
+    case 'catchApply':{
+      const p9=activeProgSafe();const cu=(typeof catchUpPlan==='function')?catchUpPlan(p9):[];
+      cu.forEach(x=>{try{applyAdj(x.ex,Math.round((x.to-x.from)*4)/4,'caught up to your logs',true)}catch(e9){}});
+      S.sheet=null;flash(cu.length+' lift'+(cu.length===1?'':'s')+' caught up to what you actually lift. The ledger shows each one.');render();break}
     case 'avOpen':{S.avSel=avParse((acct()||{}).av)||{c:1,g:0};S.sheet={t:'avatar'};render();break}
     case 'avSetC':{S.avSel=Object.assign({},S.avSel||{c:0,g:0},{c:+v});render();break}
     case 'avSetG':{S.avSel=Object.assign({},S.avSel||{c:0,g:0},{g:+v});render();break}
