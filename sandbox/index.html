@@ -476,6 +476,14 @@ const reps=(r,n,perSide)=>Array.from({length:n},()=>({reps:r,perSide:!!perSide})
 function setsForWeek(ex,wk){const s=ex.sets;if(Array.isArray(s))return s;
   if(s&&typeof s==='object')return s[String(wk)]||s.default||null;return null}
 function adjOf(prog,name){return (prog&&prog.adj&&prog.adj[name])||0}
+function sessAdv(s){
+ /* the NEXT UNLOGGED set's index, scanning forward then wrapping —
+    a superset hop used to lap the list and silently relog set #1
+    (owner-caught, 9 Sep). -1 means every set is logged. */
+ try{const logged=i=>s.log.some(l=>l.ex===s.sets[i].ex&&l.setNo===s.sets[i].setNo);
+  for(let i=s.idx+1;i<s.sets.length;i++)if(!logged(i))return i;
+  for(let i=0;i<s.sets.length;i++)if(!logged(i))return i;
+  return -1}catch(e){return Math.min((+s.idx||0)+1,(s.sets||[]).length-1)}}
 /* heldBest was removed 9 Sep (owner ruling): the written hold time is
    the prescription, always — a long hold is logged in full but never
    becomes the next set's target. */
@@ -658,7 +666,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='4e28ef';  // stamped by tools/build.py with the content hash
+const BUILD_ID='aacb17';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -2479,12 +2487,13 @@ A.commit=(confirmed)=>{const s=S.sess,c=s.sets[s.idx],timed=!!c.secs;
   e.t=Date.now(); // wall-clock stamp: a live set is auditable, a typed one is not
   s.log.push(e);
   upsert(record(false));
-  if(s.idx>=s.sets.length-1){s.phase='done';S.restEnd=null;audioCancel();
+  const ni9=sessAdv(s);
+  if(ni9<0){s.phase='done';S.restEnd=null;audioCancel();
     try{S.sessReveal=sessionReveal()}catch(e){S.sessReveal=null}
     try{if(typeof reviewMoment==='function')setTimeout(reviewMoment,2500)}catch(e){}}
   else{const r=c.rest||0;
     if(r>5){audioCancel();S.restBeep=audioIn(r);S.restEnd=Date.now()+r*1000;S.restTotal=r;s.phase='resting'}
-    else{s.idx++;s.phase='ready'}}
+    else{s.idx=ni9;s.phase='ready'}}
   const gHit=checkGoals(e);
   const auto=autoProgress(e,c);
   persistActive();render();
@@ -2530,7 +2539,9 @@ A.jumpTo=i=>{audioCancel();const s=S.sess;const t=Math.max(0,Math.min(+i,s.sets.
 A.skipSet=()=>A.adv(S.sess.idx+1);
 A.skipEx=()=>{S.sess.skipped=(S.sess.skipped||[]);if(S.sess.skipped.indexOf(S.sess.sets[S.sess.idx].exNo)<0)S.sess.skipped.push(S.sess.sets[S.sess.idx].exNo);const s=S.sess,no=s.sets[s.idx].exNo;let i=s.idx;
   while(i<s.sets.length&&s.sets[i].exNo===no)i++;A.adv(i)};
-A.skipRest=()=>{audioCancel();S.restEnd=null;S.sess.idx++;S.sess.phase='ready';persistActive();render()};
+A.skipRest=()=>{audioCancel();S.restEnd=null;const n9=sessAdv(S.sess);
+  if(n9<0){S.sess.phase='done';try{S.sessReveal=sessionReveal()}catch(e){}}
+  else{S.sess.idx=n9;S.sess.phase='ready'}persistActive();render()};
 A.addRest=()=>{S.restEnd=(S.restEnd||Date.now())+30000;S.restTotal=(S.restTotal||((S.sess&&S.sess.sets[S.sess.idx])||{}).rest||30)+30;audioCancel();S.restBeep=audioIn((S.restEnd-Date.now())/1000);render()};
 A.saveExit=complete=>{const s=S.sess;if(!s)return;
   if(!s.log.length){ldel(K_A);S.sess=null;S.view='today';wakeOff();return flash('Nothing logged, so nothing saved.')}
@@ -9230,7 +9241,7 @@ window.watchAct=function(a,ts){
     const s=S.sess;if(!s){wristMark(a,'no session');return}
     const ph0=s.phase;let norm='';
     if(s.phase==='resting'&&S.restEnd&&S.restEnd-Date.now()<=1500){
-      audioCancel();S.restEnd=null;s.idx++;s.phase='ready';persistActive();norm=' (rest normalized)'}
+      audioCancel();S.restEnd=null;const n8=sessAdv(s);if(n8>=0)s.idx=n8;s.phase='ready';persistActive();norm=' (rest normalized)'}
     if(a==='begin'&&s.phase==='ready'){wristMark(a,ph0+'\u2192working'+norm);runAction('begin','');
       if(+ts>0&&+ts<=Date.now()){S.setStart=+ts;
         /* a timed hold armed late by a sleeping phone must not run
@@ -9257,7 +9268,7 @@ window.watchLog=function(r,w,rpe,finTs,begTs){
       S._lastWristFin=+finTs}
     /* convergence: replay whatever the sleeping phone missed */
     if(s.phase==='resting'&&S.restEnd&&S.restEnd-Date.now()<=1500){
-      audioCancel();S.restEnd=null;s.idx++;s.phase='ready';persistActive()}
+      audioCancel();S.restEnd=null;const n7=sessAdv(s);if(n7>=0)s.idx=n7;s.phase='ready';persistActive()}
     if(s.phase==='ready'){const c0=(s.sets||[])[s.idx]||{};
       if(!c0.secs){runAction('begin','');
         if(+begTs>0&&+begTs<=Date.now())S.setStart=+begTs}}
@@ -9296,7 +9307,8 @@ function watchStatePush(){
          9 Sep: 'after the last set the watch should say up next') —
          the finished set is paperwork; the ticking rest belongs to
          the set you are about to do */
-      const ni=(s.phase==='resting'&&((+s.idx||0)+1)<(s.sets||[]).length)?(+s.idx||0)+1:(+s.idx||0);
+      let ni=(+s.idx||0);
+      if(s.phase==='resting'){const n6=sessAdv(s);if(n6>=0)ni=n6}
       const cur=(s.sets||[])[ni]||{};
       st={on:true,phase:String(s.phase||''),
         ex:String(cur.ex||'').slice(0,40),
@@ -23229,7 +23241,7 @@ setInterval(()=>{
     return}
   if(s.phase!=='resting'||!S.restEnd)return;
   const left=Math.ceil((S.restEnd-Date.now())/1000);
-  if(left<=0){S.restEnd=null;s.idx++;s.phase='ready';
+  if(left<=0){S.restEnd=null;const n9=sessAdv(s);if(n9>=0)s.idx=n9;else s.idx=Math.min(s.idx+1,s.sets.length-1);s.phase='ready';
     // the beep was scheduled when the rest started and has already sounded on
     // time. Only sound one here if that never happened — no scheduling, or the
     // phone suspended the audio context while the screen was off.
