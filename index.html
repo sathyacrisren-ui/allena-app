@@ -666,7 +666,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='936860';  // stamped by tools/build.py with the content hash
+const BUILD_ID='3df53b';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -20306,6 +20306,16 @@ function sheetHtml(){
       if(others.length)inner+='<p style="color:var(--dim);font-size:11px;letter-spacing:.1em;text-transform:uppercase;margin:18px 0 8px">Wrong exercise? Move it to</p>'+
         '<div style="display:flex;flex-direction:column;gap:6px">'+
         others.map(x=>'<button data-a="editMove" data-v="'+esc(x)+'" class="card" style="width:100%;text-align:left;padding:10px 14px;font-size:13px">'+esc(x)+'</button>').join('')+'</div>'}
+    /* wrong set NUMBER (owner-caught, 9 Sep, twice in one night: a
+       superset dupe could only be fixed by delete-and-relog, and the
+       delete renumbering looped it) — renumber in place instead */
+    {let of9=0;
+     if(S.sheet.scope==='live'&&S.sess)of9=(S.sess.sets||[]).filter(st=>st.ex===e.ex).length;
+     else{const h9=S.history.find(x=>x.id===S.sheet.sid);
+       if(h9)(h9.log||[]).forEach(l=>{if(l.ex===e.ex)of9=Math.max(of9,+l.setNo||0)})}
+     if(of9>1){const opts=[];for(let n=1;n<=of9;n++)if(n!==e.setNo)opts.push(n);
+       if(opts.length)inner+='<p style="color:var(--dim);font-size:11px;letter-spacing:.1em;text-transform:uppercase;margin:18px 0 8px">Wrong set number? Make it</p>'+
+         '<div style="display:flex;gap:8px">'+opts.map(n=>'<button data-a="editSetNo" data-v="'+n+'" class="btn" style="flex:1;padding:10px 0;border-radius:12px;font-size:14px">'+n+'</button>').join('')+'</div>'}}
     if(S.sheet.scope==='hist'||S.sheet.scope==='live')
       inner+='<button data-a="editDelete" class="btn" style="margin-top:12px;color:var(--red);background:transparent">Delete this set</button>';
     return wrapSheet(esc(e.ex)+' · set '+e.setNo,inner)}
@@ -21500,6 +21510,19 @@ function runAction(a,v,t,e){
       if(sh.scope==='live'){Object.assign(S.sess.log[sh.i],patch);upsert(record(S.sess.phase==='done'));persistActive()}
       else{const h=S.history.find(x=>x.id===sh.sid);if(h){Object.assign(h.log[sh.i],patch);h.edited=today();saveHistory()}}
       S.sheet=null;render();break}
+    case 'editSetNo':{const sh=S.sheet;
+      const e8=sh.scope==='live'?(S.sess&&S.sess.log[sh.i]):((S.history.find(x=>x.id===sh.sid)||{log:[]}).log[sh.i]);
+      if(!e8||!(+v>0))break;
+      e8.setNo=+v;
+      if(sh.scope==='live'){
+        /* renumbering can complete the session or free the pointer —
+           re-aim so Start-set never offers a set that now exists */
+        if(S.sess.phase==='ready'){const na=sessAdv(S.sess);
+          if(na<0){S.sess.phase='done';S.restEnd=null;try{S.sessReveal=sessionReveal()}catch(e9){}}
+          else S.sess.idx=na}
+        upsert(record(S.sess.phase==='done'));persistActive()}
+      else{const h8=S.history.find(x=>x.id===sh.sid);if(h8){h8.edited=today();saveHistory()}}
+      S.sheet=null;flash('Now set '+v+'.');render();break}
     case 'editDelete':{const sh=S.sheet;
       if(sh.scope==='live'){
         const gone=S.sess.log[sh.i];
