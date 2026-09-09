@@ -188,7 +188,8 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
 .sheet{animation:sheetUp .32s cubic-bezier(.16,1,.3,1)}
 @keyframes sheetUp{from{transform:translateY(26px);opacity:.55}to{transform:none;opacity:1}}
 @keyframes prPulse{0%{box-shadow:0 0 0 0 rgba(240,238,230,.45)}100%{box-shadow:0 0 0 14px rgba(240,238,230,0)}}
-.toast div.gold{border-color:var(--amber);color:var(--amber);animation:fadeUp .18s ease,prPulse .9s ease-out}
+.toast div.gold{border-color:var(--amber);color:var(--amber);animation:capDrop .38s cubic-bezier(.32,1.3,.5,1),prPulse .9s ease-out}
+.toast div.gold::before{background:var(--amber)}
 .pad{padding-left:20px;padding-right:20px}
 .eyebrow{font-size:13.5px;letter-spacing:-.01em;text-transform:none;font-weight:700;color:var(--dim);font-family:-apple-system,'Inter',system-ui,sans-serif}
 .card{background:var(--surface);border:1px solid rgba(255,255,255,.05);border-radius:20px;max-width:100%;min-width:0}
@@ -262,9 +263,12 @@ body.sesslive #hkPulse{top:calc(env(safe-area-inset-top) + 40px)}
   border-radius:26px 26px 0 0;max-height:88vh;overflow-y:auto;overscroll-behavior:contain;padding:26px 20px calc(32px + env(safe-area-inset-bottom));position:relative}
 .sheet::before{content:'';position:absolute;top:9px;left:50%;transform:translateX(-50%);
   width:38px;height:4px;border-radius:4px;background:var(--line)}
-.toast{position:fixed;bottom:92px;left:0;right:0;display:flex;justify-content:center;z-index:95;pointer-events:none}
-.toast div{background:var(--raised);border:1px solid var(--line);border-radius:14px;box-shadow:0 10px 30px rgba(0,0,0,.4);
-  padding:12px 16px;font-size:13px;max-width:400px;margin:0 16px;animation:fadeUp .18s ease}
+.toast{position:fixed;top:calc(env(safe-area-inset-top, 10px) + 6px);left:0;right:0;display:flex;justify-content:center;z-index:95;pointer-events:none}
+.toast div{display:flex;align-items:center;gap:8px;background:color-mix(in srgb, var(--raised) 94%, #000);border:1px solid var(--line);border-radius:999px;box-shadow:0 12px 34px rgba(0,0,0,.5);
+  padding:10px 18px;font-size:13px;font-weight:600;max-width:400px;margin:0 16px;animation:capDrop .38s cubic-bezier(.32,1.3,.5,1)}
+.toast div::before{content:'';width:7px;height:7px;border-radius:7px;background:var(--green);flex:none}
+@keyframes capDrop{from{transform:translateY(-26px);opacity:0}to{transform:translateY(0);opacity:1}}
+@media (prefers-reduced-motion: reduce){.toast div{animation:none}}
 .logline{display:flex;justify-content:space-between;width:100%;padding:10px 0;
   border-bottom:1px solid var(--line);font-size:12.5px;text-align:left;gap:8px}
 .logline span:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -666,7 +670,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='33417c';  // stamped by tools/build.py with the content hash
+const BUILD_ID='40793f';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -2056,7 +2060,10 @@ async function nudgeSend(toId,msgI){
       headers:{'content-type':'application/json',apikey:CLOUD.anon,Authorization:'Bearer '+tok,Prefer:'return=minimal'},
       body:JSON.stringify([{from_id:c.sub,to_id:toId,msg:+msgI||0}])});
     if(r.ok){sent[toId]=today();lset(K_ACCT,Object.assign({},a9,{nudgeSent:sent}));
-      S.sheet=null;flash('Sent. It lands on their phone.');try{haptic('success')}catch(e9){}render()}
+      try{haptic('success')}catch(e9){}
+      if(S.sheet&&S.sheet.t==='nudge'){S.sheet.sentI=+msgI||0;render();
+        setTimeout(()=>{if(S.sheet&&S.sheet.t==='nudge'){S.sheet=null;render()}},900)}
+      else{flash('Sent.');render()}}
     else if(r.status===404)flash('The nudge table is not set up yet \u2014 one SQL paste turns it on.');
     else if(r.status===409||r.status===400){sent[toId]=today();lset(K_ACCT,Object.assign({},a9,{nudgeSent:sent}));flash('One nudge per mate per day \u2014 the server holds that line too.')}
     else flash('Could not send \u2014 try again in a minute.')
@@ -20316,15 +20323,21 @@ function sheetHtml(){
     /* the fist bump (council-approved, 10 Sep): a reaction to real
        showing-up, offered only when they HAVE shown up this week \u2014
        recipient-only, never counted, no reply loop */
+    /* SENT-STATE MORPH (owner, 10 Sep: the bottom toast 'makes the
+       app look old') \u2014 the tapped row itself turns green and says
+       Sent, then the sheet closes. No toast. */
+    const sentI=S.sheet.sentI;
     let bump='';
     try{const f9=(typeof raceField==='function'?raceField():[]).find(x=>x.id===id);
-      if(f9&&(+f9.sess||0)>0)bump='<button data-a="nudgeSendPick" data-v="90" class="card" style="width:100%;text-align:left;padding:14px 15px;border-color:var(--green)">'+
-        '<span style="display:block;font-size:14px;font-weight:650;color:var(--green)">Fist bump</span>'+
-        '<span style="color:var(--dim);font-size:12px">\u201cSaw you showing up this week.\u201d The good one.</span></button>'}catch(e9){}
+      if(f9&&(+f9.sess||0)>0){const on=sentI===90;
+        bump='<button '+(sentI==null?'data-a="nudgeSendPick" data-v="90" ':'')+'class="card" style="width:100%;text-align:left;padding:14px 15px;border-color:var(--green)'+(on?';background:color-mix(in srgb, var(--green) 12%, var(--surface))':'')+'">'+
+        '<span style="display:block;font-size:14px;font-weight:650;color:var(--green)">'+(on?'\u2713 Sent':'Fist bump')+'</span>'+
+        '<span style="color:var(--dim);font-size:12px">\u201cSaw you showing up this week.\u201d The good one.</span></button>'}}catch(e9){}
     return wrapSheet('Send a nudge',
       '<p style="color:var(--dim);font-size:13px;line-height:1.6">One tap, lands on their phone. One per mate per day \u2014 the server holds that line even if you don\u2019t.</p>'+
       '<div style="margin-top:12px;display:flex;flex-direction:column;gap:8px">'+bump+
-      NUDGE_MSGS.map((m9,i)=>'<button data-a="nudgeSendPick" data-v="'+i+'" class="card" style="width:100%;text-align:left;padding:13px 15px;font-size:13.5px">\u201c'+esc(m9)+'\u201d</button>').join('')+'</div>')}
+      NUDGE_MSGS.map((m9,i)=>{const on=sentI===i;
+        return '<button '+(sentI==null?'data-a="nudgeSendPick" data-v="'+i+'" ':'')+'class="card" style="width:100%;text-align:left;padding:13px 15px;font-size:13.5px'+(on?';border-color:var(--green)':'')+'">'+(on?'<span style="color:var(--green);font-weight:700">\u2713 Sent \u00b7 </span>':'')+'\u201c'+esc(m9)+'\u201d</button>'}).join('')+'</div>')}
   if(S.sheet.t==='demo'){
     const live=!!localStorage.getItem('allena-demo-live');
     return wrapSheet('Demo mode',live
