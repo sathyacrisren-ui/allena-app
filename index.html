@@ -658,7 +658,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='2ef394';  // stamped by tools/build.py with the content hash
+const BUILD_ID='644d89';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -2008,10 +2008,14 @@ async function nudgePull(tok,h){
   /* ride frLoad: fetch unseen nudges, queue at most 3 as pings (the
      proven claim/overtake path drains them), mark all seen */
   try{
-    const c=acctClaims(tok);if(!c||!c.sub)return;
+    S._ndgLast={t:new Date().toTimeString().slice(0,8),st:'started'};
+    const c=acctClaims(tok);if(!c||!c.sub){S._ndgLast.st='no token claims';return}
     const r=await fetch(CLOUD.url+'/rest/v1/nudges?select=id,from_id,msg,created_at&to_id=eq.'+encodeURIComponent(c.sub)+'&seen=eq.false&order=created_at.asc&limit=10',{headers:h});
+    S._ndgLast.st='http '+r.status;
     if(!r.ok)return;
-    const rows=await r.json();if(!Array.isArray(rows)||!rows.length)return;
+    const rows=await r.json();
+    S._ndgLast.found=Array.isArray(rows)?rows.length:-1;
+    if(!Array.isArray(rows)||!rows.length)return;
     const names={};try{raceField().forEach(f=>names[f.id]=f.name)}catch(e9){}
     const a9=acct()||{};const q=a9.ovQueue||[];
     rows.slice(0,3).forEach(x=>{
@@ -2020,11 +2024,13 @@ async function nudgePull(tok,h){
       if(!q.some(y=>y.id==='ndg'+x.id))q.push({id:'ndg'+x.id,ts:Math.round(Date.now()/1000)+5,body:body});
       try{if(document.visibilityState==='visible')flash(body)}catch(e9){}});
     lset(K_ACCT,Object.assign({},a9,{ovQueue:q}));
+    S._ndgLast.queued=q.filter(x=>!x.sent).length;
     try{if(typeof notifSync==='function')notifSync()}catch(e9){}
     await fetch(CLOUD.url+'/rest/v1/nudges?to_id=eq.'+encodeURIComponent(c.sub)+'&id=in.('+rows.map(x=>x.id).join(',')+')',{method:'PATCH',
       headers:Object.assign({},h,{'content-type':'application/json',Prefer:'return=minimal'}),
-      body:JSON.stringify({seen:true})})
-  }catch(e){}}
+      body:JSON.stringify({seen:true})});
+    S._ndgLast.st='done'
+  }catch(e){try{S._ndgLast=Object.assign(S._ndgLast||{},{st:'error: '+String(e&&e.message||e).slice(0,60)})}catch(e2){}}}
 function frRename(id,nm){
   try{const a9=acct()||{};const m=a9.frNames||{};
     nm=String(nm||'').trim().slice(0,14);
@@ -4990,10 +4996,17 @@ function dataPoints(){
     byDay[day]=(byDay[day]||0)+earn+zearn;
     /* a witnessed run competes beside the lifting (owner ruling,
        8 Sep) — run + workout COMPOUND: both land on the same weekly
-       score, and a run counts as showing up in the sessions line */
-    if(runLive(r)){live+=earn+zearn;
-      if(wkStart&&day>=wkStart){weekLive+=earn+zearn;weekSess++}
-      else if(pvStart&&day>=pvStart&&day<wkStart)prevWeekLive+=earn+zearn}
+       score, and a run counts as showing up in the sessions line.
+       RACE SCORING IS TIME-BASED (owner ruling, 9 Sep: an 11-point
+       5K couldn't race a 40-point gym session): witnessed cardio
+       earns 0.8 per moving minute toward the race (+ the HR/effort/
+       zone bonuses), capped at 40 a run. The DATA economy (B.runs,
+       day caps, the tree) keeps the information price unchanged. */
+    const mins9=+r.mins||0;
+    const race9=mins9>0?Math.min(40,0.8*mins9+(r.hr?1:0)+(r.rpe?1:0)+zearn):earn+zearn;
+    if(runLive(r)){live+=race9;
+      if(wkStart&&day>=wkStart){weekLive+=race9;weekSess++}
+      else if(pvStart&&day>=pvStart&&day<wkStart)prevWeekLive+=race9}
     B.runs+=earn;B.zones+=zearn});
   const g=(S.gar&&S.gar.days)||{};
   Object.keys(g).forEach(k=>{const d=g[k]||{};
@@ -18250,6 +18263,7 @@ function viewData(){
   const left=Object.keys(byTitle).filter(k=>KNOWN.indexOf(k)<0);
   if(left.length)h+=setGroup('More',left.map(k=>setRow(I.prog,k,'',k)));
   h+='<p class="mono" style="color:var(--faint);font-size:10px;text-align:center;margin:22px 0 8px;letter-spacing:.08em">ALLENA · BUILD '+BUILD_ID+(SANDBOX?' · SANDBOX':'')+'</p>';
+  try{if(S._ndgLast)h+='<p class="mono" style="color:var(--faint);font-size:9.5px;text-align:center;margin:0 0 6px">NUDGE PULL · '+esc(S._ndgLast.t||'')+' · '+esc(S._ndgLast.st||'')+(S._ndgLast.found!=null?' · found '+S._ndgLast.found:'')+(S._ndgLast.queued!=null?' · queued '+S._ndgLast.queued:'')+'</p>'}catch(e){}
   h+='<p style="color:var(--faint);font-size:10.5px;text-align:center;margin:0 24px 8px;line-height:1.5">Allena keeps score. It isn’t medical advice. Your physio or doctor makes the calls.</p>';
   return h+'</div>'}
 function dataRaw(){
