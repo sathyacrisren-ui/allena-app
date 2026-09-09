@@ -666,7 +666,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='d16670';  // stamped by tools/build.py with the content hash
+const BUILD_ID='9c7ab0';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -1720,7 +1720,11 @@ function snapshotData(){
       out.prev_week_live=d.prevWeekLive||0;
       try{out.prev_week_key=dayKey(new Date(new Date(questWeekKey()+'T12:00').getTime()-7*864e5))}catch(e){}}
     out.week_live=d.weekLive||0;out.week_sessions=d.weekSessions||0;
-    try{const av9=(acct()||{}).av;if(av9)out.av=String(av9).slice(0,5)}catch(e){}
+    try{let av9=(acct()||{}).av;
+      if(av9){const tm=/^(\d):t(\d)$/.exec(String(av9));
+        if(tm){const st9=treeStageN();
+          if(st9!==+tm[2]){av9=tm[1]+':t'+st9;lset(K_ACCT,Object.assign({},acct()||{},{av:av9}))}}
+        out.av=String(av9).slice(0,5)}}catch(e){}
     out.display=(function(){
       const c9=nameClean(String((S.prof&&S.prof.name)||'').split(' ')[0]);
       if(c9)return c9.slice(0,12);
@@ -1952,11 +1956,34 @@ const AV_GLYPHS={
   2:'<svg viewBox="0 0 24 24" width="55%" height="55%" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 21v-8M12 13 7 6h10l-5 7zM12 13l-3.5-5M12 13l3.5-5"/></svg>',
   3:'<svg viewBox="0 0 24 24" width="60%" height="60%" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 12h18M6 8v8M18 8v8M9 10v4M15 10v4"/></svg>',
   4:'<svg viewBox="0 0 24 24" width="55%" height="55%" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 4 14h6l-1 8 9-12h-6l1-8z"/></svg>'};
-function avParse(av){const m=/^(\d):(\d)$/.exec(String(av||''));
+function treeStageN(){
+  /* current stage 1-7 from the same thresholds the points-page tree
+     uses (13-discoveries treeStage) */
+  try{const p=treeData().pts||0;
+    return p<60?1:p<250?2:p<1000?3:p<3000?4:p<8000?5:p<20000?6:7}catch(e){return 1}}
+function avTreeSvg(st){
+  /* the tree mark (owner ask, 10 Sep): a miniature of YOUR tree at
+     its current stage 1-7 — the stage rides inside the av string
+     ('c:t4'), so mates render it with nothing new synced. Drawn to
+     match the points-page tree's sparse character, never redesigned. */
+  st=Math.max(1,Math.min(7,+st||1));
+  let s='<svg viewBox="0 0 24 24" width="62%" height="62%" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">';
+  s+='<path d="M12 21V'+(21-4-st*1.4)+'"/>';                          // trunk grows
+  const br=[[10,'M12 14 8.5 11'],[10,'M12 14 15.5 11'],[8,'M12 11 9.5 8'],[8,'M12 11 14.5 8'],[6,'M12 8 10 6'],[6,'M12 8 14 6']];
+  for(let i=0;i<Math.min(br.length,st-1);i++)s+='<path d="'+br[i][1]+'"/>';
+  const lv=[[8.5,10.4],[15.5,10.4],[9.5,7.4],[14.5,7.4],[10,5.4],[14,5.4],[12,4.2]];
+  for(let i=0;i<Math.max(0,st-1);i++)s+='<circle cx="'+lv[i][0]+'" cy="'+lv[i][1]+'" r="1.1" fill="currentColor" stroke="none"/>';
+  if(st>=7)s+='<circle cx="12" cy="4.2" r="1.1" fill="currentColor" stroke="none"/>';
+  return s+'</svg>'}
+function avParse(av){
+  const t=/^(\d):t(\d)$/.exec(String(av||''));
+  if(t)return{c:Math.min(5,+t[1]),g:0,t:Math.max(1,Math.min(7,+t[2]))};
+  const m=/^(\d):(\d)$/.exec(String(av||''));
   return m?{c:Math.min(5,+m[1]),g:Math.min(4,+m[2])}:null}
 function avRing(av,def){const a=avParse(av);return a?AV_COLS[a.c]||def:def}
 function avInner(av,init,col){const a=avParse(av);
-  return (a&&a.g&&AV_GLYPHS[a.g])?'<span style="display:flex;align-items:center;justify-content:center;width:100%;height:100%;color:'+col+'">'+AV_GLYPHS[a.g]+'</span>':esc(init)}
+  const g9=a&&(a.t?avTreeSvg(a.t):(a.g&&AV_GLYPHS[a.g]));
+  return g9?'<span style="display:flex;align-items:center;justify-content:center;width:100%;height:100%;color:'+col+'">'+g9+'</span>':esc(init)}
 function avHtml(av,init,size,ringDefault,fs){
   const a=avParse(av);
   const ring=a?AV_COLS[a.c]||ringDefault:ringDefault;
@@ -2050,7 +2077,9 @@ async function nudgePull(tok,h){
     const a9=acct()||{};const q=a9.ovQueue||[];
     rows.slice(0,3).forEach(x=>{
       const nm=names[x.from_id]||'A mate';
-      const body=nm+': \u201c'+(NUDGE_MSGS[+x.msg]||NUDGE_MSGS[0])+'\u201d';
+      const body=(+x.msg===90)
+        ?nm+' fist-bumped your week. Seen.'
+        :nm+': \u201c'+(NUDGE_MSGS[+x.msg]||NUDGE_MSGS[0])+'\u201d';
       if(!q.some(y=>y.id==='ndg'+x.id))q.push({id:'ndg'+x.id,ts:Math.round(Date.now()/1000)+5,body:body});
       try{if(document.visibilityState==='visible')flash(body)}catch(e9){}});
     lset(K_ACCT,Object.assign({},a9,{ovQueue:q}));
@@ -20141,11 +20170,13 @@ function sheetHtml(){
     const init=(String((S.prof&&S.prof.name)||'Y').slice(0,1)).toUpperCase();
     return wrapSheet('Your mark',
       '<p style="color:var(--dim);font-size:13px;line-height:1.6">Pick a ring and a mark \u2014 it shows beside your name on every board. No photos on purpose: nothing to upload, nothing to moderate.</p>'+
-      '<div style="display:flex;justify-content:center;margin-top:14px">'+avHtml(sel.c+':'+sel.g,init,64,'var(--line)',26)+'</div>'+
+      '<div style="display:flex;justify-content:center;margin-top:14px">'+avHtml(sel.c+':'+(sel.g==='t'?'t'+treeStageN():sel.g),init,64,'var(--line)',26)+'</div>'+
       '<p class="eyebrow mt2">Ring</p>'+
       '<div class="row mt" style="gap:8px">'+AV_COLS.map((c9,i)=>'<button data-a="avSetC" data-v="'+i+'" style="flex:1;height:34px;border-radius:10px;border:2.5px solid '+c9+';background:var(--raised);'+(sel.c===i?'box-shadow:0 0 0 2px var(--text)':'')+'"></button>').join('')+'</div>'+
       '<p class="eyebrow mt2">Mark</p>'+
-      '<div class="row mt" style="gap:8px">'+[0,1,2,3,4].map(g9=>'<button data-a="avSetG" data-v="'+g9+'" style="flex:1;height:40px;border-radius:10px;border:1.5px solid '+(sel.g===g9?'var(--text)':'var(--line)')+';background:var(--raised);color:var(--text);display:flex;align-items:center;justify-content:center;font-weight:700">'+(g9===0?esc(init):AV_GLYPHS[g9])+'</button>').join('')+'</div>'+
+      '<div class="row mt" style="gap:8px">'+[0,1,2,3,4].map(g9=>'<button data-a="avSetG" data-v="'+g9+'" style="flex:1;height:40px;border-radius:10px;border:1.5px solid '+(sel.g===g9?'var(--text)':'var(--line)')+';background:var(--raised);color:var(--text);display:flex;align-items:center;justify-content:center;font-weight:700">'+(g9===0?esc(init):AV_GLYPHS[g9])+'</button>').join('')+
+      '<button data-a="avSetG" data-v="t" style="flex:1;height:40px;border-radius:10px;border:1.5px solid '+(sel.g==='t'?'var(--text)':'var(--line)')+';background:var(--raised);color:var(--text);display:flex;align-items:center;justify-content:center">'+avTreeSvg(treeStageN())+'</button></div>'+
+      (sel.g==='t'?'<p style="color:var(--faint);font-size:11.5px;margin-top:8px;text-align:center">Your tree, as it stands today \u2014 it grows on the boards as it grows here.</p>':'')+
       '<button data-a="avSave" class="big disp mt2" style="background:var(--amber);color:var(--bg);font-size:15px">Wear it</button>')}
   if(S.sheet.t==='friend'){
     const f=S.frProf||{};const id=S.sheet.id;
@@ -20171,9 +20202,17 @@ function sheetHtml(){
     return wrapSheet('Your mate',inner)}
   if(S.sheet.t==='nudge'){
     const id=S.sheet.id;
+    /* the fist bump (council-approved, 10 Sep): a reaction to real
+       showing-up, offered only when they HAVE shown up this week \u2014
+       recipient-only, never counted, no reply loop */
+    let bump='';
+    try{const f9=(typeof raceField==='function'?raceField():[]).find(x=>x.id===id);
+      if(f9&&(+f9.sess||0)>0)bump='<button data-a="nudgeSendPick" data-v="90" class="card" style="width:100%;text-align:left;padding:14px 15px;border-color:var(--green)">'+
+        '<span style="display:block;font-size:14px;font-weight:650;color:var(--green)">Fist bump</span>'+
+        '<span style="color:var(--dim);font-size:12px">\u201cSaw you showing up this week.\u201d The good one.</span></button>'}catch(e9){}
     return wrapSheet('Send a nudge',
       '<p style="color:var(--dim);font-size:13px;line-height:1.6">One tap, lands on their phone. One per mate per day \u2014 the server holds that line even if you don\u2019t.</p>'+
-      '<div style="margin-top:12px;display:flex;flex-direction:column;gap:8px">'+
+      '<div style="margin-top:12px;display:flex;flex-direction:column;gap:8px">'+bump+
       NUDGE_MSGS.map((m9,i)=>'<button data-a="nudgeSendPick" data-v="'+i+'" class="card" style="width:100%;text-align:left;padding:13px 15px;font-size:13.5px">\u201c'+esc(m9)+'\u201d</button>').join('')+'</div>')}
   if(S.sheet.t==='demo'){
     const live=!!localStorage.getItem('allena-demo-live');
@@ -22239,9 +22278,9 @@ function runAction(a,v,t,e){
       S.sheet=null;flash(cu.length+' lift'+(cu.length===1?'':'s')+' caught up to what you actually lift. The ledger shows each one.');render();break}
     case 'avOpen':{S.avSel=avParse((acct()||{}).av)||{c:1,g:0};S.sheet={t:'avatar'};render();break}
     case 'avSetC':{S.avSel=Object.assign({},S.avSel||{c:0,g:0},{c:+v});render();break}
-    case 'avSetG':{S.avSel=Object.assign({},S.avSel||{c:0,g:0},{g:+v});render();break}
+    case 'avSetG':{S.avSel=Object.assign({},S.avSel||{c:0,g:0},{g:v==='t'?'t':+v});render();break}
     case 'avSave':{const s9=S.avSel||{c:1,g:0};
-      lset(K_ACCT,Object.assign({},acct()||{},{av:s9.c+':'+s9.g}));
+      lset(K_ACCT,Object.assign({},acct()||{},{av:s9.c+':'+(s9.g==='t'?'t'+treeStageN():s9.g)}));
       S.sheet=null;flash('Yours now \u2014 it syncs to every board.');
       try{acctSync(false)}catch(e){}render();break}
     case 'frOpen':{S.sheet={t:'friend',id:v};S.frProf={__wait:1};render();
