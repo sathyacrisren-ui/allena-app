@@ -476,23 +476,15 @@ const reps=(r,n,perSide)=>Array.from({length:n},()=>({reps:r,perSide:!!perSide})
 function setsForWeek(ex,wk){const s=ex.sets;if(Array.isArray(s))return s;
   if(s&&typeof s==='object')return s[String(wk)]||s.default||null;return null}
 function adjOf(prog,name){return (prog&&prog.adj&&prog.adj[name])||0}
-function heldBest(ex){
- /* the longest hold actually LOGGED for this exercise. Prescribed hold
-    times are a floor, not a ceiling — the first real sessions find the
-    true number, not the two-minute physio conversation (owner law,
-    6 Sep). Never shrinks below the prescription; capped at 20 min so
-    a typo can never become the default. */
- try{let b=0;const g=gBase(ex);
-  (S.history||[]).forEach(h=>(h.log||[]).forEach(l=>{
-    if(l.secs>0&&l.secs<1200&&l.secs>b&&gBase(l.ex)===g)b=l.secs}));
-  return b}catch(e){return 0}}
+/* heldBest was removed 9 Sep (owner ruling): the written hold time is
+   the prescription, always — a long hold is logged in full but never
+   becomes the next set's target. */
 function buildSets(prog,di,wk){const d=prog.days[di];if(!d)return[];const out=[];let n=0;
   d.exercises.forEach(ex=>{const l=setsForWeek(ex,wk);if(!l||!l.length)return;n++;
     const a=adjOf(prog,ex.name);
-    const hb=l.some(x=>x&&x.secs)?heldBest(ex.name):0;
     l.forEach((st,i)=>out.push({ex:ex.name,bar:!!ex.bar,rest:ex.rest??60,cue:ex.cue||null,
       exNo:n,setNo:i+1,of:l.length,targetW:st.w!=null?Math.max(0,st.w+a):null,targetReps:st.reps??null,
-      targetRpe:st.rpe??null,secs:st.secs!=null?Math.max(st.secs,hb):null,perSide:!!st.perSide,warmup:ex.warmup,adj:a}))});return out}
+      targetRpe:st.rpe??null,secs:st.secs!=null?st.secs:null,perSide:!!st.perSide,warmup:ex.warmup,adj:a}))});return out}
 function validateProgram(p){const e=[];if(!p||typeof p!=='object')return["That isn't a program object."];
   if(!p.block)e.push('Missing a "block" name.');
   if(!(typeof p.weeks==='number'&&p.weeks>=1))e.push('"weeks" must be a number of at least 1.');
@@ -666,7 +658,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='df4db8';  // stamped by tools/build.py with the content hash
+const BUILD_ID='55b6e6';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -2385,10 +2377,13 @@ A.begin=()=>{audioInit();S.holdWait=false;S.holdMet=null;const c=S.sess.sets[S.s
   persistActive();render()};
 A.finish=()=>{S.holdWait=false;const c=S.sess.sets[S.sess.idx],p=lastFor(c.ex,c.setNo);
   if(c.secs){
-    /* held past the target: log what actually happened, to the second */
+    /* one tap ends AND logs the hold — the clock witnessed it, so
+       asking what you held was a needless screen (owner ruling,
+       9 Sep). Overtime counts to the second. */
     const over=(!c.perSide&&S.holdEnd)?Math.max(0,Math.round((Date.now()-S.holdEnd)/1000)):0;
     S.holdEnd=null;S.holdMet=null;
-    S.draft={w:'',r:'',secs:c.secs+over,rpe:null};S.sess.phase='logging'}
+    S.draft={w:'',r:'',secs:c.secs+over,rpe:null};S.sess.phase='logging';
+    A.commit(true);flash('Hold logged · '+(c.secs+over)+'s');return}
   else{
     /* prefill with the best honest guess so most sets are: check the
        numbers, tap RPE, Log (beta feedback, Sep 2026). Order: this
@@ -2406,12 +2401,11 @@ A.commit=(confirmed)=>{const s=S.sess,c=s.sets[s.idx],timed=!!c.secs;
   if(timed?!(+S.draft.secs>0):(S.draft.rpe==null||!S.draft.r))return;
   try{haptic('light')}catch(e){}
   const e={ex:c.ex,setNo:c.setNo,targetW:c.targetW,targetReps:c.targetReps,targetRpe:c.targetRpe};
-  if(timed){e.secs=+S.draft.secs;e.perSide=c.perSide;e.w=0;e.r=0;e.rpe=S.draft.rpe;
-    /* a longer hold takes precedence RIGHT NOW: the remaining sets of
-       this exercise rise to match, and heldBest carries it into every
-       future session (owner law, 6 Sep) */
-    if(e.secs>(c.secs||0)&&e.secs<1200)s.sets.forEach(st=>{
-      if(st.secs&&st.secs<e.secs&&gBase(st.ex)===gBase(c.ex))st.secs=e.secs})}
+  if(timed){e.secs=+S.draft.secs;e.perSide=c.perSide;e.w=0;e.r=0;e.rpe=S.draft.rpe
+    /* the prescription is the prescription (owner ruling, 9 Sep,
+       reversing the 6 Sep heldBest law): overtime is logged to the
+       second but the NEXT hold resets to the written time — a good
+       day must never quietly raise the plan */}
   else{e.w=uwIn(+S.draft.w||0);e.r=+S.draft.r||0;e.rpe=S.draft.rpe}
   if(!confirmed&&!timed){const sn=entrySanity(e,c);
     if(sn){S.sanity=sn;S.sheet={t:'sanity'};render();return}}
