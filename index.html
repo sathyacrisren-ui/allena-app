@@ -666,7 +666,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='33101e';  // stamped by tools/build.py with the content hash
+const BUILD_ID='46190a';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -14953,6 +14953,10 @@ function muscleRowsHtml(p,i,forceOpen){
     if(!open){
       const WEEK_U=16;
       let minF=101,lim=null,dSum=0,aSum=0,stim=0;
+      /* the pill shows the SAME weighted ready score as the suggests
+         card — two different maths under one word confused the owner
+         (9 Sep); the worst muscle survives as the limiter label */
+      let scR=null;try{scR=dayReadiness(p,i,S.week).score}catch(e9){}
       rows.forEach(r9=>{const f9=Math.max(0,Math.min(100,Math.round(r9.fresh)));
         if(f9<minF){minF=f9;lim=r9.m}
         dSum+=Math.min(100,Math.round((r9.weekU||0)/WEEK_U*100));
@@ -14962,6 +14966,7 @@ function muscleRowsHtml(p,i,forceOpen){
       let aAvg=Math.round(aSum/rows.length);if(aAvg>0)aAvg=Math.max(aAvg,6);
       if(done9)aAvg=0;
       const dShow=dAvg+aAvg>100?Math.max(0,100-aAvg):dAvg;
+      if(scR!=null)minF=Math.max(0,Math.min(100,scR));
       const fCol=minF>=75?'var(--green)':'var(--amber)';
       return '<span role="button" data-a="mrowsToggle" data-v="'+esc(key)+'" style="display:block;width:100%;text-align:left;margin-top:9px;cursor:pointer">'+
         '<div style="display:flex;align-items:center;gap:7px">'+
@@ -15614,10 +15619,10 @@ function recCard(){
   let h='<div class="card mt" style="padding:15px 16px;border-color:var(--amber)">'+
     '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px">'+
     '<p class="eyebrow" style="color:var(--amber)">Allena suggests today</p>'+
-    '<button data-a="readyWhy" data-v="'+r.top.i+'" class="mono" style="color:var(--faint);font-size:10px;flex:none">'+r.top.score+'% ready ⓘ</button></div>'+
+    '<button data-a="readyWhy" data-v="'+r.top.i+'" class="mono" style="color:var(--faint);font-size:10px;flex:none">'+(r.top.r&&r.top.r.score!=null?r.top.r.score:r.top.score)+'% ready ⓘ</button></div>'+
     '<button data-a="startIn" data-v="'+activeProgSafe().id+':'+r.top.i+'" style="width:100%;text-align:left;margin-top:6px">'+
     '<span class="disp" style="font-size:18px;font-weight:600;display:block">'+esc(r.top.name)+'</span>'+
-    '<span style="color:var(--dim);font-size:12.5px;line-height:1.5;display:block;margin-top:4px">Because '+esc(r.why)+'.</span></button>'+
+    '<span style="color:var(--dim);font-size:12.5px;line-height:1.5;display:block;margin-top:4px">Because '+esc(String(r.why||'').replace(/\.$/,''))+'.</span></button>'+
     muscleRowsHtml(activeProgSafe(),r.top.i,true);
   if(r.hold.length)h+='<div style="border-top:1px solid var(--line);margin-top:11px;padding-top:9px">'+
     '<p class="mono" style="color:var(--faint);font-size:10px;letter-spacing:.06em;text-transform:uppercase">Not yet</p>'+
