@@ -658,7 +658,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='55e7a8';  // stamped by tools/build.py with the content hash
+const BUILD_ID='4e28ef';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -1089,8 +1089,17 @@ function regulate(rows,c,opts){
   opts=opts||{};
   const low=repLow(c.targetReps),high=repHigh(c.targetReps);
   const tLo=rpeLow(c.targetRpe),tHi=rpeHigh(c.targetRpe),tR=tLo,tTxt=rpeStr(c.targetRpe);
-  const rpes=rows.map(x=>parseFloat(x.rpe)).filter(x=>!isNaN(x));
-  const reps=rows.map(x=>x.r).filter(x=>x!=null);
+  /* ramp-in sets are not evidence (owner-caught, 9 Sep: a 25kg @2
+     opener averaged with 30kg @8/@8.5 read the whole exercise as
+     "RPE 6.2, well inside target"): a set BOTH lighter than the
+     day's top working weight AND 2+ under the target floor is a
+     warm-into-it set — judged on nothing, dropped from the verdict. */
+  let wrk=rows;
+  try{const wTop=Math.max.apply(null,rows.map(x=>+x.w||0));
+    if(!isNaN(tLo)){const f=rows.filter(x=>!((+x.w||0)<wTop&&parseFloat(x.rpe)<=tLo-2));
+      if(f.length)wrk=f}}catch(e9){}
+  const rpes=wrk.map(x=>parseFloat(x.rpe)).filter(x=>!isNaN(x));
+  const reps=wrk.map(x=>x.r).filter(x=>x!=null);
   const W=c.targetW;
   const out={level:'ok',msg:'',delta:0,why:'',outcome:'held'};
   if(!rows.length||W==null||low==null)return null;
@@ -1132,13 +1141,15 @@ function regulate(rows,c,opts){
     out.why='double progression met'}
   // 5. in range, on effort — the genuine "same again"
   else if(d!=null&&d<=-1.5&&!allTop){out.level='ok';out.outcome='held';
-    out.msg='Well inside the target effort at RPE '+(Math.round(avg*10)/10)+' but not at the top of the range. Same load, and take the last set closer to '+tR+' — the reps are there.';
+    out.msg='Well inside the target effort at RPE '+(Math.round(avg*10)/10)+' but not at the top of the range. Same load next time, taken closer to '+tR+' — the reps are there.';
     out.why='under-effort, load unchanged'}
   else{out.level='ok';out.outcome='held';
     out.msg='On target'+(avg!=null?' (RPE '+(Math.round(avg*10)/10)+' vs '+tTxt+')':'')+'. Same load, aim for more reps next time.';
     out.why='in range at target effort'}
-  // fatigue overlay — never overrides, always informs
-  if(decay>=3&&out.level!=='warn')out.msg+=' Reps fell '+decay+' across the sets — that is a lot of within-exercise fatigue; longer rest would keep the quality up.';
+  // fatigue overlay — never overrides, always informs. Skipped on the
+  // under-effort verdict: "the reps are there" and "reps fell hard"
+  // cannot share a sentence (owner-caught, 9 Sep).
+  if(decay>=3&&out.level!=='warn'&&out.why.indexOf('under-effort')<0)out.msg+=' Reps fell '+decay+' across the sets — that is a lot of within-exercise fatigue; longer rest would keep the quality up.';
   if(opts.eased&&out.delta<0){out.delta=0;out.outcome='held';
     out.msg='Rough day by your own readiness reading, so the numbers are not evidence the load is wrong. Nothing written to the program — repeat this weight when you are fresh.';
     out.why='low-readiness session, no permanent change'}
