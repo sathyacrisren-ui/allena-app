@@ -666,7 +666,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='dbb846';  // stamped by tools/build.py with the content hash
+const BUILD_ID='2d0d2e';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -3355,7 +3355,11 @@ function muscleFresh(){
       ~40%, RPE 8+ full price, no RPE logged = full price. */
    const rq=l.rpe!=null?Math.max(0.4,Math.min(1.15,0.25+l.rpe/8)):1;
    Object.keys(hits).forEach(m=>{
-    const eff=((l.r>0)?1:0.25)*hits[m]*rq;
+    /* assisting work fatigues at ~a third of a prime set — 0.5 was
+      the volume-count weight leaking into the fatigue bill
+      (owner-audited, 9 Sep: upper back chronically 'the limiter'
+      because six exercise families assist it) */
+   const eff=((l.r>0)?1:0.25)*(hits[m]===0.5?0.3:hits[m])*rq;
     L[m]=(L[m]||0)+eff*Math.exp(-Math.max(0,hrs)*RM/(TAU[m]||44))})})});
  /* running is leg load — the one-model promise. A half marathon the
     day before must show in the legs, whatever the lifting log says. */
@@ -14998,7 +15002,7 @@ function muscleRowsHtml(p,i,forceOpen){
           '<div style="height:5px;width:'+donePct+'%;background:var(--blue)"></div>'+
           '<div style="height:5px;width:'+addPct+'%;background:repeating-linear-gradient(90deg,var(--blue) 0 3px,transparent 3px 6px);opacity:.85"></div></div>'+
           '<span class="mono" style="color:var(--blue);font-size:9.5px;font-weight:600;width:28px;text-align:right;flex:none">+'+r9.stim+'</span></div>'}).join('')+
-      '<p style="color:var(--faint);font-size:10.5px;margin-top:4px;line-height:1.5">Green: how recovered each muscle is. Blue: this week\u2019s work so far.'+iBtn('recbars')+'</p>'+
+      '<p style="color:var(--faint);font-size:10.5px;margin-top:4px;line-height:1.5">Green: how recovered each muscle is. Blue: work landing on it over the last 7 days \u2014 assisting work included.'+iBtn('recbars')+'</p>'+
       iBody('recbars','Each row is a muscle this session trains. The green bar fills as it recovers from its last work \u2014 full green means fresh. The blue bar is how much it has already worked this week, and the dashed part is what this session would add. The +number is the growth stimulus this session gives that muscle. Freshest muscles first is the whole logic.')+'</div>'
   }catch(e){return ''}}
 function dayReadiness(prog,di,wk){
@@ -15110,10 +15114,10 @@ function recommendToday(){
   const top=opts[0],rest=opts.slice(1);
   let why='';
   if(top.r.worst&&top.r.worstV<75){
-    const SUF=['Nothing is locked \u2014 just go about 10% lighter',
-      'ease the loads ~10% and stop a rep earlier',
-      'go a little lighter today \u2014 the plan adapts'];
-    why=top.r.worst+' is only '+top.r.worstV+'% recovered, so even this is not fully fresh. '+SUF[Math.floor(Date.now()/864e5)%SUF.length]}
+    const SUF=['Nothing is locked \u2014 just go about 10% lighter.',
+      'Ease the loads ~10% and stop a rep earlier.',
+      'Go a little lighter today \u2014 the plan adapts.'];
+    why=top.r.worst.toLowerCase()+' is at '+top.r.worstV+'% \u2014 the freshest option you have, but not fully fresh. '+SUF[Math.floor(Date.now()/864e5)%SUF.length]}
   else why='the muscles it trains are the freshest of what you have left';
   const hold=rest.filter(o=>o.r.worst&&o.r.worstV<65).map(o=>{
     const h=hoursSinceMuscle(o.r.worst);
