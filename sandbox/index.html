@@ -666,7 +666,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='db4c04';  // stamped by tools/build.py with the content hash
+const BUILD_ID='c1aa22';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -20181,6 +20181,29 @@ function sheetHtml(){
       :'<p style="color:var(--dim);font-size:13px;line-height:1.6">For filming: swaps in a fully populated demo account \u2014 program, runs, rehab mid-pathway, findings, readiness history. Your real data is stashed on this phone first and restored exactly when you exit. Do not export a backup while in demo mode.</p>'+
        '<button data-a="demoEnter" class="big disp mt2" style="background:var(--amber);color:var(--bg);font-size:15px">Enter demo mode</button>'+
        '<p style="color:var(--faint);font-size:11px;line-height:1.5;margin-top:10px">A banner stays on Today the whole time \u2014 one tap brings your account back.</p>')}
+  if(S.sheet.t==='ss'){
+    /* the superset weaver (owner spec, 10 Sep): pick the remaining
+       exercises IN ORDER, then the session walks one set of each,
+       skipping any that run out of sets, until all are done */
+    const s2=S.sess;if(!s2)return '';
+    const lg=st=>s2.log.some(l=>l.ex===st.ex&&l.setNo===st.setNo);
+    const groups=[],by={};
+    s2.sets.forEach(st=>{if(lg(st))return;
+      if(!by[st.exNo]){by[st.exNo]={exNo:st.exNo,ex:st.ex,left:0};groups.push(by[st.exNo])}
+      by[st.exNo].left++});
+    const ord=S.ssOrd||[];
+    let inner='<p style="color:var(--dim);font-size:13px;line-height:1.55">Tap the exercises in the order you want to rotate through them. One set of each, round and round — an exercise drops out when its sets are done.</p>'+
+      '<div style="display:flex;flex-direction:column;gap:8px;margin-top:14px">'+
+      groups.map(g=>{const pos=ord.indexOf(g.exNo);
+        return '<button data-a="ssTog" data-v="'+g.exNo+'" class="card" style="width:100%;text-align:left;padding:13px 15px;display:flex;align-items:center;gap:12px'+(pos>=0?';border-color:var(--green)':'')+'">'+
+        '<span style="width:26px;height:26px;border-radius:26px;border:1.5px solid '+(pos>=0?'var(--green)':'var(--line)')+';display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex:none;color:'+(pos>=0?'var(--green)':'var(--faint)')+'">'+(pos>=0?(pos+1):'')+'</span>'+
+        '<span style="flex:1;min-width:0"><span style="display:block;font-size:14px;font-weight:600">'+esc(g.ex)+'</span>'+
+        '<span style="color:var(--faint);font-size:11.5px">'+g.left+' set'+(g.left===1?'':'s')+' left</span></span></button>'}).join('')+
+      '</div>';
+    inner+=ord.length>=2
+      ?'<button data-a="ssGo" class="big disp mt2" style="background:var(--green);color:var(--bg);font-size:16px">Start the superset</button>'
+      :'<p style="color:var(--faint);font-size:12px;text-align:center;margin-top:14px">Pick at least two exercises.</p>';
+    return wrapSheet('Superset',inner)}
   if(S.sheet.t==='modify'){
     const s2=S.sess,cur=s2.sets[Math.min(s2.idx,s2.sets.length-1)];
     const row=(a,t2,sub,col)=>'<button data-a="'+a+'" class="card" style="width:100%;text-align:left;padding:13px 15px;display:flex;align-items:center;gap:12px">'+
@@ -20192,6 +20215,9 @@ function sheetHtml(){
       (cur.targetW!=null?row('tuneOpen','Tune load','Change the weight today and from now on','var(--amber)'):'')+
       row('subOpen','Swap exercise','Machine taken? Convert to an alternative','var(--amber)')+
       row('axOpen','Add an exercise','One-off, or into the program permanently','var(--amber)')+
+      (function(){try{const lg=st=>s2.log.some(l=>l.ex===st.ex&&l.setNo===st.setNo);
+        const exs={};s2.sets.forEach(st=>{if(!lg(st))exs[st.exNo]=1});
+        return Object.keys(exs).length>=2?row('ssOpen','Superset','Weave exercises together — one set of each, in your order','var(--amber)'):''}catch(e){return ''}})()+
       row('deferEx','Do it later','Move this exercise to the end of the session')+
       row('skipSet','Skip this set','Move on to the next set')+
       row('skipEx','Skip the whole exercise','Drops the remaining sets')+
@@ -22803,6 +22829,29 @@ function runAction(a,v,t,e){
       else A.start(pv.di);
       break}
     case 'modifyOpen':S.sheet={t:'modify'};render();break;
+    case 'ssOpen':{S.ssOrd=[];S.sheet={t:'ss'};render();break}
+    case 'ssTog':{const n=+v;S.ssOrd=S.ssOrd||[];
+      const i=S.ssOrd.indexOf(n);if(i>=0)S.ssOrd.splice(i,1);else S.ssOrd.push(n);render();break}
+    case 'ssGo':{const s=S.sess;const ord=S.ssOrd||[];
+      if(!s||ord.length<2)break;
+      if(s.phase==='working'||s.phase==='logging'||s.phase==='hold'){flash('Finish this set first.');break}
+      /* weave: logged sets keep their place, chosen exercises
+         interleave one set per round in the picked order (an
+         exhausted exercise drops out), everything else follows */
+      const lg=st=>s.log.some(l=>l.ex===st.ex&&l.setNo===st.setNo);
+      const done=[],rest=[],by={};
+      s.sets.forEach(st=>{if(lg(st))done.push(st);
+        else if(ord.indexOf(st.exNo)>=0)(by[st.exNo]=by[st.exNo]||[]).push(st);
+        else rest.push(st)});
+      const weave=[];let more=true;
+      while(more){more=false;
+        ord.forEach(n=>{const a=by[n];if(a&&a.length){weave.push(a.shift());more=true}})}
+      if(!weave.length)break;
+      s.sets=done.concat(weave,rest);
+      s.idx=done.length;
+      if(s.phase!=='resting')s.phase='ready';
+      S.ssOrd=null;S.sheet=null;persistActive();
+      flash('Superset on — '+weave.length+' sets woven.');render();break}
     case 'tuneOpen':S.sheet={t:'tune'};render();break;
     case 'tuneBy':{const cur=S.sess.sets[S.sess.idx];applyAdj(cur.ex,+v,'manual');render();break}
     case 'tuneReset':{const cur=S.sess.sets[Math.min(S.sess.idx,S.sess.sets.length-1)],prog=S.lib.programs.find(p=>p.id===S.sess.progId);
