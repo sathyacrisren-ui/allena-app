@@ -523,8 +523,33 @@ function validateProgram(p){const e=[];if(!p||typeof p!=='object')return["That i
 /* ══ storage ════════════════════════════════════════════ */
 const K_BAR='training-bar-v1',K_PL='training-plates-v1',K_SUB='training-subs-v1',K_PROF='training-profile-v1',K_GOALS='training-goals-v1',K_SUPP='training-supp-v1',K_DAILY='training-daily-v1',K_LAY='training-layout-v1',K_GAR='training-garmin-v1',K_SCAN='training-scans-v1',K_ACL='training-acl-v1',K_WK='training-weekstart-v1',K_DROP='training-dropped-v1',K_WEEKS='training-curweek-v1',K_OFF='training-offload-v1',K_ALLOW='training-allow-v1',K_CUT='training-cut-v1',K_ADD='training-addback-v1',K_PSEEN='training-patseen-v1',K_RUN='training-runs-v1',K_RUNSEEN='training-runseen-v1',K_REH='training-rehab-v1',K_APPT='training-appts-v1',K_PHYS='training-physio-v1',K_CHATS='training-chats-v1';
 const K_H='training-history-v1',K_LIB='training-library-v2',K_A='training-active-v2',K_OLD_P='training-program-v1',K_BK='training-lastbackup-v1',K_AI='training-ai-v1';
-function lget(k,f){try{const v=localStorage.getItem(k);return v?JSON.parse(v):f}catch(e){return f}}
-function lset(k,v){try{localStorage.setItem(k,JSON.stringify(v));return true}catch(e){return false}}
+/* ══ THE BLACK BOX (audit, Phase D) ═══════════════════════════════
+   The app had no way to tell you it had broken: 600+ empty catch
+   blocks, no window.onerror, and a render() whose view dispatch was
+   unguarded. A feature that silently does nothing looked exactly like
+   a feature with no data yet, which is how two dead-zone bugs and a
+   dead completion card survived for weeks. This keeps the last 40
+   failures in memory and Settings prints them. Nothing is uploaded. */
+const OOPS=[];
+function oops(tag,e){
+  try{OOPS.push({t:new Date().toTimeString().slice(0,8),k:String(tag||'?'),
+    m:String((e&&(e.message||e))||'').slice(0,160)});
+    if(OOPS.length>40)OOPS.shift()}catch(_){}}
+try{
+  window.addEventListener('error',ev=>oops('window',(ev&&(ev.error||ev.message))||'error'));
+  window.addEventListener('unhandledrejection',ev=>oops('promise',(ev&&ev.reason)||'rejected'));
+}catch(e){}
+function lget(k,f){try{const v=localStorage.getItem(k);return v?JSON.parse(v):f}catch(e){oops('lget:'+k,e);return f}}
+/* lset returned a success flag that NOT ONE of its 238 callers checked
+   (audit, high). A full or blocked store meant training data silently
+   was not saved. It still returns the flag; now the failure is at
+   least visible, once per key, without spamming a live session. */
+const LSFAIL={};
+function lset(k,v){try{localStorage.setItem(k,JSON.stringify(v));return true}
+  catch(e){oops('lset:'+k,e);
+    if(!LSFAIL[k]){LSFAIL[k]=1;
+      try{flash('This phone would not save that \u2014 free up some space, then back up from Settings.')}catch(_){}}
+    return false}}
 function ldel(k){try{localStorage.removeItem(k)}catch(e){}}
 function migrate(){
   let lib=lget(K_LIB,null);
@@ -683,7 +708,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='efce0c';  // stamped by tools/build.py with the content hash
+const BUILD_ID='11abee';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -18742,6 +18767,12 @@ function viewData(){
   if(left.length)h+=setGroup('More',left.map(k=>setRow(I.prog,k,'',k)));
   h+='<p class="mono" style="color:var(--faint);font-size:10px;text-align:center;margin:22px 0 8px;letter-spacing:.08em">ALLENA · BUILD '+BUILD_ID+(SANDBOX?' · SANDBOX':'')+'</p>';
   try{if(S._ndgLast)h+='<p class="mono" style="color:var(--faint);font-size:9.5px;text-align:center;margin:0 0 6px">NUDGE PULL · '+esc(S._ndgLast.t||'')+' · '+esc(S._ndgLast.st||'')+(S._ndgLast.found!=null?' · found '+S._ndgLast.found:'')+(S._ndgLast.queued!=null?' · queued '+S._ndgLast.queued:'')+'</p>'}catch(e){}
+    /* DIAGNOSTICS (audit, Phase D): the last failures this app hit, in
+       memory only, never uploaded. Empty is the normal state. */
+    +'<p class="mono" style="color:var(--faint);font-size:9.5px;line-height:1.5;margin-top:6px">DIAGNOSTICS \u00b7 '+
+      ((typeof OOPS!=='undefined'&&OOPS.length)
+        ? esc(OOPS.slice(-6).map(o=>o.t+' '+o.k+' '+o.m).join(' \u2502 '))
+        : 'nothing has failed this session')+'</p>'
   h+='<p style="color:var(--faint);font-size:10.5px;text-align:center;margin:0 24px 8px;line-height:1.5">Allena keeps score. It isn’t medical advice. Your physio or doctor makes the calls.</p>';
   return h+'</div>'}
 function dataRaw(){
@@ -21000,6 +21031,7 @@ function render(){
   const ae=document.activeElement,key=ae&&ae.dataset?ae.dataset.in:null;
   const pos=key&&ae.selectionStart!=null?ae.selectionStart:null;
   let body='';
+  try{
   if(S.view==='today'&&typeof arrivalDue==='function'&&arrivalDue()&&typeof viewArrival==='function')body=viewArrival();   // was below, unreachable (audit)
   else if(S.view==='today')body=viewToday();
   else if(S.view==='findings')body=viewFindings();
@@ -21041,6 +21073,21 @@ function render(){
   /* never a blank dead page: an unknown or renamed view id falls back
      to Today instead of rendering nothing (owner-caught) */
   else{S.view='today';body=viewToday()}
+  }catch(e9){
+    /* A THROWING VIEW MUST NOT FREEZE THE APP (audit, Phase D). The
+       dispatch had no try/catch, so one null access anywhere in a view
+       meant innerHTML was never assigned: the screen kept whatever was
+       last painted and every button looked dead, with no error and no
+       console on a phone. Now the failure is visible, recorded, and has
+       a way out. */
+    oops('view:'+S.view,e9);
+    body='<div class="view pad" style="padding-top:60px">'+
+      '<p class="eyebrow" style="color:var(--red)">This screen hit a problem</p>'+
+      '<p style="font-size:15px;line-height:1.6;margin-top:8px">Your training is safe \u2014 nothing was lost. This screen could not draw itself.</p>'+
+      '<button data-a="nav" data-v="today" class="big disp mt2" style="background:var(--amber);color:var(--bg);font-size:16px">Back to Today</button>'+
+      '<button data-a="nav" data-v="data" class="btn mt" style="color:var(--dim)">Open Settings</button>'+
+      '<p class="mono" style="color:var(--faint);font-size:10px;line-height:1.5;margin-top:14px">'+esc(String(e9&&e9.message||e9).slice(0,140))+'</p>'+
+      '<p style="color:var(--faint);font-size:11.5px;line-height:1.5;margin-top:10px">Settings has a Diagnostics line at the bottom \u2014 copying it into a beta report tells us exactly what broke.</p></div>'}
   const ICONS={run:'<path d="M13 4.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3z"/><path d="M7 21l2.5-6 3-2.5-1.5-4-3.5 2L6 13"/><path d="M12.5 12.5l3.5 2 1.5 4"/><path d="M11 6.5l3 1.5 2.5-1"/>',
     acl:'<path d="M12 3.2c2 1.7 4.2 2.5 6.6 2.6v5.4c0 4-2.6 7.2-6.6 9-4-1.8-6.6-5-6.6-9V5.8C7.8 5.7 10 4.9 12 3.2z"/><path d="M12 9.4v4.2M9.9 11.5h4.2"/>',
     home:'<path d="M2.6 10v4M21.4 10v4"/><rect x="4.6" y="7.2" width="3.2" height="9.6" rx="1.1"/><rect x="16.2" y="7.2" width="3.2" height="9.6" rx="1.1"/><path d="M7.8 12h8.4"/>',
