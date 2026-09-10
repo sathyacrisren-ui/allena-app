@@ -683,7 +683,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='084b2c';  // stamped by tools/build.py with the content hash
+const BUILD_ID='0cbe50';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -2060,6 +2060,27 @@ async function frProfileLoad(id){
     const r=await fetch(CLOUD.url+'/rest/v1/snapshots?select=display,points,live_points,tier,tree,collection_count,week_live,week_sessions,av,updated_at&user_id=eq.'+encodeURIComponent(id),{headers:h});
     if(!r.ok)return null;
     const rows=await r.json();return rows&&rows[0]||null}catch(e){return null}}
+/* WHERE THIS WEEK'S POINTS CAME FROM (beta ask from Angus, 10 Sep).
+   The rows come straight out of dataPoints' own scoring loop, so they
+   can never disagree with the board. Rounding is apportioned by
+   largest remainder — the parts always add up to the number on the
+   board, because a breakdown that doesn't sum is worse than none. */
+function raceMineRows(){
+  try{
+    const d=dataPoints(),items=(d.raceItems||[]).slice();
+    const live=items.filter(i=>i.live),tot=Math.round(d.weekLive||0);
+    const raw=live.reduce((a,i)=>a+i.pts,0);
+    if(live.length&&raw>0&&tot>0){
+      const exact=live.map(i=>i.pts/raw*tot);
+      const flo=exact.map(Math.floor);
+      let short=tot-flo.reduce((a,b)=>a+b,0);
+      const ord=exact.map((v,i)=>[v-flo[i],i]).sort((a,b)=>b[0]-a[0]);
+      for(let j=0;j<ord.length&&short>0;j++,short--)flo[ord[j][1]]++;
+      live.forEach((i,j)=>{i.show=flo[j]})}
+    else live.forEach(i=>{i.show=0});
+    return{items:items,tot:tot,sess:d.weekSessions||0}}
+  catch(e){return{items:[],tot:0,sess:0}}}
+
 const NUDGE_MSGS=[
   'One session flips it. Tonight?',
   'The week is watching. Get one in.',
@@ -2139,8 +2160,8 @@ function friendsSection(){
       '<div style="flex:1;min-width:0"><p style="font-size:15px;font-weight:600">'+esc(myFirstP||'You')+'</p>'+
       (reignP>=1?'<p class="mono" style="font-size:8.5px;letter-spacing:.1em;color:#E0A458;margin-top:2px">CROWN HELD '+reignP+' WEEK'+(reignP===1?'':'S')+'</p>'
         :'<p class="mono" style="font-size:9px;color:var(--faint);letter-spacing:.05em;margin-top:2px">THE WEEKLY RACE</p>')+'</div>'+
-      '<div style="text-align:right;flex:none"><p class="disp" data-cu="me" style="font-size:22px;font-weight:700;color:'+(mine>0?'var(--green)':'var(--text)')+'">'+mine+'</p>'+
-      '<p class="mono" style="font-size:8.5px;color:var(--faint);letter-spacing:.06em">THIS WEEK</p></div></div>';
+      '<button data-a="raceMineOpen" style="text-align:right;flex:none;padding:0"><p class="disp" data-cu="me" style="font-size:22px;font-weight:700;color:'+(mine>0?'var(--green)':'var(--text)')+'">'+mine+'</p>'+
+      '<p class="mono" style="font-size:8.5px;color:var(--faint);letter-spacing:.06em">THIS WEEK \u203a</p></button></div>';
     return profCard+'<p class="eyebrow mt2">The weekly race</p>'+
       '<p style="color:var(--faint);font-size:11.5px;line-height:1.55;margin-top:4px">Live points only \u2014 sessions your phone or watch actually witnessed \u2014 fresh every Monday. Typed-in history never scores.'+iBtn('racelaw')+'</p>'+
       iBody('racelaw','Every honest number in a witnessed session earns \u2014 each set\u2019s weight, reps and effort, plus one for finishing \u2014 capped per day. Witnessed means your watch overlapped the session at working heart rate, or the phone ran the clock and the sets spread like real training. Imported, typed-later and demo sessions earn regular points but never race. Your score uploads when your app opens; you see theirs as of their last open. A group link races everyone who joins it on one board; weekly crowns still settle between directly linked friends.')+
@@ -2186,7 +2207,7 @@ function friendsSection(){
             return '<div style="display:flex;align-items:center;gap:10px;padding:10px 2px 0">'+
             '<span class="mono" style="width:18px;flex:none;text-align:center;font-size:11px;font-weight:700;color:'+(x.rank===1?'var(--green)':'var(--faint)')+'">'+x.rank+'</span>'+
             '<span style="width:26px;height:26px;border-radius:26px;background:var(--raised);border:1.5px solid '+avRing(x.av,(x.me?'var(--green)':'var(--line)'))+';display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex:none">'+avInner(x.av,x.init,'var(--text)')+'</span>'+
-            (x.me?'<span style="flex:1;min-width:0;font-size:13px;font-weight:600">You</span>'
+            (x.me?'<button data-a="raceMineOpen" style="flex:1;min-width:0;font-size:13px;font-weight:600;text-align:left;padding:0">You <span style="color:var(--faint);font-size:10px">\u203a</span></button>'
               :'<button data-a="frOpen" data-v="'+esc(x.id)+'" style="flex:1;min-width:0;font-size:13px;text-align:left;padding:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(x.name)+' <span style="color:var(--faint);font-size:10px">\u203a</span></button>')+
             (x.me?'':(x.stale?'<span class="mono" style="color:var(--faint);font-size:9px;flex:none">as of '+x.stale+' ago</span>'
               :'<span class="mono" style="color:'+(lead>=0?'var(--green)':'var(--amber)')+';font-size:9.5px;flex:none">'+(lead>=0?'+'+lead+' you':'+'+(-lead)+' them')+'</span>'))+
@@ -5080,6 +5101,12 @@ function dpPlausible(h){
 function dataPoints(){
   const B={sets:0,effort:0,sessions:0,runs:0,zones:0,readiness:0,bodyweight:0,scans:0,rehab:0,notes:0};
   let live=0,byDay={},weekLive=0,weekSess=0,prevWeekLive=0;
+  /* THE RACE, ITEMISED (beta ask from Angus, 10 Sep: 'you should be
+     able to click on yourselves to see how you're getting your
+     points'). Collected inside the same loop that scores the week, so
+     the breakdown can never drift from the total — and only for the
+     current week, so it stays a handful of rows. */
+  const raceItems=[];
   let wkStart='',pvStart='';
   try{wkStart=questWeekKey();
     pvStart=dayKey(new Date(new Date(wkStart+'T12:00').getTime()-7*864e5))}catch(e){}
@@ -5110,9 +5137,17 @@ function dataPoints(){
       notes=notes*f;sess=room>0?sess:0;
       earned=sets+effort+notes+sess}
     byDay[day]=used+earned;
-    if(sessionLive(h)){live+=earned;
+    const lw8=sessionLiveWhy(h);
+    if(lw8.live){live+=earned;
       if(wkStart&&day>=wkStart){weekLive+=earned;if(sess)weekSess++}
       else if(pvStart&&day>=pvStart&&day<wkStart)prevWeekLive+=earned}
+    /* a run mirrors into history as a load row; it already appears in
+       the breakdown as its own RUN line, so listing the mirror as a
+       lift that 'did not race' would read like a session was refused
+       when it in fact scored */
+    if(wkStart&&day>=wkStart&&!h.run)raceItems.push({k:'lift',id:String(h.id||''),date:day,
+      t:h.dayTitle||'Session',sub:(h.log||[]).length+' sets',
+      live:!!lw8.live,why:lw8.why||'',pts:lw8.live?Math.round(earned):0});
     B.sessions+=sess;B.sets+=sets;B.effort+=effort;B.notes+=notes});
   (S.runs||[]).forEach(r=>{
     /* cardio spends from the same day budget as sessions — typed runs
@@ -5151,6 +5186,13 @@ function dataPoints(){
     if(races9){live+=earn+zearn;
       if(wkStart&&day>=wkStart){weekLive+=race9;weekSess++}
       else if(pvStart&&day>=pvStart&&day<wkStart)prevWeekLive+=race9}
+    if(wkStart&&day>=wkStart){
+      const why9=races9?'':(!runLive(r)?'typed in by hand — no watch or phone recorded it'
+        :'avg HR '+(+r.hr||0?(+r.hr||0):'unknown')+' — a walk or stroll is recovery, not a race entry');
+      raceItems.push({k:'run',id:String(r.id||''),date:day,
+        t:(r.type?String(r.type).charAt(0).toUpperCase()+String(r.type).slice(1):'Run'),
+        sub:(+r.km?uwNum(Math.round((+r.km)*10)/10)+' km':'')+(mins9?(+r.km?' · ':'')+Math.round(mins9)+' min':''),
+        live:!!races9,why:why9,pts:races9?Math.round(race9):0})}
     B.runs+=earn;B.zones+=zearn});
   const g=(S.gar&&S.gar.days)||{};
   Object.keys(g).forEach(k=>{const d=g[k]||{};
@@ -5174,7 +5216,8 @@ function dataPoints(){
   Object.keys(B).forEach(k=>{B[k]=Math.round(B[k]*10)/10});
   const total=Math.round(Object.keys(B).reduce((x,k)=>x+B[k],0)*10)/10;
   const todayEarned=Math.round((byDay[today()]||0)*10)/10;
-  return{total:total,by:B,live:Math.round(Math.min(live,total)*10)/10,
+  raceItems.sort((a,b)=>(a.date<b.date?1:a.date>b.date?-1:b.pts-a.pts));
+  return{total:total,by:B,raceItems:raceItems,live:Math.round(Math.min(live,total)*10)/10,
     weekLive:Math.round(weekLive),weekSessions:weekSess,prevWeekLive:Math.round(prevWeekLive),
     today:todayEarned,room:Math.max(0,Math.round((dpDayCap()-todayEarned)*10)/10),
     livePct:total?Math.round(Math.min(live,total)/total*100):0}}
@@ -20368,9 +20411,36 @@ function sheetHtml(){
         stat(f.collection_count!=null?f.collection_count:'\u2014','FINDS')+'</div>';
       if(tr&&(tr.sessions||tr.km))inner+='<div class="card mt" style="padding:13px 10px;display:flex">'+
         stat(tr.sessions||0,'SESSIONS EVER')+stat(tr.lifts||0,'LIFTS')+stat(Math.round(tr.km||0),'KM')+stat(tr.weeks||0,'WEEKS')+'</div>';
-      inner+='<p style="color:var(--faint);font-size:10.5px;line-height:1.5;margin-top:8px">The score card is all anyone can see \u2014 never sets, weights or health data.</p>'}
+      /* how they got THIS WEEK's points, as far as their score card
+         honestly goes (beta ask from Angus, 10 Sep: 'see how theyre
+         getting their points'). Their phone sends a score card and
+         nothing else, so we say what it holds and where it stops —
+         never invent a per-session breakdown we were never sent. */
+      if(f.week_live!=null){const ws9=+f.week_sessions||0;
+        inner+='<p style="color:var(--dim);font-size:12.5px;line-height:1.6;margin-top:10px">'+
+          (ws9?esc(nm)+' has '+(+f.week_live||0)+' this week from '+ws9+' witnessed session'+(ws9===1?'':'s')+'. Lifting and runs both count.'
+             :esc(nm)+' has not had a witnessed session this week yet.')+'</p>'}
+      inner+='<p style="color:var(--faint);font-size:10.5px;line-height:1.5;margin-top:8px">The score card is all anyone can see \u2014 never sets, weights or health data. Which sessions made up their week is theirs, not ours.</p>'}
     inner+='<button data-a="nudgeOpen" data-v="'+esc(id)+'" class="big disp mt2" style="background:var(--amber);color:var(--bg);font-size:15px">Send a nudge</button>';
     return wrapSheet('Your mate',inner)}
+  if(S.sheet.t==='racemine'){
+    const R=raceMineRows();
+    const row=(i)=>'<div style="display:flex;align-items:baseline;gap:10px;padding:11px 2px;border-top:1px solid var(--line)">'+
+      '<span class="mono" style="width:34px;flex:none;font-size:8.5px;letter-spacing:.06em;color:var(--faint)">'+(i.k==='run'?'RUN':'LIFT')+'</span>'+
+      '<span style="flex:1;min-width:0">'+
+      '<span style="font-size:13.5px;font-weight:600;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:'+(i.live?'var(--text)':'var(--faint)')+'">'+esc(i.t)+'</span>'+
+      '<span class="mono" style="color:var(--faint);font-size:10px">'+esc(fmtDate(i.date+'T12:00'))+(i.sub?' \u00b7 '+esc(i.sub):'')+'</span>'+
+      (i.live?'':'<span style="display:block;color:var(--faint);font-size:11px;line-height:1.45;margin-top:3px">Did not race \u2014 '+esc(i.why)+'</span>')+'</span>'+
+      '<span class="mono" style="flex:none;font-size:14px;font-weight:700;color:'+(i.live?'var(--green)':'var(--faint)')+'">'+(i.live?'+'+i.show:'0')+'</span></div>';
+    let inner='<div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px">'+
+      '<p class="eyebrow" style="margin:0">Your week</p>'+
+      '<span class="disp" style="font-size:26px;font-weight:700;color:var(--green)">'+R.tot+'</span></div>'+
+      '<p style="color:var(--faint);font-size:11.5px;line-height:1.55;margin-top:4px">'+
+      (R.sess?R.sess+' witnessed session'+(R.sess===1?'':'s')+' so far. Everything resets Monday.':'Nothing witnessed yet this week. Everything resets Monday.')+'</p>';
+    if(R.items.length)inner+='<div class="mt2">'+R.items.map(row).join('')+'</div>';
+    else inner+='<div class="card mt2" style="padding:14px 16px"><p style="color:var(--dim);font-size:12.5px;line-height:1.6">Train with the phone or watch running and the session lands here with what it earned.</p></div>';
+    inner+='<p style="color:var(--faint);font-size:11px;line-height:1.55;margin-top:14px">A lifting session earns for every honest number in it \u2014 each set\u2019s weight, reps and effort, plus one for finishing. A witnessed run earns by time on feet. Both are capped per day so one huge day cannot buy a week.</p>';
+    return wrapSheet('Where your points came from',inner)}
   if(S.sheet.t==='nudge'){
     const id=S.sheet.id;
     /* the fist bump (council-approved, 10 Sep): a reaction to real
@@ -22521,6 +22591,7 @@ function runAction(a,v,t,e){
       try{acctSync(false)}catch(e){}render();break}
     case 'frOpen':{S.sheet={t:'friend',id:v};S.frProf={__wait:1};render();
       frProfileLoad(v).then(p9=>{if(S.sheet&&S.sheet.t==='friend'&&S.sheet.id===v){S.frProf=p9||{};render()}});break}
+    case 'raceMineOpen':{S.sheet={t:'racemine'};render();break}
     case 'nudgeOpen':{S.sheet={t:'nudge',id:v};render();break}
     case 'ovMeSeen':{const a9v=acct()||{};if(a9v.ovMe){a9v.ovMe.x=1;lset(K_ACCT,a9v)}render();break}
     case 'nudgeSendPick':{const id9=S.sheet&&S.sheet.id;if(id9)nudgeSend(id9,+v);break}
