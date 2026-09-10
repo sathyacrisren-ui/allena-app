@@ -683,7 +683,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='f25cf8';  // stamped by tools/build.py with the content hash
+const BUILD_ID='c93dfe';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -8251,7 +8251,7 @@ function parseRunImport(text){
         if(/\bmi\b|mile/.test(hdr))km=km*1.60934;
         else if(/\bm\b|meter|metre/.test(hdr)&&km>400)km=km/1000;
         else if(km>400)km=km/1000;                      // metres given without a unit
-        const mins=iTime>=0?durMin(c[iTime]):null;
+        let mins=iTime>=0?durMin(c[iTime]):null;   // reassigned below when a pace is given as a time (audit C6)
         const dRaw=String(c[iDate]||'').trim();
         let dt=new Date(dRaw);
         if(isNaN(dt.getTime())){
@@ -18965,7 +18965,7 @@ function sheetHtml(){
     const cur9=s9.sets[Math.min(s9.idx,s9.sets.length-1)],b9=gBase(cur9.ex);
     const val=(s9.exNotes||{})[b9]||'';
     const pain=/hurt|pain|sharp|numb|swell|tweak|pinch/i.test(val);
-    return wrapSheet('Note on '+esc(b9),
+    return wrapSheet('Note on '+b9,
       '<p style="color:var(--dim);font-size:12.5px;line-height:1.55">Saved with today\u2019s session, kept in History, and every Allena in the app reads it \u2014 the coach, the deep read, next time\u2019s set screen.</p>'+
       '<textarea data-exnote="1" rows="3" placeholder="e.g. felt strong \u00b7 grip slipping \u00b7 hurts lower back" style="margin-top:10px">'+esc(val)+'</textarea>'+
       (pain?'<div class="card mt" style="padding:12px 14px;border-color:var(--amber)">'+
@@ -19156,7 +19156,22 @@ function sheetHtml(){
       '<button data-a="redoYes" data-v="'+S.sheet.di+'" class="big disp mt" style="background:var(--amber);color:var(--bg);font-size:16px">Do it again anyway</button>'+
       (S.week<p.weeks?'<button data-a="redoNext" class="btn mt">Go to week '+(S.week+1)+' instead</button>':''))}
   if(S.sheet.t==='sub'){
-    const s2=S.sess,cur=s2.sets[s2.idx],found=subsFor(cur.origEx||cur.ex);
+    const s2=S.sess,cur=s2.sets[s2.idx];
+    /* REHAB NEVER SEES THE GYM POOL (audit C9, 10 Sep 2026). subsFor()
+       matches by naive substring, so a phase-2 ACL knee asking to swap
+       'Leg press (both legs, partial range)' was offered HACK SQUAT and
+       SPLIT SQUAT, and 'Nordic curl' — a hamstring eccentric — offered
+       BICEPS curls (the \bcurl\b trap MUSCLE_RULES guards and SUBS does
+       not). The stated law is that rehab swaps come only from the
+       user's own programme, so in a rehab session we force the
+       suggestFor/rehabAlternatives path by refusing the preset table.
+       Outside rehab the presets still stand, but now filtered through
+       the user's own restrictions — a knee restriction should never be
+       handed a movement exclFor() already excludes. */
+    let found=isRehabSession()?null:subsFor(cur.origEx||cur.ex);
+    if(found){try{const ex9=exclFor(restrEff());
+      const safe9=found.list.filter(sb=>!exBlocked(sb.n,[],ex9));
+      found=safe9.length?{key:found.key,list:safe9}:null}catch(e9){}}
     if(!found){
       const f2=S.axf||(S.axf={cat:'pushH',name:'',sets:3,reps:'8-12',w:'',hold:false,secs:30,perSide:false,perm:false});
       const onS='background:var(--text);color:var(--bg);border-color:var(--text);font-weight:600';
@@ -19271,7 +19286,7 @@ function sheetHtml(){
     return wrapSheet(surg?'Surgery date':'Injury date',inner)}
   if(S.sheet.t==='menu'){
     const I=SET_ICONS,lt=lifetime();
-    return wrapSheet(S.prof&&S.prof.name?esc(S.prof.name):'You',
+    return wrapSheet(S.prof&&S.prof.name?S.prof.name:'You',
       '<p class="mono" style="color:var(--faint);font-size:11px">'+lt.sess+' sessions · '+tonStr(lt.ton)+' lifted · '+lt.prs+' PRs</p>'+
       '<div class="card" style="margin-top:14px;padding:0;overflow:hidden">'+(
       navRow(I.save,'History',null,'nav','history',{sub:'Every session, tap any to edit'})+
@@ -20676,7 +20691,7 @@ function sheetHtml(){
           '</div></div>'}).join('')+'</div>';
     const remaining=plan.reduce((a,e)=>a+(e.sets.length-e.done),0);
     inner+='<p class="mono" style="color:var(--faint);font-size:11px;margin-top:14px">'+remaining+' sets left of '+s2.sets.length+'</p>';
-    return wrapSheet(esc(s2.dayName||'Workout'),inner)}
+    return wrapSheet(s2.dayName||'Workout',inner)}
   if(S.sheet.t==='coach'){
     const th=S.coach.thread;
     let inner='';
@@ -20740,7 +20755,7 @@ function sheetHtml(){
     /* the forgot-to-start case: append sets a session never captured */
     const h9=S.history.find(x=>x.id===S.sheet.sid);if(!h9)return '';
     const names=[...new Set((h9.log||[]).map(l=>String(l.ex)))];
-    return wrapSheet('Add a set · '+esc(h9.dayTitle||'session'),
+    return wrapSheet('Add a set · '+(h9.dayTitle||'session'),
       '<p style="color:var(--dim);font-size:12.5px;line-height:1.55">For the work that happened before Allena was opened. It lands in this session, stamped as edited.</p>'+
       '<input data-in="sheet.exn" value="'+esc(S.sheet.exn||'')+'" list="histexn" placeholder="Exercise" style="margin-top:10px">'+
       '<datalist id="histexn">'+names.map(n=>'<option value="'+esc(n)+'">').join('')+'</datalist>'+
@@ -20781,12 +20796,19 @@ function sheetHtml(){
          '<div style="display:flex;gap:8px">'+opts.map(n=>'<button data-a="editSetNo" data-v="'+n+'" class="btn" style="flex:1;padding:10px 0;border-radius:12px;font-size:14px">'+n+'</button>').join('')+'</div>'}}
     if(S.sheet.scope==='hist'||S.sheet.scope==='live')
       inner+='<button data-a="editDelete" class="btn" style="margin-top:12px;color:var(--red);background:transparent">Delete this set</button>';
-    return wrapSheet(esc(e.ex)+' · set '+e.setNo,inner)}
+    return wrapSheet(e.ex+' · set '+e.setNo,inner)}
   return ''}
+/* THE TITLE IS ESCAPED HERE, ONCE (audit C1, 10 Sep 2026): wrapSheet took
+   raw HTML by contract and two call sites forgot — the QR sheet passed a
+   crew NAME straight from the server (written by whoever made the group)
+   and the readiness sheet passed a program day name that the AI import
+   lifts out of a file someone else sent. Verified executing in the
+   sandbox. Escaping at the helper closes every present and future call
+   site; callers must now pass PLAIN TEXT, never markup. */
 function wrapSheet(title,inner){
   return '<div class="sheet-bg" data-a="closeSheet"><div class="sheet" data-stop="1">'+
    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">'+
-   '<span class="eyebrow" style="color:var(--amber)">'+title+'</span>'+
+   '<span class="eyebrow" style="color:var(--amber)">'+esc(title==null?'':title)+'</span>'+
    '<button data-a="closeSheet" style="color:var(--dim);font-size:13px">Close</button></div>'+inner+'</div></div>'}
 
 /* ══ render ═════════════════════════════════════════════ */
@@ -22171,7 +22193,6 @@ function runAction(a,v,t,e){
     case 'questPass':{const Q=questCurrent();if(Q&&Q.state==='offered'){Q.state='passed';questSave()}S.sheet=null;render();break}
     case 'dfReveal':thinkStart('df',[['Reading last night'],['Lining it up against your history'],['Checking it is real']],
       function(){const t2=todayState();t2.revealed=true;todaySave(t2)});render();break;
-    case 'sheetClose':S.sheet=null;render();break;
     case 'wrapGo':{const ym=v;S.sheet={t:'wrap',ym:ym};
       thinkStart('wrap',[['Reading '+ymName(ym)],['Comparing with '+ymName(prevYm(ym))],['Weighing what to say honestly']],function(){
         if(!wraps()[ym]){const r=wrapBuild(ym);if(r){wraps()[ym]=r;wrapSaveAll()}}
@@ -22648,25 +22669,21 @@ function runAction(a,v,t,e){
       S.coach.thread=[];S.coach.sent=false;
       S.coach.input='I just finished '+p2.block+'. Looking at how it went, should I repeat it or move to block 2, and what would you change?';
       S.coachBack='review';S.view='coach';render();break}
-    case 'nextBlock':{const p0=activeProgSafe();
-      if(!p0||thought('nb')){S.think=null;A.act2('nextBlockGo');break}
-      thinkStart('nb',[['Reading the block you just finished','what progressed, what stalled'],
-        ['Carrying learned loads forward','per-exercise adjustments'],
-        ['Checking muscle balance','across the whole week'],
-        ['Screening against your restrictions',restrList(S.prof||{})||'no restrictions'],
-        ['Writing the next block','sets, reps and starting loads']],
-        function(){setTimeout(function(){S.think=null;A.act2('nextBlockGo')},520)});
-      break}
-    case 'nextBlockGo':{const nb=nextBlock();if(!nb){flash('No multi-week block active.');break}
+    /* THE PREVIEW AND THE COMMIT ARE TWO ACTIONS (audit C5, 10 Sep 2026).
+       Both used to be called 'nextBlockGo'. In a switch the FIRST match
+       wins, so the preview opener shadowed the commit body below and the
+       sheet's confirm button just re-opened the same sheet — nobody could
+       start a new block from the day the modules were split. */
+    case 'nextBlockPreview':{const nb=nextBlock();if(!nb){flash('No multi-week block active.');break}
       S.nb=nb;S.sheet={t:'nextblock'};render();break}
     case 'nextBlock':{const p0=activeProgSafe();
-      if(!p0||thought('nb')){S.think=null;A.act2('nextBlockGo');break}
+      if(!p0||thought('nb')){S.think=null;A.act2('nextBlockPreview');break}
       thinkStart('nb',[['Reading the block you just finished','what progressed, what stalled'],
         ['Carrying learned loads forward','per-exercise adjustments'],
         ['Checking muscle balance','across the whole week'],
         ['Screening against your restrictions',restrList(S.prof||{})||'no restrictions'],
         ['Writing the next block','sets, reps and starting loads']],
-        function(){setTimeout(function(){S.think=null;A.act2('nextBlockGo')},520)});
+        function(){setTimeout(function(){S.think=null;A.act2('nextBlockPreview')},520)});
       break}
     case 'nextBlockGo':{const nb=S.nb;if(!nb)break;
       {const old=activeProgSafe();if(old&&blockDone(old))old.archived=Date.now()}
