@@ -677,7 +677,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='a8b2f8';  // stamped by tools/build.py with the content hash
+const BUILD_ID='db6496';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -704,16 +704,20 @@ function flash(m,gold){S.toast=m;S.toastGold=!!gold;
   clearTimeout(flash.t);flash.t=setTimeout(()=>{S.toast=null;S.toastGold=false;try{render()}catch(e){}},gold?3200:2400);
   try{render()}catch(e){}}
 function saveHistory(){return lset(K_H,S.history)}
+/* honest session minutes: the work ends at the last logged set +3,
+   and a gap of 40+ minutes between two set stamps ends it at the set
+   BEFORE the gap. 'done' can lag by hours (phone in a pocket), and a
+   set re-stamped by a late edit must not stretch the session either
+   (owner-caught twice: 'Longest session: 237 minutes') */
+function sessMinutes(startedAt,log,now){
+  try{const ts=(log||[]).map(l=>+l.t).filter(t=>t>startedAt).sort((a,b)=>a-b);
+    let last=0;for(let i=0;i<ts.length;i++){if(last&&ts[i]-last>40*60000)break;last=ts[i]}
+    const end=last?Math.min(now||Date.now(),last+3*60000):(now||Date.now());
+    return Math.max(1,Math.round((end-startedAt)/60000))}catch(e){
+    return Math.max(1,Math.round(((now||Date.now())-startedAt)/60000))}}
 function record(complete){const s=S.sess;return{id:String(s.startedAt),date:new Date(s.startedAt).toISOString(),
   block:s.block,progId:s.progId,dayIdx:s.dayIdx,dayTitle:s.dayName,week:s.week,
-  minutes:(function(){
-    /* the session's work ends at the LAST LOGGED SET — 'done' can lag
-       by hours (phone in a pocket, or the 9 Sep numbering bug left a
-       finished session open and banked 'Longest session: 237 min') */
-    try{let last=0;(s.log||[]).forEach(l=>{if(+l.t>last)last=+l.t});
-      const end=(last>s.startedAt)?Math.min(Date.now(),last+3*60000):Date.now();
-      return Math.max(1,Math.round((end-s.startedAt)/60000))}catch(e){
-      return Math.max(1,Math.round((Date.now()-s.startedAt)/60000))}})(),
+  minutes:sessMinutes(s.startedAt,s.log),
   log:s.log,note:S.note,exNotes:(s.exNotes&&Object.keys(s.exNotes).length?s.exNotes:null),complete:!!complete,planned:s.sets.length,
   motion:(function(){try{const m=s.motion||{};
     const moved=Object.keys(m).filter(k=>m[k]>=3).length;
@@ -17925,14 +17929,26 @@ function crossPatterns(){
     if(l.w&&l.r&&lifts.indexOf(b)<0)lifts.push(b)}));
   const stalled=lifts.filter(b=>{const v=liftVelocity(b);return v!=null&&Math.abs(v)<0.3});
   const moving=lifts.filter(b=>{const v=liftVelocity(b);return v!=null&&v>0.5});
+  /* strength verdicts read the MAIN lifts only: goal lifts plus the
+     three heaviest. A 21 kg cable accessory moves in stack steps and
+     reads 'flat' forever (owner-caught, 10 Sep: bench PR'd 105x2 the
+     same day the app said 'gaining weight without strength' citing
+     Overhead cable triceps) */
+  const topW={};S.history.slice(-30).forEach(h=>h.log.forEach(l=>{const b=gBase(l.ex);
+    if(l.w&&l.r&&(+l.w)>(topW[b]||0))topW[b]=+l.w}));
+  const goalB=(S.goals||[]).map(g=>gBase(g.ex));
+  const heavy=Object.keys(topW).sort((a,b)=>topW[b]-topW[a]).slice(0,3);
+  const main=lifts.filter(b=>goalB.indexOf(b)>=0||heavy.indexOf(b)>=0);
+  const stalledMain=stalled.filter(b=>main.indexOf(b)>=0);
+  const movingMain=moving.filter(b=>main.indexOf(b)>=0);
   // readiness vs stalling
   const ks=Object.keys(S.gar.days||{}).sort();
   const morn=ks.map(k=>S.gar.days[k]).filter(d=>d.am!=null).map(d=>+d.am);
-  if(morn.length>=6&&stalled.length){
+  if(morn.length>=6&&stalledMain.length&&!movingMain.length){
     const base=morn.slice(0,-7).length?morn.slice(0,-7).reduce((a,b)=>a+b,0)/morn.slice(0,-7).length:null;
     const rec=morn.slice(-7).reduce((a,b)=>a+b,0)/Math.min(7,morn.length);
     if(base&&rec<base-6)out.push({src:['bb','trends'],t:'Low readiness, stalled lifts',
-      d:'Morning Body Battery is averaging '+Math.round(rec)+' against your earlier '+Math.round(base)+', and '+stalled.slice(0,2).join(' and ')+' '+(stalled.length>1?'have':'has')+' been flat. Those two usually travel together — the load is not the problem, the recovery is.',tone:'warn'})}
+      d:'Morning Body Battery is averaging '+Math.round(rec)+' against your earlier '+Math.round(base)+', and '+stalledMain.slice(0,2).join(' and ')+' '+(stalledMain.length>1?'have':'has')+' been flat. Those two usually travel together — the load is not the problem, the recovery is.',tone:'warn'})}
   // volume vs stalling
   const ws=weeklySets(28);
   stalled.slice(0,3).forEach(b=>{
@@ -17942,19 +17958,21 @@ function crossPatterns(){
     else if(high.length)out.push({src:['trends','balance'],t:b+' stalled on high volume',d:high.join(', ')+' has been over 20 sets a week. Past that point extra sets mostly buy fatigue — try cutting a set and holding the load.',tone:'warn'})});
   // bodyweight vs strength
   const days=Object.keys(S.daily.days||{}).filter(k=>S.daily.days[k]&&S.daily.days[k].bw).sort();
-  if(days.length>=8&&(stalled.length||moving.length)){
+  if(days.length>=8&&(stalledMain.length||movingMain.length)){
     const f=S.daily.days[days[0]].bw,l=S.daily.days[days[days.length-1]].bw;
     const wks=Math.max(1,Math.round((new Date(days[days.length-1])-new Date(days[0]))/6048e5));
     const rate=(l-f)/wks;
-    if(rate<-0.3&&stalled.length)out.push({src:['bw','trends'],t:'Losing weight, lifts flat',
-      d:'Down '+uwNum(Math.abs(Math.round(rate*100)/100))+' '+uwUnit()+' a week while '+stalled.slice(0,2).join(' and ')+' '+(stalled.length>1?'sit':'sits')+' flat. Holding strength in a deficit is a good outcome — do not read it as a stalled program.',tone:'ok'});
-    if(rate>0.4&&stalled.length)out.push({src:['bw','trends'],t:'Gaining weight without strength',
-      d:'Up '+uwNum(Math.round(rate*100)/100)+' '+uwUnit()+' a week with '+stalled.slice(0,2).join(' and ')+' flat. If the scale is moving and the bar is not, the surplus is outpacing the stimulus.',tone:'warn'})}
+    if(rate<-0.3&&stalledMain.length&&!movingMain.length)out.push({src:['bw','trends'],t:'Losing weight, lifts flat',
+      d:'Down '+uwNum(Math.abs(Math.round(rate*100)/100))+' '+uwUnit()+' a week while '+stalledMain.slice(0,2).join(' and ')+' '+(stalledMain.length>1?'sit':'sits')+' flat. Holding strength in a deficit is a good outcome. Don\'t read it as a stalled program.',tone:'ok'});
+    if(rate>0.4&&stalledMain.length&&!movingMain.length)out.push({src:['bw','trends'],t:'Gaining weight without strength',
+      d:'Up '+uwNum(Math.round(rate*100)/100)+' '+uwUnit()+' a week with '+stalledMain.slice(0,2).join(' and ')+' flat. If the scale is moving and the bar is not, the surplus is outpacing the stimulus.',tone:'warn'});
+    if(rate>0.4&&movingMain.length)out.push({src:['bw','trends'],t:'Gaining weight, and it is turning into strength',
+      d:'Up '+uwNum(Math.round(rate*100)/100)+' '+uwUnit()+' a week and '+movingMain.slice(0,2).join(' and ')+' '+(movingMain.length>1?'are':'is')+' climbing with it. The surplus is doing its job.',tone:'good'})}
   // drain vs stalling
   const dr=S.history.filter(h=>h.bb&&h.bb.drain!=null);
-  if(dr.length>=3&&stalled.length){
+  if(dr.length>=3&&stalledMain.length&&!movingMain.length){
     const avg=dr.reduce((a,h)=>a+h.bb.drain,0)/dr.length;
-    if(avg>=35)out.push({src:['bb','tonnage'],t:'Sessions are expensive',d:'They cost about '+Math.round(avg)+' Body Battery points on average, which is high, and '+stalled.length+' lift'+(stalled.length>1?'s are':' is')+' flat. Shorter sessions at the same intensity often move things.',tone:'warn'})}
+    if(avg>=35)out.push({src:['bb','tonnage'],t:'Sessions are expensive',d:'They cost about '+Math.round(avg)+' Body Battery points on average, which is high, and '+stalledMain.length+' lift'+(stalledMain.length>1?'s are':' is')+' flat. Shorter sessions at the same intensity often move things.',tone:'warn'})}
   // scan vs strength
   const sl=scansSorted();
   if(sl.length>=2&&moving.length){const d=scanDelta(sl[0],sl[sl.length-1]);
@@ -23879,10 +23897,10 @@ function dayCheck(){
   try{let ch9=false;
     (S.history||[]).forEach(h9=>{
       if(!h9.complete||!h9.minutes||!(h9.log||[]).length)return;
-      let last9=0;(h9.log||[]).forEach(l9=>{if(+l9.t>last9)last9=+l9.t});
       const st9=new Date(h9.date).getTime();
-      if(last9>st9){const m9=Math.max(1,Math.round((last9+3*60000-st9)/60000));
-        if(h9.minutes>m9+10){h9.minutes=m9;ch9=true}}});
+      if(!(h9.log||[]).some(l9=>+l9.t>st9))return;
+      const m9=sessMinutes(st9,h9.log,st9+h9.minutes*60000);
+      if(h9.minutes>m9+10){h9.minutes=m9;ch9=true}});
     if(ch9)saveHistory();
     const b8=discBank();
     Object.keys(b8).forEach(k=>{const e8=b8[k];
