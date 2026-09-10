@@ -708,7 +708,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='11abee';  // stamped by tools/build.py with the content hash
+const BUILD_ID='c743f1';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -1481,7 +1481,7 @@ function coachContext(){
   try{if(S.hint&&S.hint.msg)out.push('ALLENA\u2019S OWN SET COMMENT (already shown to the user this set \u2014 build on it or gently supersede it, never contradict it without saying why): \u201c'+S.hint.msg+'\u201d')}catch(e){}
   try{if(s&&s.exNotes&&Object.keys(s.exNotes).length)
     out.push('USER\u2019S EXERCISE NOTES THIS SESSION (their own words \u2014 acknowledge them): '+Object.keys(s.exNotes).map(k=>k+': \u201c'+s.exNotes[k]+'\u201d').join('; '))}catch(e){}
-  try{const nrows=[];(S.history||[]).slice(-20).forEach(h9=>{if(h9.exNotes)Object.keys(h9.exNotes).forEach(k=>nrows.push(k+' ('+String(h9.date).slice(0,10)+'): \u201c'+h9.exNotes[k]+'\u201d'))});
+  try{const nrows=[];(S.history||[]).slice(-20).forEach(h9=>{if(h9.exNotes)Object.keys(h9.exNotes).forEach(k=>nrows.push(k+' ('+hKey(h9)+'): \u201c'+h9.exNotes[k]+'\u201d'))});
     if(nrows.length)out.push('RECENT EXERCISE NOTES FROM HISTORY: '+nrows.slice(-8).join('; ')+' \u2014 if pain recurs across dates, suggest easing/swapping and seeing a health professional; NEVER diagnose.')}catch(e){}
   try{if(S.prof&&(S.prof.notes||'').trim())
     out.push('USER-STATED LIMITATION (from setup, honour it): \u201c'+S.prof.notes.trim()+'\u201d')}catch(e){}
@@ -1778,7 +1778,7 @@ function snapshotData(){
       return (e9||'Racer').slice(0,12)})();
     try{
       const L=(S.history||[]).filter(h=>h.complete&&sessionLive(h))
-        .map(h=>String(h.date).slice(0,10)).sort();
+        .map(h=>hKey(h)).sort();
       if(L.length){const cut=dayKey(new Date(new Date(L[0]+'T12:00').getTime()+7*864e5));
         out.activated=L.filter(k=>k<cut).length>=3}else out.activated=false}catch(e){out.activated=false}}
   return out}
@@ -2840,11 +2840,11 @@ A.resumeHist=id=>{const rec=S.history.find(h=>h.id===id);if(!rec)return;
 A.exportXlsx=()=>{
   if(!S.history.length)return flash('Nothing to export yet.');
   const sh=[['Date','Program','Week','Day','Status','Sets','Planned','Minutes','Volume kg','Sleep','Fatigue','Knee']];
-  S.history.forEach(h=>sh.push([h.date.slice(0,10),h.block||'',h.week,h.dayTitle,h.complete?'Complete':'Partial',
+  S.history.forEach(h=>sh.push([hKey(h),h.block||'',h.week,h.dayTitle,h.complete?'Complete':'Partial',
     h.log.length,h.planned||'',h.minutes,Math.round(h.log.reduce((a,l)=>a+(l.w||0)*(l.r||0),0)),
     h.note&&h.note.sleep||'',h.note&&h.note.fatigue||'',h.note&&h.note.knee||'']));
   const st=[['Date','Program','Week','Day','Exercise','Set','Target kg','Target reps','Target secs','Target RPE','Actual kg','Actual reps','Actual secs','Actual RPE','Volume','Est 1RM']];
-  S.history.forEach(h=>h.log.forEach(l=>st.push([h.date.slice(0,10),h.block||'',h.week,h.dayTitle,l.ex,l.setNo,
+  S.history.forEach(h=>h.log.forEach(l=>st.push([hKey(h),h.block||'',h.week,h.dayTitle,l.ex,l.setNo,
     l.targetW==null?'':l.targetW,l.targetReps==null?'':String(l.targetReps),'',
     l.targetRpe==null?'':String(l.targetRpe),
     l.w||'',l.r||'',l.secs==null?'':l.secs,l.rpe==null?'':l.rpe,
@@ -3589,6 +3589,18 @@ function dayKey(d){d=d?new Date(d):new Date();
   const t=d.getTime()-d.getTimezoneOffset()*60000;
   return new Date(t).toISOString().slice(0,10)}
 function today(){return dayKey()}
+/* ══ A HISTORY ROW'S DAY (audit C4, 10 Sep 2026) ═══════════════════
+   record() stores `new Date(startedAt).toISOString()` — a UTC instant —
+   while every comparison in the app uses a LOCAL day key. In Melbourne
+   that filed anything trained before ~10am under YESTERDAY: the daily
+   task never ticked, the day's points read zero, and a Monday-morning
+   session scored into LAST week's race.
+   Reading through dayKey() is correct for BOTH row shapes — the UTC
+   timestamps record() writes, and the local `dayKey(d)+'T18:00'` that
+   imports write. Do NOT change what record() stores: that would alter
+   rows already on people's phones and in their backups. */
+function hKey(h){try{const d=h&&h.date;if(!d)return '';
+  return dayKey(new Date(d))}catch(e){return String((h&&h.date)||'').slice(0,10)}}
 function daysSince(k){
   /* whole calendar days from dayKey k to today — stable all day,
      unlike Date.now()-based math which flips at noon. */
@@ -3699,7 +3711,7 @@ function recoveryMod(){
     const bw=(function(){const kk=Object.keys(dd).filter(k=>dd[k].bw>0).sort().pop();
       return kk?dd[kk].bw:((S.scans||[]).map(x=>+x.w||0).filter(Boolean).pop()||0)})();
     const heavy=(S.runs||[]).some(r=>String(r.date).slice(0,10)===yk&&(+r.mins||0)>=45&&!/walk/.test(String(r.type||'')))
-      ||S.history.some(h=>String(h.date).slice(0,10)===yk&&(h.log||[]).filter(l=>l.r>0&&(l.rpe==null||l.rpe>=6)).length>=10);
+      ||S.history.some(h=>hKey(h)===yk&&(h.log||[]).filter(l=>l.r>0&&(l.rpe==null||l.rpe>=6)).length>=10);
     if(heavy&&bw>0&&cb<3*bw)m*=0.90}}catch(e3){}
   return Math.max(0.75,Math.min(1.15,m))}catch(e){return 1}}
 function muscleFresh(){
@@ -4683,7 +4695,7 @@ function todayTasks(){
   if(p&&!p.acl){
     const ws=weekState(p,S.week);
     const left=p.days.filter(d=>!ws.done.has(d.name));
-    const didToday=S.history.some(h=>h.complete&&h.date.slice(0,10)===k&&!h.run);
+    const didToday=S.history.some(h=>h.complete&&hKey(h)===k&&!h.run);
     if(left.length||didToday)T.push({k:'session',n:didToday?'Session done':'Train today',
       sub:didToday?'The rest of this is small stuff.':left.length+' session'+(left.length===1?'':'s')+' left this week.',
       done:didToday,go:null,pts:10,optional:true})}
@@ -4710,7 +4722,7 @@ function todayPoints(){
   // points earned today, so the counter visibly moves
   const k=today();
   let n=0;
-  (S.history||[]).forEach(h=>{if((h.date||'').slice(0,10)!==k)return;
+  (S.history||[]).forEach(h=>{if(hKey(h)!==k)return;
     if(h.complete)n+=1;
     (h.log||[]).forEach(l=>{if(l.w!=null)n+=1;if(l.r!=null)n+=1;if(l.secs!=null)n+=1;if(l.rpe!=null)n+=1})});
   (S.runs||[]).forEach(r=>{if(r.date!==k)return;n+=2;if(r.hr)n+=1;if(zoneMins(r))n+=5});
@@ -4724,7 +4736,7 @@ function dayStreakInfo(){
   // week can bridge a single gap between logged days — never two in a row,
   // never at the tail, never banked. It is an anti-anxiety valve, not a loophole.
   const has={};
-  (S.history||[]).forEach(h=>{has[(h.date||'').slice(0,10)]=1});
+  (S.history||[]).forEach(h=>{has[hKey(h)]=1});
   (S.runs||[]).forEach(r=>{has[r.date]=1});
   Object.keys((S.gar&&S.gar.days)||{}).forEach(k=>{if(S.gar.days[k].am!=null)has[k]=1});
   Object.keys((S.daily&&S.daily.days)||{}).forEach(k=>{if(S.daily.days[k].bw!=null)has[k]=1});
@@ -4856,10 +4868,10 @@ function noticedPool(){
      casual reader would never compute — so there is always
      something genuinely interesting to say ─────────────────── */
   // rest-day bounce: how much a full day off is worth
-  try{const days={};H.filter(h=>!h.run).forEach(h=>{days[h.date.slice(0,10)]=1});
+  try{const days={};H.filter(h=>!h.run).forEach(h=>{days[hKey(h)]=1});
     const byGap={};
     H.filter(h=>!h.run).forEach(h=>{
-      const d0=new Date(h.date.slice(0,10)+'T12:00');
+      const d0=new Date(hKey(h)+'T12:00');
       let gap=0;for(let g=1;g<=3;g++){const k=dayKey(new Date(d0-g*864e5));if(days[k])break;gap=g}
       let best=0;h.log.forEach(l=>{if(l.w&&l.r)best=Math.max(best,e1rm(l.w,l.r,l.rpe))});
       if(best)(byGap[gap?'rest':'b2b']=byGap[gap?'rest':'b2b']||[]).push(best)});
@@ -4919,7 +4931,7 @@ function noticedPool(){
   // rehab: the boring sessions show up in the pain numbers
   try{if(S.acl&&S.acl.on){
     const rp=S.lib.programs.filter(p2=>p2.acl||p2.rehabProto).map(p2=>p2.id);
-    const rehabDays={};H.forEach(h=>{if(rp.indexOf(h.progId)>=0)rehabDays[h.date.slice(0,10)]=1});
+    const rehabDays={};H.forEach(h=>{if(rp.indexOf(h.progId)>=0)rehabDays[hKey(h)]=1});
     const after=[],other=[];
     ((S.acl.checks)||[]).forEach(c=>{if(c.pain==null)return;
       const prev=dayKey(new Date(new Date(c.date+'T12:00')-864e5));
@@ -4931,7 +4943,7 @@ function noticedPool(){
   // the quiet climber: up without a single headline set
   try{const cut=dayKey(new Date(Date.now()-30*864e5));const by={};
     H.filter(h=>!h.run).forEach(h=>h.log.forEach(l=>{if(!l.w||!l.r)return;
-      const b=gBase(l.ex);(by[b]=by[b]||[]).push({d:h.date.slice(0,10),e:e1rm(l.w,l.r,l.rpe),pr:!!l.pr})}));
+      const b=gBase(l.ex);(by[b]=by[b]||[]).push({d:hKey(h),e:e1rm(l.w,l.r,l.rpe),pr:!!l.pr})}));
     let best=null;
     Object.keys(by).forEach(b=>{const l=by[b];if(l.length<8)return;
       const recent=l.filter(x=>x.d>=cut),before=l.filter(x=>x.d<cut);
@@ -4969,7 +4981,7 @@ function noticedPool(){
   try{const marks=[[365,'A year ago today'],[182,'Six months ago today']];
     marks.forEach(mk=>{
       const then=dayKey(new Date(Date.now()-mk[0]*864e5));
-      const h0=H.find(h=>String(h.date).slice(0,10)===then&&(h.log||[]).length);
+      const h0=H.find(h=>hKey(h)===then&&(h.log||[]).length);
       if(h0){const top=(h0.log||[]).filter(l=>l.w>0&&l.r>0).sort((a,b)=>e1rm(b.w,b.r,b.rpe)-e1rm(a.w,a.r,a.rpe))[0];
         add(mk[1]+': '+(h0.dayTitle||'a session'),
           top?('You logged '+gBase(top.ex)+' '+top.w+'\u00d7'+top.r+' that day. Look how far the log reaches back \u2014 this record is becoming a training life.')
@@ -4977,7 +4989,7 @@ function noticedPool(){
   // near-misses: within touching distance of an all-time mark
   try{const lifts2={};
     H.forEach(h=>h.log.forEach(l=>{if(!l.w||!l.r)return;const b=gBase(l.ex);
-      const e=e1rm(l.w,l.r,l.rpe);(lifts2[b]=lifts2[b]||[]).push({e:e,d:String(h.date).slice(0,10)})}));
+      const e=e1rm(l.w,l.r,l.rpe);(lifts2[b]=lifts2[b]||[]).push({e:e,d:hKey(h)})}));
     const cut14=dayKey(new Date(Date.now()-14*864e5));
     Object.keys(lifts2).forEach(b=>{const arr=lifts2[b];if(arr.length<8)return;
       const best=Math.max.apply(null,arr.map(x=>x.e));
@@ -4997,7 +5009,7 @@ function noticedPool(){
     if([25,50,75,100,150,200,300].indexOf(nS)>=0)add('Session '+nS+' is in the book',
       'Most people quit before 10. The evidence pool this builds is why your insights keep getting sharper.',2)}catch(e){}
   // consistency texture: same weekday, N in a row
-  try{const dows={};H.slice(-60).forEach(h=>{const dw=new Date(h.date).getDay();(dows[dw]=dows[dw]||[]).push(String(h.date).slice(0,10))});
+  try{const dows={};H.slice(-60).forEach(h=>{const dw=new Date(h.date).getDay();(dows[dw]=dows[dw]||[]).push(hKey(h))});
     const names=['Sundays','Mondays','Tuesdays','Wednesdays','Thursdays','Fridays','Saturdays'];
     Object.keys(dows).forEach(dw=>{const ds=[...new Set(dows[dw])].sort().reverse();
       let run=0;for(let i=0;i<ds.length;i++){const expect=dayKey(new Date(new Date(ds[0]+'T12:00')-i*7*864e5));
@@ -5200,7 +5212,7 @@ function srpeStrain(){
   try{
     const by={};
     (S.history||[]).filter(h=>h.complete).forEach(h=>{
-      const k=String(h.date).slice(0,10);
+      const k=hKey(h);
       const t=new Date(k+'T12:00').getTime();
       if(t<Date.now()-27*864e5||t>Date.now()+864e5)return;
       const rp=(h.log||[]).map(l=>parseFloat(l.rpe)).filter(x=>isFinite(x));
@@ -5227,7 +5239,7 @@ function formModel(){
     if(S._formC&&S._formC.k===ck)return S._formC.v;
     const by={};let first=null;
     (S.history||[]).filter(h=>h.complete).forEach(h=>{
-      const k=String(h.date).slice(0,10);
+      const k=hKey(h);
       if(new Date(k+'T12:00').getTime()>Date.now()+864e5)return;
       const rp=(h.log||[]).map(l=>parseFloat(l.rpe)).filter(x=>isFinite(x));
       const rpe=rp.length?rp.reduce((a,b)=>a+b,0)/rp.length:5;
@@ -5282,7 +5294,7 @@ function dataPoints(){
     pvStart=dayKey(new Date(new Date(wkStart+'T12:00').getTime()-7*864e5))}catch(e){}
   (S.history||[]).forEach(h=>{
     if(!dpPlausible(h))return;                       // implausible sessions score nothing
-    const day=(h.date||'').slice(0,10);
+    const day=hKey(h);
     let sets=0,effort=0,notes=0,sess=0;
     if(h.complete)sess=1;
     (h.log||[]).forEach(l=>{
@@ -5441,7 +5453,7 @@ function rehabStartKey(){
   const rp=S.lib.programs.filter(p=>p.acl||p.rehabProto).map(p=>p.id);
   let first=null;
   (S.history||[]).forEach(h=>{if(rp.indexOf(h.progId)>=0&&h.complete){
-    const k=(h.date||'').slice(0,10);if(k&&(!first||k<first))first=k}});
+    const k=hKey(h);if(k&&(!first||k<first))first=k}});
   ((S.acl&&S.acl.checks)||[]).forEach(c=>{if(c.date&&(!first||c.date<first))first=c.date});
   Object.keys(S.rehab||{}).forEach(k=>{(((S.rehab[k]||{}).log)||[]).forEach(e=>{
     if(e&&e.date&&(!first||e.date<first))first=e.date})});
@@ -5454,7 +5466,7 @@ function rehabAdherence(days){
   const d=tracked,cut=Date.now()-d*864e5;
   const rp=S.lib.programs.filter(p=>p.acl||p.rehabProto).map(p=>p.id);
   const done=S.history.filter(h=>rp.indexOf(h.progId)>=0&&h.complete&&new Date(h.date).getTime()>=cut);
-  const byDay={};done.forEach(h=>{byDay[h.date.slice(0,10)]=1});
+  const byDay={};done.forEach(h=>{byDay[hKey(h)]=1});
   // what was asked for: rehab sessions per week across active protocols
   let target=0;
   if(S.acl&&S.acl.on)target+=(S.acl.phase===1?7:2)*(d/7);
@@ -6186,7 +6198,7 @@ function rehabWeekSessions(){
   const end=(function(){const d=new Date(wk+'T12:00');d.setDate(d.getDate()+7);return dayKey(d)})();
   const rp=S.lib.programs.filter(p=>p.acl||p.rehabProto).map(p=>p.id);
   return (S.history||[]).filter(h=>h.complete&&rp.indexOf(h.progId)>=0&&
-    h.date.slice(0,10)>=wk&&h.date.slice(0,10)<end).length}
+    hKey(h)>=wk&&hKey(h)<end).length}
 function rehabPainHot(){
   /* adherence nudges stand down when the knee is speaking (owner call,
      7 Sep). The line sits at 4 — the same reference line the check-in
@@ -6323,7 +6335,7 @@ function openDoorsCard(){
     if(rs)names.forEach(b=>{
       let before=0,during=0;
       (S.history||[]).forEach(h=>{if(!h.complete||h.run)return;
-        const d=String(h.date).slice(0,10);
+        const d=hKey(h);
         (h.log||[]).forEach(l=>{if(gBase(l.ex)!==b||!(l.w>0&&l.r>0))return;
           const e9=e1rm(l.w,l.r,l.rpe);
           if(d<rs){if(e9>before)before=e9}else{if(e9>during)during=e9}})});
@@ -7558,7 +7570,7 @@ function viewPoints(){
   /* keep it climbing: what today could still earn, each row a door */
   {const room=d.room||0;
    const tk=today();
-   const doneSess=S.history.some(h=>!h.run&&h.complete&&String(h.date).slice(0,10)===tk&&!h.demo);
+   const doneSess=S.history.some(h=>!h.run&&h.complete&&hKey(h)===tk&&!h.demo);
    const doneRun=runs().some(r=>String(r.date).slice(0,10)===tk);
    /* the knee's cardio completes ITSELF (owner-caught, 4 Sep): a
       Health-synced walk workout counts, and so do 4,000+ plain steps */
@@ -8491,7 +8503,7 @@ function weekStreak(){
     else run=1;
     best=Math.max(best,run);prev=k});
   const days=new Set(H.filter(h=>new Date(h.date).getTime()>Date.now()-28*864e5)
-    .map(h=>h.date.slice(0,10))).size;
+    .map(h=>hKey(h))).size;
   return{weeks:n,days:days,best:Math.max(best,n)}}
 
 /* ══ adherence ══════════════════════════════════════════════
@@ -8904,7 +8916,7 @@ function watchCorroborate(){
         /* say it out loud (owner call, 3 Sep): a witness that never
            testifies is wasted — the moment the watch corroborates a
            session, the user hears it */
-        try{livePill();flash('Your watch confirmed '+(String(h.date).slice(0,10)===today()?'today\u2019s':fmtDate(h.date)+'\u2019s')+' session \u2014 '+w.mins+' min at avg HR '+(w.hr||'?')+'. Witnessed live.');
+        try{livePill();flash('Your watch confirmed '+(hKey(h)===today()?'today\u2019s':fmtDate(h.date)+'\u2019s')+' session \u2014 '+w.mins+' min at avg HR '+(w.hr||'?')+'. Witnessed live.');
           haptic('success')}catch(e9){}}});
     if(dirty){saveHistory();lset(K_WG,watchGym());
       /* the corroboration can flip a session to LIVE after today's
@@ -9291,7 +9303,7 @@ function histCommit(recs){
   /* replace, never compound: a re-import of the same days replaces the
      earlier IMPORT; a hand-logged real session always outranks an
      import and the colliding import row is dropped. */
-  const key=h=>String(h.date).slice(0,10)+'|'+String(h.dayTitle||'').toLowerCase();
+  const key=h=>hKey(h)+'|'+String(h.dayTitle||'').toLowerCase();
   const incoming=new Set(recs.map(key));
   let replaced=0,skipped=0;
   const isImport=h=>h.approx||h.progId==='imported';
@@ -9829,7 +9841,7 @@ function notifPlan(){
      replanned away the moment the session is done (notifSync re-runs
      on every foreground). */
   if(P.morning){try{
-    const trained=(S.history||[]).some(h=>h.complete&&!h.run&&String(h.date).slice(0,10)===today());
+    const trained=(S.history||[]).some(h=>h.complete&&!h.run&&hKey(h)===today());
     if(!trained){
       const rec=(typeof recommendToday==='function')?recommendToday():null;
       if(rec&&rec.top&&!rec.empty){
@@ -9856,7 +9868,7 @@ function notifPlan(){
       const done9=rehabWeekSessions(),targ9=rehabWeekTarget();
       const dow9=new Date().getDay()||7;
       const pace9=Math.ceil(targ9*dow9/7);
-      const rehabbedToday=(S.history||[]).some(h=>h.complete&&String(h.date).slice(0,10)===today()&&(function(){const p9=S.lib.programs.find(x=>x.id===h.progId);return p9&&(p9.acl||p9.rehabProto)})());
+      const rehabbedToday=(S.history||[]).some(h=>h.complete&&hKey(h)===today()&&(function(){const p9=S.lib.programs.find(x=>x.id===h.progId);return p9&&(p9.acl||p9.rehabProto)})());
       if(done9<targ9&&done9<pace9&&!rehabbedToday&&!(typeof rehabPainHot==='function'&&rehabPainHot())){
         const at6=new Date(today()+'T17:45:00').getTime();
         if(at6>Date.now()+60000)items.push({id:'reh'+today(),ts:Math.round(at6/1000),title:'Allena',
@@ -10108,12 +10120,12 @@ function hrWitnessBackfill(){
        blocks — a sustained working-heart-rate block that day, with no
        run or watch workout to claim it, verifies the session. */
     (S.history||[]).filter(h=>h.complete&&!h.run&&!h.hr&&!h.startedAt&&
-        String(h.date).slice(0,10)>=cutK)
-      .filter(h=>{const dk=String(h.date).slice(0,10);
+        hKey(h)>=cutK)
+      .filter(h=>{const dk=hKey(h);
         if((S.runs||[]).some(r=>String(r.date).slice(0,10)===dk))return false;
         if((typeof watchGym==='function'?watchGym():[]).some(w=>w.date===dk))return false;
         return true})
-      .slice(-2).forEach(h=>{const dk=String(h.date).slice(0,10);
+      .slice(-2).forEach(h=>{const dk=hKey(h);
         for(let b=0;b<6;b++){const st=new Date(dk+'T05:00').getTime()+b*3*3600e3;
           try{window.webkit.messageHandlers.allena.postMessage(JSON.stringify(
             {type:'hr',id:'DAY:'+h.id+':'+b,start:Math.round(st/1000),end:Math.round((st+3*3600e3)/1000)}))}catch(e2){}}})
@@ -10423,7 +10435,7 @@ function discoveries(){
   if(H.length>=5){
     const byTon=H.map(h=>({h:h,t:h.log.reduce((a,l)=>a+(l.w||0)*(l.r||0),0)}));
     const big=byTon.reduce((a,c)=>c.t>a.t?c:a,byTon[0]);
-    if(big.t>0&&big.h.date.slice(0,10)===today())
+    if(big.t>0&&hKey(big.h)===today())
       add('rare','Biggest session yet','You moved '+tonStr(big.t)+' today, more than any session you have logged.','record');
     const longest=H.reduce((a,c)=>(c.minutes||0)>(a.minutes||0)?c:a,H[0]);
     if(longest.minutes>=90)add('common','Longest session: '+longest.minutes+' minutes',
@@ -10458,7 +10470,7 @@ function discoveries(){
       if(r9)add(r9>=12?'epic':'rare',r9+' weeks without missing one',
         'Consistency beats every programming decision you will ever make'+(st.weeks>r9?' \u2014 '+st.weeks+' weeks now':'')+'.','streak')}
     // gap analysis
-    const days=[...new Set(H.map(h=>h.date.slice(0,10)))].sort();
+    const days=[...new Set(H.map(h=>hKey(h)))].sort();
     if(days.length>=8){let maxGap=0;
       for(let i=1;i<days.length;i++){const g=Math.round((new Date(days[i])-new Date(days[i-1]))/864e5);
         if(g>maxGap)maxGap=g}
@@ -10537,7 +10549,7 @@ function discoveries(){
         const isRehab9=h9=>{try{const p9=(S.lib.programs||[]).find(x=>x.id===h9.progId);
           return !!(p9&&(p9.acl||p9.rehabProto))}catch(e8){return false}};
         (S.history||[]).forEach(h9=>{if(!h9.complete||h9.run||hit||isRehab9(h9))return;
-          const d9=String(h9.date).slice(0,10);if(d9<rs9)return;
+          const d9=hKey(h9);if(d9<rs9)return;
           (h9.log||[]).forEach(l9=>{if(l9.pr&&l9.w>0&&l9.r>0&&!l9.secs&&!hit)hit={ex:gBase(l9.ex),d:d9}})});
         if(hit)add('rare','A PR while healing',
           'New best '+hit.ex+' on '+fmtDate(hit.d+'T12:00')+', set in the middle of rehab. Training kept moving.','rehab')}}catch(e9){}}catch(e){}
@@ -10558,7 +10570,7 @@ function discoveries(){
      ── */
   try{
     const nSess=H.length,nSets=sets.length;
-    const dates=[...new Set(H.map(h=>h.date.slice(0,10)))].sort();
+    const dates=[...new Set(H.map(h=>hKey(h)))].sort();
     if(nSess>=1)add('common','First session logged',
       'The model starts here. Everything Allena tells you from now on is built on sessions like this one.','first');
     if(nSess>=2)add('common','You came back',
@@ -10637,7 +10649,7 @@ function discoveries(){
     const after=[],normal=[];
     H.forEach(h=>{const rp=h.log.filter(l=>l.rpe!=null).map(l=>l.rpe);
       if(!rp.length)return;const m=rp.reduce((x,y)=>x+y,0)/rp.length;
-      (easyDays.has(String(h.date).slice(0,10))?after:normal).push(m)});
+      (easyDays.has(hKey(h))?after:normal).push(m)});
     if(after.length>=3&&normal.length>=5){
       const aa=after.reduce((x,y)=>x+y,0)/after.length,na=normal.reduce((x,y)=>x+y,0)/normal.length;
       if(na-aa>0.4)
@@ -10990,7 +11002,7 @@ function healthDiscoveries(){
       const good=[],poor=[];
       (S.history||[]).forEach(h=>{
         if(!h.complete||h.run)return;
-        const dk=String(h.date).slice(0,10);
+        const dk=hKey(h);
         const night=(st.days[dk]||{}).sleep;
         if(night==null)return;
         let best=0;h.log.forEach(l=>{if(l.w>0&&l.r>0)best=Math.max(best,e1rm(l.w,l.r,l.rpe))});
@@ -11020,7 +11032,7 @@ function healthDiscoveries(){
     /* HRV × rest days — recovery visible in the nervous system */
     try{
       const st=hkDailyStore();
-      const trained={};(S.history||[]).forEach(h=>{if(h.complete)trained[String(h.date).slice(0,10)]=1});
+      const trained={};(S.history||[]).forEach(h=>{if(h.complete)trained[hKey(h)]=1});
       const after=[],other=[];
       Object.keys(st.days).forEach(k=>{
         const v=st.days[k].hrv;if(v==null)return;
@@ -11080,7 +11092,7 @@ function healthDiscoveries(){
       const dd=(S.daily&&S.daily.days)||{};
       const hi=[],lo=[];
       (S.history||[]).forEach(h=>{if(!h.complete||h.run)return;
-        const k=String(h.date).slice(0,10);const c=dd[k]&&dd[k].carb;if(c==null)return;
+        const k=hKey(h);const c=dd[k]&&dd[k].carb;if(c==null)return;
         const ton=(h.log||[]).reduce((a,l)=>a+(l.w||0)*(l.r||0),0);if(!ton)return;
         (c>=200?hi:lo).push(ton)});
       if(hi.length>=4&&lo.length>=4){const avg=a=>a.reduce((x,y)=>x+y,0)/a.length;
@@ -11433,7 +11445,7 @@ function bloodNotes(draw){
       out.push('Vitamin D is under the range. Cheap to retest, worth the doctor conversation.');
     if(m.ck&&bloodFlag('ck',m.ck.v,m.ck.u)==='high'){
       const hard=(S.history||[]).some(h=>h.complete&&!h.run&&(h.log||[]).length>=10&&
-        Math.abs(new Date(String(h.date).slice(0,10)+'T12:00')-new Date(draw.d+'T12:00'))<3*864e5);
+        Math.abs(new Date(hKey(h)+'T12:00')-new Date(draw.d+'T12:00'))<3*864e5);
       if(hard)out.push('Creatine kinase runs high for days after hard training — a draw this close to a session reads high without meaning trouble.')}}catch(e){}
   return out}
 function bloodCard(){
@@ -11588,7 +11600,7 @@ function corrDayData(){
     if(dd[k].kcal!=null)put(k,'kcal',dd[k].kcal)})}catch(e){}
   // outcomes from training
   try{(S.history||[]).forEach(h=>{if(!h.complete||h.run)return;
-    const k=String(h.date).slice(0,10);let best=0,rpes=[],ton=0;
+    const k=hKey(h);let best=0,rpes=[],ton=0;
     (h.log||[]).forEach(l=>{if(l.w>0&&l.r>0){best=Math.max(best,e1rm(l.w,l.r,l.rpe));ton+=l.w*l.r}
       if(l.rpe!=null)rpes.push(l.rpe)});
     if(best>0)put(k,'topset',best);
@@ -11660,7 +11672,7 @@ function corrDayData(){
     const topEx=Object.keys(cnt).filter(k=>cnt[k]>=8).sort((a,b)=>cnt[b]-cnt[a]).slice(0,20);
     const exSet=new Set(topEx);
     (S.history||[]).forEach(h=>{if(!h.complete||h.run)return;
-      const k=String(h.date).slice(0,10),tops={};
+      const k=hKey(h),tops={};
       (h.log||[]).forEach(l=>{if(!(l.w>0&&l.r>0))return;const b2=gBase(l.ex);
         if(exSet.has(b2))tops[b2]=Math.max(tops[b2]||0,e1rm(l.w,l.r,l.rpe))});
       Object.keys(tops).forEach(b2=>put(k,'ex:'+b2,tops[b2]))})}catch(e){}
@@ -12055,7 +12067,7 @@ function whisperGen(){
              today cites a day still being lived (owner-caught twice,
              8 Sep) */
           if(!h.complete)return false;
-          if(String(h.date).slice(0,10)>=today())return false;
+          if(hKey(h)>=today())return false;
           return (h.log||[]).slice().reverse().some(l=>{
             if(l.pr&&goals.some(g=>gBase(l.ex).toLowerCase().indexOf(g)>=0)){hit=h;hitEx=gBase(l.ex);return true}
             return false})});
@@ -12075,7 +12087,7 @@ function whisperGen(){
                notification). One per PR, stable id; a new PR writes a
                new recipe. Lives in the collection with everything else. */
             try{
-              const rid='recipe:'+hitEx+':'+String(hit.date).slice(0,10);
+              const rid='recipe:'+hitEx+':'+hKey(hit);   // local day, matching the sweep (audit C4)
               if(!bank[rid]){bank[rid]={t:'The '+hitEx+' PR recipe',
                 d:'Your PR on '+fmtDate(String(hit.date).slice(0,10)+'T12:00')+' came off '+bits.join(', ')+'. Not proof of cause \u2014 but it is the one day the recipe provably worked. Worth recreating on the next attempt.',
                 rar:'rare',tag:'insight',found:today()};bankSave()}}catch(e8){}}}}}catch(e){}
@@ -12145,7 +12157,7 @@ function analystContext(){
   }catch(e){}
   try{
     const cut=dayKey(new Date(Date.now()-14*864e5));
-    const hs=(S.history||[]).filter(h=>h.complete&&!h.run&&String(h.date).slice(0,10)>=cut);
+    const hs=(S.history||[]).filter(h=>h.complete&&!h.run&&hKey(h)>=cut);
     const ton=hs.reduce((a,h)=>a+(h.log||[]).reduce((x,l)=>x+(l.w||0)*(l.r||0),0),0);
     const km=(S.runs||[]).filter(r=>isRunType(r.type)&&String(r.date).slice(0,10)>=cut).reduce((a,r)=>a+(r.km||0),0);
     L.push('LAST 14 DAYS: '+hs.length+' lifting sessions, '+Math.round(ton/1000*10)/10+'t total, '+Math.round(km)+'km run.');
@@ -12173,7 +12185,7 @@ function expStatus(){
     const dayN=Math.floor((new Date(today()+'T12:00')-new Date(start+'T12:00'))/864e5)+1;
     const top=(from,to)=>{const v=[];
       (S.history||[]).forEach(h=>{if(!h.complete||h.run)return;
-        const k=String(h.date).slice(0,10);if(k<from||k>=to)return;
+        const k=hKey(h);if(k<from||k>=to)return;
         let b=0;(h.log||[]).forEach(l=>{if(l.w>0&&l.r>0&&String(gBase(l.ex)).toLowerCase().indexOf(anchor)>=0)b=Math.max(b,e1rm(l.w,l.r,l.rpe))});
         if(b>0)v.push(b)});return v};
     const before=top(dayKey(new Date(new Date(start+'T12:00').getTime()-28*864e5)),start);
@@ -12785,7 +12797,7 @@ function restPool(){
     if(tw&&t4)add('This week you moved '+Math.round(tw/1000*10)/10+' tonnes. Your recent weeks average '+Math.round(t4/Math.max(1,wkSeen.size)/1000*10)/10+'.','nav','progress')}catch(e){}
   try{ // biggest lift move over 8 weeks
     const since=dayKey(new Date(Date.now()-56*864e5)),lifts={};
-    H.forEach(h=>{if(h.date.slice(0,10)<since)return;
+    H.forEach(h=>{if(hKey(h)<since)return;
       h.log.forEach(l=>{if(!l.w||!l.r)return;const b=gBase(l.ex),e=e1rm(l.w,l.r,l.rpe);
         (lifts[b]=lifts[b]||[]).push({e:e,d:h.date})})});
     let best=null;
@@ -12796,7 +12808,7 @@ function restPool(){
   try{ // the standing best
     let top=null;
     H.forEach(h=>h.log.forEach(l=>{if(!l.w||!l.r)return;const e=e1rm(l.w,l.r,l.rpe);
-      if(!top||e>top.e)top={e:e,ex:gBase(l.ex),w:l.w,r:l.r,d:h.date.slice(0,10)}}));
+      if(!top||e>top.e)top={e:e,ex:gBase(l.ex),w:l.w,r:l.r,d:hKey(h)}}));
     if(top)add('Your best set ever is still '+uwNum(top.w)+' '+uwUnit()+' × '+top.r+' on '+top.ex+', from '+fmtDate(top.d+'T12:00')+'. It is waiting.','nav','progress')}catch(e){}
   try{ // readiness week vs baseline
     if(S.gar&&S.gar.on){const days=S.gar.days||{},ks=Object.keys(days).filter(k=>days[k].am!=null).sort();
@@ -12836,7 +12848,7 @@ function restPool(){
     let big=null;
     H.forEach(h=>{if(new Date(h.date)<Date.now()-30*864e5)return;
       const t=h.log.reduce((a,l)=>a+(l.w||0)*(l.r||0),0);
-      if(t&&(!big||t>big.t))big={t:t,d:h.date.slice(0,10),n:h.dayTitle||'a session'}});
+      if(t&&(!big||t>big.t))big={t:t,d:hKey(h),n:h.dayTitle||'a session'}});
     if(big)add('Your biggest session this month moved '+Math.round(big.t/1000*10)/10+' tonnes ('+fmtDate(big.d+'T12:00')+'). Rest is how that gets paid for.','nav','history')}catch(e){}
   try{ // rehab direction
     if(S.acl&&S.acl.on){const ch=(S.acl.checks||[]).slice().sort((a,b)=>a.date.localeCompare(b.date));
@@ -13010,7 +13022,7 @@ function weekRecapBuild(wk){
   try{
     const end=(function(){const d=new Date(wk+'T12:00');d.setDate(d.getDate()+7);return dayKey(d)})();
     const inWk=k=>k>=wk&&k<end;
-    const H=(S.history||[]).filter(h=>h.complete&&!h.run&&inWk(String(h.date).slice(0,10)));
+    const H=(S.history||[]).filter(h=>h.complete&&!h.run&&inWk(hKey(h)));
     const R=(S.runs||[]).filter(r=>inWk(r.date));
     if(!H.length&&!R.length)return null;
     const ton=H.reduce((a,h)=>a+(h.log||[]).reduce((x,l)=>x+(l.w||0)*(l.r||0),0),0);
@@ -13019,7 +13031,7 @@ function weekRecapBuild(wk){
     const prs=H.reduce((a,h)=>a+(h.log||[]).filter(l=>l.pr).length,0);
     // last week vs the week before, sessions only — one honest delta
     const prev=(function(){const d=new Date(wk+'T12:00');d.setDate(d.getDate()-7);return dayKey(d)})();
-    const prevN=(S.history||[]).filter(h=>h.complete&&!h.run&&String(h.date).slice(0,10)>=prev&&String(h.date).slice(0,10)<wk).length;
+    const prevN=(S.history||[]).filter(h=>h.complete&&!h.run&&hKey(h)>=prev&&hKey(h)<wk).length;
     let find=null;
     try{const order={epic:0,rare:1,uncommon:2,common:3};
       const l=bankList().filter(x=>(x.found||'')>=wk&&(x.found||'')<end).sort((a,b)=>order[a.rar]-order[b.rar]);
@@ -13071,7 +13083,7 @@ function wrapsCard(){
 function todayVerdict(){
   const p=activeProgSafe();
   const k=today();
-  const didToday=(S.history||[]).some(h=>h.complete&&!h.run&&h.date.slice(0,10)===k);
+  const didToday=(S.history||[]).some(h=>h.complete&&!h.run&&hKey(h)===k);
   const ranToday=(S.runs||[]).some(r=>r.date===k);
   const g=(S.gar&&S.gar.days||{})[k]||{};
   const rd=(function(){
@@ -13207,7 +13219,7 @@ function questGen(wk,preferK){
   const H=(S.history||[]).filter(h=>h.complete&&!h.run);
   // 1. one more rep at a weight already handled (e1rm rises ≤3.3% for r≥1)
   {const since=dayKey(new Date(Date.now()-70*864e5)),best={};
-   H.filter(h=>h.date.slice(0,10)>=since).forEach(h=>(h.log||[]).forEach(l=>{
+   H.filter(h=>hKey(h)>=since).forEach(h=>(h.log||[]).forEach(l=>{
      if(!l.w||!l.r||l.r>=12)return;const b=gBase(l.ex);
      if(!best[b]||l.w>best[b].w||(l.w===best[b].w&&l.r>best[b].r))best[b]={w:l.w,r:l.r}}));
    const goals=(S.goals||[]).map(g=>gBase(g.ex));
@@ -13223,7 +13235,7 @@ function questGen(wk,preferK){
   {const p=activeProgSafe();
    if(p&&!p.acl&&!p.rehabProto&&p.days&&p.days.length>=2){
      const cut=recentCutKey();
-   const cnt={};H.forEach(h=>{if(h.date.slice(0,10)<cut)return;const k=questWeekKey(h.date);cnt[k]=(cnt[k]||0)+1});
+   const cnt={};H.forEach(h=>{if(hKey(h)<cut)return;const k=questWeekKey(h.date);cnt[k]=(cnt[k]||0)+1});
      delete cnt[wk];
      const bestN=Object.keys(cnt).reduce((a,k)=>Math.max(a,cnt[k]),0);
      const target=Math.min(p.days.length,bestN);
@@ -13261,7 +13273,7 @@ function questGen(wk,preferK){
   // 5b. rehab sessions matching your best week
   if((S.acl&&S.acl.on)||activeProtocols().length){
     const rp=S.lib.programs.filter(p=>p.acl||p.rehabProto).map(p=>p.id);
-    const cut=recentCutKey();const byWk={};(S.history||[]).forEach(h=>{if(!h.complete||rp.indexOf(h.progId)<0||h.date.slice(0,10)<cut)return;
+    const cut=recentCutKey();const byWk={};(S.history||[]).forEach(h=>{if(!h.complete||rp.indexOf(h.progId)<0||hKey(h)<cut)return;
       const k=questWeekKey(h.date);byWk[k]=(byWk[k]||0)+1});delete byWk[wk];
     const best=Object.keys(byWk).reduce((a,k)=>Math.max(a,byWk[k]),0);
     const target=Math.min(best,rehabWeekTarget());
@@ -13302,14 +13314,14 @@ function questCurrent(){
 function questHave(q,wk){
   const end=(function(){const d=new Date(wk+'T12:00');d.setDate(d.getDate()+7);return dayKey(d)})();
   const inWk=k=>k>=wk&&k<end;
-  if(q.k==='reps')return (S.history||[]).some(h=>h.complete&&!h.run&&inWk(h.date.slice(0,10))&&
+  if(q.k==='reps')return (S.history||[]).some(h=>h.complete&&!h.run&&inWk(hKey(h))&&
     (h.log||[]).some(l=>gBase(l.ex)===q.ex&&l.w>=q.w&&l.r>=q.r))?1:0;
-  if(q.k==='sess')return (S.history||[]).filter(h=>h.complete&&!h.run&&inWk(h.date.slice(0,10))).length;
+  if(q.k==='sess')return (S.history||[]).filter(h=>h.complete&&!h.run&&inWk(hKey(h))).length;
   if(q.k==='runkm')return Math.round((S.runs||[]).filter(r=>inWk(r.date)&&isRunType(r.type)).reduce((a,r)=>a+(r.km||0),0)*10)/10;
   if(q.k==='ready')return Object.keys((S.gar&&S.gar.days)||{}).filter(k=>inWk(k)&&S.gar.days[k].am!=null).length;
   if(q.k==='rehab')return ((S.acl&&S.acl.checks)||[]).filter(c=>inWk(c.date)).length;
   if(q.k==='rehabsess'){const rp=S.lib.programs.filter(p=>p.acl||p.rehabProto).map(p=>p.id);
-    return (S.history||[]).filter(h=>h.complete&&rp.indexOf(h.progId)>=0&&inWk(h.date.slice(0,10))).length}
+    return (S.history||[]).filter(h=>h.complete&&rp.indexOf(h.progId)>=0&&inWk(hKey(h))).length}
   return 0}
 function questProgress(){
   const Q=S.quest;if(!Q||!Q.q)return{have:0,target:1};
@@ -14422,7 +14434,7 @@ function holdStates(){
   const last={};
   (S.history||[]).forEach(h=>{
     if(!h.complete)return;
-    const k=(h.date||'').slice(0,10);
+    const k=hKey(h);
     (h.log||[]).forEach(l=>{
       if(!(l.w||l.r||l.secs))return;
       const b=gBase(l.ex);
@@ -14725,7 +14737,7 @@ const K_CB='training-comeback-v1';
 function cbStore(){return lget(K_CB,null)}
 function cbLastActivity(){
   let last=null;
-  (S.history||[]).forEach(h=>{const k=(h.date||'').slice(0,10);if(!last||k>last)last=k});
+  (S.history||[]).forEach(h=>{const k=hKey(h);if(!last||k>last)last=k});
   (S.runs||[]).forEach(r=>{if(!last||r.date>last)last=r.date});
   ((S.acl&&S.acl.checks)||[]).forEach(c=>{if(!last||c.date>last)last=c.date});
   return last}
@@ -14738,7 +14750,7 @@ function cbState(){
   const gap=cbGap();
   const sessions=(S.history||[]).filter(h=>h.complete&&!h.run).length;
   if(cb&&cb.state==='on'){
-    const done=(S.history||[]).filter(h=>h.complete&&!h.run&&h.date.slice(0,10)>=cb.started).length;
+    const done=(S.history||[]).filter(h=>h.complete&&!h.run&&hKey(h)>=cb.started).length;
     if(done>=3){cb.state='done';cb.doneOn=today();lset(K_CB,cb);
       try{const bank=discBank(),id='comeback:'+cb.started;
         if(!bank[id]){bank[id]={t:'The comeback',
@@ -15278,7 +15290,7 @@ function isSupport(p){return (p.weeks===1&&p.kind!=='rehab')||p.kind==='posture'
 function mainProgs(){return S.lib.programs.filter(p=>!isSupport(p)&&!p.acl&&!p.rehabProto&&!p.archived)}
 function supportProgs(){return S.lib.programs.filter(isSupport)}
 function doneTodayIn(p){const t=today();
-  return new Set(S.history.filter(h=>h.progId===p.id&&h.complete&&h.date.slice(0,10)===t).map(h=>h.dayTitle))}
+  return new Set(S.history.filter(h=>h.progId===p.id&&h.complete&&hKey(h)===t).map(h=>h.dayTitle))}
 function activeProgSafe(){const p=activeProg();return (isSupport(p)||p.acl||p.rehabProto)?(mainProgs()[0]||p):p}
 function garCard(){
   if(!S.gar.on||!S.gar.morning)return '';
@@ -15656,7 +15668,7 @@ function weekClock(){
 function hardDaysRun(){ // consecutive days trained ending today
   let n=0;
   for(let d=0;d<7;d++){const k=dayKey(Date.now()-d*864e5);
-    const any=S.history.some(h=>h.complete&&h.date.slice(0,10)===k&&h.log.length>=6);
+    const any=S.history.some(h=>h.complete&&hKey(h)===k&&h.log.length>=6);
     if(any)n++;else break}
   return n}
 function weekCardBody(){
@@ -15708,7 +15720,7 @@ function weekBoard(){
       return !!(p9&&(p9.acl||p9.rehabProto))}catch(e){return false}};
     let rehabDone=0;const liftedNames={};
     (S.history||[]).forEach(h=>{if(!h.complete)return;
-      const d=byKey[String(h.date).slice(0,10)];if(!d)return;
+      const d=byKey[hKey(h)];if(!d)return;
       if(h.run){d.items.push({k:'run',l:'ran',done:1})}
       else if(isRehabSess(h)){d.items.push({k:'rehab',l:'rehab',done:1});rehabDone++}
       else{const nm=String(h.dayTitle||'lifted').split(' ')[0].slice(0,6);
@@ -16261,7 +16273,7 @@ function secHabits(){const c=creatineCard(),d=dailyCard();return (c||d)?'<p clas
 function calDays(){
   const has={};
   const bump=(k,n)=>{if(k)has[k]=(has[k]||0)+n};
-  (S.history||[]).forEach(h=>{if(h.complete)bump((h.date||'').slice(0,10),2)});
+  (S.history||[]).forEach(h=>{if(h.complete)bump(hKey(h),2)});
   (S.runs||[]).forEach(r=>bump(r.date,2));
   Object.keys((S.gar&&S.gar.days)||{}).forEach(k=>{if(S.gar.days[k].am!=null)bump(k,1)});
   Object.keys((S.daily&&S.daily.days)||{}).forEach(k=>{if(S.daily.days[k].bw!=null)bump(k,1)});
@@ -16734,7 +16746,7 @@ function deepReadyInfo(){
   if(!aiReady())return null;
   if(st.last===today())return null;
   const since=st.last||'0000-00-00';
-  const sess=(S.history||[]).filter(h=>h.complete&&!h.run&&String(h.date).slice(0,10)>since).length;
+  const sess=(S.history||[]).filter(h=>h.complete&&!h.run&&hKey(h)>since).length;
   const rn=(typeof runs==='function'?runs():[]).filter(r=>String(r.date).slice(0,10)>since).length;
   if(!st.last){
     if(sess+rn<8)return null; // a first read needs something to read
@@ -16793,7 +16805,7 @@ function deepContext(){
   H.forEach(h=>{let best={};
     h.log.forEach(l=>{if(!l.w||!l.r)return;const b=gBase(l.ex),e=e1rm(l.w,l.r,l.rpe);
       if(!best[b]||e>best[b])best[b]=e});
-    Object.keys(best).forEach(b=>{(lifts[b]=lifts[b]||[]).push([String(h.date).slice(0,10),Math.round(best[b])])})});
+    Object.keys(best).forEach(b=>{(lifts[b]=lifts[b]||[]).push([hKey(h),Math.round(best[b])])})});
   Object.keys(lifts).filter(b=>lifts[b].length>=5).slice(0,6).forEach(b=>{
     L.push(b+' e1RM: '+lifts[b].slice(-8).map(p=>p[0]+'='+p[1]).join(' '))});
   // session timing
@@ -16956,7 +16968,7 @@ function deepCard(){
     else
       inner=(function(){
         const since9=st.last||'0000-00-00';
-        const ns=(S.history||[]).filter(h=>h.complete&&!h.run&&String(h.date).slice(0,10)>since9).length+
+        const ns=(S.history||[]).filter(h=>h.complete&&!h.run&&hKey(h)>since9).length+
           (typeof runs==='function'?runs():[]).filter(r=>String(r.date).slice(0,10)>since9).length;
         return ns>0
           ?'<p style="color:var(--dim);font-size:12.5px;line-height:1.6;margin-top:8px">'+ns+' of 6 new sessions toward the next read'+(st.last?' (last: '+esc(st.last)+')':'')+'. A read needs enough new evidence to say something genuinely new — re-reading near-identical numbers would cost tokens to repeat itself.</p>'
@@ -16983,7 +16995,7 @@ function ghostData(){
   /* the ghost only races the RECENT you — a best week from years ago
      (or the pre-injury you) is a record, not a target */
   (S.history||[]).forEach(h=>{if(!h.complete||h.run)return;
-    const dk9=h.date.slice(0,10);
+    const dk9=hKey(h);
     const k=questWeekKey(h.date);byWk[k]=(byWk[k]||0)+1;
     if(dk9<cut)delete byWk[k]});
   (S.runs||[]).forEach(r=>{if(!isRunType(r.type))return;
@@ -18251,7 +18263,7 @@ function crossPatterns(){
   // is the thing draining the map (owner-caught, 3 Sep: "yeah, because
   // I'm literally in the session right now"). This warning is about
   // chronic under-recovery; on a training day it reads tomorrow.
-  const trainedToday=!!S.sess||S.history.some(h=>!h.run&&(h.log||[]).length&&String(h.date).slice(0,10)===today());
+  const trainedToday=!!S.sess||S.history.some(h=>!h.run&&(h.log||[]).length&&hKey(h)===today());
   const fresh=muscleFresh().filter(x=>x.fresh<60);
   if(!trainedToday&&fresh.length>=3)out.push({src:['recovery','balance'],t:'Several muscles under 60% recovered',d:fresh.slice(0,3).map(x=>x.m.toLowerCase()+' '+x.fresh+'%').join(', ')+'. If that is normal for you rather than a one-off, weekly volume is running ahead of recovery.',tone:'warn'});
   return out}
@@ -23817,7 +23829,7 @@ function runAction(a,v,t,e){
     case 'quickSave':{const q=S.quick;
       /* the same day + same session logged twice is usually a mistap —
          say so before doubling the record (owner call, Sep 2026) */
-      const dup=(S.history||[]).some(h=>h.complete&&!h.run&&String(h.date).slice(0,10)===q.date&&(h.dayTitle||'')===(q.dayName||''));
+      const dup=(S.history||[]).some(h=>h.complete&&!h.run&&hKey(h)===q.date&&(h.dayTitle||'')===(q.dayName||''));
       if(dup&&!q.dupOk){S.confirm={t:'Already logged that day',
         d:(q.dayName||'That session')+' is already in your history for '+fmtDate(q.date+'T12:00')+'. Logging it again creates a second copy of the whole session.',
         go:'quickDupGo',v:'',soft:true,ok:'Log it again anyway',no:'Never mind'};
@@ -24313,8 +24325,12 @@ function dayCheck(){
         else{
           /* the find must still have its evidence: the cited PR day
              must hold a completed session with that lift */
+          /* ids banked BEFORE the local-day fix (audit C4) carry a UTC
+             slice, so accept either key here — otherwise every recipe a
+             morning PR earned would sweep itself away on the day the
+             fix shipped. New ids are built local; this is the amnesty. */
           const alive=(S.history||[]).some(h9=>h9.complete&&
-            String(h9.date).slice(0,10)===m9[2]&&
+            (hKey(h9)===m9[2]||String(h9.date||'').slice(0,10)===m9[2])&&
             (h9.log||[]).some(l9=>gBase(l9.ex)===m9[1]));
           if(!alive){delete b9[k];bankSave()}}}})}catch(e){}
   try{
