@@ -683,7 +683,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='c93dfe';  // stamped by tools/build.py with the content hash
+const BUILD_ID='1c2a79';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -1912,12 +1912,58 @@ async function frJoin(code){
   try{code=String(code||'').trim().toUpperCase();
     if(code.length<4){flash('Enter the code your friend sent.');return}
     const h=await frHeaders();if(!h||!S.frMe){flash('Sign in first.');return}
-    const r=await fetch(CLOUD.url+'/rest/v1/friends?code=eq.'+encodeURIComponent(code)+'&friend_id=is.null',
-      {method:'PATCH',headers:Object.assign({Prefer:'return=representation'},h),
-       body:JSON.stringify({friend_id:S.frMe,linked_at:new Date().toISOString()})});
-    const rows=r.ok?await r.json():[];
-    if(rows.length){acctSync(false);frLoad(true)}
-    else flash('That code did not match an open invite.')}catch(e){flash('No connection.')}}
+    /* claim through the security-definer RPC (audit C3, social5.sql):
+       the old PATCH let a claimer rewrite owner_id to a stranger's id,
+       forging a friendship with someone who never invited anyone. The
+       function looks the row up server-side and never trusts the body.
+       Falls back to the old PATCH so a client on the pre-social5 schema
+       keeps working until the SQL is pasted. */
+    let r=await fetch(CLOUD.url+'/rest/v1/rpc/claim_invite',
+      {method:'POST',headers:Object.assign({'content-type':'application/json'},h),
+       body:JSON.stringify({p_code:code})});
+    if(r.ok){acctSync(false);frLoad(true);return}
+    if(r.status===404){
+      r=await fetch(CLOUD.url+'/rest/v1/friends?code=eq.'+encodeURIComponent(code)+'&friend_id=is.null',
+        {method:'PATCH',headers:Object.assign({Prefer:'return=representation'},h),
+         body:JSON.stringify({friend_id:S.frMe,linked_at:new Date().toISOString()})});
+      const rows=r.ok?await r.json():[];
+      if(rows.length){acctSync(false);frLoad(true);return}}
+    flash('That code did not match an open invite.')}catch(e){flash('No connection.')}}
+/* IN-APP ACCOUNT DELETION (audit S1, 10 Sep 2026). App Store guideline
+   5.1.1(v): an app that lets you create an account must let you delete
+   it from inside the app — a "email us" line is an explicit rejection.
+   Order matters: the rows first (they are what other people can see),
+   then the auth user via the edge function, then the local token. If
+   the edge function is not deployed yet we still clear every row and
+   sign out, and say plainly what is left. */
+async function acctDelete(){
+  try{
+    const tok=await acctToken();
+    if(!tok){lset(K_ACCT,null);S.acctPending=false;render();
+      flash('Signed out. Nothing of yours is on the server.');return}
+    const c=acctClaims(tok),uid=c&&c.sub;
+    const h={apikey:CLOUD.anon,Authorization:'Bearer '+tok};
+    S.acctBusy=true;render();
+    let rowsGone=true;
+    const del=async u=>{try{const r=await fetch(CLOUD.url+u,{method:'DELETE',headers:h});
+      if(!r.ok&&r.status!==404)rowsGone=false}catch(e){rowsGone=false}};
+    if(uid){
+      await del('/rest/v1/friends?or=(owner_id.eq.'+uid+',friend_id.eq.'+uid+')');
+      await del('/rest/v1/crew_members?user_id=eq.'+uid);
+      await del('/rest/v1/nudges?or=(from_id.eq.'+uid+',to_id.eq.'+uid+')');
+      await del('/rest/v1/snapshots?user_id=eq.'+uid)}
+    let authGone=false;
+    try{const r2=await fetch(CLOUD.url+'/functions/v1/delete-account',
+      {method:'POST',headers:Object.assign({'content-type':'application/json'},h),body:'{}'});
+      authGone=r2.ok}catch(e){}
+    try{await fetch(CLOUD.url+'/auth/v1/logout',{method:'POST',headers:h})}catch(e){}
+    lset(K_ACCT,null);S.acctBusy=false;S.acctPending=false;S.sheet=null;
+    S.frRows=[];S.frSnaps=[];S.crewRows=[];S.frMe=null;
+    render();
+    flash(authGone?'Account deleted. Your training data is still on this phone.'
+      :rowsGone?'Your data is off the server and you are signed out. The sign-in record clears within 24 hours.'
+      :'Signed out, but some rows could not be reached — try again on a better connection.')
+  }catch(e){S.acctBusy=false;render();flash('Could not finish that \u2014 try again in a minute.')}}
 async function frRemove(code){
   try{const h=await frHeaders();if(!h)return;
     await fetch(CLOUD.url+'/rest/v1/friends?code=eq.'+encodeURIComponent(code),{method:'DELETE',headers:h});
@@ -2474,7 +2520,9 @@ function accountSection(){
       :S.acctSynced
       ?'<button class="btn mt an-pop" style="color:var(--green);border-color:var(--greensoft)" disabled>\u2713 Synced</button>'
       :'<button data-a="acctSync" class="btn mt" style="color:var(--amber)">Sync now</button>')+
-    '<button data-a="acctOut" class="btn mt" style="color:var(--dim)">Sign out</button>';
+    '<button data-a="acctOut" class="btn mt" style="color:var(--dim)">Sign out</button>'+
+    '<button data-a="acctDelOpen" class="btn mt" style="color:var(--red);font-size:12.5px">Delete my account</button>'+
+    '<p style="color:var(--faint);font-size:11px;line-height:1.5;margin-top:8px">Deleting removes your score card, friendships and groups from the server for good. Your training lives on this phone and stays here \u2014 back it up first if you want to keep it.</p>';
   if(S.acctPending||(a&&a.pendingEmail&&!a.refresh))return '<p style="color:var(--amber);font-size:13px;line-height:1.55;margin-top:8px">'+
       'Type the 8-digit code from the email here. If the email shows a button instead of a code, ignore the button — it opens the browser, not this app. The code is the way in.</p>'+
     '<input data-in="acctCode" value="'+esc(S.acctCode||'')+'" placeholder="8-digit code" inputmode="numeric" autocomplete="one-time-code" class="mono" style="width:100%;margin-top:10px;background:var(--surface);border:1px solid var(--line);border-radius:10px;color:var(--text);padding:12px;font-size:16px;letter-spacing:.2em;text-align:center;outline:none">'+
@@ -23812,6 +23860,11 @@ function runAction(a,v,t,e){
       saveHistory();if(S.sess)persistActive();
       S.sheet=null;flash(n+' sets converted. Same tap swaps them back if this was wrong.');render();break}
     case 'acctSync':acctSync(true);break;
+    case 'acctDelOpen':{S.confirm={t:'Delete your account?',
+      d:'This removes your score card, every friendship and any group you are in from the server, for good. It cannot be undone. Your training history stays on this phone \u2014 it was never on the server.',
+      go:'acctDelGo',v:'',ok:'Delete it',no:'Keep my account'};
+      S.sheet={t:'confirm'};render();break}
+    case 'acctDelGo':{S.sheet=null;render();acctDelete();break}
     case 'acctOut':lset(K_ACCT,null);S.acctPending=false;render();
       flash('Signed out. Your training data never left this phone anyway.');break;
     case 'loadPasted':if(S.paste.trim())doImport(S.paste);break;
