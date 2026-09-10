@@ -22,7 +22,7 @@
 <style>
 :root{
   --bg:#131313; --surface:#1B1B1B; --raised:#252525; --line:#343434;
-  --text:#EFEDE6; --dim:#AFACA5; --faint:#7C7A75;
+  --text:#EFEDE6; --dim:#AFACA5; --faint:#908C85;
   --amber:#E8E5DC; --blue:#0A84FF; --green:#30D158; --greensoft:rgba(48,209,88,.4); --red:#FF453A;
   --teal:#5FA8A0; --violet:#9C8AC4; --gold:#E0A458;
   --cardline:rgba(255,255,255,.05); --halo:rgba(240,238,230,.035);
@@ -263,6 +263,8 @@ body.sesslive #hkPulse{top:calc(env(safe-area-inset-top) + 40px)}
   border-radius:26px 26px 0 0;max-height:88vh;overflow-y:auto;overscroll-behavior:contain;padding:26px 20px calc(32px + env(safe-area-inset-bottom));position:relative}
 .sheet::before{content:'';position:absolute;top:9px;left:50%;transform:translateX(-50%);
   width:38px;height:4px;border-radius:4px;background:var(--line)}
+/* HIG 44pt hit area for small controls: render() tags any [data-a] under 36px with .hit and a --hs slop; the pseudo-element takes the tap without moving a pixel */
+.hit{position:relative}.hit::after{content:'';position:absolute;inset:calc(-1*var(--hs,6px))}
 .toast{position:fixed;top:calc(env(safe-area-inset-top, 10px) + 6px);left:0;right:0;display:flex;justify-content:center;z-index:95;pointer-events:none}
 .toast div{display:flex;align-items:center;gap:8px;background:color-mix(in srgb, var(--raised) 94%, #000);border:1px solid var(--line);border-radius:999px;box-shadow:0 12px 34px rgba(0,0,0,.5);
   padding:10px 18px;font-size:13px;font-weight:600;max-width:400px;margin:0 16px;animation:capDrop .38s cubic-bezier(.32,1.3,.5,1)}
@@ -670,7 +672,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='40793f';  // stamped by tools/build.py with the content hash
+const BUILD_ID='4078d8';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -5879,7 +5881,7 @@ const RSI_Q=['I am confident I could play my sport without concern for my knee',
  'I am confident I could play without thinking about my knee'];
 function menuBtn(){return '<button data-a="menuOpen" style="width:40px;height:40px;border-radius:13px;background:var(--surface);border:1px solid var(--line);color:var(--dim);display:flex;align-items:center;justify-content:center;flex:none">'+
   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" style="width:19px;height:19px"><circle cx="12" cy="8" r="3.2"/><path d="M5 20c0-3.6 3.1-5.5 7-5.5s7 1.9 7 5.5"/></svg></button>'}
-function drawerBtn(){return '<button data-a="drawerOpen" style="width:42px;height:42px;border-radius:13px;background:var(--surface);border:1px solid var(--line);color:var(--dim);display:flex;align-items:center;justify-content:center;flex:none">'+
+function drawerBtn(){return '<button data-a="drawerOpen" style="width:44px;height:44px;border-radius:13px;background:var(--surface);border:1px solid var(--line);color:var(--dim);display:flex;align-items:center;justify-content:center;flex:none">'+
   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" style="width:19px;height:19px"><path d="M4 7h16M4 12h16M4 17h10"/></svg></button>'}
 function headBtns(){return ''}   // chips live in the drawer now — headers stay quiet
 function pointsChip(){
@@ -6155,7 +6157,7 @@ function climbCard(){
 
 function rehabDocsBtn(){
   const unseen=rehabIssues().filter(x=>!x.seen).length;
-  return '<button data-a="rehabDocs" style="width:42px;height:42px;border-radius:13px;background:var(--surface);border:1px solid var(--line);color:var(--dim);display:flex;align-items:center;justify-content:center;position:relative;flex:none">'+
+  return '<button data-a="rehabDocs" style="width:44px;height:44px;border-radius:13px;background:var(--surface);border:1px solid var(--line);color:var(--dim);display:flex;align-items:center;justify-content:center;position:relative;flex:none">'+
     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px"><path d="M7 3h7l4 4v14H7z"/><path d="M14 3v4h4"/><path d="M10 12h5M10 16h5"/></svg>'+
     (unseen?'<span style="position:absolute;top:-4px;right:-4px;min-width:16px;height:16px;border-radius:8px;background:var(--red);color:#fff;font-size:9px;font-weight:600;display:flex;align-items:center;justify-content:center;padding:0 4px">'+unseen+'</span>':'')+
     '</button>'}
@@ -11008,7 +11010,7 @@ function viewSigDetail(){
       '<p class="mono" style="color:var(--faint);font-size:8px;letter-spacing:.08em;margin-top:3px">'+x[1]+'</p></div>').join('')+'</div>'}
   return '<div class="view pad modalrise" style="padding-top:20px">'+
     '<div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">'+
-    '<button data-a="back" style="width:42px;height:42px;border-radius:42px;background:var(--surface);border:1px solid var(--line);color:var(--dim);display:flex;align-items:center;justify-content:center;flex:none;font-size:16px">\u2039</button>'+
+    '<button data-a="back" style="width:44px;height:44px;border-radius:42px;background:var(--surface);border:1px solid var(--line);color:var(--dim);display:flex;align-items:center;justify-content:center;flex:none;font-size:16px">\u2039</button>'+
     '<h1 class="disp" style="font-size:19px;font-weight:600;flex:1;text-align:center;margin:0">'+kind.k+'</h1>'+
     '<span style="width:42px;flex:none"></span></div>'+
     '<p style="color:var(--dim);font-size:13px;line-height:1.65;margin-top:8px">'+(SIG_WHY[kind.k]||'')+'</p>'+
@@ -13966,8 +13968,8 @@ function thinkPanel(title){
   const step=Math.min(t.steps.length-1,t.i);
   return '<div class="card mt2 an-hero" style="padding:20px;border-radius:20px">'+
     '<div style="display:flex;align-items:center;gap:13px">'+
-    '<div style="position:relative;width:42px;height:42px;flex:none">'+
-    '<svg viewBox="0 0 42 42" style="position:absolute;inset:0;width:42px;height:42px">'+
+    '<div style="position:relative;width:44px;height:44px;flex:none">'+
+    '<svg viewBox="0 0 42 42" style="position:absolute;inset:0;width:44px;height:44px">'+
     '<circle class="an-ring" cx="21" cy="21" r="18" fill="none" stroke="var(--amber)" stroke-width="1.4" stroke-linecap="round" stroke-dasharray="27 86" opacity=".85"/>'+
     '<circle class="an-ring2" cx="21" cy="21" r="12.5" fill="none" stroke="var(--amber)" stroke-width="1" stroke-linecap="round" stroke-dasharray="12 66" opacity=".5"/></svg>'+
     '<img class="mk" src="'+MARK+'" alt="" class="mk an-mark" style="position:absolute;inset:0;margin:auto;width:18px;height:18px;object-fit:contain">'+
@@ -16076,7 +16078,7 @@ function findingsBtn(){
   /* sized to match the hamburger opposite (42px), and the badge sits
      INSIDE the corner — hanging off the edge, #app's overflow-x
      clipping cut it in half (owner screenshot) */
-  return '<button data-a="findingsOpen" style="position:relative;width:42px;height:42px;border-radius:13px;background:var(--raised);border:1.5px solid '+(n?'color-mix(in srgb, var(--text) 75%, transparent)':'color-mix(in srgb, var(--text) 28%, transparent)')+';box-shadow:0 0 13px 0 rgba(30,155,255,.45);display:flex;align-items:center;justify-content:center;flex:none">'+
+  return '<button data-a="findingsOpen" style="position:relative;width:44px;height:44px;border-radius:13px;background:var(--raised);border:1.5px solid '+(n?'color-mix(in srgb, var(--text) 75%, transparent)':'color-mix(in srgb, var(--text) 28%, transparent)')+';box-shadow:0 0 13px 0 rgba(30,155,255,.45);display:flex;align-items:center;justify-content:center;flex:none">'+
     '<div style="transform:scale(.76);transform-origin:center;filter:drop-shadow(0 0 4px rgba(30,155,255,.8))">'+depthGlyph(3,true)+'</div>'+
     (n?'<span class="mono" style="position:absolute;top:-5px;right:-2px;min-width:17px;height:17px;padding:0 4px;border-radius:10px;background:var(--red);color:#fff;font-size:9.5px;font-weight:700;display:flex;align-items:center;justify-content:center">'+(n>9?'9+':n)+'</span>':'')+
     '</button>'}
@@ -18412,7 +18414,7 @@ function viewData(){
   const nm=(S.prof&&S.prof.name)||'You';
   let h='<div class="view pad modalrise" style="padding-top:20px">'+
    '<div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">'+
-   '<button data-a="back" style="width:42px;height:42px;border-radius:42px;background:var(--surface);border:1px solid var(--line);color:var(--dim);display:flex;align-items:center;justify-content:center;flex:none;font-size:17px">✕</button>'+
+   '<button data-a="back" style="width:44px;height:44px;border-radius:42px;background:var(--surface);border:1px solid var(--line);color:var(--dim);display:flex;align-items:center;justify-content:center;flex:none;font-size:17px">✕</button>'+
    '<h1 class="disp" style="font-size:19px;font-weight:600;flex:1;text-align:center;margin:0">Settings</h1>'+
    '<span style="width:42px;flex:none"></span></div>';
   /* profile header → the You page (name/age/sex + account) */
@@ -18691,14 +18693,14 @@ function youPageHtml(){
 function viewYou(){
   return '<div class="view pad modalrise" style="padding-top:20px">'+
    '<div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">'+
-   '<button data-a="back" style="width:42px;height:42px;border-radius:42px;background:var(--surface);border:1px solid var(--line);color:var(--dim);display:flex;align-items:center;justify-content:center;flex:none;font-size:16px">\u2039</button>'+
+   '<button data-a="back" style="width:44px;height:44px;border-radius:42px;background:var(--surface);border:1px solid var(--line);color:var(--dim);display:flex;align-items:center;justify-content:center;flex:none;font-size:16px">\u2039</button>'+
    '<h1 class="disp" style="font-size:19px;font-weight:600;flex:1;text-align:center;margin:0">You</h1>'+
    '<span style="width:42px;flex:none"></span></div>'+
    youPageHtml()+'</div>'}
 function viewAcct(){
   return '<div class="view pad modalrise" style="padding-top:20px">'+
    '<div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">'+
-   '<button data-a="back" style="width:42px;height:42px;border-radius:42px;background:var(--surface);border:1px solid var(--line);color:var(--dim);display:flex;align-items:center;justify-content:center;flex:none;font-size:16px">\u2039</button>'+
+   '<button data-a="back" style="width:44px;height:44px;border-radius:42px;background:var(--surface);border:1px solid var(--line);color:var(--dim);display:flex;align-items:center;justify-content:center;flex:none;font-size:16px">\u2039</button>'+
    '<h1 class="disp" style="font-size:19px;font-weight:600;flex:1;text-align:center;margin:0">Account &amp; sync</h1>'+
    '<span style="width:42px;flex:none"></span></div>'+
    accountSection()+'</div>'}
@@ -20631,7 +20633,7 @@ function viewGuide(){
     '</div>';
   return '<div class="view pad modalrise pinpage" style="padding-top:20px">'+
     '<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">'+
-    '<button data-a="impGuideBack" style="width:42px;height:42px;border-radius:42px;background:var(--surface);border:1px solid var(--line);color:var(--dim);display:flex;align-items:center;justify-content:center;flex:none;font-size:16px">\u2039</button>'+
+    '<button data-a="impGuideBack" style="width:44px;height:44px;border-radius:42px;background:var(--surface);border:1px solid var(--line);color:var(--dim);display:flex;align-items:center;justify-content:center;flex:none;font-size:16px">\u2039</button>'+
     '<h1 class="disp" style="font-size:19px;font-weight:600;flex:1;text-align:center;margin:0">'+(health?'Auto-sync to Health':'Getting your file')+'</h1>'+
     '<span style="width:42px;flex:none"></span></div>'+
     '<div style="display:flex;gap:6px">'+(health?['garmin','watch','strava','food']:['garmin','strava','health']).map(k=>
@@ -20856,6 +20858,13 @@ function render(){
     /* an OPEN sheet re-rendered (typing, toggles) must not replay its
        slide-up — only a newly opened sheet animates. Same for a toast
        that is still showing. */
+    /* HIG 44pt: tag small controls with a hit slop (see .hit in the shell) */
+    try{document.querySelectorAll('[data-a]').forEach(el=>{
+      if(el.classList.contains('hit'))return;
+      const r=el.getBoundingClientRect();if(r.width<1||r.height<1)return;
+      const m=Math.min(r.width,r.height);if(m>=36)return;
+      if(getComputedStyle(el).position!=='static')return;
+      el.classList.add('hit');el.style.setProperty('--hs',Math.min(12,Math.ceil((44-m)/2))+'px')})}catch(e){}
     try{if(!sheetChanged){const sh=extra.querySelector('.sheet');if(sh)sh.style.animation='none'}
       const tEl=extra.querySelector('.toast div');
       if(tEl&&render.__lastToast===S.toast)tEl.style.animation='none';
