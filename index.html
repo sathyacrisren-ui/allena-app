@@ -683,7 +683,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='3c4be1';  // stamped by tools/build.py with the content hash
+const BUILD_ID='34855c';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -5267,9 +5267,14 @@ function dataPoints(){
          so two records only ever tie if the training itself is
          identical. Not performance pay: a fraction of a point can
          never outweigh logging one more real thing. */
-      if(l.w!=null){sets+=1+Math.min(0.25,Math.abs(+l.w||0)/1000)}
-      if(l.r!=null){sets+=1+Math.min(0.06,Math.abs(+l.r||0)/500)}
+      /* a timed hold is logged with w:0 and r:0 placeholders, and
+         0 != null, so it billed THREE numbers where the rule is one
+         point per honest number — inflating points, the tree, levels
+         and the weekly race, most for rehab users (audit, high) */
       if(l.secs!=null){sets+=1+Math.min(0.12,Math.abs(+l.secs||0)/1000)}
+      else{
+        if(l.w!=null){sets+=1+Math.min(0.25,Math.abs(+l.w||0)/1000)}
+        if(l.r!=null){sets+=1+Math.min(0.06,Math.abs(+l.r||0)/500)}}
       if(l.rpe!=null){effort+=1+Math.min(0.05,Math.abs(+l.rpe||0)/200)}
       if(l.note)notes+=1});
     if(h.note&&Object.keys(h.note).length)notes+=Object.keys(h.note).length;
@@ -8005,8 +8010,12 @@ function runLoad(r){
   // session load: minutes × intensity, the standard sRPE approach
   const rpe=r.rpe!=null?r.rpe:({easy:4,recovery:3,long:5,tempo:7,interval:8,hills:7,race:9,walk:2})[r.type]||5;
   return Math.round((r.mins||0)*rpe)}
-function runsIn(days){const cut=Date.now()-days*864e5;
-  return runs().filter(r=>new Date(r.date+'T12:00').getTime()>=cut)}
+function runsIn(days,anyType){const cut=Date.now()-days*864e5;
+  /* RUNS ONLY, unless asked (audit, high): S.runs holds rides, walks,
+     swims and rows. Without this a phase-2 ACL user who did the walking
+     the app prescribed was told "you have run N km while phase 2 is
+     still open" — a false injury alarm on the app's own advice. */
+  return runs().filter(r=>new Date(r.date+'T12:00').getTime()>=cut&&(anyType||(typeof isRunType!=='function')||isRunType(r.type)))}
 function weeklyKm(weeksBack){
   const out=[];
   for(let w=weeksBack-1;w>=0;w--){
@@ -8084,7 +8093,7 @@ function criticalSpeed(){
     const eff=[];
     B.forEach(b=>{let best=null;
       R.forEach(r=>{if(r.km>=b[0]&&r.km<b[1]){const sp=r.km/r.mins;
-        if(!best||sp>best.sp)best={d:r.km*1000,t:r.mins*60}}});
+        if(!best||sp>best.sp)best={d:r.km*1000,t:r.mins*60,sp:sp}}});   // best.sp was never set, so the comparison was always false (audit)
       if(best)eff.push(best)});
     if(eff.length<3)return null;
     const n=eff.length;let sx=0,sy=0,sxy=0,sxx=0;
@@ -8450,7 +8459,10 @@ function weekStreak(){
   const keys=Object.keys(wk).sort();
   let best=0,run=0,prev=null;
   keys.forEach(k=>{
-    if(prev){const a=new Date(prev+'-1'),b=new Date(k+'-1');run=1+run}
+    /* the consecutive-week comparison was computed and thrown away, so
+       `best` reported total distinct weeks ever trained (audit) */
+    if(prev){const a=new Date(prev+'-1'),b=new Date(k+'-1');
+      run=(b-a)<=7.5*864e5?run+1:1}
     else run=1;
     best=Math.max(best,run);prev=k});
   const days=new Set(H.filter(h=>new Date(h.date).getTime()>Date.now()-28*864e5)
@@ -9059,7 +9071,7 @@ function csvGrid(text){
   const head=lines.slice(0,20).join('\n');
   const delim=[['\t',(head.match(/\t/g)||[]).length],[';',(head.match(/;/g)||[]).length],[',',(head.match(/,/g)||[]).length]]
     .sort((a,b)=>b[1]-a[1])[0];
-  if(delim[1]<lines.length)return null;
+  if(delim[1]<Math.min(20,lines.length))return null;   // delimiters were counted over 20 lines but compared to ALL of them (audit)
   const dc=delim[0];
   const split=l=>{const out=[];let cur='',q=false;
     for(let i=0;i<l.length;i++){const ch=l[i];
@@ -10938,7 +10950,13 @@ function hrvGate(){
 function hkdMed(a){if(!a.length)return null;const s9=a.slice().sort((x,y)=>x-y);return s9[Math.floor(s9.length/2)]}
 function healthDiscoveries(){
   const D=[];
-  const add=(rar,t,d,tag)=>D.push({rar:rar,t:t,d:d,tag:tag||'signal',id:t});
+  /* THE ID IS NOT THE TITLE (audit C8, 10 Sep 2026). Titles here carry
+     live numbers ("22% stronger on sleep"), and bankDiscoveries keys on
+     id — so a one-point drift banked a NEW epic: +75 points, another
+     ceremony, another near-duplicate shelf entry. Ids are now stable
+     per generator (bucketed where a threshold is the point), matching
+     the found-date contract standing-test.js already enforces for 13d. */
+  const add=(rar,t,d,tag,id)=>D.push({rar:rar,t:t,d:d,tag:tag||'signal',id:id||('hkd:'+String(t).toLowerCase().replace(/[^a-z]+/g,'').slice(0,28))});
   try{
     const ym=today().slice(0,7),mn=monthName(ym);
     /* THE find: sleep × strength — the cross no one else can make */
@@ -11665,7 +11683,7 @@ const CORR_SIGNALS={
   load:{n:'a big training day',dir:'a bigger session',trained:1},
   resty:{n:'longer rests between sets',dir:'longer rests'},
   hour:{n:'training later in the day',dir:'a later session'},
-  sleepvar:{n:'an inconsistent sleep pattern',dir:'more night-to-night swing',inv:1},
+  sleepvar:{n:'an inconsistent sleep pattern',dir:'more night-to-night swing'},   // no inv: the NAME describes the high end (audit)
   vo2:{n:'a higher VO2max reading',dir:'a higher VO2max'},
   hrvswing:{n:'HRV on the way up',dir:'a rising HRV'},
   bwtrend:{n:'bodyweight trending up',dir:'a rising weekly bodyweight'},
@@ -11745,6 +11763,10 @@ function correlations(){
           if((sig==='hrv'||sig==='hrvswing')&&out==='hrvo')return;
           if((sig==='rhr'||sig==='rhr3')&&out==='rhro')return;
           if(sig==='ready'&&out==='readyo')return;
+          /* readiness is COMPUTED from hrv, rhr and sleep (hkReadiness in
+             12b-intake), so these pairs are the engine rediscovering its
+             own arithmetic and dressing it as an epic insight (audit) */
+          if((sig==='hrv'||sig==='hrvswing'||sig==='rhr'||sig==='rhr3'||sig==='sleep'||sig==='sleep3')&&out==='readyo')return;
           if(sig==='hour'&&lag>0)return;   // the clock only speaks about its own day
           if((sig==='km'||sig==='km3')&&lag===0&&(out==='pace'||out==='beatkm'))return; // a run vs its own numbers
           if(sig==='ridekm'&&lag===0&&out==='rideeff')return;
@@ -12732,10 +12754,10 @@ function restPool(){
   const add=(d,a,v,label)=>{if(d)out.push({d:d,a:a||null,v:v||'',label:label||'Have a look'})};
   try{ // tonnage this week vs the month
     const wk=questWeekKey();let tw=0,t4=0,w4=0;
-    H.forEach(h=>{const t=h.log.reduce((a,l)=>a+(l.w||0)*(l.r||0),0);
+    const wkSeen=new Set();H.forEach(h=>{const t=h.log.reduce((a,l)=>a+(l.w||0)*(l.r||0),0);
       if(questWeekKey(h.date)===wk)tw+=t;
-      else if(new Date(h.date)>Date.now()-28*864e5){t4+=t;w4=1}});
-    if(tw&&t4)add('This week you moved '+Math.round(tw/1000*10)/10+' tonnes. Your recent weeks average '+Math.round(t4/4/1000*10)/10+'.','nav','progress')}catch(e){}
+      else if(new Date(h.date)>Date.now()-28*864e5){t4+=t;w4=1;wkSeen.add(questWeekKey(h.date))}});
+    if(tw&&t4)add('This week you moved '+Math.round(tw/1000*10)/10+' tonnes. Your recent weeks average '+Math.round(t4/Math.max(1,wkSeen.size)/1000*10)/10+'.','nav','progress')}catch(e){}
   try{ // biggest lift move over 8 weeks
     const since=dayKey(new Date(Date.now()-56*864e5)),lifts={};
     H.forEach(h=>{if(h.date.slice(0,10)<since)return;
@@ -12760,7 +12782,11 @@ function restPool(){
   try{ // bodyweight fortnight
     const dd=(S.daily&&S.daily.days)||{},ks=Object.keys(dd).filter(k=>dd[k].bw!=null).sort();
     if(ks.length>=8){const cut=dayKey(new Date(Date.now()-14*864e5));
-      const rec=ks.filter(k=>k>=cut).map(k=>dd[k].bw),old=ks.filter(k=>k<cut).map(k=>dd[k].bw);
+      const cut2=dayKey(new Date(Date.now()-28*864e5));
+    /* `old` was every weigh-in ever recorded, so someone stable for a
+       fortnight after a year-long loss was told "down 5 kg over the
+       fortnight" (audit) */
+    const rec=ks.filter(k=>k>=cut).map(k=>dd[k].bw),old=ks.filter(k=>k<cut&&k>=cut2).map(k=>dd[k].bw);
       if(rec.length>=3&&old.length>=3){
         const a=rec.reduce((x,y)=>x+y,0)/rec.length,b=old.reduce((x,y)=>x+y,0)/old.length,df=a-b;
         add('Bodyweight is '+(Math.abs(df)<0.4?'holding steady at '+uwNum(Math.round(a*10)/10)+' '+uwUnit()+' over the fortnight.':(df>0?'up ':'down ')+uwNum(Math.round(Math.abs(df)*10)/10)+' '+uwUnit()+' over the fortnight — '+uwNum(Math.round(a*10)/10)+' '+uwUnit()+' now.'),'nav','progress')}}}catch(e){}
@@ -13070,7 +13096,10 @@ function todayVerdict(){
   /* pick a session */
   let pick=null;
   if(p&&!p.acl&&!p.rehabProto){
-    try{const r=recCard&&dayReadiness?dayReadiness(p):null;
+    try{const r=(typeof recommendToday==='function')?recommendToday():null;
+    /* was a one-argument dayReadiness call reading a .top it never
+       returns, so the hero picked by array order while the board picked
+       by readiness (audit) */
       if(r&&r.top)pick={i:r.top.i,name:p.days[r.top.i].name}}catch(e){}
     if(!pick){const ws=weekState(p,S.week);
       const left=p.days.map((d,i)=>({d:d,i:i})).filter(x=>!ws.done.has(x.d.name));
@@ -18043,7 +18072,11 @@ function chartFindings(kind,ex){
   }
   if(kind==='tonnage'){
     const wk={};S.history.forEach(h=>{const k=isoWeek(h.date);wk[k]=(wk[k]||0)+h.log.reduce((a,l)=>a+(l.w||0)*(l.r||0),0)});
-    const keys=Object.keys(wk).sort().slice(-8);
+    /* the newest key is THIS week the moment one session lands, so a
+       Tuesday read "last week ... 68% below your average week" off one
+       session, and the average was dragged down by it too (audit) */
+    const thisWk=isoWeek(new Date());
+    const keys=Object.keys(wk).filter(k=>k!==thisWk).sort().slice(-8);
     if(keys.length<2)return F;
     const vals=keys.map(k=>wk[k]);
     const avg=vals.reduce((a,b)=>a+b,0)/vals.length;
@@ -20967,7 +21000,8 @@ function render(){
   const ae=document.activeElement,key=ae&&ae.dataset?ae.dataset.in:null;
   const pos=key&&ae.selectionStart!=null?ae.selectionStart:null;
   let body='';
-  if(S.view==='today')body=viewToday();
+  if(S.view==='today'&&typeof arrivalDue==='function'&&arrivalDue()&&typeof viewArrival==='function')body=viewArrival();   // was below, unreachable (audit)
+  else if(S.view==='today')body=viewToday();
   else if(S.view==='findings')body=viewFindings();
   else if(S.view==='territory')body=viewTerritory();
   else if(S.view==='home')body=viewHome();
@@ -23140,7 +23174,7 @@ function runAction(a,v,t,e){
         ['bb','rack','db','mc','cb','pullup','bench','band','kb','cardio'].forEach(k=>S.prof.eqx[k]=1);S.prof.eq='custom'}
       S.prof.eqx[v]=!S.prof.eqx[v];lset(K_PROF,S.prof);render();break}
     case 'availEqApply':{try{const r=equipRework();
-      S.confirm={t:'Rework the block?',m:r.summary,yes:'availEqGo',v:''};render()}catch(e){flash('Nothing to rework.')}break}
+      S.confirm={t:'Rework the block?',d:r.summary,go:'availEqGo',v:'',soft:true,ok:'Rework it',no:'Leave it'};S.sheet={t:'confirm'};render()}catch(e){flash('Nothing to rework.')}break}
     case 'availEqGo':{try{equipReworkApply();S.confirm=null;render();flash('Block reworked around your equipment.')}catch(e){S.confirm=null;flash('Could not rework.')}break}
     case 'notifPace':{
       const P=notifPrefs();P.pace=v;notifSave();
