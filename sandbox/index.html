@@ -708,7 +708,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='c743f1';  // stamped by tools/build.py with the content hash
+const BUILD_ID='78e9ff';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -2170,7 +2170,9 @@ function friendRows(){
       /* a friend seen for the FIRST time gets today as their baseline,
          so a new link never reads as '+71 sessions since you looked' */
       Object.keys(now).forEach(id=>{if(!keep[id])keep[id]=now[id]});
-      Object.keys(keep).forEach(id=>{if(now[id])keep[id]=keep[id]});
+      /* and drop baselines for people no longer linked, so the store
+         does not grow forever (this line was a no-op; eslint caught it) */
+      Object.keys(keep).forEach(id=>{if(!now[id])delete keep[id]});
       lset(K_ACCT,Object.assign({},a9,{frBase:keep,frBaseT:Date.now()}))}
     const base=(acct()||{}).frBase||{};
     return F.map(f=>{
@@ -10744,7 +10746,7 @@ function ratioDupeSweep(){
       if(!seen[nid])seen[nid]=seen[top.id]||today()});
     try{if(bank['undefined'])delete bank['undefined']}catch(e9){}
     try{lset('training-disc-v1',seen)}catch(e9){}
-    bank._ratiofix2=1;if(dirty||1)bankSave()}catch(e){}
+    bank._ratiofix2=1;bankSave()}catch(e){}   // always save: the sweep above may have deleted without setting dirty
   try{
     const bank=discBank();
     if(!bank._bodyfix){
@@ -21467,14 +21469,15 @@ setInterval(function(){try{
 /* swipe the drawer back out (owner call, 3 Sep): it slides in from
    the edge, so a leftward drag anywhere on it slides it away — the
    panel follows the finger, the scrim fades with it. */
-(function(){let x0=null,y0=null,panel=null,scrim=null,drag=false;
+(function(){let x0=null,y0=null,panel=null,scrim=null,drag=false,panW=300;
   document.addEventListener('touchstart',e=>{
     panel=null;x0=null;drag=false;
     if(!S.drawerOpen)return;
     const dr=document.getElementById('drawer');if(!dr)return;
     panel=dr.querySelector('.panel');scrim=dr.querySelector('.scrim');
     if(!panel)return;
-    x0=e.touches[0].clientX;y0=e.touches[0].clientY},{passive:true});
+    x0=e.touches[0].clientX;y0=e.touches[0].clientY;
+    panW=panel.offsetWidth||300},{passive:true});   // measured once per gesture (audit)
   document.addEventListener('touchmove',e=>{
     if(x0==null||!panel)return;
     const dx=e.touches[0].clientX-x0,dy=Math.abs(e.touches[0].clientY-y0);
@@ -21484,7 +21487,7 @@ setInterval(function(){try{
       drag=true;panel.style.transition='none';if(scrim)scrim.style.transition='none'}
     const off=Math.min(0,dx);
     panel.style.transform='translateX('+off+'px)';
-    if(scrim)scrim.style.opacity=String(Math.max(0,1+off/(panel.offsetWidth||300)));
+    if(scrim)scrim.style.opacity=String(Math.max(0,1+off/panW));
     if(e.cancelable)e.preventDefault()},{passive:false});
   document.addEventListener('touchend',e=>{
     if(!drag||!panel){x0=null;panel=null;drag=false;return}
@@ -21504,7 +21507,7 @@ setInterval(function(){try{
 /* step swiper (owner call, 3 Sep): drag horizontally through the
    guide's steps — the row follows the finger, snaps with animation,
    then the state catches up. */
-(function(){let x0=null,y0=null,row=null,idx=0,n=1,drag=false,act='impgStep',wEl=null;
+(function(){let rowW=1,tallest=0,x0=null,y0=null,row=null,idx=0,n=1,drag=false,act='impgStep',wEl=null;
   document.addEventListener('touchstart',e=>{
     row=null;x0=null;drag=false;
     const w=e.target.closest&&e.target.closest('[data-swipestep]');
@@ -21513,7 +21516,9 @@ setInterval(function(){try{
     act=(w.dataset&&w.dataset.swipeact)||'impgStep';wEl=w;
     n=row.children.length;
     const m9=/-(\d+)%/.exec(row.style.transform||'');idx=m9?Math.round(+m9[1]/100):0;
-    x0=e.touches[0].clientX;y0=e.touches[0].clientY},{passive:true});
+    x0=e.touches[0].clientX;y0=e.touches[0].clientY;
+    rowW=(row.parentElement&&row.parentElement.clientWidth)||1;   // measured once per gesture (audit)
+    tallest=0;try{for(const c9 of row.children)tallest=Math.max(tallest,c9.offsetHeight)}catch(e2){}},{passive:true});
   document.addEventListener('touchmove',e=>{
     if(x0==null||!row)return;
     const dx=e.touches[0].clientX-x0,dy=Math.abs(e.touches[0].clientY-y0);
@@ -21521,10 +21526,8 @@ setInterval(function(){try{
       if(Math.abs(dx)<10)return;drag=true;row.style.transition='none';
       /* nothing crops mid-flight: the frame opens to its tallest page
          for the duration of the drag (owner-caught on video, 7 Sep) */
-      try{if(wEl&&wEl.style.height){let mx=0;
-        for(const c9 of row.children)mx=Math.max(mx,c9.offsetHeight);
-        if(mx)wEl.style.height=mx+'px'}}catch(e2){}}
-    const w9=row.parentElement.clientWidth||1;
+      try{if(wEl&&wEl.style.height&&tallest)wEl.style.height=tallest+'px'}catch(e2){}}
+    const w9=rowW;
     let off=-idx*100+dx/w9*100;
     off=Math.max(-(n-1)*100-8,Math.min(8,off));
     row.style.transform='translateX('+off+'%)';
@@ -22725,6 +22728,8 @@ function runAction(a,v,t,e){
     case 'aclView':S.aclView=+v;render();break;
     case 'aclGate':{const ph0=+String(v).split(':')[0];
       if(ph0&&!priorPhasesMet(ph0)){flash('Phase '+firstUnmetPhase(ph0)+' still has criteria outstanding — clear those first.');break}}
+    // falls through: the guard above is the only difference between the two
+    // eslint-disable-next-line no-fallthrough
     case 'aclGateGo':{const [p2,k2]=v.split(':');const row=aclGateState(+p2).find(x=>x.key===k2);
       if(row){S.agate=Object.assign({},row,{ph:+p2});S.sheet={t:'aclgate'};render()}break}
     case 'aclReturn':{const t2=Math.min(aclPeak(),S.acl.phase+1);
@@ -23599,6 +23604,8 @@ function runAction(a,v,t,e){
     case 'frNameGo':{frRename(S.frNmId,S.frNm);S.sheet=null;flash('Saved.');break}
     case 'frJoinGo':{const c9=String(S.frIn||'').trim().toUpperCase();
       if(/^G[A-Z0-9]{4,7}$/.test(c9)&&S.crewCap===true){crewJoin(c9);break}}
+    // falls through: a G-code joins a crew, anything else is a friend code
+    // eslint-disable-next-line no-fallthrough
     case '__frJoinGoPair':frJoin(S.frIn||'');break;
     case 'frRemove':frRemove(v);break;
     case 'lensStep':{
@@ -24330,7 +24337,7 @@ function dayCheck(){
              morning PR earned would sweep itself away on the day the
              fix shipped. New ids are built local; this is the amnesty. */
           const alive=(S.history||[]).some(h9=>h9.complete&&
-            (hKey(h9)===m9[2]||String(h9.date||'').slice(0,10)===m9[2])&&
+            (hKey(h9)===m9[2]||String(h9.date||'').slice(0,10)===m9[2])&&   /* auditcheck-allow: utc-day-key (deliberate amnesty for ids banked before the fix) */
             (h9.log||[]).some(l9=>gBase(l9.ex)===m9[1]));
           if(!alive){delete b9[k];bankSave()}}}})}catch(e){}
   try{
