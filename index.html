@@ -683,7 +683,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='0cbe50';  // stamped by tools/build.py with the content hash
+const BUILD_ID='8d48b8';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -1814,7 +1814,14 @@ async function frLoad(force){
       .map(x=>x.owner_id===S.frMe?x.friend_id:x.owner_id).filter(Boolean)
       .concat(crewIds).filter(function(x,i,a){return a.indexOf(x)===i});
     if(ids.length){
-      let r2=await fetch(CLOUD.url+'/rest/v1/snapshots?select=user_id,display,week_live,week_sessions,live_points,tier,prev_week_live,prev_week_key,av,updated_at&user_id=in.('+ids.map(encodeURIComponent).join(',')+')',{headers:h});
+      /* tree + collection_count ride the SAME batch (owner ask, 10 Sep:
+         a friends list you follow outside the race). They were already
+         synced and already readable one friend at a time — the room
+         just needed them for everyone, so this costs no server work
+         and no new column. The graduated fallbacks below still carry
+         an older schema. */
+      let r2=await fetch(CLOUD.url+'/rest/v1/snapshots?select=user_id,display,week_live,week_sessions,live_points,points,tier,tree,collection_count,prev_week_live,prev_week_key,av,updated_at&user_id=in.('+ids.map(encodeURIComponent).join(',')+')',{headers:h});
+      if(!r2.ok)r2=await fetch(CLOUD.url+'/rest/v1/snapshots?select=user_id,display,week_live,week_sessions,live_points,tier,prev_week_live,prev_week_key,av,updated_at&user_id=in.('+ids.map(encodeURIComponent).join(',')+')',{headers:h});
       if(!r2.ok)r2=await fetch(CLOUD.url+'/rest/v1/snapshots?select=user_id,display,week_live,week_sessions,live_points,tier,updated_at&user_id=in.('+ids.map(encodeURIComponent).join(',')+')',{headers:h});
       S.frSnaps=r2.ok?await r2.json():[]}
     else S.frSnaps=[];
@@ -1925,7 +1932,8 @@ function raceField(){
     const sn=(S.frSnaps||[]).find(s9=>s9.user_id===id)||{};
     const local=((acct()||{}).frNames||{})[id];
     out.push({crew:1,id:id,name:local||sn.display||'A racer',named:!!(local||sn.display),
-      week:sn.week_live||0,sess:sn.week_sessions||0,tier:sn.tier||'',allp:sn.live_points||0,av:sn.av||'',seen:sn.updated_at||null})})}catch(e){}
+      week:sn.week_live||0,sess:sn.week_sessions||0,tier:sn.tier||'',allp:sn.live_points||0,av:sn.av||'',seen:sn.updated_at||null,
+      tree:sn.tree||null,finds:sn.collection_count||0,pts:sn.points||0})})}catch(e){}
   return out}
 async function crewMake(nm){
   {const c9=nameClean(nm);
@@ -1970,7 +1978,8 @@ function frLinked(){
     const sn=(S.frSnaps||[]).find(s9=>s9.user_id===fid)||{};
     const local=((acct()||{}).frNames||{})[fid];
     return{code:x.code,id:fid,name:local||sn.display||'Your friend',named:!!(local||sn.display),
-      week:sn.week_live||0,sess:sn.week_sessions||0,tier:sn.tier||'',allp:sn.live_points||0,av:sn.av||'',seen:sn.updated_at||null}})}
+      week:sn.week_live||0,sess:sn.week_sessions||0,tier:sn.tier||'',allp:sn.live_points||0,av:sn.av||'',seen:sn.updated_at||null,
+      tree:sn.tree||null,finds:sn.collection_count||0,pts:sn.points||0}})}
 const AV_COLS=['var(--line)','#30D158','#1E9BFF','#E0A458','#E8927C','#B8B4A8'];
 const AV_GLYPHS={
   1:'<svg viewBox="0 0 24 24" width="55%" height="55%" fill="currentColor"><path d="M12 2c1 4-3 5-3 9a3 3 0 0 0 6 0c0-1.5-.8-2.6-1.4-3.6C15.8 8.6 19 10.5 19 15a7 7 0 0 1-14 0C5 8.5 10.5 6.5 12 2z"/></svg>',
@@ -2065,6 +2074,82 @@ async function frProfileLoad(id){
    can never disagree with the board. Rounding is apportioned by
    largest remainder — the parts always add up to the number on the
    board, because a breakdown that doesn't sum is worse than none. */
+/* ══ THE FRIENDS LIST (owner ask, 10 Sep: 'a separate friends list
+   different to the weekly race where you can add friends and follow
+   their progress outside of the race') ═══════════════════════════
+   The race is one week and resets Monday. This is the long view: what
+   someone has actually built, and what has moved since you last
+   looked. Sorted by who has been training, never by score — it is not
+   a second leaderboard, and it never ranks anyone. Every number here
+   was already in the score card; nothing new is asked of anyone's
+   phone. The TREE lives here on purpose: it is the one thing in the
+   app that is not comparable, so a room that does not compare is its
+   only honest home outside your own points page. */
+function friendRows(){
+  try{
+    const F=(typeof raceField==='function'?raceField():frLinked())||[];
+    /* the since-you-last-looked baseline, frozen once per app open —
+       the 30-minute rule the boot screen and the board movers use */
+    const a9=acct()||{};
+    const now={};
+    F.forEach(f=>{const t=f.tree||{};
+      now[f.id]={s:+t.sessions||0,k:Math.round(+t.km||0),f:+f.finds||0,l:+t.lifts||0}});
+    if(!a9.frBaseT||Date.now()-a9.frBaseT>18e5){
+      const keep=Object.assign({},a9.frBase||{});
+      /* a friend seen for the FIRST time gets today as their baseline,
+         so a new link never reads as '+71 sessions since you looked' */
+      Object.keys(now).forEach(id=>{if(!keep[id])keep[id]=now[id]});
+      Object.keys(keep).forEach(id=>{if(now[id])keep[id]=keep[id]});
+      lset(K_ACCT,Object.assign({},a9,{frBase:keep,frBaseT:Date.now()}))}
+    const base=(acct()||{}).frBase||{};
+    return F.map(f=>{
+      const t=f.tree||{},b=base[f.id]||now[f.id]||{s:0,k:0,f:0,l:0};
+      const d={s:(+t.sessions||0)-(b.s||0),k:Math.round(+t.km||0)-(b.k||0),f:(+f.finds||0)-(b.f||0)};
+      let ago=null;
+      try{if(f.seen){const h9=(Date.now()-new Date(f.seen).getTime())/36e5;
+        ago=h9<1?'just now':h9<24?Math.round(h9)+'h ago':Math.round(h9/24)+'d ago'}}catch(e9){}
+      return{id:f.id,name:f.name,av:f.av,tier:f.tier,code:f.code,
+        sess:+t.sessions||0,lifts:+t.lifts||0,km:Math.round(+t.km||0),weeks:+t.weeks||0,
+        runs:+t.runs||0,finds:+f.finds||0,pts:+f.pts||0,week:+f.week||0,
+        /* their tree's stage NAME from the same ladder the points page
+           uses — treeStageN() reads MY tree, so it is the wrong tool
+           for a friend's card */
+        stage:(typeof treeStage==='function'&&t.pts!=null)?(treeStage({pts:+t.pts||0})||[])[0]:null,
+        moved:(d.s>0||d.k>0||d.f>0)?d:null,ago:ago,
+        act:(f.week>0?2:0)+(d.s>0?1:0)}})
+      .sort((a,b)=>(b.act-a.act)||(b.sess-a.sess))}
+  catch(e){return []}}
+function friendsPanel(){
+  const R=friendRows();
+  let h='<div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-top:14px">'+
+    '<p class="eyebrow" style="margin:0">Your people</p>'+
+    '<button data-a="addFriendOpen" class="mono" style="color:var(--amber);font-size:10px;letter-spacing:.08em;padding:4px 0">+ ADD A FRIEND</button></div>'+
+    '<p style="color:var(--faint);font-size:11.5px;line-height:1.55;margin-top:4px">What they have built, not this week\u2019s score. Nobody is ranked here.</p>';
+  if(!R.length)return h+'<div class="card mt" style="padding:16px"><p style="color:var(--dim);font-size:13px;line-height:1.6">Nobody yet. Swap an invite code and their training shows up here \u2014 sessions, distance, finds, and the tree they have grown.</p>'+
+    '<button data-a="addFriendOpen" class="big disp mt" style="background:var(--amber);color:var(--bg);font-size:15px">Add a friend</button></div>';
+  const st=(v,l)=>'<div style="flex:1;min-width:0;text-align:center"><p class="mono" style="font-size:15px;font-weight:700">'+v+'</p>'+
+    '<p class="mono" style="font-size:8px;color:var(--faint);letter-spacing:.06em;margin-top:2px">'+l+'</p></div>';
+  h+='<div class="mt" style="display:flex;flex-direction:column;gap:10px">'+R.map(f=>{
+    const mv=f.moved;
+    return '<div class="card" style="padding:14px 15px">'+
+      '<div style="display:flex;align-items:center;gap:11px">'+
+      ((typeof avHtml==='function')?avHtml(f.av,String(f.name).slice(0,1).toUpperCase(),42,'var(--line)',17):'')+
+      '<div style="flex:1;min-width:0">'+
+      '<button data-a="frOpen" data-v="'+esc(String(f.id))+'" style="font-size:15px;font-weight:600;text-align:left;padding:0;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block">'+esc(f.name)+' <span style="color:var(--faint);font-size:11px">\u203a</span></button>'+
+      '<p class="mono" style="font-size:9px;color:var(--faint);letter-spacing:.05em;margin-top:2px">'+
+      [f.stage?esc(String(f.stage).toUpperCase()):(f.tier?esc(String(f.tier).toUpperCase()):''),f.ago?esc(f.ago):''].filter(Boolean).join(' \u00b7 ')+'</p></div>'+
+      (f.week>0?'<span class="mono" style="flex:none;font-size:9px;letter-spacing:.06em;color:var(--green);border:1px solid var(--green);border-radius:9px;padding:3px 7px">RACING</span>':'')+
+      '</div>'+
+      '<div style="display:flex;gap:6px;margin-top:12px">'+
+        st(f.sess,'SESSIONS')+st(f.lifts,'LIFTS')+st(f.km,'KM')+st(f.finds,'FINDS')+'</div>'+
+      (mv?'<p style="color:var(--green);font-size:11.5px;line-height:1.5;margin-top:10px">Since you last looked: '+
+        [mv.s>0?mv.s+' session'+(mv.s===1?'':'s'):'',mv.k>0?mv.k+' km':'',mv.f>0?mv.f+' find'+(mv.f===1?'':'s'):'']
+          .filter(Boolean).join(' \u00b7 ')+'</p>':'')+
+      '<div class="row" style="gap:8px;margin-top:11px">'+
+      '<button data-a="nudgeOpen" data-v="'+esc(String(f.id))+'" class="btn" style="flex:1;color:var(--dim);font-size:12px;padding:9px 4px;border-radius:12px">Nudge</button>'+
+      '<button data-a="frOpen" data-v="'+esc(String(f.id))+'" class="btn" style="flex:1;color:var(--dim);font-size:12px;padding:9px 4px;border-radius:12px">Their card</button></div>'+
+      '</div>'}).join('')+'</div>';
+  return h}
 function raceMineRows(){
   try{
     const d=dataPoints(),items=(d.raceItems||[]).slice();
@@ -2339,7 +2424,9 @@ function viewSocial(){
       '<p style="font-size:14px;font-weight:600">Sign in to race</p>'+
       '<p style="color:var(--dim);font-size:12.5px;line-height:1.6;margin-top:5px">An email and a code \u2014 then swap invite codes with a friend and race the week on live points. Fresh every Monday; showing up is the whole game.</p>'+
       '<button data-a="nav" data-v="acct" class="big disp mt" style="background:var(--amber);color:var(--bg);font-size:14.5px">Sign in</button></div>'}
-  else inner=(typeof friendsSection==='function'?friendsSection():'');
+  else inner=(S.socTab==='friends')
+    ?(typeof friendsPanel==='function'?friendsPanel():'')
+    :(typeof friendsSection==='function'?friendsSection():'');
   try{const pend=(S.crewIn||S.frIn);
     if(pend&&S._joinArr&&!(typeof inWrapper==='function'&&inWrapper()))
       inner='<div class="card mt2" style="padding:13px 15px;border-color:var(--amber)">'+
@@ -2357,7 +2444,17 @@ function viewSocial(){
     ((acctReady()&&acct())?'<button data-a="addFriendOpen" style="width:40px;height:40px;border-radius:40px;background:var(--raised);border:1.5px solid var(--line);display:flex;align-items:center;justify-content:center;flex:none">'+
       '<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="10" cy="8.5" r="3.6"/><path d="M4 19.5c.7-3.4 2.9-5.3 6-5.3s5.3 1.9 6 5.3"/><path d="M18.5 6.5v6M15.5 9.5h6"/></svg></button>':'')+
     '</div>'+
-    '<p style="color:var(--dim);font-size:13px;line-height:1.6;margin-top:8px">Compete on showing up \u2014 never on output. Weekly live points from workouts AND device-witnessed runs; a run and a session on the same day both count.</p>'+
+    /* TWO SURFACES, ONE ROOM (owner ask, 10 Sep). The race page keeps
+       the furniture rule — it is still only the race. The friends list
+       is the long view beside it: what people have built, never
+       ranked. The blurb belongs to the race, so it moves with it. */
+    ((acctReady()&&acct())?'<div class="row" style="gap:7px;margin-top:14px">'+
+      [['race','The race'],['friends','Friends']].map(x=>{
+        const on=(S.socTab==='friends')===(x[0]==='friends');
+        return '<button data-a="socTab" data-v="'+x[0]+'" class="pill" style="flex:1;text-align:center;'+
+          (on?'border-color:var(--text);color:var(--text);background:var(--raised)':'color:var(--faint)')+'">'+x[1]+'</button>'}).join('')+'</div>':'')+
+    ((S.socTab==='friends'&&acctReady()&&acct())?''
+      :'<p style="color:var(--dim);font-size:13px;line-height:1.6;margin-top:8px">Compete on showing up \u2014 never on output. Weekly live points from workouts AND device-witnessed runs; a run and a session on the same day both count.</p>')+
     inner+'</div>'}
 let acctSyncT=null;
 function acctSyncSoon(){
@@ -22591,6 +22688,7 @@ function runAction(a,v,t,e){
       try{acctSync(false)}catch(e){}render();break}
     case 'frOpen':{S.sheet={t:'friend',id:v};S.frProf={__wait:1};render();
       frProfileLoad(v).then(p9=>{if(S.sheet&&S.sheet.t==='friend'&&S.sheet.id===v){S.frProf=p9||{};render()}});break}
+    case 'socTab':{S.socTab=(v==='friends')?'friends':'race';render();break}
     case 'raceMineOpen':{S.sheet={t:'racemine'};render();break}
     case 'nudgeOpen':{S.sheet={t:'nudge',id:v};render();break}
     case 'ovMeSeen':{const a9v=acct()||{};if(a9v.ovMe){a9v.ovMe.x=1;lset(K_ACCT,a9v)}render();break}
