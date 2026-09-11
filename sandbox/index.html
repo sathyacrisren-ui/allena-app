@@ -76,9 +76,13 @@ button:active{transform:scale(.96);opacity:.85}
    both themes, and they do not fight an element's own background or
    glow. Fast in, slower out, so a tap feels answered rather than
    animated. Reduced motion keeps the dim and drops the movement. */
-.tapd{opacity:.6!important;transform:scale(.97)!important;
-  transition:opacity .06s linear,transform .06s linear!important}
-@media (prefers-reduced-motion:reduce){.tapd{transform:none!important}}
+/* `scale`, never `transform:scale` — the pills that centre themselves with
+   translateX(-50%) (the LIVE pill, the win pill) JUMPED sideways on
+   every press when the pressed state clobbered their transform
+   (owner-caught, 11 Sep). The individual property composes instead. */
+.tapd{opacity:.6!important;scale:.97!important;
+  transition:opacity .06s linear,scale .06s linear!important}
+@media (prefers-reduced-motion:reduce){.tapd{scale:none!important}}
 input,textarea,select{font-family:inherit;background:var(--raised);border:1px solid transparent;border-radius:14px;
   color:var(--text);padding:13px 14px;font-size:16px;outline:none;width:100%;min-width:0;
   -webkit-appearance:none;appearance:none;box-sizing:border-box}
@@ -196,10 +200,18 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
    motion says which way you went. ONE animation per navigation: while
    the page itself is moving, the staggered child rise stands down —
    stacking them stuttered every time on-device. */
-@keyframes pgFwd{from{opacity:0;transform:translate3d(16px,0,0)}to{opacity:1;transform:none}}
-@keyframes pgBack{from{opacity:0;transform:translate3d(-16px,0,0)}to{opacity:1;transform:none}}
-#app.pgnav{animation:pgFwd .28s cubic-bezier(.22,1,.36,1) both;will-change:transform,opacity}
-#app.pgnav.back{animation-name:pgBack}
+/* Pages FADE, they do not slide. A transform on #app (the whole page,
+   thousands of px tall, under the Dynamic Type zoom) made WebKit
+   rasterise the page as one giant layer mid-flight: frames rendered
+   shrunk, shifted down with a blank strip, or with the old page
+   ghosting under the new one (owner's recording, 11 Sep). Opacity alone
+   composites cleanly. The direction still lives on the header. */
+@keyframes pgFwd{from{opacity:0}to{opacity:1}}
+@keyframes pgHdrF{from{opacity:0;transform:translateX(10px)}to{opacity:1;transform:none}}
+@keyframes pgHdrB{from{opacity:0;transform:translateX(-10px)}to{opacity:1;transform:none}}
+#app.pgnav{animation:pgFwd .24s ease-out both}
+#app.pgnav .stickyhead{animation:pgHdrF .28s cubic-bezier(.22,1,.36,1) both}
+#app.pgnav.back .stickyhead{animation-name:pgHdrB}
 #app.pgnav .stg>*,#app.pgnav .view.anim{animation:none!important}
 @media (prefers-reduced-motion: reduce){#app.pgnav{animation:none}}
 .stg>*{animation:allenaRise .45s cubic-bezier(.22,1,.36,1) both}
@@ -764,7 +776,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='2f2928';  // stamped by tools/build.py with the content hash
+const BUILD_ID='aa1de6';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
