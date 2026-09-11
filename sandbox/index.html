@@ -792,7 +792,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='bc41b1';  // stamped by tools/build.py with the content hash
+const BUILD_ID='5d3497';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -5313,7 +5313,7 @@ function noticedToday(){
     const bank=discBank();
     const RANKF=x=>(x.tag==='signal'?0:x.rar==='epic'?1:x.rar==='rare'?2:9);
     finds0=Object.keys(bank).map(id=>Object.assign({id:id},bank[id]))
-      .filter(x=>x.found===today()&&RANKF(x)<9&&x.tag!=='call')
+      .filter(x=>x.found===today()&&RANKF(x)<9&&x.tag!=='call'&&!x.contra)   // a backwards pattern never headlines
       .sort((a,b)=>RANKF(a)-RANKF(b))
       .map(f=>({t:f.t,d:f.d,tier:0,find:1,id:f.id}))}catch(e){oops('noticedFinds',e)}
   let ntc={};try{S.daily.ntc=S.daily.ntc||{};ntc=S.daily.ntc}catch(e){}
@@ -12627,21 +12627,29 @@ function corrPhrase(c){
   const move=O.pace?(outcomeRises?'slower':'faster')
     :O.rpe?(outcomeRises?'harder':'easier')
     :(outcomeRises?'higher':'lower');
+  /* 'your the stiffness check-in' (owner-caught, 11 Sep): outcome
+     names carry their own article; drop it after 'your' */
+  const on=O.n.replace(/^(a|an|the) /,'');
+  /* TWO SENTENCES ON THE CARD, the reasoning behind More (owner, 11
+     Sep: 'too much writing, should be 2 sentences and a more info
+     thing'). body = what was seen; x = why to read it carefully. */
   if(contra){
     const title='A backwards pattern: '+O.n+' vs '+S9.n.replace(/^(a|an|the) /,'');
-    const body='Across '+c.n+' days, your '+O.n+' tends to run '+move+' '+when+' '+S9.dir+
-      ' (correlation '+(Math.round(c.rho*100)/100)+'). Read that with a raised eyebrow: it is almost certainly not '+S9.dir+' hurting — far more likely your schedule bunches things (hard sessions landing after short nights, say), or something else drives both. Filed as a curiosity, never as advice — Allena will not coach against '+S9.n+'.';
-    return{title:title,body:body,strong:false,good:false,contra:true}}
+    const body='Across '+c.n+' days, your '+on+' tends to run '+move+' '+when+' '+S9.dir+
+      ' (correlation '+(Math.round(c.rho*100)/100)+'). Almost certainly a schedule thing, not '+S9.dir+' hurting \u2014 filed as a curiosity, never as advice.';
+    const x='Read it with a raised eyebrow. Far more likely your schedule bunches things (hard sessions landing after short nights, say), or something else drives both. Allena will not coach against '+S9.n+'.';
+    return{title:title,body:body,x:x,strong:false,good:false,contra:true}}
   const title=O.n.charAt(0).toUpperCase()+O.n.slice(1)+' runs '+move+' after '+S9.n;
-  const body='Across '+c.n+' days, your '+O.n+' tends to be '+move+' '+when+' '+S9.dir+' '+
-    '(correlation '+(Math.round(c.rho*100)/100)+'). A pattern in your own data, not proof of cause — but worth watching.';
-  return{title:title,body:body,strong:Math.abs(c.rho)>=0.65,good:good}}
+  const body='Across '+c.n+' days, your '+on+' tends to be '+move+' '+when+' '+S9.dir+' '+
+    '(correlation '+(Math.round(c.rho*100)/100)+'). A pattern in your own data, not proof of cause \u2014 but worth watching.';
+  const x='Found by checking every signal against every outcome in your own days, keeping only links that hold on both halves of the data and clear a strict threshold. It says these two move together, not that one causes the other.';
+  return{title:title,body:body,x:x,strong:Math.abs(c.rho)>=0.65,good:good}}
 function correlationDiscoveries(){
   const D=[];
   const cur=correlations();
   cur.forEach(c=>{
     const p=corrPhrase(c);
-    D.push({rar:p.contra?'common':(p.strong?'epic':'rare'),t:p.title,d:p.body,tag:'signal',contra:p.contra?1:0,id:'corr:'+c.sig+':'+c.out+':'+c.lag})});
+    D.push({rar:p.contra?'common':(p.strong?'epic':'rare'),t:p.title,d:p.body,x:p.x||'',tag:'signal',contra:p.contra?1:0,id:'corr:'+c.sig+':'+c.out+':'+c.lag})});
   /* the second harvest (owner call, 3 Sep — more, all day, honestly):
      a known link STRENGTHENING on new evidence, or a once-solid link
      BREAKING, is genuinely new information. Tracked against the last
@@ -14335,7 +14343,8 @@ function verdictCard(){
     inner+='<div class="an-rise" style="margin-top:11px">'+
       '<p class="mono" style="font-size:10px;color:var(--amber);letter-spacing:.08em">✦ ALLENA NOTICED</p>'+
       '<p class="disp gradhead" style="font-size:24px;line-height:1.18;margin-top:7px">'+esc(n.t)+'</p>'+
-      '<p style="color:var(--dim);font-size:13.5px;line-height:1.6;margin-top:6px">'+esc(n.d)+'</p></div>'+
+      '<p style="color:var(--dim);font-size:13.5px;line-height:1.6;margin-top:6px">'+esc(n.d)+'</p>'+
+      (n.find&&n.id?'<button data-a="findOpen" data-v="'+esc(n.id)+'" class="mono" style="color:var(--amber);font-size:11.5px;margin-top:8px;padding:0">More \u203a</button>':'')+'</div>'+
       taskRow(true)}
   else if(done&&n){
     inner+='<p class="disp gradhead" style="font-size:24px;line-height:1.18;margin-top:10px">'+(pr.done>=pr.total?'All done today':'Check-ins done')+'</p>'+
@@ -14828,9 +14837,22 @@ function bankDiscoveries(){
   // returns the ones newly banked by this call
   try{bankLiveTier()}catch(e){}
   const bank=discBank(),fresh=[];
+  /* one-time repair of backwards patterns banked before 11 Sep: they
+     carry the long body and no flag. Split at the old hinge so the card
+     reads two sentences and the reasoning moves behind More. */
+  try{let fixed=0;Object.keys(bank).forEach(id=>{const b=bank[id];
+    if(!b||b.contra||!/^A backwards pattern/.test(b.t||''))return;
+    b.contra=1;const i=(b.d||'').indexOf('Read that with a raised eyebrow');
+    if(i>0&&!b.x){b.x='Read it with a raised eyebrow'+b.d.slice(i+'Read that with a raised eyebrow'.length).replace(/ Filed as a curiosity, never as advice \u2014 /,' ');
+      b.d=b.d.slice(0,i).trim()+' Almost certainly a schedule thing \u2014 filed as a curiosity, never as advice.'}
+    fixed++});if(fixed)bankSave()}catch(e){oops('bank.contraFix',e)}
   discoveries().forEach(d=>{
     if(bank[d.id])return;
     bank[d.id]={t:d.t,d:d.d,rar:d.rar,tag:d.tag,found:today()};
+    /* the backwards flag and the explainer ride into the bank — the
+       flag was dropped here, so the hero exclusion and the nudge
+       filter never saw it (owner-caught, 11 Sep) */
+    if(d.contra)bank[d.id].contra=1;if(d.x)bank[d.id].x=d.x;
     fresh.push(Object.assign({},d,{found:today()}))});
   if(fresh.length)bankSave();
   return fresh}
@@ -21315,6 +21337,7 @@ function sheetHtml(){
       '<p class="mono" style="font-size:9.5px;letter-spacing:.1em;color:'+r[1]+'">'+esc(r[2].toUpperCase())+' \u00b7 FOUND '+esc(fmtDate(String(e.found||today())+'T12:00'))+'</p>'+
       '<p class="disp" style="font-size:21px;font-weight:650;line-height:1.2;margin-top:8px">'+esc(e.t)+'</p>'+
       '<p style="color:var(--dim);font-size:13.5px;line-height:1.65;margin-top:10px">'+esc(e.d||'')+'</p>'+
+      (e.x?'<p class="eyebrow" style="margin-top:14px">How to read it</p><p style="color:var(--dim);font-size:13px;line-height:1.6;margin-top:5px">'+esc(e.x)+'</p>':'')+
       '<p style="color:var(--faint);font-size:11px;line-height:1.5;margin-top:14px">Kept with the numbers it had the day it was found \u2014 beating it never erases it.</p>'+
       ((typeof evidenceData==='function'&&evidenceData(S.sheet.id))
         ?'<button data-a="evidenceOpen" data-v="'+esc(S.sheet.id)+'" class="big disp mt2" style="background:var(--amber);color:var(--bg);font-size:14.5px">See the evidence \u2014 the charts behind this</button>':'')+
