@@ -317,6 +317,10 @@ body.sesslive #hkPulse{top:calc(env(safe-area-inset-top) + 40px)}
 @keyframes bgFade{from{opacity:0}to{opacity:1}}
 .sheet-bg{position:fixed;inset:0;background:rgba(20,19,17,.74);z-index:70;display:flex;align-items:flex-end;justify-content:center;
   animation:bgFade .26s ease both}
+/* over the SESSION the backdrop goes solid — the rest ring and the Skip
+   rest button read straight through a 74% scrim and the two screens look
+   printed on top of each other (owner-caught, 11 Sep) */
+body.sessview .sheet-bg{background:var(--bg)}
 @media (prefers-reduced-motion: reduce){.sheet-bg{animation-duration:.01s}}
 .sheet{width:100%;max-width:460px;background:var(--surface);border-top:1px solid var(--line);
   border-radius:26px 26px 0 0;max-height:88vh;overflow-y:auto;overscroll-behavior:contain;padding:26px 20px calc(32px + env(safe-area-inset-bottom));position:relative}
@@ -760,7 +764,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='d53f9e';  // stamped by tools/build.py with the content hash
+const BUILD_ID='4fead7';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -22182,6 +22186,10 @@ function cuSweep(){
       else setTimeout(()=>{const el3=document.querySelector('[data-cu="'+k+'"]');
         if(el3){el3.style.textShadow='none'}},900)};
     requestAnimationFrame(tick)})}
+/* is the SESSION SCREEN itself what a sheet would open over? Named so it
+   can be tested — the condition used to live inline in render, where the
+   only way to check it was to look. */
+function onSessionScreen(){try{return !!(S.sess&&S.view==='session')}catch(e){return false}}
 function render(){
   const ae=document.activeElement,key=ae&&ae.dataset?ae.dataset.in:null;
   const pos=key&&ae.selectionStart!=null?ae.selectionStart:null;
@@ -22406,6 +22414,16 @@ function render(){
       if(!S.scrollTo)window.scrollTo(0,0)}}catch(e){}
     try{document.body.classList.toggle('sesslive',
       !!(S.sess&&S.view!=='session'&&S.view!=='coach'&&S.sess.phase!=='done'))}catch(e){}
+    /* A SHEET OVER THE SESSION NEEDS AN OPAQUE BACKDROP (owner-caught,
+       11 Sep, with a recording of the exercise list opened mid-rest).
+       The backdrop is 74% opaque, which is right over a normal page — you
+       want to feel the page you came from. The session screen is not a
+       page you came from, it is a competing full-screen instrument: a
+       bright ring, big white numerals and a solid Skip rest pill. At 26%
+       all of that reads clean through the sheet and the two screens look
+       printed on top of each other. Stacking was never wrong; opacity
+       was. */
+    try{document.body.classList.toggle('sessview',onSessionScreen())}catch(e){oops('sessview',e)}
     /* the page behind a sheet does not change when the sheet opens —
        rebuilding it anyway repainted the whole DOM (a visible "refresh"
        on-device). Identical HTML is left alone. */
