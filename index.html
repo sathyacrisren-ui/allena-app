@@ -760,7 +760,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='7e33aa';  // stamped by tools/build.py with the content hash
+const BUILD_ID='76f37e';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -6941,7 +6941,11 @@ function viewRehabHub(){
        'Measure knee bend',null,'romOpen',null,
        {sub:s9?('Last: L '+(s9.l!=null?s9.l+'\u00b0':'\u2014')+' · R '+(s9.r!=null?s9.r+'\u00b0':'\u2014')+(s9.sym!=null?' · '+s9.sym+'% even':'')):'The camera reads both knees in degrees'}))}
      /* the squat gate, measured (owner ask, 11 Sep) — same camera, and
-        only on a build that has it, so it is never a dead row */
+        only on a build that HAS it. Build 17 is where the squat mode
+        lands; on anything older the native side ignores mode:'squat' and
+        opens the knee camera instead, which is a button that does the
+        wrong thing — worse than one that is missing. */
+     if((window.__wrapperBuild||0)>=17)
      {let sq9=null;try{const lst=squatStore().list;sq9=lst.length?squatSummary(lst[lst.length-1]):null}catch(e9){oops('squatRow',e9)}
       pg9.push(navRow('<path d="M4 20h16"/><path d="M7 20v-6l5-4 5 4v6"/>',
         'Squat symmetry',null,'squatOpen',null,
@@ -21098,7 +21102,16 @@ function sheetHtml(){
          propping a phone against a water bottle (owner ask, 11 Sep) */
       (typeof romSetupSvg==='function'?romSetupSvg():'')+
       (typeof romSetupSteps==='function'?romSetupSteps():'')+
-      '<button data-a="romStart" class="big disp mt2" style="background:var(--amber);color:var(--bg);font-size:15px">Start measurement</button>'+
+      /* THE PAGE MUST NOT PROMISE A FLOW THE INSTALLED APP CANNOT RUN
+         (owner-caught, 11 Sep: "I clicked capturing and there's nothing
+         indicating that it's capturing"). The guided, spoken flow is
+         native and lands in build 17; the web side ships instantly, so
+         for one archive the copy described a camera the phone did not
+         have yet. It now says which camera you are about to open. */
+      (((window.__wrapperBuild||0)>=17)
+        ?'<button data-a="romStart" class="big disp mt2" style="background:var(--amber);color:var(--bg);font-size:15px">Start capturing</button>'
+        :'<button data-a="romStart" class="big disp mt2" style="background:var(--amber);color:var(--bg);font-size:15px">Open the camera</button>'+
+         '<p style="color:var(--faint);font-size:11px;line-height:1.55;margin-top:8px">This build opens the plain camera: it shows both knees live and you tap Capture yourself. The guided version above — it picks a leg, talks you through extension then flexion, and captures on its own — arrives with the next app update.</p>')+
       (L9.length?'<p class="eyebrow" style="margin-top:16px">Measured so far</p>'+
         L9.map(e9=>{const s9=romSummary(e9);
           return '<div style="display:flex;align-items:baseline;gap:10px;margin-top:9px">'+
