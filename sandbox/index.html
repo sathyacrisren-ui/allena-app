@@ -726,7 +726,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='8ac5b0';  // stamped by tools/build.py with the content hash
+const BUILD_ID='2507f5';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -15817,7 +15817,7 @@ function weekBoard(){
       if(legs&&longIdx>=0&&!reason){
         const dist=Math.min(Math.abs(i-longIdx),7-Math.abs(i-longIdx));
         if(dist>1)reason='Legs on '+DN7[i]+'. Long run '+DN7[longIdx]+'. Kept '+dist+' days apart on purpose.'}
-      d.items.push({k:'lift',l:String(base).split(' ')[0].slice(0,6).toLowerCase(),done:0,legs:legs})});
+      d.items.push({k:'lift',l:String(base).split(' ')[0].slice(0,10).toLowerCase(),done:0,legs:legs})});
     let unplaced=Object.keys(remNames).filter(n=>!placedNames[n]);
     /* THE VERDICT IS THE BRAIN (owner-caught, 9 Sep: the card said
        Heavy Press + Back while the board put Technique on today).
@@ -15834,13 +15834,13 @@ function weekBoard(){
         const hit=unplaced.find(n=>n===recName||recName.indexOf(n)>=0||n.indexOf(recName)>=0);
         if(hit){
           unplaced=unplaced.filter(n=>n!==hit);
-          tD.items.unshift({k:'lift',l:String(hit).split(' ')[0].slice(0,6).toLowerCase(),done:0})}
+          tD.items.unshift({k:'lift',l:String(hit).split(' ')[0].slice(0,10).toLowerCase(),done:0})}
         else{
-          const dO=days.find(d2=>d2.key>tk&&d2.items.some(x=>x.k==='lift'&&!x.done&&(recName.toLowerCase().indexOf(x.l)>=0||x.l.indexOf(recName.slice(0,6).toLowerCase())>=0)));
+          const dO=days.find(d2=>d2.key>tk&&d2.items.some(x=>x.k==='lift'&&!x.done&&(recName.toLowerCase().indexOf(x.l)>=0||x.l.indexOf(recName.slice(0,10).toLowerCase())>=0)));
           if(dO){const it9=dO.items.find(x=>x.k==='lift'&&!x.done);
             dO.items=dO.items.filter(x=>x!==it9);
             tD.items.unshift(it9)}}}}catch(e){}
-    let unfit=0;
+    let unfit=0,rehabOver=0;
     if(unplaced.length){
       /* same-block days share muscles — the board must never SUGGEST
          them back to back (owner-caught, 8 Sep: 'wants me to hit
@@ -15859,14 +15859,31 @@ function weekBoard(){
           : days.find((d2,i2)=>d2.key>=tk&&!d2.items.length&&i2>lastIdx+1);
         if(!d){unfit++;return}
         if(!rec9)lastIdx=days.indexOf(d);
-        d.items.push({k:rec9?'rehab':'lift',l:String(n).split(' ')[0].slice(0,6).toLowerCase(),done:0,rec:rec9})})}
+        d.items.push({k:rec9?'rehab':'lift',l:String(n).split(' ')[0].slice(0,10).toLowerCase(),done:0,rec:rec9})})}
     if(unfit&&!conflict&&!reason)reason=unfit+' session'+(unfit===1?'':'s')+' left over \u2014 a rest day belongs between them, so they place as days open.';
     // remaining rehab fills the quietest days ahead
-    for(let r=rehabDone;r<rehabT;r++){
-      const cand=days.filter(d=>d.key>=tk&&d.items.length<2)
-        .sort((a,b)=>a.items.length-b.items.length)[0];
-      if(!cand)break;cand.items.push({k:'rehab',l:'rehab',done:0})}
-    if(!reason&&rehabT>rehabDone)reason=(rehabT-rehabDone)+' rehab session'+(rehabT-rehabDone===1?'':'s')+' still to fit. They sit on the quiet days.';
+    /* TWICE A DAY IS TWICE A DAY (owner-caught, 11 Sep: "not showing my 2
+       rehab sessions per day"). The fill capped at two items per day, so
+       a physio plan asking for 14 a week could never be drawn. Rehab now
+       stacks onto the same day and the pill counts itself. */
+    /* Two a day is the most any physio plan realistically asks of one
+       day; past that the board stops being readable and starts lying
+       about what a Tuesday looks like. The overflow is said in words
+       below instead of crammed into squares. */
+    {let left9=Math.max(0,rehabT-rehabDone);
+     const perDay={};
+     while(left9>0){
+       const cand=days.filter(d=>d.key>=tk&&(perDay[d.key]||0)<2)
+         .sort((a,b)=>((perDay[a.key]||0)-(perDay[b.key]||0))||(a.items.length-b.items.length))[0];
+       if(!cand)break;
+       perDay[cand.key]=(perDay[cand.key]||0)+1;
+       const ex9=cand.items.find(x=>x.k==='rehab'&&!x.done);
+       if(ex9){ex9.n=(ex9.n||1)+1;ex9.l='rehab \u00d7'+ex9.n}
+       else cand.items.push({k:'rehab',l:'rehab',done:0,n:1});
+       left9--}
+     rehabOver=left9}
+    if(rehabOver>0)reason='Your physio plan asks for '+rehabT+' rehab sessions a week. '+rehabOver+" won't fit in the days left — the board shows two a day at most.";
+    else if(!reason&&rehabT>rehabDone)reason=(rehabT-rehabDone)+' rehab session'+(rehabT-rehabDone===1?'':'s')+' still to fit. They sit on the quiet days.';
     return{days:days,todayKey:tk,reason:conflict||reason,conflict:!!conflict,
       hasRuns:!!rp,hasRehab:rehabT>0}}catch(e){return null}}
 function weekBoardCard(){
@@ -15875,7 +15892,12 @@ function weekBoardCard(){
      really readable') — bigger type, taller chips, a real legend,
      today's column lifted on its own ground */
   const chip=it=>{
-    const base='display:block;width:100%;box-sizing:border-box;text-align:center;border-radius:8px;padding:6px 2px;font-size:10px;line-height:1.2;letter-spacing:.02em;margin-top:5px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;';
+    /* WRAP, DO NOT TRUNCATE (owner-caught, 11 Sep: "all writing still cut
+       off"). Seven columns on a phone cannot hold a word on one line, so
+       the labels were ellipsed into "rec…" and "tech…" — a board you
+       cannot read is not a board. Two short lines fit where one long one
+       never could. */
+    const base='display:block;width:100%;box-sizing:border-box;text-align:center;border-radius:8px;padding:5px 2px;font-size:9.5px;line-height:1.15;letter-spacing:0;margin-top:5px;overflow:hidden;overflow-wrap:anywhere;word-break:break-word;hyphens:auto;';
     if(it.k==='run')return '<span class="mono" style="'+base+(it.done?'background:var(--chart);color:var(--bg);font-weight:700':'border:1.5px solid var(--chart)66;color:var(--chart)'+(it.long?';font-weight:700':''))+'">'+esc(it.l)+'</span>';
     if(it.k==='rehab')return '<span class="mono" style="'+base+(it.done?'background:var(--green);color:var(--bg);font-weight:700':'border:1.5px solid var(--greensoft);color:var(--green)')+'">'+esc(it.l)+'</span>';
     return '<span class="mono" style="'+base+(it.done?'background:var(--text);color:var(--bg);font-weight:700':'border:1.5px solid var(--line);color:var(--dim)')+'">'+esc(it.l)+'</span>'};
@@ -16323,7 +16345,8 @@ function secSessions(p,ws){
     h+=dayCard(p,d,i,doneSet.has(d.name),daily)});
   h+='</div>';
   h+='<button data-a="quickOpen" class="btn" style="margin-top:12px;width:100%;color:var(--dim);font-size:13px;text-align:left">Trained without the app? Log a past session ›</button>';
-  if(!p.days.some(d=>d&&d.recday))
+  const isRecDay9=d=>d&&(d.recday||String(d.name||'').trim().toLowerCase()==='recovery');
+  if(!p.days.some(isRecDay9))
     h+='<button data-a="recDayOpen" class="btn" style="margin-top:8px;width:100%;color:var(--dim);font-size:13px;text-align:left">Want a rehab / recovery day in the week? Add one ›</button>';
   else
     h+='<button data-a="recDayDelOpen" class="btn" style="margin-top:8px;width:100%;color:var(--faint);font-size:12.5px;text-align:left">Remove the recovery day \u203a</button>';
@@ -17523,6 +17546,15 @@ function catchUpPlan(p){
       const to=Math.round(med*4)/4;
       if(Math.abs(to-eff)>=2.5)out.push({ex:ex.name,from:eff,to:to})}));
     return out}catch(e){return []}}
+function catchRow(p){
+  /* under "Trained without the app", not above the week (owner call,
+     11 Sep). Same content, same door — it just stops being the first
+     thing you see on Program. */
+  try{const cu=catchUpPlan(p);
+    if(!cu.length)return '';
+    return '<button data-a="catchOpen" class="btn" style="margin-top:8px;width:100%;color:var(--amber);font-size:13px;text-align:left">'+
+      'Your logs are ahead of the program on '+cu.length+' lift'+(cu.length===1?'':'s')+' \u2014 catch it up \u203a</button>'}
+  catch(e){oops('catchRow',e);return ''}}
 function adjRow(p){
   /* the learned-adjustments ledger, in the same row language as
      "Trained without the app" beneath it (owner call, 11 Sep). Same
@@ -17566,12 +17598,7 @@ function viewHome(){
      showed +12.5 on a skullcrusher and −5 on his key bench): what
      regulation has moved is VISIBLE and reversible in one place —
      never a mystery a user has to reverse-engineer from set screens */
-  try{const cu=catchUpPlan(p);
-    if(cu.length)h+='<button data-a="catchOpen" class="card mt" style="width:100%;text-align:left;padding:14px 16px;display:block;border-color:var(--amber)">'+
-      '<p class="eyebrow" style="color:var(--amber)">Your logs are ahead of the written program</p>'+
-      '<p style="color:var(--dim);font-size:12.5px;line-height:1.55;margin-top:5px">'+cu.length+' lift'+(cu.length===1?'':'s')+' where what you actually lift differs from what the plan says \u2014 common with imported spreadsheets whose plan column went stale. One tap catches the program up.</p>'+
-      '<p class="mono" style="color:var(--amber);font-size:11px;margin-top:7px">See the catch-up \u203a</p></button>'}catch(e){}
-  const render1={stats:()=>secStats(),program:()=>secProgram(p,ws),sessions:()=>secSessions(p,ws)+adjRow(p),
+  const render1={stats:()=>secStats(),program:()=>secProgram(p,ws),sessions:()=>secSessions(p,ws)+catchRow(p)+adjRow(p),
     goals:()=>secGoals(),habits:()=>secHabits(),support:()=>secSupport()};
   /* program, then the week's sessions (owner call, 11 Sep) — saved
      layouts keep whatever the user chose */
@@ -23609,17 +23636,25 @@ function runAction(a,v,t,e){
     /* THE WAY BACK OUT (owner ask, 11 Sep): a recovery day could be added
        and never removed. Sessions already logged against it stay in the
        history — the day leaves the plan, not the record. */
-    case 'recDayDelOpen':{const p9=activeProg();
-      const d9=p9&&(p9.days||[]).filter(d=>d&&d.recday).length;
+    case 'recDayDelOpen':{const p9=activeProgSafe();
+      /* activeProgSafe, not activeProg (owner-caught, 11 Sep: "remove
+         recovery day not working" while the button was right there).
+         The page renders against activeProgSafe — which skips a rehab
+         or support program — so the door found the day and the action
+         looked in a different program entirely. Also tolerate a day
+         named Recovery without the flag, from before recday existed. */
+      const isRec9=d=>d&&(d.recday||String(d.name||'').trim().toLowerCase()==='recovery');
+      const d9=p9&&(p9.days||[]).filter(isRec9).length;
       if(!d9){flash('No recovery day to remove.');break}
       const done9=(S.history||[]).filter(h=>h.complete&&/^Recovery/.test(String(h.dayTitle||''))).length;
       S.confirm={t:'Remove the recovery day?',
         d:'It comes out of the week from here on.'+(done9?' The '+done9+' you have already done stay in your history \u2014 this only changes the plan ahead.':''),
         go:'recDayDelGo',v:'',ok:'Remove it',no:'Keep it'};
       S.sheet={t:'confirm'};render();break}
-    case 'recDayDelGo':{const p9=activeProg();if(!p9){S.sheet=null;render();break}
+    case 'recDayDelGo':{const p9=activeProgSafe();if(!p9){S.sheet=null;render();break}
+      const isRec9=d=>d&&(d.recday||String(d.name||'').trim().toLowerCase()==='recovery');
       const before=(p9.days||[]).length;
-      p9.days=(p9.days||[]).filter(d=>!(d&&d.recday));
+      p9.days=(p9.days||[]).filter(d=>!isRec9(d));
       saveLib();S.sheet=null;S.patCache=null;render();
       flash(before>(p9.days||[]).length?'Recovery day removed.':'Nothing to remove.');break}
     case 'recDayAdd':{const p=activeProg();if(!p)break;
