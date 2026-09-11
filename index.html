@@ -764,7 +764,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='ac6540';  // stamped by tools/build.py with the content hash
+const BUILD_ID='710bd6';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -18688,8 +18688,16 @@ function viewSession(){
       (rir(cur.targetRpe)!==null?'<span style="color:var(--faint);font-weight:400"> · '+(rir(cur.targetRpe)===0?'nothing left':rir(cur.targetRpe)+' reps in reserve')+'</span>':'')+'</p>':'');
     if(last){const dw=(last.week&&last.week!==s.week)?'WEEK '+last.week:'LAST TIME';
       let delta='';
-      if(!cur.secs&&last.w&&cur.targetW!=null&&last.w!==cur.targetW)
-        delta=' · '+(cur.targetW>last.w?'+':'')+(UNITS.w==='lb'?Math.round((cur.targetW-last.w)*LB_KG*2)/2:Math.round((cur.targetW-last.w)*10)/10)+' '+uwUnit();
+      if(!cur.secs&&last.w&&cur.targetW!=null&&last.w!==cur.targetW){
+        const dk=UNITS.w==='lb'?Math.round((cur.targetW-last.w)*LB_KG*2)/2:Math.round((cur.targetW-last.w)*10)/10;
+        /* say what the number is being compared to (owner-caught, 11 Sep:
+           "-2.5 kg" under an 80 kg log read as Allena cutting the load,
+           when the written program said 77.5 both weeks and the 80 was
+           the lifter's own call). Regulation's moves already explain
+           themselves on the amber line above; an unchanged prescription
+           under a heavier log names the heavier log. */
+        if(!cur.adj&&dk<0)delta=' · you put '+uwNum(-dk)+' '+uwUnit()+' more on than written';
+        else delta=' · '+(dk>0?'+':'')+dk+' '+uwUnit()}
       body+='<div style="margin-top:7px;padding-top:7px;border-top:1px solid var(--line)">'+
         '<p class="mono" style="color:var(--amber);font-size:11px">'+dw+' · SET '+last.setNo+'</p>'+
         '<p class="mono" style="color:var(--dim);font-size:13px;margin-top:2px">'+esc(entryStr(last))+
