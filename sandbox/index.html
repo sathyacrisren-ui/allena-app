@@ -708,7 +708,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='480383';  // stamped by tools/build.py with the content hash
+const BUILD_ID='c8222f';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -17389,27 +17389,53 @@ function catchUpPlan(p){
        (Dafydd's sheet) — the fallback matcher strips the furniture
        words and is used ONLY when the exact name finds no history */
     const relax=n=>String(gBase(n)).toLowerCase().replace(/\b(barbell|bb|press)\b/g,' ').replace(/[^a-z]+/g,' ').trim();
-    const byBase={},byRelax={};
+    /* THE SLOT IS THE LIFT (owner-caught, 11 Sep: 'it's thinking my volume
+       bench and technique bench are at my heavy bench weight'). gBase()
+       strips the ' — top set' / ' — back-off' / ' — technique' suffix, so
+       every bench slot collapsed into one pool and took the MAX of the
+       day — the heavy top set. Technique day was then told to go to
+       102.5 kg. Match the exact slot first; gBase is only the fallback
+       for a slot the logs have never seen under that name. */
+    const byExact={},byBase={},byRelax={};
     (S.history||[]).forEach(h=>{
       if(!h.complete||h.run)return;
       if(new Date(h.date).getTime()<cut)return;
-      const tops={};
+      const tops={},exact={};
       (h.log||[]).forEach(l=>{if(!(l.w>0&&l.r>0))return;
+        const nm=String(l.ex||'');if(l.w>(exact[nm]||0))exact[nm]=l.w;
         const b=gBase(l.ex);if(l.w>(tops[b]||0))tops[b]=l.w});
+      Object.keys(exact).forEach(nm=>{
+        (byExact[nm]=byExact[nm]||[]).push({t:new Date(h.date).getTime(),w:exact[nm]})});
       Object.keys(tops).forEach(b=>{
         (byBase[b]=byBase[b]||[]).push({t:new Date(h.date).getTime(),w:tops[b]});
         const r=relax(b);if(r)(byRelax[r]=byRelax[r]||[]).push({t:new Date(h.date).getTime(),w:tops[b]})})});
+    /* how many program slots share one base lift */
+    const slotCount={};
+    p.days.forEach(d=>(d.exercises||[]).forEach(ex=>{
+      const b=gBase(ex.name);slotCount[b]=(slotCount[b]||0)+1}));
     const out=[];const seen={};
     p.days.forEach(d=>(d.exercises||[]).forEach(ex=>{
       if(seen[ex.name])return;seen[ex.name]=1;
       const l=setsForWeek(ex,(typeof weekFor==='function'?weekFor(p.id):S.week)||1);
       const st=(l||[]).find(x=>x&&x.w!=null);if(!st)return;
       const eff=Math.round((st.w+adjOf(p,ex.name))*4)/4;
-      let pool=byBase[gBase(ex.name)]||[];
-      if(pool.length<2){const r=relax(ex.name);if(r&&byRelax[r])pool=byRelax[r]}
+      let pool=byExact[ex.name]||[];
+      /* The gBase fallback exists for ALIASES — the same lift written two
+         ways in an imported sheet. It must not fire when the program has
+         SEVERAL SLOTS of one lift (top set / back-off / technique),
+         because the pooled number is the heavy day and proposing it for
+         technique is exactly wrong. If a slot has no history of its own
+         and it is not the only slot for that lift, say nothing. */
+      if(pool.length<3&&slotCount[gBase(ex.name)]<=1){
+        pool=byBase[gBase(ex.name)]||pool;
+        if(pool.length<3){const r=relax(ex.name);
+          if(r&&byRelax[r]&&byRelax[r].length>pool.length)pool=byRelax[r]}}
       const rows=pool.slice().sort((a,b)=>a.t-b.t).slice(-3).map(x=>x.w).sort((a,b)=>a-b);
-      if(rows.length<2)return;
-      const med=rows[Math.floor(rows.length/2)];
+      /* three sessions, not two: with two rows the 'median' was
+         rows[1] — the HIGHER of the pair — so one good day proposed a
+         permanent raise (audit) */
+      if(rows.length<3)return;
+      const med=rows[1];
       const to=Math.round(med*4)/4;
       if(Math.abs(to-eff)>=2.5)out.push({ex:ex.name,from:eff,to:to})}));
     return out}catch(e){return []}}
@@ -20628,7 +20654,7 @@ function sheetHtml(){
       '<p style="color:var(--dim);font-size:13px;line-height:1.6">Each number comes from your own last few sessions (the median top working weight). Applied as visible adjustments \u2014 the ledger shows them, and one tap reverses them.</p>'+
       '<div class="card mt" style="padding:13px 15px">'+
       cu.map(x=>'<div style="display:flex;justify-content:space-between;gap:10px;padding:5px 0">'+
-        '<span style="flex:1;min-width:0;font-size:12.5px;color:var(--dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(String(x.ex).replace(/ \u2014 .*/,''))+'</span>'+
+        '<span style="flex:1;min-width:0;font-size:12.5px;color:var(--dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(String(x.ex))+'</span>'+
         '<span class="mono" style="font-size:12.5px;flex:none"><span style="color:var(--faint)">'+uwNum(x.from)+'</span> \u2192 <b>'+uwNum(x.to)+' '+uwUnit()+'</b></span></div>').join('')+'</div>'+
       '<button data-a="catchApply" class="big disp mt2" style="background:var(--amber);color:var(--bg);font-size:15px">Catch it up \u2014 '+cu.length+' lift'+(cu.length===1?'':'s')+'</button>')}
   if(S.sheet.t==='avatar'){
