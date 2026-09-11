@@ -792,7 +792,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='513ba7';  // stamped by tools/build.py with the content hash
+const BUILD_ID='e3f80e';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -18589,13 +18589,14 @@ function viewSession(){
        when I finish'). Every completed session gets the confetti burst
        and a congratulations, once per render, with the reveal haptic. */
     if(!s._celebrated){s._celebrated=1;try{hapticRun('finish')}catch(e){}}
-    /* A GOAL HIT TAKES THE SCREEN (owner ask, 11 Sep). The completion
-       screen is the one place the mid-session law allows full motion,
-       and it is the moment closest to the set that did it. The same
-       ceremony waits on Today if they leave before seeing it. */
-    try{const gc9=goalCerDue();
-      if(gc9){try{hapticRun('finish')}catch(e8){}
-        return '<div class="view pad">'+goalCerHtml(gc9)+'</div>'}}catch(e9){oops('goalCerSess',e9)}
+    /* THE REVEAL COMES FIRST (daily review, 12 Sep, reversing the 11 Sep
+       'a goal hit takes the screen'). Returning the ceremony here replaced
+       the whole completion screen, so a session that hit a goal AND banked
+       a rare find showed only the goal — the find was banked but never
+       seen, and the session's own PRs and headline went with it. The set
+       that did it already flashes GOAL HIT at the moment. The full
+       ceremony waits and lands on Today, which it already knew how to do.
+       It also means one finish haptic instead of two. */
     const CONGRATS=['Nailed it.','That\u2019s the work.','Banked.','Another one down.','Strong finish.','In the log, in the body.','Done and dusted.'];
     /* earned beats generic: if the session itself gives us a true, specific
        headline, say that instead of the rotation (owner call, 3 Sep —
@@ -19308,7 +19309,7 @@ function crossPatterns(){
      regression line says about it (owner-caught, 11 Sep: 'telling me
      I stalled when I PR'd on preacher' \u2014 mid-session, star on the
      row) */
-  const recentPR={};S.history.forEach(h=>{try{if(Date.now()-new Date(h.date).getTime()>14*864e5)return;
+  const recentPR={};S.history.slice(-40).forEach(h=>{try{if(Date.now()-new Date(h.date).getTime()>14*864e5)return;
     h.log.forEach(l=>{if(l.pr&&l.w&&l.r)recentPR[gBase(l.ex)]=1})}catch(e9){}});
   const stalled=lifts.filter(b=>{if(recentPR[b])return false;const v=liftVelocity(b);return v!=null&&Math.abs(v)<0.3});
   const moving=lifts.filter(b=>{const v=liftVelocity(b);return v!=null&&v>0.5});
