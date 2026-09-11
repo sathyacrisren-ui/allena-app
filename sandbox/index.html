@@ -760,7 +760,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='5d1d23';  // stamped by tools/build.py with the content hash
+const BUILD_ID='e8d26a';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -10786,6 +10786,58 @@ function fuelWins(){
           winPill('STEPS '+cur.toLocaleString()+' \u00b7 PAST YOUR NORMAL')}}}
     if(dirty)lset('training-fuelwins-v1',st)
   }catch(e){}}
+
+/* ══ WHERE TO PUT THE PHONE, AND WHERE TO PUT YOURSELF ═══════
+   Owner ask, 11 Sep: "what position do you want the person to be? We
+   need a step by step human diagram of the position of where the phone
+   needs to be and where the user needs to be."
+
+   The old sheet had one paragraph of prose. Nobody reads prose while
+   propping a phone against a water bottle. This is a drawn side-on
+   scene — the phone, the distance, the floor, and a person lying with
+   the knee bent — plus three numbered steps.
+
+   The position is the one Vision can actually read and the one
+   clinicians use for knee flexion: lying on your back, measured from
+   the side, with hip, knee and ankle all visible. Seated works too and
+   is named, because a knee eight weeks post-op does not always want the
+   floor. */
+function romSetupSvg(){
+  const G='var(--green)',L='var(--line)',F='var(--faint)',T='var(--text)';
+  return '<svg viewBox="0 0 320 132" width="100%" style="display:block;margin-top:10px" aria-hidden="true">'+
+    /* the floor */
+    '<line x1="8" y1="112" x2="312" y2="112" stroke="'+L+'" stroke-width="1.5"/>'+
+    /* the phone, propped, lens level with the knee */
+    '<g>'+
+      '<rect x="18" y="64" width="26" height="46" rx="5" fill="none" stroke="'+G+'" stroke-width="2.5"/>'+
+      '<circle cx="31" cy="74" r="2.6" fill="'+G+'"/>'+
+      '<path d="M44 78 L44 104" stroke="'+G+'" stroke-width="1" opacity=".5"/>'+
+      '<text x="31" y="126" font-size="8" fill="'+G+'" text-anchor="middle" font-family="ui-monospace,monospace">PHONE</text>'+
+    '</g>'+
+    /* the sight line + distance */
+    '<path d="M48 88 L150 88" stroke="'+F+'" stroke-width="1" stroke-dasharray="3 3"/>'+
+    '<text x="99" y="82" font-size="8" fill="'+F+'" text-anchor="middle" font-family="ui-monospace,monospace">about 2 m</text>'+
+    /* the person, lying on their back, knee bent, seen from the side */
+    '<g stroke="'+T+'" stroke-width="2.5" fill="none" stroke-linecap="round">'+
+      '<circle cx="292" cy="99" r="8" fill="'+T+'" stroke="none"/>'+      /* head */
+      '<path d="M284 105 L232 105"/>'+                                    /* torso */
+      '<path d="M232 105 L196 78" stroke="'+G+'"/>'+                      /* femur */
+      '<path d="M196 78 L168 106" stroke="'+G+'"/>'+                      /* tibia */
+      '<circle cx="232" cy="105" r="3.5" fill="'+G+'" stroke="none"/>'+   /* hip */
+      '<circle cx="196" cy="78" r="4.5" fill="'+G+'" stroke="none"/>'+    /* knee */
+      '<circle cx="168" cy="106" r="3.5" fill="'+G+'" stroke="none"/>'+   /* ankle */
+    '</g>'+
+    '<text x="196" y="66" font-size="8" fill="'+G+'" text-anchor="middle" font-family="ui-monospace,monospace">KNEE</text>'+
+    '</svg>'}
+function romSetupSteps(){
+  const S9=[
+    ['Prop the phone side on','About two metres away, leaning against something, camera roughly level with your knee. Your whole leg has to fit in frame — hip, knee and ankle.'],
+    ['Lie on your back','Or sit on the edge of a bed if the floor is not comfortable yet. Side on to the phone, so it sees the length of your leg and not the front of you.'],
+    ['Start it, then get into position','It waits until it can see a leg, counts you down, then watches you bend to your deepest comfortable point and straighten fully. You never touch the phone.']];
+  return S9.map((s,i)=>'<div style="display:flex;gap:11px;margin-top:12px">'+
+    '<span class="mono" style="width:20px;height:20px;border-radius:20px;flex:none;display:inline-flex;align-items:center;justify-content:center;font-size:10.5px;font-weight:700;background:var(--raised);color:var(--green);border:1px solid var(--line)">'+(i+1)+'</span>'+
+    '<span style="flex:1;min-width:0"><span style="display:block;font-size:13px;font-weight:600">'+esc(s[0])+'</span>'+
+    '<span style="display:block;color:var(--faint);font-size:11.5px;line-height:1.5;margin-top:2px">'+esc(s[1])+'</span></span></div>').join('')}
 const RARITY=[['common','#8A8782','Noticed'],['uncommon','var(--green)','Worth knowing'],
   ['rare','#D9D6CD','Rare find'],['epic','#FFFFFF','Big one']];
 function rarityOf(k){return RARITY.find(x=>x[0]===k)||RARITY[0]}
@@ -20827,8 +20879,11 @@ function sheetHtml(){
   if(S.sheet.t==='rom'){
     const L9=(typeof romStore==='function'?romStore().list:[]).slice(-8).reverse();
     return wrapSheet('The knee protractor',
-      '<p style="color:var(--dim);font-size:13px;line-height:1.65;margin-top:6px">Prop the phone so your whole body is in frame \u2014 side-on works best. Bend and straighten slowly. Capture at the deepest bend and again at full straight. Both knees read at once, in degrees.</p>'+
-      '<button data-a="romStart" class="big disp mt2" style="background:var(--amber);color:var(--bg);font-size:15px">Start the camera</button>'+
+      /* a drawn scene beats a paragraph — nobody reads prose while
+         propping a phone against a water bottle (owner ask, 11 Sep) */
+      (typeof romSetupSvg==='function'?romSetupSvg():'')+
+      (typeof romSetupSteps==='function'?romSetupSteps():'')+
+      '<button data-a="romStart" class="big disp mt2" style="background:var(--amber);color:var(--bg);font-size:15px">Start measurement</button>'+
       (L9.length?'<p class="eyebrow" style="margin-top:16px">Measured so far</p>'+
         L9.map(e9=>{const s9=romSummary(e9);
           return '<div style="display:flex;align-items:baseline;gap:10px;margin-top:9px">'+
