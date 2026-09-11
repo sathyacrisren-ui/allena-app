@@ -776,7 +776,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='aa1de6';  // stamped by tools/build.py with the content hash
+const BUILD_ID='32956f';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -10155,6 +10155,18 @@ window.watchAct=function(a,ts){
     const ph0=s.phase;let norm='';
     if(s.phase==='resting'&&S.restEnd&&S.restEnd-Date.now()<=1500){
       audioCancel();S.restEnd=null;const n8=sessAdv(s);if(n8>=0)s.idx=n8;s.phase='ready';persistActive();norm=' (rest normalized)'}
+    /* a wrist 'Start set' during a rest the phone still believes in is
+       the wrist saying the rest is OVER — its clock started at the real
+       tap, the phone's may have been armed late from a queued logset
+       (owner-caught, 11 Sep: Start set flipped straight back). The
+       wrist is the clock; the phone skips the rest and begins. */
+    if(a==='begin'&&s.phase==='resting'){
+      /* only a tap made AFTER the last set finished counts — a queued
+         duplicate of an older begin carries an older stamp and must
+         not kill a real rest (pinned since build 12) */
+      const lastT=Math.max(0,...(s.log||[]).map(l9=>+l9.t||0));
+      if(+ts>lastT&&+ts<=Date.now()+5000){
+        audioCancel();S.restEnd=null;const n5=sessAdv(s);if(n5>=0){s.idx=n5;s.phase='ready';persistActive();norm=' (wrist ended the rest)'}}}
     if(a==='begin'&&s.phase==='ready'){wristMark(a,ph0+'\u2192working'+norm);runAction('begin','');
       if(+ts>0&&+ts<=Date.now()){S.setStart=+ts;
         /* a timed hold armed late by a sleeping phone must not run
@@ -10197,9 +10209,18 @@ window.watchLog=function(r,w,rpe,finTs,begTs){
     if(+rpe>=1&&+rpe<=10)S.draft.rpe=Math.round(+rpe*2)/2;
     const fin=S._watchFin;
     runAction('commit','');
+    /* the row's wall-clock stamp is the wrist's finish, not the moment a
+       sleeping phone got round to it — later wrist taps are judged
+       against it */
+    try{const row=s.log[s.log.length-1];if(fin&&row&&(!row.t||row.t>fin))row.t=fin}catch(e9){oops('watchLog.stamp',e9)}
     if(fin&&S.restEnd&&S.restEnd>Date.now()){
       S.restEnd-=(Date.now()-fin);
-      if(S.restEnd<Date.now()+1000)S.restEnd=Date.now()+1000;
+      /* the rest already ran out on the wrist's clock: go straight to
+         ready. The old 1-second floor made the phone rest, then push
+         'ready' a beat later — over the top of the Start set the wrist
+         had already taken (owner-caught, 11 Sep). */
+      if(S.restEnd<=Date.now()+300){try{wristMark('logset','rest already over on the wrist')}catch(e9){oops('watchLog.mark',e9)}
+        A.skipRest();S._watchFin=null;return}
       /* the lock-screen countdown was armed at commit with the
          un-backdated end — retarget it to the corrected clock so
          island, notification and watch all agree (owner-caught,
@@ -10258,6 +10279,7 @@ function watchStatePush(){
         st.dW=+cur.targetW||0;st.dRpe=8}}
     const j=JSON.stringify(st);
     if(S._watchJ===j)return;S._watchJ=j;
+    st.t=Date.now();   /* after the compare: the wrist ignores a push older than its last tap */
     webkit.messageHandlers.allena.postMessage(JSON.stringify({type:'watch',state:st}))}catch(e){}}
 function reviewMoment(){
   /* Apple's own guidance: request at a moment of demonstrated
