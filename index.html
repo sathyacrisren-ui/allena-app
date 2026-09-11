@@ -760,7 +760,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='6b2b84';  // stamped by tools/build.py with the content hash
+const BUILD_ID='523bda';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -6994,6 +6994,28 @@ function physioReport(){
         '%, crossover '+Math.round(x.cross)+'%, 6 m timed '+Math.round(x.timed)+'%')}
     const rs=T.filter(t=>t.kind==='rsi');
     if(rs.length)L.push('  ACL-RSI '+Math.round(rs[rs.length-1].score)+'/100 — '+fmtDate(rs[rs.length-1].date+'T12:00'));}
+  /* THE CAMERA MEASUREMENTS GO TO THE PHYSIO TOO (owner spec, 11 Sep:
+     "it stores in Allena's measurements with the date and time, visible
+     in the physio report also"). Date AND time, because two scans in one
+     day are a different thing from one, and the honesty line travels with
+     the numbers so they are never mistaken for goniometer readings. */
+  try{
+    const rl=(typeof romStore==='function'?romStore().list:[]).slice(-3).reverse();
+    const sl=(typeof squatStore==='function'?squatStore().list:[]).slice(-3).reverse();
+    if(rl.length||sl.length){
+      L.push('');L.push('PHONE CAMERA MEASUREMENTS (estimates, not goniometry)');
+      rl.forEach(e9=>{const m=romSummary(e9)||{};
+        L.push('  Knee ROM '+fmtDate(e9.d+'T12:00')+' '+new Date(e9.t||Date.now()).toTimeString().slice(0,5)+
+          ' — flexion L '+(m.l!=null?m.l+'\u00b0':'—')+' R '+(m.r!=null?m.r+'\u00b0':'—')+
+          ', extension L '+(m.el!=null?m.el+'\u00b0':'—')+' R '+(m.er!=null?m.er+'\u00b0':'—')+
+          (m.sym!=null?' ('+m.sym+'% even)':''))});
+      sl.forEach(e9=>{const m=squatSummary(e9)||{};
+        if(!m||!m.kept)return;
+        L.push('  Squat symmetry '+fmtDate(e9.d+'T12:00')+' '+new Date(e9.t||Date.now()).toTimeString().slice(0,5)+
+          ' — '+m.kept+' squats'+(m.kept===m.total?'':' of '+m.total+' kept')+', '+m.depth+'\u00b0 mean depth, '+
+          (m.even?'hips centred':'hips '+m.pct+'% toward the '+m.toward)+
+          (m.away===true?' (away from the reconstructed side)':m.away===false?' (onto the reconstructed side)':''))});
+    }}catch(e){oops('reportCam',e)}
   if(a.on){
     const g=aclGateState(a.phase);
     L.push('');L.push('PHASE '+a.phase+' CRITERIA');
@@ -10964,28 +10986,48 @@ const K_SQUAT='training-squat-v1';
 function squatStore(){const v=lget(K_SQUAT,null);return (v&&typeof v==='object')?v:{list:[]}}
 window.squatResult=function(res){
   try{
-    const reps=+(res&&res.reps)||0;
-    if(!reps){flash('No squats counted — step back so your hips, knees and ankles are in frame.');return}
+    /* EVERY REP COMES BACK, not an average (owner spec, 11 Sep: "it tells
+       you the amount of squats and the imbalance per squat — you can
+       delete some measurements if it miscalculated, then it takes the
+       average"). A body-pose reading can be wrong for one rep: someone
+       steps out of frame, a hand crosses a hip, the far leg occludes.
+       Averaging that in silently would be the app lying with a straight
+       face, so the reps are shown one by one and any of them can be
+       thrown out before the average is taken. */
+    const rows=((res&&res.reps)||[]).filter(r=>r&&isFinite(+r.shift));
+    if(!rows.length){flash('No squats counted — step back so your hips, knees and ankles are in frame.');return}
     const st=squatStore();
-    st.list.push({d:today(),t:Date.now(),reps:reps,
-      shift:+(res.shift||0),depth:+(res.depth||0)});
+    st.list.push({d:today(),t:Date.now(),
+      reps:rows.map(r=>({shift:Math.round((+r.shift||0)*1000)/1000,
+                         depth:Math.round((+r.depth||0)*10)/10,out:0}))});
     st.list=st.list.slice(-60);lset(K_SQUAT,st);
-    const pct=Math.round(Math.abs(res.shift||0)*100);
-    flash(reps+' squat'+(reps===1?'':'s')+' · '+(pct<4?'hips centred':pct+'% toward your '+((res.shift>0)?'right':'left')),true);
+    flash(rows.length+' squat'+(rows.length===1?'':'s')+' recorded.',true);
     try{haptic('success')}catch(e9){}
-    S.sheet={t:'squat'};render()}
+    S.squatIdx=st.list.length-1;S.sheet={t:'squatrev'};render()}
   catch(e){oops('squatResult',e)}};
-/* the injured side is known from the ACL record, so the app can say the
-   thing that actually matters: whether the drift is AWAY from it */
+/* the average over the reps still counted — `out` marks one thrown out */
+function squatKept(e9){try{return (e9&&e9.reps||[]).filter(r=>!r.out)}catch(e){return []}}
 function squatSummary(e9){
   try{
     if(!e9)return null;
-    const pct=Math.round(Math.abs(e9.shift||0)*100);
-    const toward=(e9.shift>0)?'right':'left';
+    /* the total is taken BEFORE anything is derived. An earlier cut
+       reassigned the parameter and then read arguments[0] for the total —
+       in a non-strict function those two are the same slot, so the count
+       came back as a number's .length, which is undefined. Never read
+       arguments after touching a parameter; just hold the value. */
+    const total=(e9.reps||[]).length;
+    const kept=squatKept(e9);
+    if(!kept.length)return{reps:0,pct:0,toward:'',depth:0,even:true,away:null,kept:0,total:total};
+    const avg=a9=>a9.reduce((x,y)=>x+y,0)/a9.length;
+    const shift=avg(kept.map(r=>+r.shift||0));
+    const depthAvg=avg(kept.map(r=>+r.depth||0));
+    const pct=Math.round(Math.abs(shift)*100);
+    const toward=(shift>0)?'right':'left';
     let away=null;
     try{const inj=String((S.acl&&S.acl.side)||(S.prof&&S.prof.aclSide)||'').toLowerCase();
       if(inj==='left'||inj==='right')away=(toward!==inj);}catch(e){oops('squatSide',e)}
-    return{reps:e9.reps,pct:pct,toward:toward,depth:Math.round(e9.depth||0),even:pct<4,away:away}}
+    return{reps:kept.length,pct:pct,toward:toward,depth:Math.round(depthAvg),even:pct<4,away:away,
+      kept:kept.length,total:total}}
   catch(e){oops('squatSummary',e);return null}}
 const RARITY=[['common','#8A8782','Noticed'],['uncommon','var(--green)','Worth knowing'],
   ['rare','#D9D6CD','Rare find'],['epic','#FFFFFF','Big one']];
@@ -21079,6 +21121,38 @@ function sheetHtml(){
             '<span class="mono" style="color:var(--faint);font-size:12px;flex:none">\u203a</span></button>').join('')+
         '</div>'}).join('')+
       '<p style="color:var(--faint);font-size:11px;line-height:1.55;margin-top:16px">Cleared dates are the day Allena saw it met. Anything met before it was watching is counted but carries no date \u2014 it will not invent one.</p>')}
+  /* THE REVIEW (owner spec, 11 Sep): every squat listed with its own
+     imbalance, any of them removable, and the average taken from what is
+     left. A pose reading can be wrong for a single rep — someone steps
+     part-way out of frame, a hand crosses a hip — and averaging that in
+     silently would be the app stating a number it should not trust. */
+  if(S.sheet.t==='squatrev'){
+    const st=squatStore(),e9=st.list[S.squatIdx];
+    if(!e9)return wrapSheet('Your squats','<p style="color:var(--dim);font-size:13px;margin-top:6px">That scan is gone.</p>');
+    const s9=squatSummary(e9)||{};
+    const when=new Date(e9.t||Date.now());
+    return wrapSheet(e9.reps.length+' squat'+(e9.reps.length===1?'':'s'),
+      '<p class="mono" style="color:var(--faint);font-size:10.5px">'+esc(fmtDate(when.toISOString()))+' \u00b7 '+
+        esc(when.toTimeString().slice(0,5))+'</p>'+
+      (s9.kept?'<p class="disp" style="font-size:22px;font-weight:600;line-height:1.2;margin-top:10px">'+
+        (s9.even?'Hips centred':s9.pct+'% toward your '+s9.toward)+'</p>'+
+        '<p style="color:var(--dim);font-size:13px;line-height:1.6;margin-top:6px">Averaged over '+s9.kept+
+        (s9.kept===s9.total?' squat'+(s9.kept===1?'':'s'):' of '+s9.total)+
+        ', '+s9.depth+'\u00b0 deep'+
+        (s9.away===true?'. That is away from the reconstructed side.':s9.away===false?'. That is onto the reconstructed side.':'.')+'</p>'
+        :'<p style="color:var(--dim);font-size:13px;line-height:1.6;margin-top:10px">Every rep is set aside, so there is no average to take.</p>')+
+      '<p class="eyebrow mt2">Each squat</p>'+
+      '<p style="color:var(--faint);font-size:11.5px;line-height:1.55;margin-top:4px">Set aside any the camera misread — it can lose a hip if you drift out of frame. The average follows what is left.</p>'+
+      e9.reps.map((r,i)=>{const p9=Math.round(Math.abs(+r.shift||0)*100);
+        const tw=(+r.shift>0)?'right':'left';
+        return '<div class="card" style="padding:11px 14px;margin-top:7px;display:flex;align-items:center;gap:11px'+(r.out?';opacity:.45':'')+'">'+
+        '<span class="mono" style="width:20px;flex:none;color:var(--faint);font-size:11px">'+(i+1)+'</span>'+
+        '<span style="flex:1;min-width:0;font-size:13px'+(r.out?';text-decoration:line-through':'')+'">'+
+          (p9<4?'centred':p9+'% '+tw)+' \u00b7 '+Math.round(+r.depth||0)+'\u00b0</span>'+
+        '<button data-a="squatRepTog" data-v="'+i+'" class="mono" style="flex:none;font-size:11px;color:'+(r.out?'var(--amber)':'var(--faint)')+'">'+
+          (r.out?'Put back':'Set aside')+'</button></div>'}).join('')+
+      '<button data-a="squatSaved" class="big disp mt2" style="background:var(--amber);color:var(--bg);font-size:15px">Save to my measurements</button>'+
+      '<button data-a="squatDel" data-v="'+S.squatIdx+'" class="btn mt" style="color:var(--red);font-size:12.5px">Throw the whole scan away</button>')}
   if(S.sheet.t==='squat'){
     const L9=squatStore().list.slice(-8).reverse();
     return wrapSheet('Squat symmetry',
@@ -21086,14 +21160,16 @@ function sheetHtml(){
       '<p style="color:var(--faint);font-size:11.5px;line-height:1.55;margin-top:8px">Weight-shifting away from the reconstructed leg is close to universal after surgery, and invisible without measuring. That is why phase 2 gates on it.</p>'+
       '<button data-a="squatStart" class="big disp mt2" style="background:var(--amber);color:var(--bg);font-size:15px">Start capturing</button>'+
       (L9.length?'<p class="eyebrow" style="margin-top:16px">Scanned so far</p>'+
-        L9.map(e9=>{const s9=squatSummary(e9)||{};
-          return '<div style="display:flex;align-items:baseline;gap:10px;margin-top:9px">'+
-          '<span class="mono" style="color:var(--faint);font-size:10px;flex:none">'+esc(String(e9.d).slice(5))+'</span>'+
+        L9.map(e9=>{const s9=squatSummary(e9)||{};const idx9=squatStore().list.indexOf(e9);
+          /* date AND time, and the row opens its own review */
+          return '<button data-a="squatRev" data-v="'+idx9+'" style="width:100%;text-align:left;display:flex;align-items:baseline;gap:10px;margin-top:9px">'+
+          '<span class="mono" style="color:var(--faint);font-size:10px;flex:none">'+esc(String(e9.d).slice(5))+
+            ' '+esc(new Date(e9.t||Date.now()).toTimeString().slice(0,5))+'</span>'+
           '<span style="flex:1;font-size:13px">'+s9.reps+' squats \u00b7 '+s9.depth+'\u00b0 deep \u00b7 '+
             (s9.even?'centred':s9.pct+'% toward '+s9.toward)+'</span>'+
           '<span class="mono" style="font-size:10.5px;flex:none;color:'+(s9.even?'var(--green)':'var(--amber)')+'">'+
             (s9.even?'even':(s9.away===true?'away from it':s9.away===false?'onto it':''))+'</span>'+
-          '</div>'}).join(''):'')+
+          '</button>'}).join(''):'')+
       '<p style="color:var(--faint);font-size:11px;line-height:1.55;margin-top:14px">A phone estimate, not a force plate \u2014 your physio\u2019s eye is the judge. It tracks the trend between visits, and nothing leaves the phone.</p>')}
   if(S.sheet.t==='rom'){
     const L9=(typeof romStore==='function'?romStore().list:[]).slice(-8).reverse();
@@ -24345,6 +24421,16 @@ function runAction(a,v,t,e){
       break}
     /* the same camera, told which job to do */
     case 'squatOpen':S.sheet={t:'squat'};render();break;
+    case 'squatRev':{S.squatIdx=+v;S.sheet={t:'squatrev'};render();break}
+    /* setting a rep aside is reversible — nothing is destroyed, it just
+       stops counting toward the average */
+    case 'squatRepTog':{const st=squatStore(),e9=st.list[S.squatIdx];
+      if(!e9||!e9.reps[+v])break;
+      e9.reps[+v].out=e9.reps[+v].out?0:1;lset(K_SQUAT,st);render();break}
+    case 'squatSaved':{S.sheet={t:'squat'};render();
+      flash('Saved to your measurements.');break}
+    case 'squatDel':{const st=squatStore();st.list.splice(+v,1);lset(K_SQUAT,st);
+      S.sheet={t:'squat'};render();flash('Scan removed.');break}
     case 'squatStart':{
       try{webkit.messageHandlers.allena.postMessage(JSON.stringify({type:'rom',mode:'squat'}))}
       catch(e){flash('The camera needs the Allena app.')}
