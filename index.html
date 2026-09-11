@@ -760,7 +760,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='c6eb01';  // stamped by tools/build.py with the content hash
+const BUILD_ID='a60132';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -7035,6 +7035,10 @@ function viewRun(){
   let h='<div class="view pad stg" style="padding-top:40px">'+
     '<div style="display:flex;justify-content:space-between;align-items:center;gap:12px">'+
     drawerBtn()+'<h1 class="disp" style="font-size:25px;font-weight:600;flex:1;min-width:0">Running</h1>'+headBtns()+'</div>';
+  /* RUNNING GOALS sit where the lifting goals sit — at the top of their
+     own room (owner ask, 11 Sep: "make running goals a pill in the
+     running tab, same thing") */
+  try{h+='<p class="eyebrow mt2">Goals</p>'+rgGoalsCard()}catch(e){oops('rgCard',e)}
   if(!R.length)return h+'<div class="card mt2" style="padding:18px">'+
     '<p style="color:var(--dim);font-size:13.5px;line-height:1.6">Nothing logged yet. Add a run by hand, or bring your history across from Strava, Garmin or wherever it lives.</p>'+
     '<button data-a="runLog" class="big disp mt2" style="background:var(--amber);color:var(--bg);font-size:15px">Log a run</button>'+
@@ -20766,6 +20770,38 @@ function sheetHtml(){
      this is the ledger behind it — what has fallen, on what day, and
      what is still standing, phase by phase. Each row opens the test
      itself, so it is a door and not a list. */
+  /* RUNNING GOALS (owner ask, 11 Sep: "make running goals a pill in the
+     running tab, same thing"). Three kinds, all measured from runs the
+     app already witnessed. Pace on its own is deliberately absent — a
+     raw min/km target is met by running 400 m fast, which is the exact
+     behaviour the run engine's quality gate exists to prevent. A time AT
+     a distance is the honest version of that wish. */
+  if(S.sheet.t==='rgoal'){
+    const f=S.rgForm||(S.rgForm={kind:'dist',km:'',mins:''});
+    const st=rgStore(),cur=(st.list||[]).find(g=>g.id===S.sheet.id);
+    const KP=[['dist','A distance'],['time','A time'],['week','A week']];
+    return wrapSheet(cur?'Your running goal':'A running goal',
+      cur?(function(){const p=rgProgress(cur)||{};
+        return '<p class="disp" style="font-size:19px;font-weight:600;line-height:1.25">'+esc(rgLabel(cur))+'</p>'+
+          '<p class="mono" style="color:var(--faint);font-size:11.5px;margin-top:6px">'+esc(p.label||'')+'</p>'+
+          '<div style="height:6px;border-radius:3px;background:var(--line);overflow:hidden;margin-top:10px">'+
+          '<div class="an-bar" style="height:6px;width:'+(p.pct||0)+'%;background:var(--chart)"></div></div>'+
+          '<p style="color:var(--faint);font-size:11.5px;line-height:1.55;margin-top:12px">Tracked from the runs Allena already sees. Nothing to tick off — it clears itself the moment a real run clears it.</p>'+
+          '<button data-a="rgDel" data-v="'+esc(cur.id)+'" class="btn mt2" style="color:var(--red);font-size:12.5px">Remove this goal</button>'})()
+      :'<p style="color:var(--dim);font-size:13px;line-height:1.6">Allena tracks it from the runs it already sees. There is nothing to tick off.</p>'+
+       '<div style="display:flex;gap:6px;margin-top:12px">'+
+       KP.map(k=>'<button data-a="rgKind" data-v="'+k[0]+'" class="mono" style="flex:1;padding:10px 0;border-radius:10px;font-size:11.5px;font-weight:600;'+
+         (f.kind===k[0]?'background:var(--amber);color:var(--bg);border:1px solid var(--amber)'
+            :'background:var(--surface);border:1px solid var(--line);color:var(--faint)')+'">'+k[1]+'</button>').join('')+'</div>'+
+       '<p style="color:var(--faint);font-size:11.5px;line-height:1.55;margin-top:10px">'+
+       (f.kind==='dist'?'One run, start to finish, of this distance. The plainest goal in running.'
+        :f.kind==='week'?'This many kilometres across one week, however you spread them.'
+        :'This distance, under this time. Read from your best effort at it — a shorter run can never stand in for it.')+'</p>'+
+       '<div style="display:grid;grid-template-columns:'+(f.kind==='time'?'1fr 1fr':'1fr')+';gap:10px;margin-top:12px">'+
+       '<input data-in="rgForm.km" value="'+esc(f.km||'')+'" inputmode="decimal" placeholder="Distance in '+udUnit()+'">'+
+       (f.kind==='time'?'<input data-in="rgForm.mins" value="'+esc(f.mins||'')+'" placeholder="Time, e.g. 25:00">':'')+
+       '</div>'+
+       '<button data-a="rgSave" class="big disp mt2" style="background:var(--amber);color:var(--bg);font-size:15px">Set the goal</button>')}
   if(S.sheet.t==='track'){
     const T9=(typeof aclTrack==='function')?aclTrack():null;
     if(!T9)return wrapSheet('The gates','<p style="color:var(--dim);font-size:13px;margin-top:6px">The pathway is not running yet.</p>');
@@ -24297,6 +24333,27 @@ function runAction(a,v,t,e){
       if(a==='goalCerDone'){S.sheet={t:'goal'};}
       render();break}
     case 'trackOpen':S.sheet={t:'track'};render();break;
+    case 'rgOpen':{S.rgForm={kind:'dist',km:'',mins:''};S.sheet={t:'rgoal',id:v||null};render();break}
+    case 'rgKind':{S.rgForm=S.rgForm||{};S.rgForm.kind=v;render();break}
+    case 'rgDel':{const st=rgStore();st.list=(st.list||[]).filter(g=>g.id!==v);rgSave(st);
+      S.sheet=null;render();flash('Goal removed.');break}
+    case 'rgSave':{
+      const f=S.rgForm||{};
+      const km=parseFloat(String(f.km||'').replace(/[^0-9.]/g,''));
+      if(!(km>0)){flash('Give it a distance.');break}
+      /* typed in the runner's OWN units, stored in km like every other
+         distance in the app — udIn is the same converter run logging uses */
+      const g={id:'rg'+Date.now(),kind:f.kind||'dist',km:udIn(km),created:Date.now(),done:null};
+      if(g.kind==='time'){
+        /* accept 25:00, 25.5 or 25 — a runner writes a time three ways */
+        const raw=String(f.mins||'').trim();
+        const mm=raw.match(/^(\d+)\s*:\s*(\d{1,2})$/);
+        const mins=mm?(+mm[1]+(+mm[2])/60):parseFloat(raw.replace(/[^0-9.]/g,''));
+        if(!(mins>0)){flash('Give it a time, like 25:00.');break}
+        g.mins=Math.round(mins*100)/100}
+      const st=rgStore();st.list=(st.list||[]).concat([g]);rgSave(st);
+      S.sheet=null;S.rgForm=null;render();
+      flash('Goal set — '+rgLabel(g)+'.');break}
     /* the climb's phase pills are doors now — straight into that phase
        of the pathway, not the page you were already on */
     case 'aclPhaseOpen':{S.aclView=Math.max(1,Math.min(5,+v||1));
