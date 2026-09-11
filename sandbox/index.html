@@ -117,30 +117,22 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
 .find-glow{box-shadow:0 0 20px 0 rgba(48,209,88,.18),0 0 4px 0 rgba(48,209,88,.28)}
 .find-dust{position:absolute;width:3px;height:3px;border-radius:3px;background:var(--green);opacity:0;pointer-events:none;z-index:6;animation:findDust 2.8s ease-out infinite}
 @media (prefers-reduced-motion:reduce){.find-dust{display:none}.find-glow{box-shadow:0 0 12px 0 rgba(48,209,88,.18)}}
-/* THE LEADER'S FLAME (owner ask, 11 Sep) — same language as the find
-   dust: small motes rising, looping, deterministic. Coloured by the
-   leader's OWN avatar colour via --fl, so the crown reads as theirs. */
-/* THE LEADER'S FIRE. It sits OVER the avatar (owner ask, 11 Sep: "they
-   should cover the user profile as well and be translucent enough to see
-   the profile") and taller than it, so the body wraps the mark and the
-   tongues lick past the crown. Every fill is translucent — the face,
-   initial and ring all read straight through. The group breathes slightly
-   out of step with the path morph: two rhythms read as fire, one reads as
-   a loop. pointer-events stay off so it never eats a tap. */
-@keyframes leadBreathe{0%,100%{transform:translateY(0) scaleY(1) scaleX(1)}
-  28%{transform:translateY(-1.5px) scaleY(1.07) scaleX(.95)}
-  62%{transform:translateY(.5px) scaleY(.95) scaleX(1.04)}}
-/* embers break off, drift and vanish */
-@keyframes leadEmber{0%{opacity:0;transform:translate(-50%,0) scale(var(--esz,.5))}
-  18%{opacity:.55}
-  100%{opacity:0;transform:translate(calc(-50% + var(--edx,0px)),-58px) scale(calc(var(--esz,.5) * .35))}}
-.lead-fire{position:absolute;left:50%;bottom:30%;transform:translateX(-50%);
-  pointer-events:none;z-index:2;filter:blur(.35px)}
-.lead-svg{display:block;mix-blend-mode:screen}
-.lead-flicker{transform-origin:50% 100%;animation:leadBreathe 1.9s ease-in-out infinite}
-.lead-ember{position:absolute;bottom:22%;line-height:0;opacity:0;pointer-events:none;
-  mix-blend-mode:screen;animation:leadEmber 2.4s ease-out infinite}
-@media (prefers-reduced-motion:reduce){.lead-flicker{animation:none}.lead-ember{display:none}}
+/* THE LEADER'S FIRE (owner ask 11 Sep, settled after three passes).
+   Final mechanic, in the owner's words: "more like the dot artefacts we
+   use elsewhere" — so this is find-dust with flame-shaped particles, not
+   a solid body. Small flames spawn at the circle's rim, rise, drift and
+   fade. They may leave the card; at 5-11px fading out they read as
+   sparks, which a solid shape crossing a border never did. Coloured by
+   the leader's OWN avatar colour via --fl, so the fire is theirs. */
+@keyframes leadFlame{0%{opacity:0;transform:translate(0,5px) scale(.75) rotate(var(--fr,0deg))}
+  18%{opacity:var(--fo,.7)}
+  65%{opacity:calc(var(--fo,.7) * .5)}
+  100%{opacity:0;transform:translate(var(--fdx,0px),var(--fup,-34px)) scale(.2) rotate(var(--fr,0deg))}}
+.lead-fire{position:absolute;left:50%;bottom:42%;transform:translateX(-50%);
+  pointer-events:none;z-index:2}
+.lead-flame{position:absolute;bottom:0;line-height:0;opacity:0;pointer-events:none;
+  transform-origin:50% 100%;animation:leadFlame 2.3s ease-out infinite}
+@media (prefers-reduced-motion:reduce){.lead-fire{display:none}}
 @keyframes anShimmer{0%{background-position:-220% 0}100%{background-position:220% 0}}
 @keyframes anBarGrow{from{transform:scaleX(0)}to{transform:scaleX(1)}}
 @keyframes anTick{0%{stroke-dashoffset:28}100%{stroke-dashoffset:0}}
@@ -740,7 +732,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='4584ff';  // stamped by tools/build.py with the content hash
+const BUILD_ID='fe7f06';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -864,70 +856,46 @@ function dustF(){
    colour so the fire reads as theirs, then it climbs through --gold to
    warm-white at the tip — a real fire gradient with no new colour and,
    deliberately, no red: red means stop and nothing else. */
-/* TWO peaks in the silhouette, both tapering to a real point — a round
-   teardrop reads as a blob, and the owner said so ("needs sharper
-   elements"). Every frame keeps the same eight cubic segments so the
-   path can morph between them. */
-const FLAME_BODY=[
-  'M32 106C12 106 3 93 3 78C3 63 16 56 22 42C26 32 25 20 19 8C24 14 30 18 34 24C36 14 34 6 30 0C44 12 52 30 48 46C52 54 61 62 61 78C61 93 52 106 32 106Z',
-  'M32 106C13 106 5 92 5 77C5 63 17 57 24 44C28 34 27 22 22 11C26 16 31 20 35 26C37 16 36 8 32 2C45 14 51 31 47 47C51 55 59 62 59 77C59 92 51 106 32 106Z',
-  'M32 106C11 106 2 94 2 79C2 63 15 55 21 40C25 30 24 18 17 5C23 12 29 17 33 23C35 12 33 4 28 -2C43 10 53 29 49 45C53 54 62 63 62 79C62 94 53 106 32 106Z',
-  'M32 106C12 106 4 93 4 78C4 63 16 56 23 43C27 33 26 21 20 9C25 15 30 19 34 25C36 15 35 7 31 1C44 13 52 30 48 46C52 55 60 62 60 78C60 93 52 106 32 106Z'];
-const FLAME_TONGUE=[
-  'M32 97C22 97 16 89 16 79C16 69 26 62 29 50C31 42 30 33 27 26C38 35 42 47 41 58C44 66 48 71 48 79C48 89 42 97 32 97Z',
-  'M32 97C23 97 17 88 17 78C17 69 27 63 31 52C33 44 32 35 30 28C40 36 42 48 41 59C44 66 47 71 47 78C47 88 41 97 32 97Z',
-  'M32 97C21 97 15 90 15 80C15 69 25 61 28 48C30 40 29 31 25 24C37 34 43 46 42 57C45 66 49 72 49 80C49 90 43 97 32 97Z',
-  'M32 97C22 97 16 89 16 79C16 69 26 62 30 51C32 43 31 34 28 27C39 35 42 47 41 58C44 66 48 71 48 79C48 89 42 97 32 97Z'];
-/* a detached lick, the way real fire throws one off the main body */
-const FLAME_LICK=[
-  'M47 60C43 56 42 49 44 43C46 37 50 33 49 26C56 32 58 42 57 50C56 55 52 58 47 60Z',
-  'M48 56C44 53 42 46 44 40C46 35 51 31 50 24C57 31 59 40 58 48C57 53 53 55 48 56Z',
-  'M46 63C42 59 41 51 43 45C45 39 49 35 48 27C55 34 58 44 57 52C56 58 51 61 46 63Z',
-  'M47 58C43 55 42 48 44 42C46 37 51 33 50 25C57 32 59 41 58 49C57 55 52 57 47 58Z'];
-/* the small flames that break off and vanish — same pointed shape as the
-   body so an ember reads as fire, not as a dot */
-const FLAME_EMBER='M7 19C3 19 0 15 0 11C0 6 5 4 6 0C9 4 14 6 14 11C14 15 11 19 7 19Z';
+/* THE LEADER'S FIRE — settled 11 Sep after three passes with the owner.
+   First cut was rising dots ("doesn't look like a flame at all"), second
+   was a solid morphing body ("can't be hitting the element above it, can't
+   exit the pill, border looks wrong"), and the owner named the answer:
+   "it can exit, it just needs to be more like the mechanics of the dot
+   artefacts that we use elsewhere."
+
+   So it is find-dust with flame-shaped particles. Small flames spawn at
+   the rim of the leader's avatar, rise, drift apart and fade out. Nothing
+   is solid, so nothing can sit on the card's text or break its border —
+   a particle that drifts past the edge is already fading, and reads as a
+   spark. Every particle is the leader's OWN avatar colour.
+
+   Deterministic: the same leader gets the same fire on every render, so
+   it never re-scrambles under a re-render mid-week. */
+const FLAME_P='M7 19C3 19 0 15.2 0 11.2C0 6.4 5.2 4.2 6.1 0C9.2 4 14 6.2 14 11.2C14 15.2 11 19 7 19Z';
 function flameF(av,size){
   try{
     const col=(typeof avRing==='function')?avRing(av,'var(--green)'):'var(--green)';
-    /* anchored a third of the way UP the avatar, not at its foot — the fire
-       emerges out of the circle (owner ask) instead of standing behind it */
-    const s=Math.max(28,Number(size)||54),w=Math.round(s*0.98),h=Math.round(s*1.55);
-    const id='fl'+Math.random().toString(36).slice(2,8);
-    let still=false;
-    try{still=!!(window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches)}catch(e2){}
-    const morph=(frames,dur)=>still?'':
-      '<animate attributeName="d" dur="'+dur+'s" repeatCount="indefinite" calcMode="spline" '+
-      'keySplines="'+frames.map(()=>'.42 0 .58 1').join(';')+'" '+
-      'values="'+frames.concat(frames[0]).join(';')+'"/>';
-    /* four embers break off on their own clocks, deterministic placement */
-    let emb='';
-    for(let i=0;i<4;i++){
-      const f=[0.3,0.7,0.16,0.84][i];
-      emb+='<i class="lead-ember" style="left:'+(f*100).toFixed(0)+'%;'+
-        '--esz:'+(0.42+(i%2)*0.22).toFixed(2)+';--edx:'+((f-0.5)*26).toFixed(0)+'px;'+
-        'animation-duration:'+(2.1+i*0.45).toFixed(2)+'s;'+
-        'animation-delay:'+(i*0.74).toFixed(2)+'s">'+
-        '<svg viewBox="0 0 14 19" width="14" height="19"><path d="'+FLAME_EMBER+'" fill="var(--gold)"/></svg></i>'}
-    return '<div class="lead-fire" style="width:'+w+'px;height:'+h+'px" aria-hidden="true">'+
-      '<svg class="lead-svg" viewBox="0 0 64 110" width="100%" height="100%" preserveAspectRatio="xMidYMax meet">'+
-      /* the base carries the leader's colour, but it sits BEHIND the avatar
-         and is never the part you read — everything visible above the mark
-         is gold climbing to warm white, so it reads as fire, not as a blob.
-         Everything is translucent on purpose (owner: "they need to be see
-         through") — the podium reads through it. */
-      '<defs><linearGradient id="'+id+'" x1="0" y1="1" x2="0" y2="0">'+
-        '<stop offset="0" stop-color="'+col+'" stop-opacity="0"/>'+
-        '<stop offset=".2" stop-color="'+col+'" stop-opacity="0"/>'+
-        '<stop offset=".4" stop-color="var(--gold)" stop-opacity=".5"/>'+
-        '<stop offset=".78" stop-color="var(--gold)" stop-opacity=".6"/>'+
-        '<stop offset="1" stop-color="var(--amber)" stop-opacity=".55"/>'+
-      '</linearGradient></defs>'+
-      '<g class="lead-flicker">'+
-        '<path d="'+FLAME_LICK[0]+'" fill="var(--gold)" opacity=".34">'+morph(FLAME_LICK,1.42)+'</path>'+
-        '<path d="'+FLAME_BODY[0]+'" fill="url(#'+id+')">'+morph(FLAME_BODY,1.15)+'</path>'+
-        '<path d="'+FLAME_TONGUE[0]+'" fill="var(--amber)" opacity=".28">'+morph(FLAME_TONGUE,0.83)+'</path>'+
-      '</g></svg>'+emb+'</div>'}
+    const s=Math.max(28,Number(size)||54);
+    /* the field is the width of the mark — particles start on its rim */
+    const w=Math.round(s*0.96),h=Math.round(s*0.3);
+    const N=9;
+    let m='';
+    for(let i=0;i<N;i++){
+      /* spread across the mark, biggest and highest in the middle, the way
+         a fire's centre burns tallest */
+      const f=(i+0.5)/N,edge=Math.abs(f-0.5)*2;
+      const px=Math.round(7+(1-edge)*7);          // 7px at the edges, 14 in the middle
+      m+='<i class="lead-flame" style="left:'+(f*100).toFixed(0)+'%;'+
+        '--fo:'+(0.5+(1-edge)*0.45).toFixed(2)+';'+
+        '--fup:-'+Math.round(s*(0.55+(1-edge)*0.4))+'px;'+
+        '--fdx:'+((f-0.5)*s*0.4).toFixed(0)+'px;'+
+        '--fr:'+((f-0.5)*30).toFixed(0)+'deg;'+
+        'margin-left:-'+(px/2).toFixed(0)+'px;'+
+        'animation-duration:'+(1.8+edge*0.85).toFixed(2)+'s;'+
+        'animation-delay:'+(i*0.23).toFixed(2)+'s">'+
+        '<svg viewBox="0 0 14 19" width="'+px+'" height="'+Math.round(px*1.36)+'">'+
+        '<path d="'+FLAME_P+'" fill="'+col+'"/></svg></i>'}
+    return '<div class="lead-fire" style="width:'+w+'px;height:'+h+'px" aria-hidden="true">'+m+'</div>'}
   catch(e){oops('flameF',e);return ''}}
 function iBtn(k){return '<button data-a="iTog" data-v="'+esc(k)+'" aria-label="More info" style="width:17px;height:17px;border-radius:17px;border:1px solid var(--line);background:none;color:var(--faint);font-size:10px;font-style:italic;font-family:Georgia,serif;line-height:1;display:inline-flex;align-items:center;justify-content:center;vertical-align:-2px;margin-left:7px;padding:0;flex:none">i</button>'}
 function iOn(k){return !!S.openSec['i:'+k]}
@@ -6497,7 +6465,11 @@ function rehabHero(){
     h+='<div style="display:flex;align-items:center;gap:9px;margin-top:11px;padding-top:11px;border-top:1px solid var(--line)">'+
       '<span class="mono" style="font-size:9px;color:'+(sess>=targ?'var(--green)':'var(--faint)')+';letter-spacing:.06em;flex:none">THE WORK</span>'+
       '<span style="flex:1;color:var(--dim);font-size:12px">'+sess+' of '+targ+' rehab sessions this week</span>'+
-      (found?'<button data-a="nav" data-v="acl" class="mono" style="color:var(--amber);font-size:10px;flex:none">'+found+' GATES ›</button>':'')+'</div>';
+      /* DEAD BUTTON (owner-caught, 11 Sep: "8 gates doesn't work") — it
+         ran nav to 'acl', and the renderer maps 'acl' to viewRehabHub, so
+         the tap redrew the page you were already on. It lands on the gates
+         themselves now, the same door the climb card already used. */
+      (found?'<button data-a="collOpen" data-v="bodyrehab" class="mono" style="color:var(--amber);font-size:10px;flex:none">'+found+' GATES ›</button>':'')+'</div>';
     return h+'</div>'}catch(e){return ''}}
 function openDoorsCard(){
   try{
@@ -6596,6 +6568,164 @@ function climbCard(){
       '<p class="mono" style="color:var(--faint);font-size:9px;letter-spacing:.04em">CHECK-IN DAYS RUNNING</p></div></div>';
     return h+'</div>'}catch(e){return ''}}
 
+
+/* ══ THE TRAJECTORY ═════════════════════════════════════════
+   Owner design, 11 Sep, in their own words: "a time graph, x
+   axis on each phase of acl rehab — where they're at and the
+   end is the gate, showing nearer goals than the long distance
+   'phase 3 cleared'. Split into more phases? See where they
+   started?"
+
+   Three neutral advisors, asked to test that idea, agreed
+   independently that this is the product: the thing an ACL
+   patient would pay for is knowing whether they are on track
+   between appointments. One of them put it plainly — twenty
+   minutes a fortnight with a physio, thirteen days guessing,
+   and the guessing is the worst part.
+
+   THE ONE RULE THAT GOVERNS THIS WHOLE SURFACE: it shows where
+   you have BEEN, never where you will be. No projected gate
+   dates, no predicted return, no "at this rate you clear phase
+   3 by October". Two of the three advisors said a slipping
+   predicted date on a knee is the single thing that could do
+   real harm, and the owner already killed forecasts app-wide on
+   the same instinct (THE FORECAST IS DEAD, 8 Sep). The axis is
+   time because time is what has passed.
+
+   The nearer goals were already there and never surfaced: five
+   phases carry about twenty-seven individual criteria between
+   them, so something moves every week or two. The graph counts
+   those, not the phases.
+   ══════════════════════════════════════════════════════════ */
+function aclTrack(){
+  try{
+    if(!(S.acl&&S.acl.on))return null;
+    const start=(typeof rehabStartKey==='function')?rehabStartKey():null;
+    if(!start)return null;
+    const bank=(typeof discBank==='function')?discBank():{};
+    const gates=[],phases=[];
+    let run=0;
+    for(let ph=1;ph<=ACL_PHASES.length;ph++){
+      const st=aclGateState(ph)||[];
+      if(!st.length)continue;
+      st.forEach(g=>{
+        const b=bank['aclgate:'+ph+':'+g.key];
+        gates.push({ph:ph,key:g.key,label:g.label,how:g.how,why:g.why,
+          met:!!g.met,detail:g.detail||'',
+          /* the date it was CLEARED, from the moment the app banked it —
+             never back-filled, never guessed */
+          on:(g.met&&b&&b.found)?String(b.found).slice(0,10):null})});
+      run+=st.length;
+      phases.push({n:ph,name:(ACL_PHASES[ph-1]||{}).name||('Phase '+ph),
+        weeks:(ACL_PHASES[ph-1]||{}).weeks||'',at:run,of:st.length})}
+    const total=gates.length;
+    if(!total)return null;
+    const cleared=gates.filter(g=>g.met).length;
+    /* THE CURVE. Clears the app actually witnessed carry their own day.
+       Anything met before Allena was watching (a tick carried in at
+       setup, a test predating the install) sits at the origin rather
+       than inventing a day — the line must never claim a date it did
+       not see. */
+    const dated=gates.filter(g=>g.met&&g.on).map(g=>g.on)
+      .map(d=>d<start?start:d).sort();
+    const undated=Math.max(0,cleared-dated.length);
+    const pts=[{d:start,y:0}];
+    let y=0;
+    if(undated){y=undated;pts.push({d:start,y:y})}
+    dated.forEach(d=>{y++;pts.push({d:d,y:y})});
+    const tk=(typeof today==='function')?today():new Date().toISOString().slice(0,10);
+    if(pts[pts.length-1].d!==tk)pts.push({d:tk,y:cleared});
+    const next=gates.find(g=>!g.met)||null;
+    const lastMove=dated.length?dated[dated.length-1]:null;
+    const daysFlat=lastMove
+      ?Math.floor((new Date(tk+'T12:00')-new Date(lastMove+'T12:00'))/864e5)
+      :Math.floor((new Date(tk+'T12:00')-new Date(start+'T12:00'))/864e5);
+    const weeks=Math.max(0,Math.floor((new Date(tk+'T12:00')-new Date(start+'T12:00'))/6048e5));
+    return{start:start,today:tk,gates:gates,phases:phases,total:total,cleared:cleared,
+      pts:pts,next:next,lastMove:lastMove,daysFlat:daysFlat,weeks:weeks,
+      dated:dated.length,undated:undated}}
+  catch(e){oops('aclTrack',e);return null}}
+/* where they started, in their own numbers — the origin point the owner
+   asked for. Only things Allena genuinely recorded near day one. */
+function aclOrigin(T){
+  try{
+    if(!T)return null;
+    const out=[];
+    const near=d=>d&&d<=dayKey(new Date(new Date(T.start+'T12:00').getTime()+10*864e5));
+    const c0=((S.acl&&S.acl.checks)||[]).slice().sort((a,b)=>String(a.date).localeCompare(String(b.date)))[0];
+    if(c0&&near(c0.date)){
+      if(c0.pain!=null)out.push('pain '+c0.pain+'/10');
+      if(c0.conf!=null)out.push('trust in it '+c0.conf+'/10')}
+    const q0=((S.acl&&S.acl.tests)||[]).filter(t=>t.kind==='quad')
+      .slice().sort((a,b)=>String(a.date).localeCompare(String(b.date)))[0];
+    if(q0&&q0.lsi!=null)out.push('quad '+Math.round(q0.lsi)+'%');
+    return out.length?out.join(' · '):null}
+  catch(e){oops('aclOrigin',e);return null}}
+function aclTrackCard(){
+  try{
+    const T=aclTrack();if(!T)return '';
+    const W=320,H=132,PL=4,PR=54,PT=10,PB=18;
+    const t0=new Date(T.start+'T12:00').getTime();
+    const t1=new Date(T.today+'T12:00').getTime();
+    const span=Math.max(7*864e5,t1-t0);
+    const X=d=>PL+((new Date(d+'T12:00').getTime()-t0)/span)*(W-PL-PR);
+    const Y=v=>PT+(1-(v/T.total))*(H-PT-PB);
+    /* the line is a STAIRCASE, because that is what clearing a gate is:
+       nothing moves for days, then one thing does. A smoothed curve would
+       imply continuous progress the knee did not make. */
+    let d='';
+    T.pts.forEach((p,i)=>{
+      if(!i){d='M'+X(p.d).toFixed(1)+' '+Y(p.y).toFixed(1);return}
+      d+=' L'+X(p.d).toFixed(1)+' '+Y(T.pts[i-1].y).toFixed(1)+
+         ' L'+X(p.d).toFixed(1)+' '+Y(p.y).toFixed(1)});
+    const lastX=X(T.today),lastY=Y(T.cleared);
+    /* phase bands on the Y axis: the long-distance markers stay visible,
+       but they are no longer the only thing that moves */
+    let bands='';
+    T.phases.forEach(ph=>{
+      const yy=Y(ph.at);
+      const done=T.cleared>=ph.at;
+      bands+='<line x1="'+PL+'" y1="'+yy.toFixed(1)+'" x2="'+(W-PR)+'" y2="'+yy.toFixed(1)+
+        '" stroke="'+(done?'var(--green)':'var(--line)')+'" stroke-width="1"'+(done?'':' stroke-dasharray="2 3"')+' opacity="'+(done?'.5':'.7')+'"/>'+
+        '<text x="'+(W-PR+11)+'" y="'+(yy+3.2).toFixed(1)+'" font-size="7.5" fill="'+(done?'var(--green)':'var(--faint)')+
+        '" font-family="ui-monospace,monospace">P'+ph.n+(done?' ✓':'')+'</text>'})
+    /* the origin dot — "see where they started" */
+    const ox=X(T.start),oy=Y(T.pts[0].y);
+    const org=aclOrigin(T);
+    const nx=T.next;
+    /* flat weeks are NORMAL and the graph says so before the reader
+       decides otherwise — the advisor who played the patient said a bad
+       fortnight is exactly when this page either helps or hurts */
+    const flatLine=T.daysFlat>=14
+      ?'Nothing has ticked over for '+Math.floor(T.daysFlat/7)+' weeks. Rehab moves in steps with long flats between them — that is the normal shape of it, not a stall.'
+      :T.daysFlat>=7?'A quiet week. Gates come in steps, not daily.':null;
+    return '<div class="card mt" style="padding:16px;border-radius:18px">'+
+      '<div style="display:flex;justify-content:space-between;align-items:baseline">'+
+      '<p class="eyebrow" style="margin:0">Where you are</p>'+
+      '<span class="mono" style="color:var(--faint);font-size:10px">'+T.weeks+' WEEK'+(T.weeks===1?'':'S')+' IN</span></div>'+
+      '<p class="disp" style="font-size:25px;font-weight:600;line-height:1.15;margin-top:8px">'+
+        T.cleared+' of '+T.total+' <span style="color:var(--faint);font-size:15px;font-weight:500">gates cleared</span></p>'+
+      '<svg viewBox="0 0 '+W+' '+H+'" width="100%" style="display:block;margin-top:10px;overflow:visible" aria-hidden="true">'+
+      bands+
+      '<path d="'+d+'" fill="none" stroke="var(--green)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>'+
+      '<circle cx="'+ox.toFixed(1)+'" cy="'+oy.toFixed(1)+'" r="3" fill="none" stroke="var(--faint)" stroke-width="1.5"/>'+
+      '<circle cx="'+lastX.toFixed(1)+'" cy="'+lastY.toFixed(1)+'" r="4" fill="var(--green)"/>'+
+      '<circle cx="'+lastX.toFixed(1)+'" cy="'+lastY.toFixed(1)+'" r="7.5" fill="none" stroke="var(--green)" stroke-width="1" opacity=".35"/>'+
+      '<text x="'+PL+'" y="'+(H-4)+'" font-size="7.5" fill="var(--faint)" font-family="ui-monospace,monospace">'+esc(fmtDate(T.start+'T12:00'))+'</text>'+
+      '<text x="'+(W-PR)+'" y="'+(H-4)+'" font-size="7.5" fill="var(--faint)" text-anchor="end" font-family="ui-monospace,monospace">today</text>'+
+      '</svg>'+
+      (org?'<p style="color:var(--faint);font-size:10.5px;line-height:1.5;margin-top:2px">Started '+esc(fmtDate(T.start+'T12:00'))+' at '+esc(org)+'.</p>':'')+
+      (nx?'<div style="margin-top:12px;padding-top:11px;border-top:1px solid var(--line)">'+
+        '<p class="mono" style="font-size:9px;color:var(--amber);letter-spacing:.06em">THE NEXT ONE</p>'+
+        '<p style="font-size:13.5px;font-weight:600;line-height:1.35;margin-top:5px">'+esc(nx.label)+'</p>'+
+        (nx.detail?'<p class="mono" style="color:var(--faint);font-size:10.5px;margin-top:3px">'+esc(nx.detail)+'</p>':'')+
+        '<button data-a="aclGateGo" data-v="'+esc(nx.ph+':'+nx.key)+'" class="mono" style="color:var(--amber);font-size:11px;margin-top:7px">How to clear it ›</button>'+
+        '</div>'
+        :'<p class="mono" style="color:var(--green);font-size:11.5px;margin-top:12px">Every gate on the pathway is cleared.</p>')+
+      (flatLine?'<p style="color:var(--faint);font-size:11px;line-height:1.55;margin-top:10px">'+flatLine+'</p>':'')+
+      '<p style="color:var(--faint);font-size:10.5px;line-height:1.5;margin-top:9px">This is where you have been, not a prediction. Allena does not put a date on a knee — your physio makes that call.</p>'+
+      '</div>'}
+  catch(e){oops('aclTrackCard',e);return ''}}
 function rehabDocsBtn(){
   const unseen=rehabIssues().filter(x=>!x.seen).length;
   return '<button data-a="rehabDocs" aria-label="Rehab documents" style="width:44px;height:44px;border-radius:13px;background:var(--surface);border:1px solid var(--line);color:var(--dim);display:flex;align-items:center;justify-content:center;position:relative;flex:none">'+
@@ -6618,6 +6748,10 @@ function viewRehabHub(){
    drawerBtn()+'<h1 class="disp" style="font-size:25px;font-weight:600;flex:1;min-width:0">Rehab</h1>'+rehabDocsBtn()+headBtns()+'</div>';
   h+=apptBanner();
   h+=rehabHero();
+  /* THE TRAJECTORY LEADS THE PAGE (owner design, 11 Sep). The question
+     this page exists to answer is "am I on track?" — everything else is
+     the work that answers it. It sits above The work for that reason. */
+  try{h+=(typeof aclTrackCard==='function'?aclTrackCard():'')}catch(e){oops('trackCard',e)}
   const cards=[];
   /* the medical hierarchy, automatic (owner call, 2 Sep): a real
      physio's prescription outranks the built-in pathway the moment it
