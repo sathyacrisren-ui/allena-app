@@ -117,22 +117,35 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
 .find-glow{box-shadow:0 0 20px 0 rgba(48,209,88,.18),0 0 4px 0 rgba(48,209,88,.28)}
 .find-dust{position:absolute;width:3px;height:3px;border-radius:3px;background:var(--green);opacity:0;pointer-events:none;z-index:6;animation:findDust 2.8s ease-out infinite}
 @media (prefers-reduced-motion:reduce){.find-dust{display:none}.find-glow{box-shadow:0 0 12px 0 rgba(48,209,88,.18)}}
-/* THE LEADER'S FIRE (owner ask 11 Sep, settled after three passes).
-   Final mechanic, in the owner's words: "more like the dot artefacts we
-   use elsewhere" — so this is find-dust with flame-shaped particles, not
-   a solid body. Small flames spawn at the circle's rim, rise, drift and
-   fade. They may leave the card; at 5-11px fading out they read as
-   sparks, which a solid shape crossing a border never did. Coloured by
-   the leader's OWN avatar colour via --fl, so the fire is theirs. */
-@keyframes leadFlame{0%{opacity:0;transform:translate(0,5px) scale(.75) rotate(var(--fr,0deg))}
-  18%{opacity:var(--fo,.7)}
-  65%{opacity:calc(var(--fo,.7) * .5)}
-  100%{opacity:0;transform:translate(var(--fdx,0px),var(--fup,-34px)) scale(.2) rotate(var(--fr,0deg))}}
-.lead-fire{position:absolute;left:50%;bottom:42%;transform:translateX(-50%);
-  pointer-events:none;z-index:2}
-.lead-flame{position:absolute;bottom:0;line-height:0;opacity:0;pointer-events:none;
-  transform-origin:50% 100%;animation:leadFlame 2.3s ease-out infinite}
-@media (prefers-reduced-motion:reduce){.lead-fire{display:none}}
+/* THE LEADER'S FIRE — a ring of licks standing on every point of the
+   mark's rim (owner ask, 11 Sep: "every point around the circle should be
+   where the fire emerges"), each rotated to point outward and breathing on
+   its own clock, plus the round dust motes a fresh find already throws.
+   It sits OVER the mark and every fill is translucent, so the face reads
+   straight through. pointer-events stay off so it never eats a tap. */
+@keyframes leadLick{0%,100%{transform:scaleY(.66) scaleX(1.08)}
+  38%{transform:scaleY(1.08) scaleX(.9)}
+  68%{transform:scaleY(.84) scaleX(1.02)}}
+@keyframes leadEmber{0%{opacity:0;transform:translate(-50%,0) scale(var(--esz,.5))}
+  18%{opacity:.5}
+  100%{opacity:0;transform:translate(calc(-50% + var(--edx,0px)),-30px) scale(calc(var(--esz,.5) * .35))}}
+.lead-fire{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+  pointer-events:none;z-index:2;filter:blur(.4px)}
+.lead-base{position:absolute;left:0;top:0;pointer-events:none;mix-blend-mode:screen;
+  animation:leadBase 2.1s ease-in-out infinite}
+@keyframes leadBase{0%,100%{opacity:.85}45%{opacity:1}}
+.lead-lick{position:absolute;transform-origin:50% 100%;pointer-events:none}
+.lead-lick>b{position:absolute;top:0;left:0;width:100%;display:block;
+  transform-origin:50% 100%;mix-blend-mode:screen;
+  animation:leadLick 1.5s ease-in-out infinite}
+.lead-lick svg{display:block;width:100%;height:100%}
+.lead-ember{position:absolute;bottom:62%;line-height:0;opacity:0;pointer-events:none;
+  mix-blend-mode:screen;animation:leadEmber 2.4s ease-out infinite}
+/* the round dust mote — the same artefact a fresh find throws off, so the
+   leader's fire speaks the app's existing language (owner ask, 11 Sep) */
+.lead-mote{position:absolute;bottom:55%;border-radius:50%;opacity:0;pointer-events:none;
+  mix-blend-mode:screen;animation:leadEmber 2.6s ease-out infinite}
+@media (prefers-reduced-motion:reduce){.lead-lick>b{animation:none}.lead-ember,.lead-mote{display:none}}
 @keyframes anShimmer{0%{background-position:-220% 0}100%{background-position:220% 0}}
 @keyframes anBarGrow{from{transform:scaleX(0)}to{transform:scaleX(1)}}
 @keyframes anTick{0%{stroke-dashoffset:28}100%{stroke-dashoffset:0}}
@@ -732,7 +745,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='fe7f06';  // stamped by tools/build.py with the content hash
+const BUILD_ID='5179b0';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -856,46 +869,90 @@ function dustF(){
    colour so the fire reads as theirs, then it climbs through --gold to
    warm-white at the tip — a real fire gradient with no new colour and,
    deliberately, no red: red means stop and nothing else. */
-/* THE LEADER'S FIRE — settled 11 Sep after three passes with the owner.
-   First cut was rising dots ("doesn't look like a flame at all"), second
-   was a solid morphing body ("can't be hitting the element above it, can't
-   exit the pill, border looks wrong"), and the owner named the answer:
-   "it can exit, it just needs to be more like the mechanics of the dot
-   artefacts that we use elsewhere."
+/* ══ THE LEADER'S FIRE ══════════════════════════════════════
+   Settled 11 Sep after six passes with the owner. The route there is
+   worth keeping, because each turn ruled something out:
+     · rising dots        — "doesn't look like a flame at all"
+     · one solid body     — "can't be hitting the element above it,
+                            can't exit the pill, border looks wrong"
+     · flame particles    — "I like the previous flame, just smaller"
+     · smaller body       — "it isn't enveloping the whole profile"
+     · enveloping body    — "every point around the circle should be
+                            where the fire emerges"
+   So it is a RING: a lick of flame standing on every point of the mark's
+   rim, each one pointing outward from the centre, each breathing on its
+   own clock. The licks are taller toward the top, because fire rises.
+   Combined with the round dust motes the app already throws off a fresh
+   find (owner ask: "the dot artefacts emerging as well, combined with
+   the flame"), so the leader's fire speaks the app's own language.
 
-   So it is find-dust with flame-shaped particles. Small flames spawn at
-   the rim of the leader's avatar, rise, drift apart and fade out. Nothing
-   is solid, so nothing can sit on the card's text or break its border —
-   a particle that drifts past the edge is already fading, and reads as a
-   spark. Every particle is the leader's OWN avatar colour.
+   Every fill is the leader's OWN avatar colour — "congruent with the
+   colour of the profile". No gold, which read as a second identity, and
+   no red, which means stop and nothing else. Everything is translucent,
+   so the face, the initial and the ring read straight through. It is
+   pointer-events:none throughout, so it never eats a tap.
 
-   Deterministic: the same leader gets the same fire on every render, so
-   it never re-scrambles under a re-render mid-week. */
-const FLAME_P='M7 19C3 19 0 15.2 0 11.2C0 6.4 5.2 4.2 6.1 0C9.2 4 14 6.2 14 11.2C14 15.2 11 19 7 19Z';
+   Deterministic: the same leader gets the same fire on every render. */
+const FLAME_LICK_D='M10 44C4 44 1 39 1 33C1 25 8 20 9 10C9.5 6 9 3 7.5 0C13 5 18 14 17 25C18.5 29 19 31 19 33C19 39 16 44 10 44Z';
+const FLAME_EMBER='M7 19C3 19 0 15 0 11C0 6 5 4 6 0C9 4 14 6 14 11C14 15 11 19 7 19Z';
 function flameF(av,size){
   try{
     const col=(typeof avRing==='function')?avRing(av,'var(--green)'):'var(--green)';
     const s=Math.max(28,Number(size)||54);
-    /* the field is the width of the mark — particles start on its rim */
-    const w=Math.round(s*0.96),h=Math.round(s*0.3);
-    const N=9;
-    let m='';
+    const R=s*0.47;                      // the rim the licks stand on
+    /* THE CROWN SHAPE (owner reference image, 11 Sep): fire wraps the rim
+       from about eight o'clock round the top to four o'clock and leaves
+       the foot of the circle bare — flame climbs, it does not pool under
+       things. Tallest at the crown, tapering down both sides, and every
+       lick leans toward the top so it curls the way fire is drawn. */
+    /* few, wide and uneven — seventeen even spikes read as grass, not
+       fire. These overlap, alternate tall and short, and lean hard toward
+       the crown so they curl the way flame is drawn. */
+    const SPREAD=252,N=15;
+    const VAR=[1,0.56,1.12,0.64,1.22,0.72,1.26,0.8,1.2,0.6,1.14,0.66,1.08,0.54,1];
+    /* THE SHARED BASE. Separate licks read as leaves however well they are
+       drawn — in the owner's reference the flames all rise out of one
+       continuous band hugging the rim. This arc is that band: the licks
+       overlap it, and the whole thing becomes one mass of fire. It stops
+       at about eight and four o'clock, leaving the foot of the mark bare. */
+    const a0=-SPREAD/2*Math.PI/180,a1=SPREAD/2*Math.PI/180,cx=s/2;
+    const arc='<svg class="lead-base" viewBox="0 0 '+s+' '+s+'" width="'+s+'" height="'+s+'">'+
+      '<path d="M'+(cx+R*Math.sin(a0)).toFixed(1)+' '+(cx-R*Math.cos(a0)).toFixed(1)+
+      ' A'+R.toFixed(1)+' '+R.toFixed(1)+' 0 1 1 '+(cx+R*Math.sin(a1)).toFixed(1)+' '+(cx-R*Math.cos(a1)).toFixed(1)+'"'+
+      ' fill="none" stroke="'+col+'" stroke-width="'+(s*0.15).toFixed(1)+'" stroke-linecap="round" opacity=".4"/></svg>';
+    let lk=arc;
     for(let i=0;i<N;i++){
-      /* spread across the mark, biggest and highest in the middle, the way
-         a fire's centre burns tallest */
-      const f=(i+0.5)/N,edge=Math.abs(f-0.5)*2;
-      const px=Math.round(7+(1-edge)*7);          // 7px at the edges, 14 in the middle
-      m+='<i class="lead-flame" style="left:'+(f*100).toFixed(0)+'%;'+
-        '--fo:'+(0.5+(1-edge)*0.45).toFixed(2)+';'+
-        '--fup:-'+Math.round(s*(0.55+(1-edge)*0.4))+'px;'+
-        '--fdx:'+((f-0.5)*s*0.4).toFixed(0)+'px;'+
-        '--fr:'+((f-0.5)*30).toFixed(0)+'deg;'+
-        'margin-left:-'+(px/2).toFixed(0)+'px;'+
-        'animation-duration:'+(1.8+edge*0.85).toFixed(2)+'s;'+
-        'animation-delay:'+(i*0.23).toFixed(2)+'s">'+
-        '<svg viewBox="0 0 14 19" width="'+px+'" height="'+Math.round(px*1.36)+'">'+
-        '<path d="'+FLAME_P+'" fill="'+col+'"/></svg></i>'}
-    return '<div class="lead-fire" style="width:'+w+'px;height:'+h+'px" aria-hidden="true">'+m+'</div>'}
+      const ang=-SPREAD/2+(i/(N-1))*SPREAD;        // -126 .. 126, 0 = straight up
+      const up=Math.cos(ang*Math.PI/180);
+      const k=Math.max(0,Math.min(1,(up+0.6)/1.6));     // 0 at the lowest lick, 1 at the crown
+      const L=s*(0.11+0.52*Math.pow(k,1.25))*VAR[i];
+      const W=s*(0.24+0.16*k);
+      const H=R+L;
+      const lean=-ang*0.3+((i%2)?7:-7);             // curl toward the crown, with a wobble
+      lk+='<i class="lead-lick" style="left:'+(s/2-W/2).toFixed(1)+'px;top:'+(s/2-H).toFixed(1)+'px;'+
+        'width:'+W.toFixed(1)+'px;height:'+H.toFixed(1)+'px;transform:rotate('+(ang+lean).toFixed(1)+'deg)">'+
+        '<b style="height:'+L.toFixed(1)+'px;animation-duration:'+(1.25+(i%4)*0.32).toFixed(2)+'s;'+
+        'animation-delay:'+((i%5)*0.21).toFixed(2)+'s;opacity:'+(0.3+k*0.4).toFixed(2)+'">'+
+        '<svg viewBox="0 0 20 44" preserveAspectRatio="none"><path d="'+FLAME_LICK_D+'" fill="'+col+'"/></svg>'+
+        '</b></i>'}
+    /* the breakaways: small flame embers off the crown, and the round
+       dust motes a fresh find already uses — same artefact, one language */
+    let emb='';
+    for(let i=0;i<3;i++){
+      const f=[0.34,0.68,0.2][i];
+      emb+='<i class="lead-ember" style="left:'+(f*100).toFixed(0)+'%;'+
+        '--esz:'+(0.38+(i%2)*0.2).toFixed(2)+';--edx:'+((f-0.5)*20).toFixed(0)+'px;'+
+        'animation-duration:'+(2.1+i*0.45).toFixed(2)+'s;'+
+        'animation-delay:'+(i*0.74).toFixed(2)+'s">'+
+        '<svg viewBox="0 0 14 19" width="9" height="12"><path d="'+FLAME_EMBER+'" fill="'+col+'"/></svg></i>'}
+    for(let i=0;i<7;i++){
+      const f=-0.1+i*0.2,px=(i%3===0?3.2:i%3===1?2.2:2.8);
+      emb+='<i class="lead-mote" style="left:'+(f*100).toFixed(0)+'%;'+
+        'width:'+px+'px;height:'+px+'px;background:'+col+';'+
+        '--esz:1;--edx:'+((f-0.5)*24).toFixed(0)+'px;'+
+        'animation-duration:'+(2.4+(i%3)*0.5).toFixed(2)+'s;'+
+        'animation-delay:'+(0.3+i*0.4).toFixed(2)+'s"></i>'}
+    return '<div class="lead-fire" style="width:'+s+'px;height:'+s+'px" aria-hidden="true">'+lk+emb+'</div>'}
   catch(e){oops('flameF',e);return ''}}
 function iBtn(k){return '<button data-a="iTog" data-v="'+esc(k)+'" aria-label="More info" style="width:17px;height:17px;border-radius:17px;border:1px solid var(--line);background:none;color:var(--faint);font-size:10px;font-style:italic;font-family:Georgia,serif;line-height:1;display:inline-flex;align-items:center;justify-content:center;vertical-align:-2px;margin-left:7px;padding:0;flex:none">i</button>'}
 function iOn(k){return !!S.openSec['i:'+k]}
