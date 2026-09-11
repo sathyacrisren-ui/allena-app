@@ -117,6 +117,16 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
 .find-glow{box-shadow:0 0 20px 0 rgba(48,209,88,.18),0 0 4px 0 rgba(48,209,88,.28)}
 .find-dust{position:absolute;width:3px;height:3px;border-radius:3px;background:var(--green);opacity:0;pointer-events:none;z-index:6;animation:findDust 2.8s ease-out infinite}
 @media (prefers-reduced-motion:reduce){.find-dust{display:none}.find-glow{box-shadow:0 0 12px 0 rgba(48,209,88,.18)}}
+/* THE LEADER'S FLAME (owner ask, 11 Sep) — same language as the find
+   dust: small motes rising, looping, deterministic. Coloured by the
+   leader's OWN avatar colour via --fl, so the crown reads as theirs. */
+@keyframes leadFlame{0%{opacity:0;transform:translateY(2px) scale(.7)}
+  25%{opacity:.9}
+  100%{opacity:0;transform:translateY(-17px) scale(.25)}}
+.lead-flame{position:absolute;width:5px;height:7px;border-radius:60% 60% 45% 45%;
+  background:var(--fl,var(--green));filter:blur(.4px);opacity:0;pointer-events:none;z-index:4;
+  animation:leadFlame 2.2s ease-out infinite}
+@media (prefers-reduced-motion:reduce){.lead-flame{display:none}}
 @keyframes anShimmer{0%{background-position:-220% 0}100%{background-position:220% 0}}
 @keyframes anBarGrow{from{transform:scaleX(0)}to{transform:scaleX(1)}}
 @keyframes anTick{0%{stroke-dashoffset:28}100%{stroke-dashoffset:0}}
@@ -716,7 +726,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='822c30';  // stamped by tools/build.py with the content hash
+const BUILD_ID='9b4c62';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -830,6 +840,15 @@ function dustF(){
   /* six green motes rising off a fresh find — deterministic placement,
      looping; the glow itself stays perfectly still */
   return Array.from({length:arguments[0]||6},(_,i)=>'<i class="find-dust" style="left:'+(7+(i*16.4)%86).toFixed(0)+'%;'+(i%2?'top:-3px':'bottom:-3px')+';animation-delay:'+(i*0.46).toFixed(2)+'s"></i>').join('')}
+function flameF(av){
+  /* five motes rising off the week's leader, in THEIR avatar colour
+     (owner ask, 11 Sep) — the same visual language as the find dust,
+     so "this one is alight" reads the same everywhere */
+  try{
+    const col=(typeof avRing==='function')?avRing(av,'var(--green)'):'var(--green)';
+    return Array.from({length:5},(_,i)=>
+      '<i class="lead-flame" style="--fl:'+col+';left:'+(18+i*16)+'%;bottom:-4px;animation-delay:'+(i*0.42).toFixed(2)+'s"></i>').join('')}
+  catch(e){oops('flameF',e);return ''}}
 function iBtn(k){return '<button data-a="iTog" data-v="'+esc(k)+'" aria-label="More info" style="width:17px;height:17px;border-radius:17px;border:1px solid var(--line);background:none;color:var(--faint);font-size:10px;font-style:italic;font-family:Georgia,serif;line-height:1;display:inline-flex;align-items:center;justify-content:center;vertical-align:-2px;margin-left:7px;padding:0;flex:none">i</button>'}
 function iOn(k){return !!S.openSec['i:'+k]}
 function iBody(k,txt){return iOn(k)?'<p class="irev" style="color:var(--dim);font-size:11.5px;line-height:1.6;margin-top:7px">'+txt+'</p>':''}
@@ -17387,14 +17406,19 @@ function viewToday(){
         const stepH9={1:32,2:19,3:13};
         const col9=x=>{const first=x.rank===1;const size=first?54:40;
           return '<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:5px;min-width:0">'+
-            '<div style="position:relative;width:'+size+'px;height:'+size+'px;border-radius:'+size+'px;background:var(--raised);border:2.5px solid '+((typeof avRing==='function')?avRing(x.av,(first?'var(--green)':'var(--line)')):(first?'var(--green)':'var(--line)'))+';display:flex;align-items:center;justify-content:center;font-size:'+(first?21:15)+'px;font-weight:700'+(first?';box-shadow:0 0 14px 0 color-mix(in srgb, var(--green) 40%, transparent)':'')+'">'+(crowned(x)?CROWN:'')+((typeof avInner==='function')?avInner(x.av,x.init,first?'var(--green)':'var(--text)'):esc(x.init))+'</div>'+
+            '<div style="position:relative;width:'+size+'px;height:'+size+'px;border-radius:'+size+'px;background:var(--raised);border:2.5px solid '+((typeof avRing==='function')?avRing(x.av,(first?'var(--green)':'var(--line)')):(first?'var(--green)':'var(--line)'))+';display:flex;align-items:center;justify-content:center;font-size:'+(first?21:15)+'px;font-weight:700'+(first?';box-shadow:0 0 14px 0 color-mix(in srgb, var(--green) 40%, transparent)':'')+'">'+(crowned(x)?CROWN:'')+(first?flameF(x.av):'')+((typeof avInner==='function')?avInner(x.av,x.init,first?'var(--green)':'var(--text)'):esc(x.init))+'</div>'+
             '<span style="font-size:11px;font-weight:600;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(x.id==='me'?'You':x.name)+'</span>'+
             '<span class="mono" data-cu="tdy-'+esc(String(x.id))+'" style="font-size:'+(first?14:11.5)+'px;font-weight:700;color:'+(first&&x.week>0?'var(--green)':'var(--text)')+'">'+x.week+'</span>'+
             '<div style="width:100%;height:'+stepH9[x.rank]+'px;border-radius:8px 8px 4px 4px;background:'+(first?'var(--green)':'var(--raised)')+';border:1px solid '+(first?'var(--green)':'var(--line)')+';display:flex;align-items:center;justify-content:center;overflow:hidden">'+
             '<span class="mono" style="font-size:9.5px;line-height:1;font-weight:800;color:'+(first?'var(--bg)':'var(--faint)')+'">'+x.rank+'</span></div></div>'};
         const pod9=R9.slice(0,3);
         const ord9=[pod9[1],pod9[0],pod9[2]].filter(Boolean);
-        h+='<button data-a="nav" data-v="social" class="card mt" style="width:100%;text-align:center;padding:15px 16px;display:block">'+
+        /* A DIV, NOT A BUTTON (owner-caught, 11 Sep: "can't click on the
+           top pill"). The podium nests avatar markup inside, and HTML
+           silently splits nested interactive elements — the outer button
+           broke and the whole card stopped responding. Same fix dayCard
+           already carries. */
+        h+='<div data-a="nav" data-v="social" class="card mt" style="width:100%;text-align:center;padding:15px 16px;display:block;cursor:pointer">'+
           '<p class="mono" style="font-size:9px;letter-spacing:.12em;color:var(--faint)">THE WEEK\u2019S RACE \u00b7 '+(Ls.length+1)+' RACING \u00b7 RESETS MONDAY</p>'+
           '<div style="display:flex;align-items:flex-end;gap:8px;margin-top:12px;padding:0 2px">'+ord9.map(col9).join('')+'</div>'+
           ((crown==='me'&&S._reign>=2)?'<p class="mono" style="font-size:8.5px;letter-spacing:.1em;color:var(--gold);margin-top:8px">CROWN HELD '+S._reign+' WEEKS</p>':'')+
@@ -17403,7 +17427,7 @@ function viewToday(){
               '<span style="flex:1;min-width:0;text-align:left;font-size:12px;color:var(--dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+x.rank+' \u00b7 '+esc(x.id==='me'?'You':x.name)+'</span>'+
               '<span class="mono" data-cu="tdy-'+esc(String(x.id))+'" style="font-size:12.5px;font-weight:600;color:var(--dim)">'+x.week+'</span></div>').join('')+'</div>':'')+
           '<p style="color:var(--dim);font-size:11.5px;margin-top:10px">'+endLine+'</p>'+
-          '</button>'}
+          '</div>'}
       else{
       const tot=Math.max(1,mine+top.week);
       h+='<button data-a="nav" data-v="social" class="card mt" style="width:100%;text-align:center;padding:15px 16px;display:block">'+
