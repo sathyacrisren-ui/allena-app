@@ -776,7 +776,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='841c35';  // stamped by tools/build.py with the content hash
+const BUILD_ID='eb7018';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -19205,7 +19205,11 @@ function markPatternsSeen(){
   lset(K_PSEEN,S.patSeen)}
 function patternsCached(){
   try{
-    const stamp=(S.history.length?S.history[S.history.length-1].id:'0')+':'+S.history.length+':'+
+    /* the live session is upserted under one id as sets land \u2014 the
+       set count must be in the stamp or the patterns stay frozen at
+       the first set (owner-caught, 11 Sep) */
+    const lastH=S.history.length?S.history[S.history.length-1]:null;
+    const stamp=(lastH?lastH.id+':'+((lastH.log||[]).length):'0')+':'+S.history.length+':'+
       ((S.scans||[]).length)+':'+Object.keys(S.gar.days||{}).length+':'+Object.keys((S.daily||{}).days||{}).length;
     if(S.patCache&&S.patCache.k===stamp)return S.patCache.v;
     const v=crossPatterns();
@@ -19216,7 +19220,13 @@ function crossPatterns(){
   const out=[];
   const lifts=[];S.history.slice(-30).forEach(h=>h.log.forEach(l=>{const b=gBase(l.ex);
     if(l.w&&l.r&&lifts.indexOf(b)<0)lifts.push(b)}));
-  const stalled=lifts.filter(b=>{const v=liftVelocity(b);return v!=null&&Math.abs(v)<0.3});
+  /* a lift that just set a best is not stalled, whatever a six-week
+     regression line says about it (owner-caught, 11 Sep: 'telling me
+     I stalled when I PR'd on preacher' \u2014 mid-session, star on the
+     row) */
+  const recentPR={};S.history.forEach(h=>{try{if(Date.now()-new Date(h.date).getTime()>14*864e5)return;
+    h.log.forEach(l=>{if(l.pr&&l.w&&l.r)recentPR[gBase(l.ex)]=1})}catch(e9){}});
+  const stalled=lifts.filter(b=>{if(recentPR[b])return false;const v=liftVelocity(b);return v!=null&&Math.abs(v)<0.3});
   const moving=lifts.filter(b=>{const v=liftVelocity(b);return v!=null&&v>0.5});
   /* strength verdicts read the MAIN lifts only: goal lifts plus the
      three heaviest. A 21 kg cable accessory moves in stack steps and
