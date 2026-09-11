@@ -760,7 +760,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='e8d26a';  // stamped by tools/build.py with the content hash
+const BUILD_ID='c9e611';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -16808,6 +16808,9 @@ function secSessions(p,ws){
     h+=dayCard(p,d,i,doneSet.has(d.name),daily)});
   h+='</div>';
   h+='<button data-a="quickOpen" class="btn" style="margin-top:12px;width:100%;color:var(--dim);font-size:13px;text-align:left">Trained without the app? Log a past session ›</button>';
+  /* another day in the week (owner ask, 11 Sep) — repeat one you already
+     have, or build one from what you actually train */
+  h+='<button data-a="addDayOpen" class="btn" style="margin-top:8px;width:100%;color:var(--dim);font-size:13px;text-align:left">Add another day \u2014 repeat one, or build your own \u203a</button>';
   const isRecDay9=d=>d&&(d.recday||String(d.name||'').trim().toLowerCase()==='recovery');
   if(!p.days.some(isRecDay9))
     h+='<button data-a="recDayOpen" class="btn" style="margin-top:8px;width:100%;color:var(--dim);font-size:13px;text-align:left">Want a rehab / recovery day in the week? Add one ›</button>';
@@ -18198,6 +18201,54 @@ function sessionPRs(s2){
       h.log.forEach(x=>{if(gBase(x.ex)===b&&x.w&&x.r)prior=Math.max(prior,e1rm(x.w,x.r,x.rpe))})});
     if(prior&&e>prior+0.5){seen[b]=1;out.push({ex:b,e:Math.round(e),prev:Math.round(prior)})}});
   return out}
+
+/* ══ ANOTHER DAY IN THE WEEK ════════════════════════════════
+   Owner ask, 11 Sep: "what's the ability to add in another day of
+   custom lifts or choose to repeat a day in their week."
+
+   Two doors, because the two wishes behind that sentence are different.
+   REPEAT is the common one and it is nearly always about frequency —
+   someone hitting a lift twice a week instead of once. It clones a day
+   whole, so the prescription, the rest times and the RPE targets are
+   the ones already written; regulation keeps treating it as the same
+   exercises, which is the point.
+   CUSTOM is for the day the programme does not contain at all: pick
+   from what you already train plus what your physio wrote, and the sets
+   are seeded from how you actually do that lift.
+
+   A repeated day cannot share its name — adherence, the week board and
+   the done-set all key on day NAME, so two days called Push would read
+   as one day done twice. The copy is named, visibly, and the user can
+   rename it. */
+function customPool(){
+  const out=[],seen={};
+  const add=n=>{n=String(n||'').trim();if(!n)return;
+    const k=n.toLowerCase();if(seen[k])return;seen[k]=1;out.push(n)};
+  try{(activeProgSafe()||{days:[]}).days.forEach(d=>(d.exercises||[]).forEach(e=>add(e.name)))}catch(e){oops('customPool.prog',e)}
+  try{activeProtocols().forEach(p=>{
+    (p.routine||[]).forEach(x=>add(x.n));
+    (p.stages||[]).forEach(st=>((st&&st.ex)||(st&&st.routine)||[]).forEach(x=>add(x.n)))})}catch(e){oops('customPool.proto',e)}
+  try{(S.history||[]).slice(-80).forEach(h=>(h.log||[]).forEach(l=>{if(l.w!=null||l.r!=null)add(gBase(l.ex))}))}catch(e){oops('customPool.hist',e)}
+  return out.slice(0,40)}
+/* how this person actually does this lift — so a custom day arrives with
+   real numbers rather than blanks */
+function customSets(name){
+  try{
+    const base=gBase(name),rows=[];
+    (S.history||[]).forEach(h=>{if(!h.complete)return;
+      (h.log||[]).forEach(l=>{if(gBase(l.ex)!==base)return;
+        if(l.secs!=null){rows.push({secs:l.secs,perSide:!!l.perSide});return}
+        if(l.r!=null)rows.push({reps:String(l.r),rpe:'7-8'})})});
+    const last=rows.slice(-3);
+    if(last.length)return last;
+  }catch(e){oops('customSets',e)}
+  return [{reps:'8',rpe:'7-8'},{reps:'8',rpe:'7-8'},{reps:'8',rpe:'7-8'}]}
+function dayCopyName(p,base){
+  try{
+    const names=(p.days||[]).map(d=>String(d.name||'').toLowerCase());
+    let n=base+' (again)',i=2;
+    while(names.indexOf(n.toLowerCase())>=0){n=base+' ('+i+')';i++}
+    return n}catch(e){return base+' (again)'}}
 function viewSession(){
   const s=S.sess;if(!s)return viewHome();
   const prog=S.lib.programs.find(p=>p.id===s.progId)||activeProg();
@@ -21514,6 +21565,36 @@ function sheetHtml(){
       :'<p style="color:var(--dim);font-size:13px;line-height:1.6">For filming: swaps in a fully populated demo account \u2014 program, runs, rehab mid-pathway, findings, readiness history. Your real data is stashed on this phone first and restored exactly when you exit. Do not export a backup while in demo mode.</p>'+
        '<button data-a="demoEnter" class="big disp mt2" style="background:var(--amber);color:var(--bg);font-size:15px">Enter demo mode</button>'+
        '<p style="color:var(--faint);font-size:11px;line-height:1.5;margin-top:10px">A banner stays on Today the whole time \u2014 one tap brings your account back.</p>')}
+  /* ANOTHER DAY (owner ask, 11 Sep: "the ability to add in another day of
+     custom lifts or choose to repeat a day in their week"). Two doors,
+     because the two wishes are different: repeating is about frequency,
+     custom is about a session the programme does not contain. */
+  if(S.sheet.t==='addday'){
+    const p9=activeProgSafe();
+    if(!p9)return wrapSheet('Another day','<p style="color:var(--dim);font-size:13px;margin-top:6px">No programme is running yet.</p>');
+    return wrapSheet('Add another day',
+      '<p style="color:var(--dim);font-size:13px;line-height:1.6">Repeat a day you already have, or build one from what you actually train. Either way it joins the week like any other day — it counts, it is regulated, and you can remove it.</p>'+
+      '<p class="eyebrow mt2">Repeat a day</p>'+
+      (p9.days||[]).map((d,i)=>'<button data-a="dayRepeat" data-v="'+i+'" class="card" style="width:100%;text-align:left;padding:12px 15px;margin-top:8px;display:flex;align-items:center;gap:11px">'+
+        '<span style="width:8px;height:8px;border-radius:8px;background:'+dayCol(i)+';flex:none"></span>'+
+        '<span style="flex:1;min-width:0"><span style="display:block;font-size:13.5px;font-weight:600">'+esc(d.name)+'</span>'+
+        '<span class="mono" style="color:var(--faint);font-size:10.5px">'+((d.exercises||[]).length)+' exercises \u00b7 copied exactly as written</span></span>'+
+        '<span class="mono" style="color:var(--faint);font-size:12px;flex:none">\u203a</span></button>').join('')+
+      '<p class="eyebrow mt2">Or build one</p>'+
+      '<button data-a="cusPickOpen" class="btn mt" style="width:100%;color:var(--text)">Pick the exercises yourself \u203a</button>'+
+      '<p style="color:var(--faint);font-size:11px;line-height:1.55;margin-top:12px">A repeated day gets its own name \u2014 adherence and the week board key on the day\u2019s name, so two days called the same thing would read as one day done twice.</p>')}
+  if(S.sheet.t==='cuspick'){
+    const sel=S.cusSel||[],pool=customPool();
+    if(!pool.length)return wrapSheet('Build a day','<p style="color:var(--dim);font-size:13px;margin-top:6px">Nothing to pick from yet \u2014 log a few sessions first and your own lifts will show up here.</p>');
+    return wrapSheet('Build a day',
+      '<p style="color:var(--dim);font-size:13px;line-height:1.6">Everything you already train, plus anything your physio wrote. Sets come from how you actually do each one.</p>'+
+      '<div style="margin-top:10px">'+pool.map(n=>{const on=sel.indexOf(n)>=0;
+        return '<button data-a="cusPickTog" data-v="'+esc(n)+'" class="card" style="width:100%;text-align:left;padding:11px 14px;margin-top:7px;display:flex;align-items:center;gap:11px'+(on?';border-color:var(--green)':'')+'">'+
+        '<span class="mono" style="width:19px;height:19px;border-radius:6px;flex:none;display:inline-flex;align-items:center;justify-content:center;font-size:11px;'+
+        (on?'background:var(--green);color:var(--bg)':'border:1.5px solid var(--line);color:var(--faint)')+'">'+(on?String(sel.indexOf(n)+1):'')+'</span>'+
+        '<span style="flex:1;min-width:0;font-size:13px">'+esc(n)+'</span></button>'}).join('')+'</div>'+
+      '<button data-a="cusPickGo" class="big disp mt2" style="background:'+(sel.length?'var(--amber)':'var(--raised)')+';color:'+(sel.length?'var(--bg)':'var(--faint)')+';font-size:15px">'+
+        (sel.length?'Add the day \u2014 '+sel.length+' exercise'+(sel.length===1?'':'s'):'Pick at least one')+'</button>')}
   if(S.sheet.t==='recday'){
     const hasProto=(function(){try{return (typeof activeProtocols==='function'&&activeProtocols().length>0)}catch(e){return false}})();
     return wrapSheet('A recovery day',
@@ -24414,6 +24495,31 @@ function runAction(a,v,t,e){
     case 'aclPhaseOpen':{S.aclView=Math.max(1,Math.min(5,+v||1));
       S.backTo='acl';S.backDrawer=false;S.sheet=null;S.view='aclpath';render();break}
     case 'cerDone':{try{const a9c=acct();if(a9c){a9c.cerWk=questWeekKey();lset(K_ACCT,a9c)}}catch(e9){}render();break}
+    case 'addDayOpen':{S.sheet={t:'addday'};render();break}
+    case 'cusPickOpen':{S.cusSel=[];S.sheet={t:'cuspick'};render();break}
+    case 'cusPickTog':{S.cusSel=S.cusSel||[];
+      const i9=S.cusSel.indexOf(v);
+      if(i9>=0)S.cusSel.splice(i9,1);else S.cusSel.push(v);
+      render();break}
+    case 'cusPickGo':{const p=activeProg();if(!p)break;
+      const sel=(S.cusSel||[]).slice();
+      if(!sel.length){flash('Pick at least one exercise.');break}
+      p.days.push({name:dayCopyName(p,'My day'),custom:1,
+        exercises:sel.map(n=>({name:n,rest:75,sets:customSets(n)}))});
+      saveLib();S.cusSel=null;
+      S.sheet={t:'dayreview',di:p.days.length-1};
+      flash('Day added.');render();break}
+    case 'dayRepeat':{const p=activeProg();if(!p)break;
+      const src=p.days[+v];if(!src){flash('That day is gone.');break}
+      /* a DEEP copy — a shallow one shares the exercise and set objects,
+         so editing the copy would silently rewrite the original */
+      let cp;try{cp=JSON.parse(JSON.stringify(src))}catch(e9){oops('dayRepeat',e9);break}
+      cp.name=dayCopyName(p,String(src.name||'Day'));
+      cp.repeatOf=String(src.name||'');
+      delete cp.recday;
+      p.days.push(cp);saveLib();
+      S.sheet={t:'dayreview',di:p.days.length-1};
+      flash(cp.name+' added — same prescription as '+src.name+'.');render();break}
     case 'recPickOpen':{S.recSel=[];S.sheet={t:'recpick'};render();break}
     case 'recPickTog':{S.recSel=S.recSel||[];
       const i9=S.recSel.indexOf(v);if(i9>=0)S.recSel.splice(i9,1);else S.recSel.push(v);render();break}
