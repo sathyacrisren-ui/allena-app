@@ -745,7 +745,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='5179b0';  // stamped by tools/build.py with the content hash
+const BUILD_ID='45d43a';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -8151,6 +8151,44 @@ function viewAcl(){
     '<div style="display:flex;gap:4px;margin-top:12px">'+ACL_PHASES.map(x=>
       '<div style="flex:1;height:5px;border-radius:5px;background:'+(phaseMet(x.n)?'var(--green)':x.n===ph?'var(--amber)':'var(--line)')+'"></div>').join('')+'</div></div>';
 
+  /* THE PRESCRIBED SESSION (owner ask, 11 Sep: "the physio pill should be
+     in the acl pathway and I should be able to select which phase it
+     belongs to, and that should be above suggested sessions under
+     'prescribed session'"). It sits ABOVE the pathway's own suggestions
+     because that is the physio supremacy law made visible: their plan is
+     the prescription of record, the pathway's exercises are suggestions.
+     A plan with no phase set belongs to every phase — most are written
+     for the whole recovery. */
+  {try{
+    const pres=activeProtocols().filter(p2=>p2.ev==='physio'&&(!p2.phase||+p2.phase===ph));
+    if(pres.length){
+      h+='<p class="eyebrow mt2" style="color:var(--green)">Prescribed session</p>'+
+        '<p style="color:var(--faint);font-size:11.5px;line-height:1.55;margin-top:6px">'+
+        (pres.length===1&&+((pres[0].phase)||0)===ph
+          ?'Written for this phase. It leads — everything below is the pathway\u2019s own suggestion, for reference.'
+          :'Your physio\u2019s plan. It leads \u2014 everything below is the pathway\u2019s own suggestion, for reference.')+'</p>'+
+        '<div style="margin-top:10px;display:flex;flex-direction:column;gap:8px">'+
+        pres.map(p2=>{const n2=(p2.routine||[]).length;
+          return '<div class="card" style="padding:13px 15px;border-color:var(--greensoft)">'+
+            '<div style="display:flex;align-items:center;gap:11px">'+
+            '<span style="width:8px;height:8px;border-radius:8px;background:var(--green);flex:none"></span>'+
+            '<span style="flex:1;min-width:0"><span style="display:block;font-size:14px;font-weight:600">'+esc(p2.n)+'</span>'+
+            '<span class="mono" style="color:var(--faint);font-size:10.5px">'+
+            (p2.by?esc(p2.by)+' \u00b7 ':'')+n2+' exercise'+(n2===1?'':'s')+
+            (p2.freq?' \u00b7 '+esc(String(p2.freq).slice(0,34)):'')+
+            (+((p2.phase)||0)?' \u00b7 phase '+(+p2.phase):' \u00b7 any phase')+'</span></span></div>'+
+            '<div class="row mt" style="gap:8px">'+
+            '<button data-a="protoStart" data-v="'+esc(p2.k)+'" class="btn" style="flex:1;border-color:var(--green);color:var(--green);font-size:12.5px">Start this session</button>'+
+            '<button data-a="pplanOpen" data-v="'+esc(p2.k)+'" class="btn" style="flex:none;padding:0 14px;color:var(--dim);font-size:12.5px">Edit</button></div>'+
+            '</div>'}).join('')+'</div>'}
+    else if(activeProtocols().some(p2=>p2.ev==='physio')){
+      /* every plan is pinned to another phase — say so rather than
+         leaving a silent gap where the prescription should be */
+      h+='<p class="eyebrow mt2" style="color:var(--faint)">Prescribed session</p>'+
+        '<p style="color:var(--faint);font-size:11.5px;line-height:1.55;margin-top:6px">'+
+        'Your physio\u2019s plan is pinned to another phase. Open it to change which phase it belongs to, or set it to any phase.</p>'+
+        '<button data-a="pplanOpen" data-v="'+esc(activeProtocols().filter(p2=>p2.ev==='physio')[0].k)+'" class="btn mt" style="color:var(--dim);font-size:12.5px">Open the plan</button>'}
+  }catch(e){oops('aclPrescribed',e)}}
   {const pv=aclProgram(ph);
    const physioLeads9=(function(){try{return activeProtocols().some(p2=>p2.ev==='physio')}catch(e){return false}})();
    h+='<p class="eyebrow mt2">'+(isNow?'Suggested sessions':'Suggested in this phase')+'</p>'+
@@ -20406,7 +20444,22 @@ function sheetHtml(){
       '<button data-a="apptAdd" class="big disp mt" style="background:'+((f.date||'').trim()?'var(--amber)':'var(--raised)')+';color:'+((f.date||'').trim()?'var(--bg)':'var(--faint)')+';font-size:15px">Save appointment</button>'+
       (past?'<p class="mono" style="color:var(--faint);font-size:10.5px;margin-top:10px">'+past+' past appointment'+(past===1?'':'s')+' kept in the record.</p>':''))}
   if(S.sheet.t==='pplan'){
-    const f=S.pform||(S.pform={id:null,name:'',by:'',freq:'',notes:'',ex:[],exn:'',exs:'',exr:''});
+    const f=S.pform||(S.pform={id:null,name:'',by:'',freq:'',notes:'',ex:[],exn:'',exs:'',exr:'',phase:0});
+    /* WHICH PHASE (owner ask, 11 Sep): only offered when the ACL pathway
+       is running, because there are no phases to pick from otherwise.
+       "Any phase" is the default and the common case — most physio plans
+       are written for the whole recovery, not one gate. */
+    const phPick=(S.acl&&S.acl.on)
+      ?'<p class="eyebrow mt2">Which phase is it for?</p>'+
+       '<div style="display:flex;gap:6px;margin-top:8px">'+
+       [0,1,2,3,4,5].map(n=>{const on=(+(f.phase||0))===n;
+         return '<button data-a="pplanPhase" data-v="'+n+'" class="mono" style="flex:'+(n?'1':'1.5')+';padding:9px 0;border-radius:10px;font-size:11.5px;font-weight:600;'+
+           (on?'background:var(--amber);color:var(--bg);border:1px solid var(--amber)'
+              :'background:var(--surface);border:1px solid var(--line);color:var(--faint)')+'">'+(n?n:'Any')+'</button>'}).join('')+'</div>'+
+       '<p style="color:var(--faint);font-size:11px;line-height:1.5;margin-top:6px">'+
+       ((+(f.phase||0))?'It leads the prescribed session inside phase '+(+f.phase)+' of the pathway. It still runs and still counts on any other day.'
+         :'Any phase — it leads the prescribed session the whole way through. Pick a number if your physio wrote it for one stage.')+'</p>'
+      :'';
     return wrapSheet(f.id?'Edit the plan':'Your physio\u2019s plan',
       '<p style="color:var(--dim);font-size:13px;line-height:1.6;margin-top:2px">Hand the phone to your physio at your appointment, or copy the plan in yourself. It becomes a session Allena runs, counts and reports on like everything else.</p>'+
       '<p class="eyebrow mt2">The plan</p>'+
@@ -20415,6 +20468,7 @@ function sheetHtml(){
       '<input data-in="pform.by" value="'+esc(f.by)+'" placeholder="Physio (optional)">'+
       '<input data-in="pform.freq" value="'+esc(f.freq)+'" placeholder="How often"></div>'+
       '<textarea data-in="pform.notes" rows="2" placeholder="Notes from the physio (optional)" style="margin-top:10px">'+esc(f.notes)+'</textarea>'+
+      phPick+
       '<p class="eyebrow mt2">Exercises</p>'+
       (aiReady()
         ?'<label class="btn mt" style="display:block;text-align:center;cursor:pointer;color:var(--amber);font-size:13px">'+(S.ppBusy?'Reading the photo…':'📷 Photo of the plan — Allena reads it in')+
@@ -23206,9 +23260,11 @@ function runAction(a,v,t,e){
     case 'pplanOpen':{
       if(v&&S.phys&&S.phys[v]){const p=S.phys[v];
         S.pform={id:v,name:p.n,by:p.by||'',freq:p.freq||'',notes:p.why||'',exn:'',exs:'',exr:'',
+          phase:p.phase||0,
           ex:(p.routine||[]).map(e=>({n:e.n,s:e.s||3,r:e.secs?e.secs+'s':String(e.reps||10)}))}}
-      else S.pform={id:null,name:'',by:'',freq:'',notes:'',ex:[],exn:'',exs:'',exr:''};
+      else S.pform={id:null,name:'',by:'',freq:'',notes:'',ex:[],exn:'',exs:'',exr:'',phase:0};
       S.sheet={t:'pplan'};render();break}
+    case 'pplanPhase':{const f=S.pform;if(!f)break;f.phase=+v||0;render();break}
     case 'pplanEx':{const f=S.pform;if(!f)break;
       if(!(f.exn||'').trim()){flash('Name the exercise first.');break}
       /* timed holds parse generously — physios write '30 sec', '0:45',
@@ -23226,7 +23282,11 @@ function runAction(a,v,t,e){
       if(!f.ex.length){flash('Add at least one exercise.');break}
       const id=f.id||('phys'+Date.now());
       S.phys=S.phys||{};
+      /* WHICH PHASE THIS BELONGS TO (owner ask, 11 Sep: "I should be able
+         to select which phase it belongs to"). 0 means every phase — a
+         plan written for the whole recovery, which is the common case. */
       S.phys[id]={n:f.name.trim(),by:(f.by||'').trim(),mode:'manage',ev:'physio',
+        phase:+(f.phase||0)||0,
         why:(f.notes||'').trim()||'Written with your physio. Progress it at your appointments — Allena runs the sessions, counts adherence and builds the report in between.',
         freq:(f.freq||'').trim()||'As prescribed by your physio.',
         progress:'At your physio\u2019s call — bring the report and adjust it together.',
