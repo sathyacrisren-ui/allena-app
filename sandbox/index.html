@@ -740,7 +740,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='3165df';  // stamped by tools/build.py with the content hash
+const BUILD_ID='4584ff';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -4777,10 +4777,17 @@ function todayTasks(){
   if(S.gar&&S.gar.on){
     const gd=g[k]||{};
     // answered at any hour counts, and so does saying "not today"
-    const answered=gd.am!=null||gd.day!=null||gd.pre!=null||gd.amSkip;
+    const logged=gd.am!=null||gd.day!=null||gd.pre!=null;
+    const answered=logged||gd.amSkip;
+    /* a SKIPPED task still says skipped (owner ask, 11 Sep: "so I can do
+       it later if I skipped it"). It stops blocking the day the moment
+       you wave it off — but it never silently reads as ticked, and the
+       door back stays open until midnight. */
     T.push({k:'bb',n:'Log how you woke up',
-      sub:'Thirty seconds. It is what lets Allena pick the right day to go hard.',
-      done:!!answered,go:'sigBb',pts:3})}
+      sub:logged?'Thirty seconds. It is what lets Allena pick the right day to go hard.'
+        :(gd.amSkip?'Waved off for today. It still counts if you log it before midnight.'
+          :'Thirty seconds. It is what lets Allena pick the right day to go hard.'),
+      done:!!answered,skipped:!logged&&!!gd.amSkip,go:'sigBb',pts:3})}
   // 2. rehab check-in, if rehabbing
   if(S.acl&&S.acl.on)T.push({k:'rehab',n:'Rehab check-in',
     sub:'Pain, stiffness, confidence. This is the record your physio wants.',
@@ -4809,9 +4816,17 @@ function todayTasks(){
       the task returns tomorrow. Stopping for good is a separate,
       deliberate choice, because a scale is not a neutral object for
       everyone and neither is being nagged by one. */
-   if(tracking&&!(dd[k]&&dd[k].bwSkip))T.push({k:'bw',n:'Log bodyweight',
-    sub:'Only because you track it — same time of day keeps the trend readable.',
-    done:!!(dd[k]&&dd[k].bw!=null),go:'sigBw',skip:'bwSkip',pts:2})}
+   /* A SKIP USED TO DELETE THE ROW (owner-caught, 11 Sep: "so I can do it
+      later if I skipped it") — the task vanished from the list for the
+      day, which broke the standing rule that nothing silently disappears.
+      It stays now: greyed, never counted against the day, with the door
+      still open until midnight. */
+   const skipped=!!(dd[k]&&dd[k].bwSkip),logged=!!(dd[k]&&dd[k].bw!=null);
+   if(tracking)T.push({k:'bw',n:'Log bodyweight',
+    sub:(!logged&&skipped)?'Waved off for today. Still here if you change your mind.'
+      :'Only because you track it — same time of day keeps the trend readable.',
+    done:logged||skipped,skipped:!logged&&skipped,optional:!logged&&skipped,
+    go:'sigBw',skip:(logged||skipped)?null:'bwSkip',pts:2})}
   // 4. the session, if one is due
   const p=activeProgSafe();
   if(p&&!p.acl){
@@ -5095,7 +5110,7 @@ function noticedPool(){
       if(rate>0.5){const weeksLeft=Math.round((next-n)/rate);
         const when=new Date(Date.now()+weeksLeft*7*864e5);
         add('Session '+next+' lands around '+when.toLocaleDateString(undefined,{month:'long',year:'numeric'}),
-          'You are at '+n+', averaging '+(Math.round(rate*10)/10)+' a week since '+fmtDate(first.date)+'. At your own pace — no deadline, just the shape of the road.')}}}catch(e){}
+          'You are at '+n+', averaging '+(Math.round(rate*10)/10)+' a week since '+fmtDate(first.date)+'. At your own pace — no deadline, just the shape of the road.',3)}}}catch(e){}
   try{if(typeof healthNoticed==='function')healthNoticed().forEach(x=>{if(x.t&&x.d)out.push({t:x.t,d:x.d,tier:1})})}catch(e){}
   try{if(typeof correlationNoticed==='function')correlationNoticed().forEach(x=>{if(x.t&&x.d)out.push({t:x.t,d:x.d,tier:1})})}catch(e){}
   /* ── the memory generators (owner call, 4 Sep: grow the pool) ── */
@@ -5129,7 +5144,7 @@ function noticedPool(){
       totalSets.toLocaleString()+' honest sets logged so far. Volume is the quiet author of every PR in this app.',3);
     const nS=H.length;
     if([25,50,75,100,150,200,300].indexOf(nS)>=0)add('Session '+nS+' is in the book',
-      'Most people quit before 10. The evidence pool this builds is why your insights keep getting sharper.',2)}catch(e){}
+      'Most people quit before 10. The evidence pool this builds is why your insights keep getting sharper.',3)}catch(e){}
   // consistency texture: same weekday, N in a row
   try{const dows={};H.slice(-60).forEach(h=>{const dw=new Date(h.date).getDay();(dows[dw]=dows[dw]||[]).push(hKey(h))});
     const names=['Sundays','Mondays','Tuesdays','Wednesdays','Thursdays','Fridays','Saturdays'];
@@ -5151,20 +5166,23 @@ function noticedToday(){
      carb thing and not show it?'): the coolest find banked TODAY owns
      this slot, and a newer cooler one takes it over mid-day. Rank:
      insights first (the crown), then epics, then rare unlocks/finds.
-     The rotation below only ever speaks when today found nothing. */
+     AMENDED 11 Sep (owner: a new one every time you open the app): today's
+     finds used to RETURN here and short-circuit everything, so an account
+     that found something in the morning saw that one line all day. They
+     are candidates now — tier 0, so they still go first — and the rotation
+     below walks them the same way it walks everything else. */
+  let finds0=[];
   try{
     const bank=discBank();
     const RANKF=x=>(x.tag==='signal'?0:x.rar==='epic'?1:x.rar==='rare'?2:9);
-    const finds=Object.keys(bank).map(id=>Object.assign({id:id},bank[id]))
-      .filter(x=>x.found===today()&&RANKF(x)<9&&x.tag!=='call');
-    if(finds.length){
-      finds.sort((a,b)=>RANKF(a)-RANKF(b));
-      const f0=finds[0];
-      return{t:f0.t,d:f0.d,tier:0,find:1,id:f0.id}}}catch(e){}
+    finds0=Object.keys(bank).map(id=>Object.assign({id:id},bank[id]))
+      .filter(x=>x.found===today()&&RANKF(x)<9&&x.tag!=='call')
+      .sort((a,b)=>RANKF(a)-RANKF(b))
+      .map(f=>({t:f.t,d:f.d,tier:0,find:1,id:f.id}))}catch(e){oops('noticedFinds',e)}
   let ntc={};try{S.daily.ntc=S.daily.ntc||{};ntc=S.daily.ntc}catch(e){}
   const cut14=dayKey(new Date(Date.now()-14*864e5));
   const tired=k9=>{const r=ntc[k9];return !!(r&&r.n>=3&&r.last>cut14)};
-  const pool=noticedPool().filter(p2=>!tired(p2.t));
+  const pool=finds0.concat(noticedPool().filter(p2=>!tired(p2.t)));
   if(!pool.length){
     try{const B=(typeof brewingQs==='function')?brewingQs():[];
       if(B.length){const b0=B[0];
@@ -5172,30 +5190,47 @@ function noticedToday(){
           d:'A real question, '+b0.have+' of 12 evidence days in \u2014 '+b0.left+' more and your own engine answers it.'+(B[1]?' Also brewing: \u201c'+B[1].q+'\u201d ('+B[1].left+' days out).':'')+' Nothing here is invented \u2014 the cool ones arrive when the data proves them.'}}}catch(e){}
     return{t:'A quiet day \u2014 honestly',tier:3,brew:1,
       d:'Nothing new is true about you today, and Allena does not invent. Log on \u2014 the next find is being earned right now.'}}
+  /* A NEW ONE EVERY TIME YOU OPEN THE APP (owner ask, 11 Sep: "the today
+     finding should be scrolling through a new one every time you open the
+     app, but not stupid findings"). It used to pin one observation for the
+     whole day. Now a genuinely new open (bootStart / dayCheck, 30-minute
+     rule) releases the pin and the next one steps up. Within one open it
+     still holds still — the hero must not change under a scroll. */
+  try{if(S._openNew){S._openNew=0;t.noticedT=null;t.seenIdx=null;t.noticedRepeat=false;todaySave(t)}}catch(e){oops('noticedOpen',e)}
   if(t.noticedT){const f9=pool.find(p2=>p2.t===t.noticedT);if(f9)return f9}
   if(t.seenIdx!=null)return pool[Math.min(t.seenIdx,pool.length-1)];
-  // stable for the day, different tomorrow — and "different tomorrow"
-  // is enforced: date%pool can land on yesterday's item (small pools,
-  // month rollovers), so yesterday's title is checked, not assumed.
   const seed=today().split('-').join('');
-  /* the obscure tier goes first: pick from the best tier that still
-     has something unshown, so bookkeeping lines only appear when the
-     interesting ones are spent */
-  let list=pool,recent=[];
-  try{recent=(S.daily&&S.daily.noticedRecent)||[];
-    for(const tv of [1,2,3]){
-      const L=pool.filter(p2=>(p2.tier||2)===tv);
-      if(L.some(p2=>recent.indexOf(p2.t)<0)){list=L;break}}}catch(e){}
+  let recent=[];try{recent=(S.daily&&S.daily.noticedRecent)||[]}catch(e){oops('noticedRecent',e)}
+  /* NOT STUPID FINDINGS (same ask). Tier 3 is the bookkeeping shelf —
+     "412 sessions logged", "set number 900 is behind you". Those are
+     texture, not observation, and with the hero rotating several times a
+     day they would otherwise come round fast. They are now a genuine last
+     resort: only reached when the app has nothing else at all to say.
+     Above that, the obscure tier goes first while it still holds
+     something unshown. */
+  const good=pool.filter(p2=>(p2.tier==null?2:p2.tier)<=2);
+  let list=good.length?good:pool;
+  /* today's real finds (tier 0) lead, then the obscure tier, then solid —
+     each level holds the slot while it still has something unshown */
+  try{for(const tv of [0,1,2]){
+    const L=list.filter(p2=>(p2.tier==null?2:p2.tier)===tv);
+    if(L.some(p2=>recent.indexOf(p2.t)<0)){list=L;break}}}catch(e){oops('noticedTier',e)}
+  /* least-recently-shown wins — recent runs oldest to newest, so each
+     open steps to the next one along and nothing repeats until the whole
+     list has had its turn */
   let idx=parseInt(seed,10)%list.length;
-  // variation is a promise: walk forward past anything shown in the
-  // last several days, so nothing repeats until the pool is exhausted
   try{
     let hops=0;
     while(hops<list.length&&recent.indexOf(list[idx].t)>=0){idx=(idx+1)%list.length;hops++}
     if(hops>=list.length){
-      t.noticedRepeat=true}       // everything already shown: keep quiet rather than fake fresh
+      /* everything here has been seen: take the OLDEST rather than
+         dropping to a bookkeeping line or faking freshness */
+      t.noticedRepeat=true;
+      let oldest=0,best=1e9;
+      list.forEach((p2,i)=>{const r=recent.indexOf(p2.t);if(r>=0&&r<best){best=r;oldest=i}});
+      idx=oldest}
     S.daily=S.daily||{days:{}};
-    S.daily.noticedRecent=recent.filter(x=>x!==list[idx].t).concat(list[idx].t).slice(-8);
+    S.daily.noticedRecent=recent.filter(x=>x!==list[idx].t).concat(list[idx].t).slice(-14);
     lset(K_DAILY,S.daily);
   }catch(e){}
   const chosen=list[idx];
@@ -10987,9 +11022,16 @@ function bootHtml(step){
     '</div>'}
 function bootStart(){
   const last=+lget('training-lastopen-v1',0)||0;
+  const fresh=Date.now()-last>=30*60*1000;
   lset('training-lastopen-v1',Date.now());
+  /* THE OPEN MARK (owner ask, 11 Sep: "the today finding should be
+     scrolling through a new one every time you open the app"). One flag,
+     set on a genuinely new open — the same 30-minute rule this screen
+     already uses — consumed once by noticedToday to advance the rotation.
+     Re-entering from your pocket two minutes later is not a new open. */
+  if(fresh)S._openNew=1;
   // straight in if you were just here
-  if(Date.now()-last<30*60*1000)return false;
+  if(!fresh)return false;
   S.boot=0;
   const L=bootLines();
   const tick=()=>{
@@ -13689,8 +13731,25 @@ function verdictCard(){
     '<img class="mk" src="'+MARK+'" alt="" style="width:17px;height:17px;object-fit:contain">'+
     '<p class="mono" style="flex:1;font-size:9.5px;color:'+(done?'var(--green)':'var(--amber)')+';letter-spacing:.06em">TODAY</p>'+
     (st>1?'<p class="mono" style="color:var(--faint);font-size:9.5px">'+st+' DAY'+(st===1?'':'S')+' RUNNING</p>':'')+'</div>';
+  /* THE DOTS ARE A DOOR (owner ask, 11 Sep: "should be able to click core
+     done to see what was done and missed so I can do it later if I
+     skipped it"). The row used to be inert text — the today sheet was
+     only reachable from elsewhere. A skipped dot is hollow, not filled:
+     it is neither done nor outstanding, and the sheet says so. */
   const dots='<span style="display:flex;gap:5px">'+
-    pr.tasks.map(x=>'<span style="width:9px;height:9px;border-radius:9px;background:'+(x.done?'var(--green)':'var(--line)')+'"></span>').join('')+'</span>';
+    pr.tasks.map(x=>'<span style="width:9px;height:9px;border-radius:9px;'+
+      (x.skipped?'border:1.5px solid var(--line)':'background:'+(x.done?'var(--green)':'var(--line)'))+'"></span>').join('')+'</span>';
+  const skipN=pr.tasks.filter(x=>x.skipped).length;
+  const leftN=pr.tasks.filter(x=>!x.done&&!x.skipped).length;
+  const taskLine=(pr.done>=pr.total&&!skipN)?'all done today'
+    :skipN?(skipN===1?'1 skipped':skipN+' skipped')+' — still open'
+    :leftN?'core done — '+leftN+' left, all optional'
+    :'core done — the rest is optional';
+  /* one row, one tap, wherever the dots appear */
+  const taskRow=(top)=>'<button data-a="todayOpen" style="display:flex;align-items:center;gap:9px;width:100%;text-align:left;padding:0'+
+    (top?';margin-top:13px;padding-top:12px;border-top:1px solid var(--line)':';margin-top:12px')+'" aria-label="Today’s check-ins">'+dots+
+    '<span class="mono" style="flex:1;min-width:0;color:var(--faint);font-size:10.5px">'+taskLine+'</span>'+
+    '<span class="mono" style="color:var(--faint);font-size:11px;flex:none">›</span></button>';
   /* the hero must be the thing that is ALIVE today (owner call, Sep
      2026): once the noticed has been seen it goes stale — the live
      forecast takes the stage and the noticed drops to a quiet line. */
@@ -13703,17 +13762,16 @@ function verdictCard(){
       '<p class="mono" style="font-size:10px;color:var(--amber);letter-spacing:.08em">✦ ALLENA NOTICED</p>'+
       '<p class="disp gradhead" style="font-size:24px;line-height:1.18;margin-top:7px">'+esc(n.t)+'</p>'+
       '<p style="color:var(--dim);font-size:13.5px;line-height:1.6;margin-top:6px">'+esc(n.d)+'</p></div>'+
-      '<div style="display:flex;align-items:center;gap:9px;margin-top:13px;padding-top:12px;border-top:1px solid var(--line)">'+dots+
-      '<span class="mono" style="color:var(--faint);font-size:10.5px">'+(pr.done>=pr.total?'all done today':'core done \u2014 the rest is optional')+'</span></div>'}
+      taskRow(true)}
   else if(done&&n){
     inner+='<p class="disp gradhead" style="font-size:24px;line-height:1.18;margin-top:10px">'+(pr.done>=pr.total?'All done today':'Check-ins done')+'</p>'+
       '<p style="color:var(--dim);font-size:13.5px;line-height:1.6;margin-top:5px">'+(pr.done>=pr.total?'And Allena found something in your data.':'Training is optional today. Allena found something in your data.')+'</p>'+
       '<button data-a="noticedOpen" class="big disp mt" style="background:var(--amber);color:var(--bg);font-size:15px">See what Allena noticed</button>'+
-      '<div style="display:flex;align-items:center;gap:9px;margin-top:12px">'+dots+'</div>'}
+      taskRow(false)}
   else if(done){
     inner+='<p class="disp gradhead" style="font-size:24px;line-height:1.18;margin-top:10px">'+(pr.done>=pr.total?'All done today':'Check-ins done')+'</p>'+
       '<p style="color:var(--dim);font-size:13.5px;line-height:1.6;margin-top:5px">'+(pr.done>=pr.total?'Everything Allena asked for is logged. Tomorrow it will have something new to say.':'Everything asked for is logged \u2014 training is optional today.')+'</p>'+
-      '<div style="display:flex;align-items:center;gap:9px;margin-top:12px">'+dots+'</div>'}
+      taskRow(false)}
   else{
     const next=pr.tasks.filter(x=>!x.done)[0];
     /* the button exists only when it DOES something (owner call, Sep
@@ -13729,9 +13787,12 @@ function verdictCard(){
     inner+='<p class="disp gradhead" style="font-size:24px;line-height:1.18;margin-top:10px">'+esc(next?next.n:'Today')+'</p>'+
       (next?'<p style="color:var(--dim);font-size:13.5px;line-height:1.6;margin-top:5px">'+esc(next.sub)+'</p>':'')+
       (cta?'<button data-a="'+cta.a+'"'+(cta.v?' data-v="'+esc(String(cta.v))+'"':'')+' class="big disp mt" style="background:var(--amber);color:var(--bg);font-size:15px">'+esc(cta.label)+'</button>':'')+
-      '<div style="display:flex;align-items:center;gap:9px;margin-top:13px;padding-top:12px;border-top:1px solid var(--line)">'+dots+
-      '<span class="mono" style="flex:1;color:var(--faint);font-size:10.5px">'+pr.done+' of '+pr.total+' · finishing the small ones is what unlocks tonight’s find</span>'+
-      '<button data-a="todayOpen" class="mono" style="color:var(--amber);font-size:11px;flex:none">All</button></div>'}
+      /* the whole row is the door — an "All" button inside a row that was
+         not itself tappable was a small target and a hidden one */
+      '<button data-a="todayOpen" style="display:flex;align-items:center;gap:9px;width:100%;text-align:left;padding:0;margin-top:13px;padding-top:12px;border-top:1px solid var(--line)" aria-label="Today’s check-ins">'+dots+
+      '<span class="mono" style="flex:1;min-width:0;color:var(--faint);font-size:10.5px">'+pr.done+' of '+pr.total+
+        (skipN?' · '+skipN+' skipped, still open':' · finishing the small ones is what unlocks tonight’s find')+'</span>'+
+      '<span class="mono" style="color:var(--amber);font-size:11px;flex:none">All ›</span></button>'}
   return '<div class="card an-hero" style="padding:18px;border-radius:22px;margin-top:16px;border-color:'+(done?'var(--greensoft)':'var(--line)')+'">'+
     inner+
     (typeof sinceLines==='function'?sinceLines():'')+
@@ -19906,13 +19967,21 @@ function sheetHtml(){
       (st>1&&dayStreakInfo().quietThisWeek?'<p class="mono" style="color:var(--faint);font-size:10.5px;margin-top:4px">\u25e6 streak includes 1 quiet day this week \u2014 the one each week that can pass unlogged</p>':'')+
       (st>1?'<p style="color:var(--faint);font-size:10.5px;line-height:1.5;margin-top:4px">A missed day never breaks a habit \u2014 the research is clear on that (Lally 2010, 96 people followed for 12 weeks). Same time, same place is what builds it.</p>':'')+
       '<div style="margin-top:14px;display:flex;flex-direction:column;gap:10px">'+
-      pr.tasks.map(x=>'<div class="card" style="padding:13px 15px;display:flex;align-items:center;gap:11px'+(x.done?';border-color:var(--greensoft)':'')+'">'+
+      /* a SKIPPED row reads as skipped, never as a green tick, and keeps
+         its door open (owner ask, 11 Sep: "see what was done and missed
+         so I can do it later if I skipped it") */
+      pr.tasks.map(x=>'<div class="card" style="padding:13px 15px;display:flex;align-items:center;gap:11px'+
+        (x.skipped?'':(x.done?';border-color:var(--greensoft)':''))+'">'+
         '<span style="width:21px;height:21px;border-radius:7px;flex:none;display:inline-flex;align-items:center;justify-content:center;font-size:12px;'+
-          (x.done?'background:var(--green);color:var(--bg)':'border:1.5px solid var(--line)')+'">'+(x.done?'\u2713':'')+'</span>'+
-        '<span style="flex:1;min-width:0"><span style="display:block;font-size:13.5px;font-weight:600'+(x.done?';color:var(--faint)':'')+'">'+esc(x.n)+'</span>'+
+          (x.skipped?'border:1.5px dashed var(--line);color:var(--faint)'
+            :x.done?'background:var(--green);color:var(--bg)':'border:1.5px solid var(--line)')+'">'+
+          (x.skipped?'\u2013':x.done?'\u2713':'')+'</span>'+
+        '<span style="flex:1;min-width:0"><span style="display:block;font-size:13.5px;font-weight:600'+((x.done&&!x.skipped)?';color:var(--faint)':'')+'">'+esc(x.n)+'</span>'+
         '<span style="display:block;color:var(--faint);font-size:11.5px;line-height:1.4">'+esc(x.sub)+'</span></span>'+
+        (x.skipped&&x.go?'<button data-a="'+x.go+'" class="mono" style="color:var(--amber);font-size:11.5px;flex:none">Do it anyway</button>':'')+
         (!x.done&&x.go?'<button data-a="'+x.go+'" class="mono" style="color:var(--amber);font-size:11.5px;flex:none">Do it</button>':'')+
-        (x.optional&&!x.done?'<span class="mono" style="color:var(--faint);font-size:9.5px;flex:none">optional</span>':'')+
+        (x.skipped?'<span class="mono" style="color:var(--faint);font-size:9.5px;flex:none">skipped</span>'
+          :(x.optional&&!x.done?'<span class="mono" style="color:var(--faint);font-size:9.5px;flex:none">optional</span>':''))+
         (!x.done&&x.skip?'<button data-a="'+x.skip+'" class="mono" style="color:var(--faint);font-size:11px;flex:none;padding-left:4px">Not today</button>':'')+
         '</div>').join('')+'</div>')}
   if(S.sheet.t==='quest'){
@@ -24616,6 +24685,11 @@ function morningAsk(){try{
   S.gform={am:''};S.sheet={t:'gam'};render();return true}catch(e){return false}}
 let lastDay=today();
 function dayCheck(){
+  /* coming back from your pocket after half an hour IS opening the app
+     (owner ask, 11 Sep) — bootStart only ever runs on a cold launch, so
+     the open mark has to be raised here too, on the same 30-minute rule */
+  try{const lo=+lget('training-lastopen-v1',0)||0;
+    if(Date.now()-lo>=30*60*1000){S._openNew=1;lset('training-lastopen-v1',Date.now())}}catch(e){oops('openMark',e)}
   try{if(typeof watchMetSweep==='function')watchMetSweep()}catch(e){}
   /* stuck-open sessions repaired (owner-caught, 9 Sep: a bug held a
      finished session open two hours and banked 'Longest session:
