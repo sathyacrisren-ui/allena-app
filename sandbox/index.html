@@ -117,27 +117,22 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
 .find-glow{box-shadow:0 0 20px 0 rgba(48,209,88,.18),0 0 4px 0 rgba(48,209,88,.28)}
 .find-dust{position:absolute;width:3px;height:3px;border-radius:3px;background:var(--green);opacity:0;pointer-events:none;z-index:6;animation:findDust 2.8s ease-out infinite}
 @media (prefers-reduced-motion:reduce){.find-dust{display:none}.find-glow{box-shadow:0 0 12px 0 rgba(48,209,88,.18)}}
-/* THE LEADER'S FIRE. The same drawn flame that worked as a single shape,
-   repeated around the mark as a ring (owner, 11 Sep: "go back to the same
-   flame as this, just make it emerge like a ring"). Thin stretched licks
-   were tried the same day and rejected outright — do not go back to them.
-   Every fill is translucent so the face, initial and ring read straight
-   through, and the layer is pointer-events:none so it never eats a tap. */
-@keyframes leadFF{0%,100%{transform:scaleY(.84) scaleX(1.05)}
-  44%{transform:scaleY(1.12) scaleX(.92)}
-  72%{transform:scaleY(.95) scaleX(1.01)}}
-@keyframes leadEmber{0%{opacity:0;transform:translate(-50%,0) scale(var(--esz,.5))}
-  18%{opacity:.5}
-  100%{opacity:0;transform:translate(calc(-50% + var(--edx,0px)),-30px) scale(calc(var(--esz,.5) * .35))}}
-.lead-fire{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
-  pointer-events:none;z-index:2;filter:blur(.35px)}
-.lead-svg{display:block;mix-blend-mode:screen;overflow:visible}
-.lead-ff{transform-box:fill-box;transform-origin:50% 100%;
-  animation:leadFF 1.5s ease-in-out infinite}
-/* the round dust mote — the same artefact a fresh find throws off */
-.lead-mote{position:absolute;bottom:42%;border-radius:50%;opacity:0;pointer-events:none;
-  mix-blend-mode:screen;animation:leadEmber 2.6s ease-out infinite}
-@media (prefers-reduced-motion:reduce){.lead-ff{animation:none}.lead-mote{display:none}}
+/* THE LEADER'S FIRE (owner ask 11 Sep, settled after three passes).
+   Final mechanic, in the owner's words: "more like the dot artefacts we
+   use elsewhere" — so this is find-dust with flame-shaped particles, not
+   a solid body. Small flames spawn at the circle's rim, rise, drift and
+   fade. They may leave the card; at 5-11px fading out they read as
+   sparks, which a solid shape crossing a border never did. Coloured by
+   the leader's OWN avatar colour via --fl, so the fire is theirs. */
+@keyframes leadFlame{0%{opacity:0;transform:translate(0,5px) scale(.75) rotate(var(--fr,0deg))}
+  18%{opacity:var(--fo,.7)}
+  65%{opacity:calc(var(--fo,.7) * .5)}
+  100%{opacity:0;transform:translate(var(--fdx,0px),var(--fup,-34px)) scale(.2) rotate(var(--fr,0deg))}}
+.lead-fire{position:absolute;left:50%;bottom:42%;transform:translateX(-50%);
+  pointer-events:none;z-index:2}
+.lead-flame{position:absolute;bottom:0;line-height:0;opacity:0;pointer-events:none;
+  transform-origin:50% 100%;animation:leadFlame 2.3s ease-out infinite}
+@media (prefers-reduced-motion:reduce){.lead-fire{display:none}}
 @keyframes anShimmer{0%{background-position:-220% 0}100%{background-position:220% 0}}
 @keyframes anBarGrow{from{transform:scaleX(0)}to{transform:scaleX(1)}}
 @keyframes anTick{0%{stroke-dashoffset:28}100%{stroke-dashoffset:0}}
@@ -737,7 +732,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='8e35e1';  // stamped by tools/build.py with the content hash
+const BUILD_ID='e19cb4';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -861,91 +856,51 @@ function dustF(){
    colour so the fire reads as theirs, then it climbs through --gold to
    warm-white at the tip — a real fire gradient with no new colour and,
    deliberately, no red: red means stop and nothing else. */
-/* TWO peaks in the silhouette, both tapering to a real point — a round
-   teardrop reads as a blob, and the owner said so ("needs sharper
-   elements"). Every frame keeps the same eight cubic segments so the
-   path can morph between them. */
-const FLAME_BODY=[
-  'M32 106C12 106 3 93 3 78C3 63 16 56 22 42C26 32 25 20 19 8C24 14 30 18 34 24C36 14 34 6 30 0C44 12 52 30 48 46C52 54 61 62 61 78C61 93 52 106 32 106Z',
-  'M32 106C13 106 5 92 5 77C5 63 17 57 24 44C28 34 27 22 22 11C26 16 31 20 35 26C37 16 36 8 32 2C45 14 51 31 47 47C51 55 59 62 59 77C59 92 51 106 32 106Z',
-  'M32 106C11 106 2 94 2 79C2 63 15 55 21 40C25 30 24 18 17 5C23 12 29 17 33 23C35 12 33 4 28 -2C43 10 53 29 49 45C53 54 62 63 62 79C62 94 53 106 32 106Z',
-  'M32 106C12 106 4 93 4 78C4 63 16 56 23 43C27 33 26 21 20 9C25 15 30 19 34 25C36 15 35 7 31 1C44 13 52 30 48 46C52 55 60 62 60 78C60 93 52 106 32 106Z'];
-const FLAME_TONGUE=[
-  'M32 97C22 97 16 89 16 79C16 69 26 62 29 50C31 42 30 33 27 26C38 35 42 47 41 58C44 66 48 71 48 79C48 89 42 97 32 97Z',
-  'M32 97C23 97 17 88 17 78C17 69 27 63 31 52C33 44 32 35 30 28C40 36 42 48 41 59C44 66 47 71 47 78C47 88 41 97 32 97Z',
-  'M32 97C21 97 15 90 15 80C15 69 25 61 28 48C30 40 29 31 25 24C37 34 43 46 42 57C45 66 49 72 49 80C49 90 43 97 32 97Z',
-  'M32 97C22 97 16 89 16 79C16 69 26 62 30 51C32 43 31 34 28 27C39 35 42 47 41 58C44 66 48 71 48 79C48 89 42 97 32 97Z'];
-/* a detached lick, the way real fire throws one off the main body */
-const FLAME_LICK=[
-  'M47 60C43 56 42 49 44 43C46 37 50 33 49 26C56 32 58 42 57 50C56 55 52 58 47 60Z',
-  'M48 56C44 53 42 46 44 40C46 35 51 31 50 24C57 31 59 40 58 48C57 53 53 55 48 56Z',
-  'M46 63C42 59 41 51 43 45C45 39 49 35 48 27C55 34 58 44 57 52C56 58 51 61 46 63Z',
-  'M47 58C43 55 42 48 44 42C46 37 51 33 50 25C57 32 59 41 58 49C57 55 52 57 47 58Z'];
-/* the small flames that break off and vanish — same pointed shape as the
-   body so an ember reads as fire, not as a dot */
-const FLAME_EMBER='M7 19C3 19 0 15 0 11C0 6 5 4 6 0C9 4 14 6 14 11C14 15 11 19 7 19Z';
+/* THE LEADER'S FIRE — settled 11 Sep after three passes with the owner.
+   First cut was rising dots ("doesn't look like a flame at all"), second
+   was a solid morphing body ("can't be hitting the element above it, can't
+   exit the pill, border looks wrong"), and the owner named the answer:
+   "it can exit, it just needs to be more like the mechanics of the dot
+   artefacts that we use elsewhere."
+
+   So it is find-dust with flame-shaped particles. Small flames spawn at
+   the rim of the leader's avatar, rise, drift apart and fade out. Nothing
+   is solid, so nothing can sit on the card's text or break its border —
+   a particle that drifts past the edge is already fading, and reads as a
+   spark. Every particle is the leader's OWN avatar colour.
+
+   Deterministic: the same leader gets the same fire on every render, so
+   it never re-scrambles under a re-render mid-week.
+
+   RETURNED HERE ON PURPOSE (owner, 11 Sep, after four more shapes were
+   tried and rejected): a solid body enveloping the mark, a crown of licks
+   on the rim, copies rotated to their radial normals, and one fire with a
+   centre. This is the one. Do not replace it with any of those again. */
+const FLAME_P='M7 19C3 19 0 15.2 0 11.2C0 6.4 5.2 4.2 6.1 0C9.2 4 14 6.2 14 11.2C14 15.2 11 19 7 19Z';
 function flameF(av,size){
   try{
     const col=(typeof avRing==='function')?avRing(av,'var(--green)'):'var(--green)';
     const s=Math.max(28,Number(size)||54);
-    const id='fl'+Math.random().toString(36).slice(2,8),ic='fc'+id;
-    /* THE LEADER'S FIRE, settled after the owner said the two things that
-       actually define it: "fire goes up" and "it has a centre as well".
-       So it is ONE fire, not a pattern: a tall centre flame with a bright
-       core rising straight up the middle of the mark, flanked by shorter
-       flames that also go UP, leaning out a little as they get further from
-       the middle. Together they wrap the circle and emerge all round its
-       lower half, which is what "emerge like a ring" meant.
-
-       Three shapes were built and rejected on the way here, all the same
-       mistake — treating the fire as a repeated motif instead of one thing
-       that burns upward: thin licks on the rim (read as grass), copies
-       rotated to their radial normals (a sunflower), copies based at the
-       centre (a fern). Do not go back to any of them. */
-    const V=100,C=50,r=100/1.9/2;              // the mark's radius in this space
-    /* x offset, base y offset, height, lean — all as fractions of the mark */
-    const F=[[ 0.00, 0.86, 1.62,   0, 1],
-             [-0.62, 0.60, 1.18, -11, 0],
-             [ 0.64, 0.58, 1.22,  12, 0],
-             [-1.00, 0.16, 0.82, -24, 0],
-             [ 1.02, 0.14, 0.86,  25, 0],
-             [-0.34, 0.92, 0.96,  -5, 0],
-             [ 0.36, 0.90, 1.00,   6, 0]];
-    let g='';
-    F.forEach((f,i)=>{
-      const bx=C+f[0]*r,by=C+f[1]*r,L=f[2]*r*1.55,sc=L/110;
-      g+='<g transform="translate('+bx.toFixed(1)+' '+by.toFixed(1)+') rotate('+f[3]+') scale('+sc.toFixed(4)+') translate(-32 -110)">'+
-        '<g class="lead-ff" style="animation-duration:'+(1.25+(i%4)*0.32).toFixed(2)+'s;'+
-        'animation-delay:'+((i%5)*0.21).toFixed(2)+'s">'+
-        '<path d="'+FLAME_BODY[0]+'" fill="url(#'+id+')"/>'+
-        /* THE CENTRE: only the middle flame carries the hot core */
-        (f[4]?'<path d="'+FLAME_TONGUE[0]+'" fill="url(#'+ic+')"/>':'')+
-        '</g></g>'});
-    /* the round dust motes a fresh find already throws off */
-    let emb='';
-    for(let i=0;i<7;i++){
-      const f=0.1+i*0.13,px=(i%3===0?3.2:i%3===1?2.2:2.8);
-      emb+='<i class="lead-mote" style="left:'+(f*100).toFixed(0)+'%;'+
-        'width:'+px+'px;height:'+px+'px;background:'+col+';'+
-        '--esz:1;--edx:'+((f-0.5)*22).toFixed(0)+'px;'+
-        'animation-duration:'+(2.4+(i%3)*0.5).toFixed(2)+'s;'+
-        'animation-delay:'+(0.3+i*0.4).toFixed(2)+'s"></i>'}
-    const box=Math.round(s*1.9);
-    return '<div class="lead-fire" style="width:'+box+'px;height:'+box+'px" aria-hidden="true">'+
-      '<svg class="lead-svg" viewBox="0 0 '+V+' '+V+'" width="100%" height="100%">'+
-      '<defs><linearGradient id="'+id+'" x1="0" y1="1" x2="0" y2="0">'+
-        /* translucent the whole way, so the face and the initial read
-           straight through; only the tips lift toward warm white */
-        '<stop offset="0" stop-color="'+col+'" stop-opacity=".14"/>'+
-        '<stop offset=".4" stop-color="'+col+'" stop-opacity=".36"/>'+
-        '<stop offset=".85" stop-color="'+col+'" stop-opacity=".58"/>'+
-        '<stop offset="1" stop-color="var(--amber)" stop-opacity=".5"/>'+
-      '</linearGradient>'+
-      '<linearGradient id="'+ic+'" x1="0" y1="1" x2="0" y2="0">'+
-        '<stop offset="0" stop-color="'+col+'" stop-opacity="0"/>'+
-        '<stop offset=".55" stop-color="var(--amber)" stop-opacity=".14"/>'+
-        '<stop offset="1" stop-color="var(--amber)" stop-opacity=".34"/>'+
-      '</linearGradient></defs>'+g+'</svg>'+emb+'</div>'}
+    /* the field is the width of the mark — particles start on its rim */
+    const w=Math.round(s*0.96),h=Math.round(s*0.3);
+    const N=9;
+    let m='';
+    for(let i=0;i<N;i++){
+      /* spread across the mark, biggest and highest in the middle, the way
+         a fire's centre burns tallest */
+      const f=(i+0.5)/N,edge=Math.abs(f-0.5)*2;
+      const px=Math.round(7+(1-edge)*7);          // 7px at the edges, 14 in the middle
+      m+='<i class="lead-flame" style="left:'+(f*100).toFixed(0)+'%;'+
+        '--fo:'+(0.5+(1-edge)*0.45).toFixed(2)+';'+
+        '--fup:-'+Math.round(s*(0.55+(1-edge)*0.4))+'px;'+
+        '--fdx:'+((f-0.5)*s*0.4).toFixed(0)+'px;'+
+        '--fr:'+((f-0.5)*30).toFixed(0)+'deg;'+
+        'margin-left:-'+(px/2).toFixed(0)+'px;'+
+        'animation-duration:'+(1.8+edge*0.85).toFixed(2)+'s;'+
+        'animation-delay:'+(i*0.23).toFixed(2)+'s">'+
+        '<svg viewBox="0 0 14 19" width="'+px+'" height="'+Math.round(px*1.36)+'">'+
+        '<path d="'+FLAME_P+'" fill="'+col+'"/></svg></i>'}
+    return '<div class="lead-fire" style="width:'+w+'px;height:'+h+'px" aria-hidden="true">'+m+'</div>'}
   catch(e){oops('flameF',e);return ''}}
 function iBtn(k){return '<button data-a="iTog" data-v="'+esc(k)+'" aria-label="More info" style="width:17px;height:17px;border-radius:17px;border:1px solid var(--line);background:none;color:var(--faint);font-size:10px;font-style:italic;font-family:Georgia,serif;line-height:1;display:inline-flex;align-items:center;justify-content:center;vertical-align:-2px;margin-left:7px;padding:0;flex:none">i</button>'}
 function iOn(k){return !!S.openSec['i:'+k]}
