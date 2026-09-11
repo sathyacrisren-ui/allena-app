@@ -760,7 +760,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='bd304d';  // stamped by tools/build.py with the content hash
+const BUILD_ID='eab297';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -17855,8 +17855,81 @@ function viewToday(){
           (Ls.length>4?'<p class="mono" style="color:var(--faint);font-size:9px;margin-top:5px;text-align:left">and '+(Ls.length-4)+' more racing</p>':'')+'</div>':'')+'</button>'}}}catch(e){}
   h+=verdictCard();
   h+=todayOrder().join('');
-  try{if(!S.sheet){const cer=ceremonyDue();if(cer)h+=ceremonyHtml(cer)}}catch(e){}
+  /* a hit goal outranks the weekly podium — it is the rarer moment */
+  try{const gc=goalCerDue();if(gc)h+=goalCerHtml(gc);
+    else if(!S.sheet){const cer=ceremonyDue();if(cer)h+=ceremonyHtml(cer)}}catch(e){oops('goalCer',e)}
   return h+'</div>'}
+
+/* ══ THE GOAL CEREMONY ══════════════════════════════════════
+   Owner ask, 11 Sep: "there needs to be a huge celebration if you hit a
+   lift goal." Until now hitting one gave a vibration and a toast that
+   was gone in two seconds — the same acknowledgement a saved setting
+   gets. A goal is the thing the whole programme points at; the owner's
+   own is bench 100 x 8, set the day he started.
+
+   It is earned, never minted: it fires only when checkGoals has actually
+   matched a logged set against the written target, so there is no way to
+   see this without having done the lift. That is the standing rule for
+   every ceremony in the app.
+
+   TIMING obeys the mid-session law. Between sets you want the next
+   number instantly, so mid-session keeps the flash it already had. The
+   full screen waits for the completion screen or the next time Today is
+   opened — both places where the app is allowed to take the stage. It
+   also yields to any open sheet, the one-banner rule. */
+function goalCerDue(){
+  try{
+    if(S.sheet)return null;                       // one banner at a time
+    if(S.sess&&S.sess.phase!=='done')return null;  // never mid-session
+    const g=(S.goals||[]).find(x=>x&&x.done&&!x.cel);
+    if(!g)return null;
+    /* how far it came: the first weight ever logged on this lift against
+       the one that just cleared the goal */
+    let from=null,days=null;
+    try{
+      const base=gBase(g.ex);
+      const rows=[];
+      (S.history||[]).forEach(h=>{if(!h.complete)return;
+        (h.log||[]).forEach(l=>{if(!l.w||!l.r)return;
+          if(gBase(l.ex)===base)rows.push({d:hKey(h),e:e1rm(l.w,l.r,l.rpe),w:l.w,r:l.r})})});
+      rows.sort((a,b)=>String(a.d).localeCompare(String(b.d)));
+      if(rows.length)from=rows[0];
+      if(g.created)days=Math.max(1,Math.round((new Date(g.done).getTime()-g.created)/864e5));
+    }catch(e){oops('goalCerFrom',e)}
+    return{g:g,from:from,days:days}}
+  catch(e){oops('goalCerDue',e);return null}}
+function goalCerHtml(c){
+  try{
+    const g=c.g,gained=(c.from&&c.from.w!=null)?Math.round((g.w-c.from.w)*10)/10:null;
+    return '<div data-a="goalCerDone" style="position:fixed;inset:0;z-index:92;background:rgba(20,19,18,.975);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px;text-align:center">'+
+    '<style>@keyframes gcRise{from{opacity:0;transform:translateY(22px)}to{opacity:1;transform:none}}'+
+    '@keyframes gcPop{0%{opacity:0;transform:scale(.72)}62%{opacity:1;transform:scale(1.06)}100%{transform:scale(1)}}'+
+    '@keyframes gcRay{from{opacity:0;transform:scaleY(0)}to{opacity:.5;transform:scaleY(1)}}'+
+    '@media (prefers-reduced-motion: reduce){.gcA,.gcB,.gcR{animation:none!important;opacity:1!important;transform:none!important}}</style>'+
+    /* light behind it — rays rising, the one place the app goes loud */
+    '<div style="position:absolute;inset:0;overflow:hidden;pointer-events:none">'+
+      Array.from({length:9},(_,i)=>'<i class="gcR" style="position:absolute;left:'+(6+i*11)+'%;bottom:0;width:2px;height:'+(38+((i*37)%42))+'%;background:linear-gradient(to top,var(--green),transparent);transform-origin:bottom;opacity:0;animation:gcRay .9s '+(0.25+i*0.07).toFixed(2)+'s both"></i>').join('')+
+    '</div>'+
+    '<p class="mono gcA" style="font-size:10.5px;letter-spacing:.2em;color:var(--green);animation:gcRise .5s both;position:relative">GOAL HIT</p>'+
+    '<p class="disp gradhead gcB" style="font-size:40px;line-height:1.05;font-weight:700;margin-top:14px;animation:gcPop .75s .25s both;position:relative">'+esc(g.ex)+'</p>'+
+    '<p class="disp gcA" style="font-size:27px;font-weight:600;margin-top:6px;color:var(--green);animation:gcRise .6s .6s both;position:relative">'+uwNum(g.w)+' '+uwUnit()+' × '+g.r+'</p>'+
+    (c.days?'<p class="mono gcA" style="font-size:11px;color:var(--faint);letter-spacing:.06em;margin-top:18px;animation:gcRise .6s .85s both;position:relative">'+c.days+' DAY'+(c.days===1?'':'S')+' FROM THE DAY YOU SET IT</p>':'')+
+    ((c.from&&gained>0)?'<p class="gcA" style="color:var(--dim);font-size:13.5px;line-height:1.6;margin-top:14px;max-width:320px;animation:gcRise .6s 1s both;position:relative">You started this lift at '+uwNum(c.from.w)+' '+uwUnit()+' for '+c.from.r+'. That is '+uwNum(gained)+' '+uwUnit()+' more on the bar, put there one session at a time.</p>':'')+
+    '<button data-a="goalCerDone" class="big disp gcA" style="background:var(--green);color:var(--bg);font-size:15px;margin-top:26px;max-width:300px;animation:gcRise .6s 1.25s both;position:relative">Set the next one</button>'+
+    '<button data-a="goalCerSeen" class="gcA mono" style="color:var(--faint);font-size:11.5px;margin-top:14px;animation:gcRise .6s 1.4s both;position:relative">Just sit with it</button>'+
+    '</div>'}
+  catch(e){oops('goalCerHtml',e);return ''}}
+/* the moment is banked like any other, so it survives in the collection
+   with the numbers it had on the day */
+function goalCerBank(g){
+  try{
+    const bank=discBank();
+    const id='goal:'+gBase(g.ex)+':'+g.w+'x'+g.r;
+    if(bank[id])return;
+    bank[id]={t:'Goal hit: '+g.ex+' '+uwNum(g.w)+' '+uwUnit()+' × '+g.r,
+      d:'The target you wrote down, cleared. Most goals are never written down, let alone met.',
+      rar:'epic',tag:'goal',found:today()};
+    bankSave()}catch(e){oops('goalCerBank',e)}}
 function catchUpPlan(p){
   /* an imported plan's weights can be STALE while the user's logs
      marched on (beta-caught via Dafydd's sheet, 9 Sep: his 'PLAN
@@ -18048,6 +18121,13 @@ function viewSession(){
        when I finish'). Every completed session gets the confetti burst
        and a congratulations, once per render, with the reveal haptic. */
     if(!s._celebrated){s._celebrated=1;try{hapticRun('finish')}catch(e){}}
+    /* A GOAL HIT TAKES THE SCREEN (owner ask, 11 Sep). The completion
+       screen is the one place the mid-session law allows full motion,
+       and it is the moment closest to the set that did it. The same
+       ceremony waits on Today if they leave before seeing it. */
+    try{const gc9=goalCerDue();
+      if(gc9){try{hapticRun('finish')}catch(e8){}
+        return '<div class="view pad">'+goalCerHtml(gc9)+'</div>'}}catch(e9){oops('goalCerSess',e9)}
     const CONGRATS=['Nailed it.','That\u2019s the work.','Banked.','Another one down.','Strong finish.','In the log, in the body.','Done and dusted.'];
     /* earned beats generic: if the session itself gives us a true, specific
        headline, say that instead of the rotation (owner call, 3 Sep —
@@ -24146,6 +24226,16 @@ function runAction(a,v,t,e){
       saveLib();
       S.sheet={t:'dayreview',di:p.days.length-1};
       flash('Recovery day added.');render();break}
+    /* THE GOAL CEREMONY closes two ways, and both mark it celebrated so
+       it never replays: straight into setting the next goal, or sit with
+       it. The moment banks either way. */
+    case 'goalCerSeen':
+    case 'goalCerDone':{
+      try{const g=(S.goals||[]).find(x=>x&&x.done&&!x.cel);
+        if(g){g.cel=1;lset(K_GOALS,S.goals);
+          try{goalCerBank(g)}catch(e8){oops('goalCerBank',e8)}}}catch(e9){oops('goalCerDone',e9)}
+      if(a==='goalCerDone'){S.sheet={t:'goal'};}
+      render();break}
     case 'cerDone':{try{const a9c=acct();if(a9c){a9c.cerWk=questWeekKey();lset(K_ACCT,a9c)}}catch(e9){}render();break}
     case 'recPickOpen':{S.recSel=[];S.sheet={t:'recpick'};render();break}
     case 'recPickTog':{S.recSel=S.recSel||[];
