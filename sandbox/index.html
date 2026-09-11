@@ -764,7 +764,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='4fead7';  // stamped by tools/build.py with the content hash
+const BUILD_ID='9682d5';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -7016,7 +7016,7 @@ function physioReport(){
       sl.forEach(e9=>{const m=squatSummary(e9)||{};
         if(!m||!m.kept)return;
         L.push('  Squat symmetry '+fmtDate(e9.d+'T12:00')+' '+new Date(e9.t||Date.now()).toTimeString().slice(0,5)+
-          ' — '+m.kept+' squats'+(m.kept===m.total?'':' of '+m.total+' kept')+', '+m.depth+'\u00b0 mean depth, '+
+          ' — '+m.kept+' squats'+(m.kept===m.total?'':' of '+m.total+' kept')+', '+
           (m.even?'hips centred':'hips '+m.pct+'% toward the '+m.toward)+
           (m.away===true?' (away from the reconstructed side)':m.away===false?' (onto the reconstructed side)':''))});
     }}catch(e){oops('reportCam',e)}
@@ -11001,9 +11001,14 @@ window.squatResult=function(res){
     const rows=((res&&res.reps)||[]).filter(r=>r&&isFinite(+r.shift));
     if(!rows.length){flash('No squats counted — step back so your hips, knees and ankles are in frame.');return}
     const st=squatStore();
+    /* NO DEPTH (owner, 11 Sep, after the first TestFlight run: "face on it
+       should not be calculating any degrees of knee bend, it should only
+       be tracking myself drifting to one side or the other"). Face-on, a
+       knee angle is not something a camera can read honestly, and it was
+       never the question. One number per rep: the hips against the
+       midline of the feet. */
     st.list.push({d:today(),t:Date.now(),
-      reps:rows.map(r=>({shift:Math.round((+r.shift||0)*1000)/1000,
-                         depth:Math.round((+r.depth||0)*10)/10,out:0}))});
+      reps:rows.map(r=>({shift:Math.round((+r.shift||0)*1000)/1000,out:0}))});
     st.list=st.list.slice(-60);lset(K_SQUAT,st);
     flash(rows.length+' squat'+(rows.length===1?'':'s')+' recorded.',true);
     try{haptic('success')}catch(e9){}
@@ -11021,16 +11026,15 @@ function squatSummary(e9){
        arguments after touching a parameter; just hold the value. */
     const total=(e9.reps||[]).length;
     const kept=squatKept(e9);
-    if(!kept.length)return{reps:0,pct:0,toward:'',depth:0,even:true,away:null,kept:0,total:total};
+    if(!kept.length)return{reps:0,pct:0,toward:'',even:true,away:null,kept:0,total:total};
     const avg=a9=>a9.reduce((x,y)=>x+y,0)/a9.length;
     const shift=avg(kept.map(r=>+r.shift||0));
-    const depthAvg=avg(kept.map(r=>+r.depth||0));
     const pct=Math.round(Math.abs(shift)*100);
     const toward=(shift>0)?'right':'left';
     let away=null;
     try{const inj=String((S.acl&&S.acl.side)||(S.prof&&S.prof.aclSide)||'').toLowerCase();
       if(inj==='left'||inj==='right')away=(toward!==inj);}catch(e){oops('squatSide',e)}
-    return{reps:kept.length,pct:pct,toward:toward,depth:Math.round(depthAvg),even:pct<4,away:away,
+    return{reps:kept.length,pct:pct,toward:toward,even:pct<4,away:away,
       kept:kept.length,total:total}}
   catch(e){oops('squatSummary',e);return null}}
 const RARITY=[['common','#8A8782','Noticed'],['uncommon','var(--green)','Worth knowing'],
@@ -21142,7 +21146,6 @@ function sheetHtml(){
         (s9.even?'Hips centred':s9.pct+'% toward your '+s9.toward)+'</p>'+
         '<p style="color:var(--dim);font-size:13px;line-height:1.6;margin-top:6px">Averaged over '+s9.kept+
         (s9.kept===s9.total?' squat'+(s9.kept===1?'':'s'):' of '+s9.total)+
-        ', '+s9.depth+'\u00b0 deep'+
         (s9.away===true?'. That is away from the reconstructed side.':s9.away===false?'. That is onto the reconstructed side.':'.')+'</p>'
         :'<p style="color:var(--dim);font-size:13px;line-height:1.6;margin-top:10px">Every rep is set aside, so there is no average to take.</p>')+
       '<p class="eyebrow mt2">Each squat</p>'+
@@ -21152,7 +21155,7 @@ function sheetHtml(){
         return '<div class="card" style="padding:11px 14px;margin-top:7px;display:flex;align-items:center;gap:11px'+(r.out?';opacity:.45':'')+'">'+
         '<span class="mono" style="width:20px;flex:none;color:var(--faint);font-size:11px">'+(i+1)+'</span>'+
         '<span style="flex:1;min-width:0;font-size:13px'+(r.out?';text-decoration:line-through':'')+'">'+
-          (p9<4?'centred':p9+'% '+tw)+' \u00b7 '+Math.round(+r.depth||0)+'\u00b0</span>'+
+          (p9<4?'on the middle':p9+'% toward the '+tw)+'</span>'+
         '<button data-a="squatRepTog" data-v="'+i+'" class="mono" style="flex:none;font-size:11px;color:'+(r.out?'var(--amber)':'var(--faint)')+'">'+
           (r.out?'Put back':'Set aside')+'</button></div>'}).join('')+
       '<button data-a="squatSaved" class="big disp mt2" style="background:var(--amber);color:var(--bg);font-size:15px">Save to my measurements</button>'+
@@ -21160,7 +21163,7 @@ function sheetHtml(){
   if(S.sheet.t==='squat'){
     const L9=squatStore().list.slice(-8).reverse();
     return wrapSheet('Squat symmetry',
-      '<p style="color:var(--dim);font-size:13px;line-height:1.65;margin-top:6px">Face the camera, whole body in frame, feet about shoulder width. Squat as many times as you comfortably can. Allena counts them and watches which way your hips drift at the bottom of each one.</p>'+
+      '<p style="color:var(--dim);font-size:13px;line-height:1.65;margin-top:6px">Face the camera, whole body in frame. You get ten seconds to get into a comfortable squat stance, then squat as many times as you comfortably can. Allena counts them and watches which way your hips drift off the middle at the bottom of each one.</p>'+
       '<p style="color:var(--faint);font-size:11.5px;line-height:1.55;margin-top:8px">Weight-shifting away from the reconstructed leg is close to universal after surgery, and invisible without measuring. That is why phase 2 gates on it.</p>'+
       '<button data-a="squatStart" class="big disp mt2" style="background:var(--amber);color:var(--bg);font-size:15px">Start capturing</button>'+
       (L9.length?'<p class="eyebrow" style="margin-top:16px">Scanned so far</p>'+
@@ -21169,7 +21172,7 @@ function sheetHtml(){
           return '<button data-a="squatRev" data-v="'+idx9+'" style="width:100%;text-align:left;display:flex;align-items:baseline;gap:10px;margin-top:9px">'+
           '<span class="mono" style="color:var(--faint);font-size:10px;flex:none">'+esc(String(e9.d).slice(5))+
             ' '+esc(new Date(e9.t||Date.now()).toTimeString().slice(0,5))+'</span>'+
-          '<span style="flex:1;font-size:13px">'+s9.reps+' squats \u00b7 '+s9.depth+'\u00b0 deep \u00b7 '+
+          '<span style="flex:1;font-size:13px">'+s9.reps+' squats \u00b7 '+
             (s9.even?'centred':s9.pct+'% toward '+s9.toward)+'</span>'+
           '<span class="mono" style="font-size:10.5px;flex:none;color:'+(s9.even?'var(--green)':'var(--amber)')+'">'+
             (s9.even?'even':(s9.away===true?'away from it':s9.away===false?'onto it':''))+'</span>'+
