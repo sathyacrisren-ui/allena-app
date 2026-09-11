@@ -69,6 +69,16 @@ html,body{background:var(--bg);color:var(--text);
 input,textarea{-webkit-user-select:text;user-select:text}
 button{font-family:inherit;border:none;background:none;color:inherit;cursor:pointer;transition:transform .08s ease,opacity .12s}
 button:active{transform:scale(.96);opacity:.85}
+/* THE PRESSED STATE (owner-caught, 11 Sep). Painted from pointerdown by
+   the delegate in 29-scrub, because iOS withholds :active until it has
+   ruled out a scroll — which is after a quick tap has already ended.
+   Opacity and transform only: they cannot break a layout, they read on
+   both themes, and they do not fight an element's own background or
+   glow. Fast in, slower out, so a tap feels answered rather than
+   animated. Reduced motion keeps the dim and drops the movement. */
+.tapd{opacity:.6!important;transform:scale(.97)!important;
+  transition:opacity .06s linear,transform .06s linear!important}
+@media (prefers-reduced-motion:reduce){.tapd{transform:none!important}}
 input,textarea,select{font-family:inherit;background:var(--raised);border:1px solid transparent;border-radius:14px;
   color:var(--text);padding:13px 14px;font-size:16px;outline:none;width:100%;min-width:0;
   -webkit-appearance:none;appearance:none;box-sizing:border-box}
@@ -732,7 +742,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='9e8de9';  // stamped by tools/build.py with the content hash
+const BUILD_ID='c4992a';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -22487,8 +22497,44 @@ document.addEventListener('pointerdown',e=>{
 function doBump(t){const p=t.dataset.k,d=parseFloat(t.dataset.d);
   setPath(p,Math.max(0,Math.round(((parseFloat(getPath(p))||0)+d)*100)/100));render()}
 
+/* ══ EVERY TAP ANSWERS ═══════════════════════════════════════
+   Owner-caught, 11 Sep: "some buttons still do nothing when they're
+   touched. It's part of Apple's design." Correct, and the HIG pass
+   before this one got it wrong — it recorded "tap highlight off" as a
+   PASS. Turning off the default highlight without replacing it is a
+   regression, not a win.
+
+   The CSS :active rule was there, but on iOS :active is withheld until
+   the system has decided the touch is not the start of a scroll. On a
+   quick tap inside any scrolling view that decision lands after the
+   finger is already gone, so the press state never paints. That is why
+   it felt dead in some places and fine in others.
+
+   This paints the state on pointerdown instead — immediately, before
+   any scroll disambiguation — and clears it on up, cancel and scroll.
+   It covers EVERY [data-a], not only <button>, so the handful of rows
+   and cards that are tappable answer too. touchcancel is handled
+   because iOS fires it whenever the system takes the gesture. */
+let _pressEl=null;
+function pressOff(){if(_pressEl){try{_pressEl.classList.remove('tapd')}catch(e){}_pressEl=null}}
+document.addEventListener('pointerdown',e=>{
+  try{
+    pressOff();
+    /* [data-a] is the app's universal tappable contract — nothing else
+       is targeted, so chart scrubbing and the hold-to-repeat steppers
+       are left completely alone */
+    const t=e.target.closest('[data-a]');
+    if(!t)return;
+    /* a text field must not dim — it is being focused, not pressed */
+    const tag=(e.target.tagName||'').toUpperCase();
+    if(tag==='INPUT'||tag==='TEXTAREA'||tag==='SELECT')return;
+    _pressEl=t;t.classList.add('tapd')}catch(e2){}},{passive:true});
+['pointerup','pointercancel','pointerleave','touchend','touchcancel','scroll','dragstart']
+  .forEach(ev=>document.addEventListener(ev,pressOff,{passive:true,capture:ev==='scroll'}));
+
 document.addEventListener('click',e=>{
   const t=e.target.closest('[data-a]');if(!t)return;
+  pressOff();
   vib(8);
   const a=t.dataset.a,v=t.dataset.v;
   if(a==='closeSheet'&&e.target.closest('[data-stop]')&&e.target.tagName!=='BUTTON')return;
