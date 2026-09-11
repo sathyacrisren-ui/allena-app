@@ -737,7 +737,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='cc3887';  // stamped by tools/build.py with the content hash
+const BUILD_ID='8e35e1';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -888,59 +888,63 @@ function flameF(av,size){
   try{
     const col=(typeof avRing==='function')?avRing(av,'var(--green)'):'var(--green)';
     const s=Math.max(28,Number(size)||54);
-    const id='fl'+Math.random().toString(36).slice(2,8);
-    /* THE RING (owner, 11 Sep: "go back to the same flame as this, just make
-       it emerge like a ring"). The SAME drawn flame as the single one that
-       worked, repeated around the mark — never the thin stretched licks that
-       came before it and read as grass. One SVG in a 100-unit square: each
-       copy is the same path, scaled to its own height, stood on the rim with
-       its base at radius R, then rotated outward about the centre. Taller at
-       the crown because fire rises, and every copy leans toward the top so
-       the ring curls rather than spiking. */
-    /* THE FLAMES STAND NEAR THE CENTRE, NOT ON THE RIM (owner, 11 Sep:
-       "the fire needs to be covering the profile but translucent enough to
-       see it"). Based out near the middle, each copy lies ACROSS the face
-       and its tip emerges past the mark's edge — so the fire covers the
-       profile and rings it at the same time. Bases on the rim pointing
-       outward read as a sunflower and were rejected. */
-    const V=100,C=50,R=7,N=12;
-    const VAR=[1,.84,1.1,.8,1.16,.88,1.12,.82,1.14,.86,1.08,.9];
+    const id='fl'+Math.random().toString(36).slice(2,8),ic='fc'+id;
+    /* THE LEADER'S FIRE, settled after the owner said the two things that
+       actually define it: "fire goes up" and "it has a centre as well".
+       So it is ONE fire, not a pattern: a tall centre flame with a bright
+       core rising straight up the middle of the mark, flanked by shorter
+       flames that also go UP, leaning out a little as they get further from
+       the middle. Together they wrap the circle and emerge all round its
+       lower half, which is what "emerge like a ring" meant.
+
+       Three shapes were built and rejected on the way here, all the same
+       mistake — treating the fire as a repeated motif instead of one thing
+       that burns upward: thin licks on the rim (read as grass), copies
+       rotated to their radial normals (a sunflower), copies based at the
+       centre (a fern). Do not go back to any of them. */
+    const V=100,C=50,r=100/1.9/2;              // the mark's radius in this space
+    /* x offset, base y offset, height, lean — all as fractions of the mark */
+    const F=[[ 0.00, 0.86, 1.62,   0, 1],
+             [-0.62, 0.60, 1.18, -11, 0],
+             [ 0.64, 0.58, 1.22,  12, 0],
+             [-1.00, 0.16, 0.82, -24, 0],
+             [ 1.02, 0.14, 0.86,  25, 0],
+             [-0.34, 0.92, 0.96,  -5, 0],
+             [ 0.36, 0.90, 1.00,   6, 0]];
     let g='';
-    for(let i=0;i<N;i++){
-      const ang=(i/N)*360;
-      const up=Math.cos(ang*Math.PI/180);
-      const k=(up*0.5+0.5);                       // 1 at the crown, 0 at the foot
-      const L=(37+11*k)*VAR[i];
-      const sc=L/110;                             // the path lives in a 64x110 box
-      const lean=(ang>180?360-ang:-ang)*0.12;     // curl toward the crown
-      g+='<g transform="rotate('+(ang+lean).toFixed(1)+' '+C+' '+C+') translate('+C+' '+(C-R)+') scale('+sc.toFixed(4)+') translate(-32 -110)">'+
-        '<g class="lead-ff" style="animation-duration:'+(1.3+(i%4)*0.3).toFixed(2)+'s;'+
-        'animation-delay:'+((i%5)*0.23).toFixed(2)+'s">'+
+    F.forEach((f,i)=>{
+      const bx=C+f[0]*r,by=C+f[1]*r,L=f[2]*r*1.55,sc=L/110;
+      g+='<g transform="translate('+bx.toFixed(1)+' '+by.toFixed(1)+') rotate('+f[3]+') scale('+sc.toFixed(4)+') translate(-32 -110)">'+
+        '<g class="lead-ff" style="animation-duration:'+(1.25+(i%4)*0.32).toFixed(2)+'s;'+
+        'animation-delay:'+((i%5)*0.21).toFixed(2)+'s">'+
         '<path d="'+FLAME_BODY[0]+'" fill="url(#'+id+')"/>'+
-        '<path d="'+FLAME_TONGUE[0]+'" fill="var(--amber)" opacity=".07"/>'+
-        '</g></g>'}
-    /* the round dust motes a fresh find already throws off (owner ask: "the
-       dot artefacts emerging as well, combined with the flame") */
+        /* THE CENTRE: only the middle flame carries the hot core */
+        (f[4]?'<path d="'+FLAME_TONGUE[0]+'" fill="url(#'+ic+')"/>':'')+
+        '</g></g>'});
+    /* the round dust motes a fresh find already throws off */
     let emb='';
     for(let i=0;i<7;i++){
-      const f=-0.06+i*0.19,px=(i%3===0?3.2:i%3===1?2.2:2.8);
+      const f=0.1+i*0.13,px=(i%3===0?3.2:i%3===1?2.2:2.8);
       emb+='<i class="lead-mote" style="left:'+(f*100).toFixed(0)+'%;'+
         'width:'+px+'px;height:'+px+'px;background:'+col+';'+
-        '--esz:1;--edx:'+((f-0.5)*24).toFixed(0)+'px;'+
+        '--esz:1;--edx:'+((f-0.5)*22).toFixed(0)+'px;'+
         'animation-duration:'+(2.4+(i%3)*0.5).toFixed(2)+'s;'+
         'animation-delay:'+(0.3+i*0.4).toFixed(2)+'s"></i>'}
     const box=Math.round(s*1.9);
     return '<div class="lead-fire" style="width:'+box+'px;height:'+box+'px" aria-hidden="true">'+
       '<svg class="lead-svg" viewBox="0 0 '+V+' '+V+'" width="100%" height="100%">'+
-      /* the leader's OWN colour all the way up, translucent, with only the
-         very tip lifting toward warm white — the face reads straight through */
       '<defs><linearGradient id="'+id+'" x1="0" y1="1" x2="0" y2="0">'+
-        /* faint where twelve copies overlap at the middle, stronger out at
-           the tips — the initial and the ring stay readable underneath */
-        '<stop offset="0" stop-color="'+col+'" stop-opacity=".05"/>'+
-        '<stop offset=".45" stop-color="'+col+'" stop-opacity=".2"/>'+
-        '<stop offset=".85" stop-color="'+col+'" stop-opacity=".46"/>'+
-        '<stop offset="1" stop-color="var(--amber)" stop-opacity=".4"/>'+
+        /* translucent the whole way, so the face and the initial read
+           straight through; only the tips lift toward warm white */
+        '<stop offset="0" stop-color="'+col+'" stop-opacity=".14"/>'+
+        '<stop offset=".4" stop-color="'+col+'" stop-opacity=".36"/>'+
+        '<stop offset=".85" stop-color="'+col+'" stop-opacity=".58"/>'+
+        '<stop offset="1" stop-color="var(--amber)" stop-opacity=".5"/>'+
+      '</linearGradient>'+
+      '<linearGradient id="'+ic+'" x1="0" y1="1" x2="0" y2="0">'+
+        '<stop offset="0" stop-color="'+col+'" stop-opacity="0"/>'+
+        '<stop offset=".55" stop-color="var(--amber)" stop-opacity=".14"/>'+
+        '<stop offset="1" stop-color="var(--amber)" stop-opacity=".34"/>'+
       '</linearGradient></defs>'+g+'</svg>'+emb+'</div>'}
   catch(e){oops('flameF',e);return ''}}
 function iBtn(k){return '<button data-a="iTog" data-v="'+esc(k)+'" aria-label="More info" style="width:17px;height:17px;border-radius:17px;border:1px solid var(--line);background:none;color:var(--faint);font-size:10px;font-style:italic;font-family:Georgia,serif;line-height:1;display:inline-flex;align-items:center;justify-content:center;vertical-align:-2px;margin-left:7px;padding:0;flex:none">i</button>'}
