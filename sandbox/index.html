@@ -760,7 +760,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='eab297';  // stamped by tools/build.py with the content hash
+const BUILD_ID='767abe';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -6483,11 +6483,14 @@ function rehabHero(){
       (st.n>1?'<p class="mono" style="color:var(--faint);font-size:9.5px">'+st.n+' DAYS RUNNING</p>':'')+'</div>';
     h+='<p class="disp gradhead" style="font-size:24px;line-height:1.18;margin-top:10px">'+esc(head)+'</p>'+
       '<p style="color:var(--dim);font-size:13px;line-height:1.55;margin-top:5px">'+esc(sub)+'</p>';
+    /* THE PHASE PILLS ARE DOORS (owner ask, 11 Sep: "should be able to
+       click the climb pill to take you to the phase you're in"). They
+       were flat divs — five numbers that looked tappable and were not. */
     if(acl)h+='<div style="display:flex;gap:6px;margin-top:13px">'+
       [1,2,3,4,5].map(n=>{const met=phaseMet(n),cur=n===a.phase;
-        return '<div style="flex:1;text-align:center">'+
+        return '<button data-a="aclPhaseOpen" data-v="'+n+'" aria-label="Phase '+n+'" style="flex:1;text-align:center;padding:0">'+
           '<div style="height:6px;border-radius:3px;background:'+(met?'var(--green)':cur?'var(--amber)':'var(--line)')+'"></div>'+
-          '<span class="mono" style="font-size:9px;color:'+(met?'var(--green)':cur?'var(--amber)':'var(--faint)')+'">'+n+'</span></div>'}).join('')+'</div>';
+          '<span class="mono" style="font-size:9px;color:'+(met?'var(--green)':cur?'var(--amber)':'var(--faint)')+'">'+n+'</span></button>'}).join('')+'</div>';
     if(lsi!=null&&nextT)h+='<div style="position:relative;height:5px;border-radius:3px;background:var(--line);overflow:hidden;margin-top:12px">'+
       '<div class="an-bar" style="height:5px;width:'+Math.min(100,Math.round(lsi/nextT*100))+'%;background:var(--amber)"></div></div>'+
       '<p class="mono" style="color:var(--faint);font-size:9.5px;margin-top:5px;text-align:right">'+lsi+'% → '+nextT+'%</p>';
@@ -6496,14 +6499,11 @@ function rehabHero(){
         '<span class="mono" style="font-size:9px;color:var(--green);letter-spacing:.06em;flex:none">CHECKED IN</span>'+
         '<span style="flex:1;min-width:0;color:var(--dim);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Pain '+c.pain+'/10'+(c.swell?' · swollen':'')+' · tap to change</span></button>'
       :'<button data-a="checkOpen" class="big disp mt" style="background:var(--amber);color:var(--bg);font-size:15px">Thirty-second check-in</button>';
-    h+='<div style="display:flex;align-items:center;gap:9px;margin-top:11px;padding-top:11px;border-top:1px solid var(--line)">'+
-      '<span class="mono" style="font-size:9px;color:'+(sess>=targ?'var(--green)':'var(--faint)')+';letter-spacing:.06em;flex:none">THE WORK</span>'+
-      '<span style="flex:1;color:var(--dim);font-size:12px">'+sess+' of '+targ+' rehab sessions this week</span>'+
-      /* DEAD BUTTON (owner-caught, 11 Sep: "8 gates doesn't work") — it
-         ran nav to 'acl', and the renderer maps 'acl' to viewRehabHub, so
-         the tap redrew the page you were already on. It lands on the gates
-         themselves now, the same door the climb card already used. */
-      (found?'<button data-a="collOpen" data-v="bodyrehab" class="mono" style="color:var(--amber);font-size:10px;flex:none">'+found+' GATES ›</button>':'')+'</div>';
+    /* THE WORK ROW IS GONE (owner, 11 Sep: "get rid of the work in the
+       climb, unnecessary to take someone to the collection from
+       physio"). The weekly session count is already the target on the
+       hub, and sending someone from a physio surface into the trophy
+       collection was the wrong door from the wrong room. */
     return h+'</div>'}catch(e){return ''}}
 function openDoorsCard(){
   try{
@@ -6645,7 +6645,7 @@ function aclTrack(){
       st.forEach(g=>{
         const b=bank['aclgate:'+ph+':'+g.key];
         gates.push({ph:ph,key:g.key,label:g.label,how:g.how,why:g.why,
-          met:!!g.met,detail:g.detail||'',
+          met:!!g.met,detail:g.detail||'',auto:(g.auto==null?null:g.auto),
           /* the date it was CLEARED, from the moment the app banked it —
              never back-filled, never guessed */
           on:(g.met&&b&&b.found)?String(b.found).slice(0,10):null})});
@@ -6669,7 +6669,36 @@ function aclTrack(){
     dated.forEach(d=>{y++;pts.push({d:d,y:y})});
     const tk=(typeof today==='function')?today():new Date().toISOString().slice(0,10);
     if(pts[pts.length-1].d!==tk)pts.push({d:tk,y:cleared});
-    const next=gates.find(g=>!g.met)||null;
+    /* THE NEXT ONE IS THE NEAREST ONE (owner-caught, 11 Sep: "the next
+       one should be the next easiest thing to reach, as you can see it'd
+       be the 90 degree equal balance criteria not the 70% quad sym").
+       It used to take the first unmet gate in list order, which is an
+       authoring order, not a difficulty order — so it pointed at a
+       strength test needing 18 more points of symmetry while a squat
+       you could check on two bathroom scales tonight sat further down.
+
+       Reachability, cheapest first:
+         1  a self-check needing nothing but you and a floor
+         3  a measured test you are already close to passing
+         5  a measured test not taken yet — the test itself is the step
+         7  a measured test still a long way off
+         9  the time gate, which nothing but months can move
+       Ties break toward the earlier phase, then list order. */
+    const gateEase=g=>{
+      try{
+        const row=(ACL_PHASES[g.ph-1]||{}).gate||[];
+        const def=row.find(r=>r.k===g.key)||{};
+        if(def.src==='time')return 9;
+        if(!def.src)return 1;
+        if(g.auto==null)return 5;
+        const need=def.need||90;
+        const short=need-g.auto;
+        return short<=10?3:7}
+      catch(e){oops('gateEase',e);return 5}};
+    const next=gates.filter(g=>!g.met)
+      .map((g,i)=>({g:g,e:gateEase(g),i:i}))
+      .sort((x,y)=>x.e-y.e||x.g.ph-y.g.ph||x.i-y.i)
+      .map(x=>x.g)[0]||null;
     const lastMove=dated.length?dated[dated.length-1]:null;
     const daysFlat=lastMove
       ?Math.floor((new Date(tk+'T12:00')-new Date(lastMove+'T12:00'))/864e5)
@@ -6734,11 +6763,15 @@ function aclTrackCard(){
       ?'Nothing has ticked over for '+Math.floor(T.daysFlat/7)+' weeks. Rehab moves in steps with long flats between them — that is the normal shape of it, not a stall.'
       :T.daysFlat>=7?'A quiet week. Gates come in steps, not daily.':null;
     return '<div class="card mt" style="padding:16px;border-radius:18px">'+
+      /* THE WHOLE HEAD IS A DOOR (owner ask, 11 Sep: "should be able to
+         click where you are to get more info") — it opens every gate on
+         the pathway, cleared and outstanding, with the day each one fell */
+      '<button data-a="trackOpen" style="width:100%;text-align:left;padding:0">'+
       '<div style="display:flex;justify-content:space-between;align-items:baseline">'+
       '<p class="eyebrow" style="margin:0">Where you are</p>'+
-      '<span class="mono" style="color:var(--faint);font-size:10px">'+T.weeks+' WEEK'+(T.weeks===1?'':'S')+' IN</span></div>'+
+      '<span class="mono" style="color:var(--faint);font-size:10px">'+T.weeks+' WEEK'+(T.weeks===1?'':'S')+' IN \u203a</span></div>'+
       '<p class="disp" style="font-size:25px;font-weight:600;line-height:1.15;margin-top:8px">'+
-        T.cleared+' of '+T.total+' <span style="color:var(--faint);font-size:15px;font-weight:500">gates cleared</span></p>'+
+        T.cleared+' of '+T.total+' <span style="color:var(--faint);font-size:15px;font-weight:500">gates cleared</span></p></button>'+
       '<svg viewBox="0 0 '+W+' '+H+'" width="100%" style="display:block;margin-top:10px;overflow:visible" aria-hidden="true">'+
       bands+
       '<path d="'+d+'" fill="none" stroke="var(--green)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>'+
@@ -20728,6 +20761,33 @@ function sheetHtml(){
           '<span class="mono" style="color:var(--faint);font-size:10.5px">'+Object.keys(x.m||{}).length+' markers</span>'+
           '<button data-a="bloodDel" data-v="'+esc(x.d)+'" style="color:var(--red);font-size:11px;flex:none">Remove</button></div>').join(''):'')+
       '<p style="color:var(--faint);font-size:11px;line-height:1.55;margin-top:14px">Reference ranges are the lab\u2019s own adult bands, checked only when units match. Trend over single numbers \u2014 and your doctor is the judge, always.</p>')}
+  /* EVERY GATE, OPEN (owner ask, 11 Sep: "should be able to click where
+     you are to get more info"). The graph shows the shape of the climb;
+     this is the ledger behind it — what has fallen, on what day, and
+     what is still standing, phase by phase. Each row opens the test
+     itself, so it is a door and not a list. */
+  if(S.sheet.t==='track'){
+    const T9=(typeof aclTrack==='function')?aclTrack():null;
+    if(!T9)return wrapSheet('The gates','<p style="color:var(--dim);font-size:13px;margin-top:6px">The pathway is not running yet.</p>');
+    const byPh={};T9.gates.forEach(g=>{(byPh[g.ph]=byPh[g.ph]||[]).push(g)});
+    return wrapSheet('The gates',
+      '<p style="color:var(--dim);font-size:13px;line-height:1.6">'+T9.cleared+' of '+T9.total+' cleared across five phases. Tap any one to read the test and why it matters.</p>'+
+      Object.keys(byPh).sort((x,y)=>x-y).map(ph=>{
+        const rows=byPh[ph],done=rows.filter(g=>g.met).length;
+        const nm=(ACL_PHASES[ph-1]||{}).name||('Phase '+ph);
+        return '<div style="margin-top:16px">'+
+          '<div style="display:flex;justify-content:space-between;align-items:baseline">'+
+          '<p class="eyebrow" style="margin:0;color:'+(done===rows.length?'var(--green)':'var(--faint)')+'">Phase '+ph+' \u00b7 '+esc(nm)+'</p>'+
+          '<span class="mono" style="font-size:10px;color:'+(done===rows.length?'var(--green)':'var(--faint)')+'">'+done+'/'+rows.length+'</span></div>'+
+          rows.map(g=>'<button data-a="aclGateGo" data-v="'+esc(g.ph+':'+g.key)+'" class="card" style="width:100%;text-align:left;padding:11px 13px;margin-top:7px;display:flex;align-items:flex-start;gap:10px'+(g.met?';border-color:var(--greensoft)':'')+'">'+
+            '<span class="mono" style="width:19px;height:19px;border-radius:6px;flex:none;display:inline-flex;align-items:center;justify-content:center;font-size:11px;'+
+            (g.met?'background:var(--green);color:var(--bg)':'border:1.5px solid var(--line);color:var(--faint)')+'">'+(g.met?'\u2713':'')+'</span>'+
+            '<span style="flex:1;min-width:0"><span style="display:block;font-size:12.5px;line-height:1.45'+(g.met?';color:var(--faint)':'')+'">'+esc(g.label)+'</span>'+
+            (g.on?'<span class="mono" style="color:var(--green);font-size:10px">cleared '+esc(fmtDate(g.on+'T12:00'))+'</span>'
+              :(g.detail?'<span class="mono" style="color:var(--amber);font-size:10px">'+esc(g.detail)+'</span>':''))+'</span>'+
+            '<span class="mono" style="color:var(--faint);font-size:12px;flex:none">\u203a</span></button>').join('')+
+        '</div>'}).join('')+
+      '<p style="color:var(--faint);font-size:11px;line-height:1.55;margin-top:16px">Cleared dates are the day Allena saw it met. Anything met before it was watching is counted but carries no date \u2014 it will not invent one.</p>')}
   if(S.sheet.t==='rom'){
     const L9=(typeof romStore==='function'?romStore().list:[]).slice(-8).reverse();
     return wrapSheet('The knee protractor',
@@ -24236,6 +24296,11 @@ function runAction(a,v,t,e){
           try{goalCerBank(g)}catch(e8){oops('goalCerBank',e8)}}}catch(e9){oops('goalCerDone',e9)}
       if(a==='goalCerDone'){S.sheet={t:'goal'};}
       render();break}
+    case 'trackOpen':S.sheet={t:'track'};render();break;
+    /* the climb's phase pills are doors now — straight into that phase
+       of the pathway, not the page you were already on */
+    case 'aclPhaseOpen':{S.aclView=Math.max(1,Math.min(5,+v||1));
+      S.backTo='acl';S.backDrawer=false;S.sheet=null;S.view='aclpath';render();break}
     case 'cerDone':{try{const a9c=acct();if(a9c){a9c.cerWk=questWeekKey();lset(K_ACCT,a9c)}}catch(e9){}render();break}
     case 'recPickOpen':{S.recSel=[];S.sheet={t:'recpick'};render();break}
     case 'recPickTog':{S.recSel=S.recSel||[];
