@@ -760,7 +760,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='818b5f';  // stamped by tools/build.py with the content hash
+const BUILD_ID='168e12';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -22309,8 +22309,17 @@ function render(){
      staggered child rise and a view transition in one frame stuttered
      every time on-device — so when the page itself moves, the stagger
      stands down (enforced in the shell by #app.pgnav .stg>*). */
+  /* THE FIRST PAINT IS NOT A NAVIGATION (owner-caught, 11 Sep: "there's
+     still a jitter when you open the app"). lastAnimKey starts null, so
+     the opening render counts as a view CHANGE and the page slid in from
+     the right on every launch — the app had not gone anywhere, it had
+     just opened, and a sideways lurch is exactly what that reads as.
+     Directional motion is for moving between pages. The first paint gets
+     the staggered card rise it always had instead, which is why .stg is
+     left alone below. */
+  const firstPaint=!render.__painted;render.__painted=1;
   let pgAnim=false;
-  try{pgAnim=viewChanged&&!(window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches)}catch(e){pgAnim=viewChanged}
+  try{pgAnim=viewChanged&&!firstPaint&&!(window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches)}catch(e){pgAnim=viewChanged&&!firstPaint}
 
   const apply=()=>{
     /* a NEW view starts at its top — the old page's scroll depth used
