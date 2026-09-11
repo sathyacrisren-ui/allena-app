@@ -726,7 +726,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='e6bc47';  // stamped by tools/build.py with the content hash
+const BUILD_ID='9a30c9';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -4707,18 +4707,29 @@ function todayTasks(){
   // Sep 2026): a daily "step on the scales" nudge is the wrong voice
   // for anyone with a fraught relationship with the number. Allena
   // supports a trend the user chose to keep; it never starts one.
-  {const tracking=Object.keys(dd).some(k2=>{
+  /* THE GATE WAS TOO TIGHT (owner-caught, 11 Sep: "Allena didn't ask me
+     to log my bodyweight today"). A fortnight without a manual entry
+     switched the task off for good, so the only way back was to find
+     the screen yourself — the gap that stops you logging is exactly the
+     gap that removes the reminder. Sixty days, and a single explicit
+     "stop asking" is the way out, not a silent timeout. */
+  {const off=!!(S.daily&&S.daily.bwOff);
+   const tracking=!off&&(Object.keys(dd).some(k2=>{
       const dt=new Date(k2+'T12:00').getTime();
-      return dd[k2]&&dd[k2].bw!=null&&(Date.now()-dt)<14*864e5})
+      return dd[k2]&&dd[k2].bw!=null&&(Date.now()-dt)<60*864e5})
     /* weekly scans ARE tracking (owner-caught, 10 Sep: 'log
        bodyweight disappeared again' — Evolt weigh-ins live in
        S.scans, and a fortnight without a manual entry hid the task
        from the person tracking hardest) */
     ||(S.scans||[]).some(x2=>{try{
-      return x2&&x2.w!=null&&x2.date&&(Date.now()-new Date(String(x2.date).slice(0,10)+'T12:00').getTime())<21*864e5}catch(e2){return false}});
-   if(tracking)T.push({k:'bw',n:'Log bodyweight',
+      return x2&&x2.w!=null&&x2.date&&(Date.now()-new Date(String(x2.date).slice(0,10)+'T12:00').getTime())<60*864e5}catch(e2){return false}}));
+   /* and it is skippable (owner ask): today's skip is just today's —
+      the task returns tomorrow. Stopping for good is a separate,
+      deliberate choice, because a scale is not a neutral object for
+      everyone and neither is being nagged by one. */
+   if(tracking&&!(dd[k]&&dd[k].bwSkip))T.push({k:'bw',n:'Log bodyweight',
     sub:'Only because you track it — same time of day keeps the trend readable.',
-    done:!!(dd[k]&&dd[k].bw!=null),go:'sigBw',pts:2})}
+    done:!!(dd[k]&&dd[k].bw!=null),go:'sigBw',skip:'bwSkip',pts:2})}
   // 4. the session, if one is due
   const p=activeProgSafe();
   if(p&&!p.acl){
@@ -19808,6 +19819,7 @@ function sheetHtml(){
         '<span style="display:block;color:var(--faint);font-size:11.5px;line-height:1.4">'+esc(x.sub)+'</span></span>'+
         (!x.done&&x.go?'<button data-a="'+x.go+'" class="mono" style="color:var(--amber);font-size:11.5px;flex:none">Do it</button>':'')+
         (x.optional&&!x.done?'<span class="mono" style="color:var(--faint);font-size:9.5px;flex:none">optional</span>':'')+
+        (!x.done&&x.skip?'<button data-a="'+x.skip+'" class="mono" style="color:var(--faint);font-size:11px;flex:none;padding-left:4px">Not today</button>':'')+
         '</div>').join('')+'</div>')}
   if(S.sheet.t==='quest'){
     const Q=questCurrent();if(!Q||!Q.q)return '';
@@ -23777,6 +23789,24 @@ function runAction(a,v,t,e){
     case 'unitD':unitsSet('d',v);render();flash(v==='mi'?'Distances now read in miles — stored metric underneath.':'Distances back to kilometres.');break;
     case 'progNoteOpen':S.sheet={t:'prognote'};render();break;
     case 'drawerAi':S.drawerOpen=false;runAction('dsetOpen','Allena \u2014 AI coach');break;
+    /* skip today's weigh-in (owner ask, 11 Sep). Three skips running and
+       Allena offers to stop asking altogether rather than keep nagging. */
+    case 'bwSkip':{
+      /* dget() returns TODAY'S record, not the day map — writing
+         dd[today()] nested it a level too deep and todayTasks never
+         saw it. Caught by testing the real path, not my own. */
+      dget().bwSkip=1;lset(K_DAILY,S.daily);
+      const days9=(S.daily&&S.daily.days)||{};
+      let run=0;for(let i=0;i<3;i++){
+        const kk=dayKey(new Date(Date.now()-i*864e5));
+        if(days9[kk]&&days9[kk].bwSkip&&days9[kk].bw==null)run++;else break}
+      if(run>=3){S.confirm={t:'Stop asking about bodyweight?',
+        d:'Three days skipped. Allena can leave it out of the daily list — your trend and any scans stay exactly as they are, and you can still log it whenever you want from Health data.',
+        go:'bwOff',v:'',soft:true,ok:'Stop asking',no:'Keep asking'};
+        S.sheet={t:'confirm'};render();break}
+      render();flash('Left for today.');break}
+    case 'bwOff':{S.daily.bwOff=1;lset(K_DAILY,S.daily);S.sheet=null;render();
+      flash('Allena will stop asking. Log it any time from Health data.');break}
     case 'adjOpen':S.sheet={t:'adjledger'};render();break;
     case '__help':S.sheet={t:'help'};render();break;
     case 'helpCopy':{try{navigator.clipboard.writeText('sathya@allenaapp.com');flash('Address copied.')}catch(e){flash('sathya@allenaapp.com')}break}
