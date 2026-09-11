@@ -792,7 +792,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='8f2a11';  // stamped by tools/build.py with the content hash
+const BUILD_ID='a591d5';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -5761,10 +5761,20 @@ function rehabAdherence(days){
   const rp=S.lib.programs.filter(p=>p.acl||p.rehabProto).map(p=>p.id);
   const done=S.history.filter(h=>rp.indexOf(h.progId)>=0&&h.complete&&new Date(h.date).getTime()>=cut);
   const byDay={};done.forEach(h=>{byDay[hKey(h)]=1});
-  // what was asked for: rehab sessions per week across active protocols
-  let target=0;
-  if(S.acl&&S.acl.on)target+=(S.acl.phase===1?7:2)*(d/7);
-  activeProtocols().forEach(p=>{target+=(p.mode==='manage'?3:2)*(d/7)});
+  /* ONE definition of the weekly dose, shared with the hub, the climb and
+     the week board (owner-caught by consequence, 11 Sep: freqPerWeek taught
+     rehabWeekTarget to read the physio's actual words — "twice a day" = 14 —
+     but adherence still scored against a hardcoded 3, and it also double-
+     counted the pathway's dose when a physio plan was leading. The same
+     plan had two different targets, so the percentage answered a question
+     nobody had asked). rehabWeekTarget is the authority; adherence just
+     scales it across the window. */
+  let perWk=0;
+  try{perWk=(typeof rehabWeekTarget==='function')?rehabWeekTarget():0}catch(e){oops('adhTarget',e)}
+  if(!perWk){
+    if(S.acl&&S.acl.on)perWk+=(S.acl.phase===1?7:2);
+    activeProtocols().forEach(p=>{perWk+=(p.mode==='manage'?3:2)})}
+  const target=perWk*(d/7);
   return{done:done.length,days:Object.keys(byDay).length,target:Math.round(target),
     pct:target?Math.min(100,Math.round(done.length/target*100)):null,tracked:d,early:false}}
 /* ══ what the symptoms line up with ══ */
@@ -16368,6 +16378,19 @@ function rehabLoadToday(){ // what rehab has already taken out of the legs
     fresh:Math.round(fresh[legs[0]]==null?100:fresh[legs.sort((a,b)=>(fresh[a]||100)-(fresh[b]||100))[0]]),
     sets:legs.reduce((a,m)=>a+load[m],0),when:recent[recent.length-1].dayTitle}}
 function recommendToday(){
+  /* MEMOIZED (found by the daily review, 11 Sep). Every day card on Program
+     now asks "are you the suggested session today?", so this ran once PER
+     DAY CARD — six full recomputations of week state, readiness baseline and
+     race countdown to draw one glow. It is cleared at the top of every
+     render, so it can never serve a stale answer; the stamp is a second
+     belt for callers outside the render cycle. */
+  const k9=(S.history?S.history.length:0)+':'+(S.week||0)+':'+today()+':'+
+    ((S.sess&&S.sess.phase)||'')+':'+((S.lib&&S.lib.activeId)||'');
+  if(S._recC&&S._recC.k===k9)return S._recC.v;
+  let v9=null;try{v9=recommendCalc()}catch(e9){oops('recommendToday',e9);v9=null}
+  S._recC={k:k9,v:v9};
+  return v9}
+function recommendCalc(){
   const p=activeProgSafe();if(!p)return null;
   const daily=p.weeks===1;
   const wkC=daily?1:weekCurrent(p);
@@ -22341,6 +22364,7 @@ function cuSweep(){
    only way to check it was to look. */
 function onSessionScreen(){try{return !!(S.sess&&S.view==='session')}catch(e){return false}}
 function render(){
+  S._recC=null;   /* the day's recommendation is computed once per render, never once per card */
   const ae=document.activeElement,key=ae&&ae.dataset?ae.dataset.in:null;
   const pos=key&&ae.selectionStart!=null?ae.selectionStart:null;
   let body='';
