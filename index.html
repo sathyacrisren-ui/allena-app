@@ -776,7 +776,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='f394c1';  // stamped by tools/build.py with the content hash
+const BUILD_ID='85ba2c';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -1099,6 +1099,13 @@ function autoReg(e,c){
       return{level:'ok',msg:'Missed the reps but only RPE '+e.rpe+'. Hold this weight and push nearer the target effort before touching the load.'};
     if(isTop&&short>=2)return{level:'warn',msg:'Top set missed by '+short+' at RPE '+(isNaN(rpe)?'max':e.rpe)+'. Take '+uwNum(drop)+' '+uwUnit()+' off the back-offs today and repeat this week rather than advancing.'};
     return{level:'warn',msg:'Missed the target at RPE '+(isNaN(rpe)?'high effort':e.rpe)+' — the load is genuinely ahead of you. Take '+uwNum(drop)+' '+uwUnit()+' off the remaining sets and keep the reps.'}}
+  /* the NEXT set's target decides what 'hot' means (owner-caught, 11
+     Sep: set 1 at RPE 9 against 8 was told to take weight off, when
+     set 2 was written at RPE 9 — the weight already fitted it) */
+  try{const nx=S.sess&&(S.sess.sets||[]).find(x=>x.ex===c.ex&&x.setNo===c.setNo+1);
+    const nHi=nx?rpeHigh(nx.targetRpe):NaN;
+    if(nx&&!isNaN(rpe)&&!isNaN(tHi)&&rpe>=tHi+0.5&&!isNaN(nHi)&&nHi>=rpe&&e.r>=low&&!isNaN(nHi)&&nHi>tHi)
+      return{level:'ok',msg:'RPE '+e.rpe+' against a target of '+tTxt+' \u2014 hotter than written, but the next set asks for RPE '+rpeStr(nx.targetRpe)+', so this weight fits it. Same weight.'}}catch(e9){oops('autoReg.next',e9)}
   if(!isNaN(rpe)&&!isNaN(tHi)&&rpe>=tHi+1){
     const drop=Math.max(step,Math.round(e.w*0.05/2.5)*2.5);
     return{level:'warn',msg:(rpe>=10?'That set went to failure against a target of RPE '+tTxt+'. ':'RPE '+e.rpe+' against a target of '+tTxt+'. ')+
@@ -1540,6 +1547,10 @@ function coachStats(){ // the profile Allena reasons over — computed fresh fro
   return out.join('\n')}
 function hintHtml(cls){if(!S.hint)return '';
   if(S.sess&&S.sess.coachUsed)return '';   // the chat is the voice now — one Allena at a time
+  /* a comment about one exercise must not follow you into the next
+     (owner-caught, 11 Sep: 'Missed the target at RPE 9.5' sitting over
+     a fresh Preacher curl) */
+  try{const cur=S.sess&&S.sess.sets[S.sess.idx];if(S.hint.ex&&cur&&cur.ex!==S.hint.ex)return ''}catch(e9){oops('hint.ex',e9)}
   const col=S.hint.level==='warn'?'var(--amber)':S.hint.level==='good'?'var(--green)':'var(--line)';
   return '<div class="cue '+(cls||'')+'" style="border-left-color:'+col+'">'+esc('Allena: '+S.hint.msg)+'</div>'}
 function sessLabel(h){const d=new Date(h.date);
@@ -2935,7 +2946,7 @@ A.commit=(confirmed)=>{const s=S.sess,c=s.sets[s.idx],timed=!!c.secs;
   if(!confirmed&&!timed){const sn=entrySanity(e,c);
     if(sn){S.sanity=sn;S.sheet={t:'sanity'};render();return}}
   const pr=isPR(e);if(pr)e.pr=true;
-  S.hint=autoReg(e,c);
+  S.hint=autoReg(e,c);if(S.hint)S.hint.ex=c.ex;   // a set comment belongs to its exercise
   e.t=Date.now(); // wall-clock stamp: a live set is auditable, a typed one is not
   s.log.push(e);
   upsert(record(false));
@@ -18777,7 +18788,12 @@ function viewSession(){
      (s.idx>=s.sets.length-1?'Log and finish':(cur.rest>5?'Log and rest '+mmss(cur.rest):'Log — next'))+'</button>'}
   /* a load change is a sentence, not a mystery pill: name the exercise,
      the amount, and hand back the undo (replaces the header "Undo +2.5") */
-  if(S.lastAdj&&(s.phase==='ready'||s.phase==='resting'))body+='<div class="card mt" style="padding:12px 15px;display:flex;align-items:center;gap:10px">'+
+  /* the adjustment sentence stays while you are still on that exercise
+     or have just left it; once a set of something else is logged it is
+     old news (owner-caught, 11 Sep: 'adjusted Bench' over Preacher curl) */
+  const adjLive=(()=>{try{const la=S.lastAdj;if(!la)return false;const ll=s.log[s.log.length-1];
+    return cur.ex===la.ex||(ll&&ll.ex===la.ex)}catch(e9){return !!S.lastAdj}})();
+  if(adjLive&&(s.phase==='ready'||s.phase==='resting'))body+='<div class="card mt" style="padding:12px 15px;display:flex;align-items:center;gap:10px">'+
     '<span style="flex:1;min-width:0;font-size:12.5px;line-height:1.5;color:var(--dim)">Allena adjusted <b style="color:var(--text)">'+esc(String(S.lastAdj.ex).replace(/ — .*/,''))+'</b> by '+(S.lastAdj.delta>0?'+':'')+uwNum(S.lastAdj.delta)+' '+uwUnit()+' for next time.</span>'+
     '<button data-a="undoAdj" class="mono" style="color:var(--amber);font-size:11px;flex:none">Undo</button></div>';
   if(isRehabSession()&&s.phase==='ready')body+='<button data-a="flagOpen" class="btn mt" style="border-color:var(--red);color:var(--red);font-size:12.5px">Flag this for my physio</button>';
