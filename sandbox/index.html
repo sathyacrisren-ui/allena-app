@@ -340,6 +340,22 @@ body.sessview .sheet-bg{background:var(--bg)}
   width:38px;height:4px;border-radius:4px;background:var(--line)}
 /* HIG 44pt hit area for small controls: render() tags any [data-a] under 36px with .hit and a --hs slop; the pseudo-element takes the tap without moving a pixel */
 .hit{position:relative}.hit::after{content:'';position:absolute;inset:calc(-1*var(--hs,6px))}
+/* the PR burst (owner, 11 Sep: 'when you get a PR and click log set it
+   should do the confetti'): a one-shot shower of the app's own dust —
+   green and gold motes thrown from the centre, a NEW BEST word that lands
+   and fades. Fixed, no pointer events, gone in 1.4s; the rest screen
+   underneath is never blocked. Reduced motion: the capsule alone. */
+#prBurst{position:fixed;inset:0;z-index:96;pointer-events:none;overflow:hidden}
+#prBurst .pb{position:absolute;left:50%;top:42%;width:5px;height:5px;border-radius:5px;background:var(--green);opacity:0;
+  animation:prFly 1.25s cubic-bezier(.15,.7,.3,1) both;animation-delay:var(--d,0s)}
+#prBurst .pb.g{background:var(--gold)}#prBurst .pb.w{background:var(--text);width:3px;height:3px}
+#prBurst .pb.s{width:7px;height:2px;border-radius:1px}
+@keyframes prFly{0%{opacity:0;transform:translate(-50%,-50%) rotate(var(--r,0deg)) scale(.4)}
+  12%{opacity:1}100%{opacity:0;transform:translate(calc(-50% + var(--x,0px)),calc(-50% + var(--y,0px))) rotate(calc(var(--r,0deg) + 300deg)) scale(1)}}
+#prBurst .pbw{position:absolute;left:0;right:0;top:36%;text-align:center;font-size:30px;font-weight:700;letter-spacing:-.02em;color:var(--gold);
+  text-shadow:0 0 22px rgba(224,164,88,.35);animation:prWord 1.3s cubic-bezier(.2,1.2,.4,1) both}
+@keyframes prWord{0%{opacity:0;transform:scale(.6)}18%{opacity:1;transform:scale(1.08)}30%{transform:scale(1)}72%{opacity:1}100%{opacity:0;transform:translateY(-12px) scale(1)}}
+@media (prefers-reduced-motion:reduce){#prBurst{display:none}}
 /* keep-it ceremony (owner, 10 Sep): the whole reveal shrinks and flies to the findings icon top-right, then the badge takes it */
 .sig-fly{animation:sigfly .62s cubic-bezier(.4,0,.2,1) forwards!important;pointer-events:none;transform-origin:top right}
 @keyframes sigfly{0%{transform:translate(0,0) scale(1);opacity:1;border-radius:0}60%{opacity:.9}100%{transform:translate(calc(50vw - 46px),calc(-50vh + 46px)) scale(.08);opacity:0;border-radius:40px}}
@@ -776,7 +792,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='eb7018';  // stamped by tools/build.py with the content hash
+const BUILD_ID='bc41b1';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -802,6 +818,21 @@ function flash(m,gold){S.toast=m;S.toastGold=!!gold;
      stuck on screen forever (owner-hit) */
   clearTimeout(flash.t);flash.t=setTimeout(()=>{S.toast=null;S.toastGold=false;try{render()}catch(e){}},gold?3200:2400);
   try{render()}catch(e){}}
+function prBurst(label){
+  /* one-shot celebration for a logged best (owner, 11 Sep). Lives
+     OUTSIDE the render cycle like the deep-read constellation — a
+     re-render mid-shower must not restart it. Self-removes. */
+  S._prBurst=Date.now();
+  try{if(window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches)return}catch(e){oops('prBurst.rm',e)}
+  try{const old=document.getElementById('prBurst');if(old)old.remove();
+    const host=document.createElement('div');host.id='prBurst';
+    let h='<div class="pbw disp">'+esc(label||'NEW BEST')+'</div>';
+    for(let i=0;i<46;i++){const a=(i/46)*Math.PI*2+((i*0.618)%1)*0.5,
+      v=90+((i*0.377)%1)*150,x=Math.round(Math.cos(a)*v),y=Math.round(Math.sin(a)*v*0.8-60);
+      const k=i%7===0?'w':(i%3===0?'g':''),sh=i%5===0?' s':'';
+      h+='<i class="pb '+k+sh+'" style="--x:'+x+'px;--y:'+y+'px;--r:'+Math.round(((i*0.73)%1)*360)+'deg;--d:'+Math.round(((i*0.41)%1)*180)+'ms"></i>'}
+    host.innerHTML=h;document.body.appendChild(host);
+    setTimeout(()=>{try{host.remove()}catch(e){oops('prBurst.rm2',e)}},1500)}catch(e){oops('prBurst',e)}}
 function saveHistory(){return lset(K_H,S.history)}
 /* honest session minutes: the work ends at the last logged set +3,
    and a gap of 40+ minutes between two set stamps ends it at the set
@@ -2964,7 +2995,7 @@ A.commit=(confirmed)=>{const s=S.sess,c=s.sets[s.idx],timed=!!c.secs;
      old `if(auto){}` swallow meant an increase on the last set could
      mute NEW BEST entirely (owner-caught, 9 Sep) */
   if(gHit){vib([40,60,40,60,40,60,140]);flash('GOAL HIT · '+gHit.ex+' '+gHit.w+' × '+gHit.r,true)}
-  else if(pr){vib([25,45,25,45,90]);flash('NEW BEST · '+c.ex+' · '+pr,true)}};
+  else if(pr){vib([25,45,25,45,90]);try{prBurst('NEW BEST')}catch(e9){oops('commit.prBurst',e9)}flash('NEW BEST · '+c.ex+' · '+pr,true)}};
 A.adv=i=>{audioCancel();S.restEnd=null;S.holdEnd=null;S.holdWait=false;const s=S.sess;
   if(i>=s.sets.length){s.phase='done';try{S.sessReveal=sessionReveal()}catch(e){}}else{s.idx=i;s.phase='ready'}persistActive();render()};
 A.exPlan=()=>{const s=S.sess,seen=[],by={};
