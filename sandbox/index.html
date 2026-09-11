@@ -760,7 +760,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='c9e611';  // stamped by tools/build.py with the content hash
+const BUILD_ID='eeb90f';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -918,14 +918,28 @@ function flameF(av,size){
          a fire's centre burns tallest */
       const f=(i+0.5)/N,edge=Math.abs(f-0.5)*2;
       const px=Math.round(7+(1-edge)*7);          // 7px at the edges, 14 in the middle
+      const dur=1.8+edge*0.85;
+      /* the phase offset is the golden ratio's fractional part, which
+         spreads any count of particles about as evenly around a loop as
+         a fixed rule can — and being fixed, the same leader still gets
+         the same fire on every render */
       m+='<i class="lead-flame" style="left:'+(f*100).toFixed(0)+'%;'+
         '--fo:'+(0.5+(1-edge)*0.45).toFixed(2)+';'+
         '--fup:-'+Math.round(s*(0.55+(1-edge)*0.4))+'px;'+
         '--fdx:'+((f-0.5)*s*0.4).toFixed(0)+'px;'+
         '--fr:'+((f-0.5)*30).toFixed(0)+'deg;'+
         'margin-left:-'+(px/2).toFixed(0)+'px;'+
-        'animation-duration:'+(1.8+edge*0.85).toFixed(2)+'s;'+
-        'animation-delay:'+(i*0.23).toFixed(2)+'s">'+
+        'animation-duration:'+dur.toFixed(2)+'s;'+
+        /* NEGATIVE delay, not positive (owner, 11 Sep: "right now it
+           starts with a row of fire then progressively becomes more
+           random — skip the structured row and go straight to random").
+           A positive delay makes every particle WAIT and then begin its
+           loop at zero, so the first pass rises as one tidy rank and only
+           drifts apart later as the different durations desynchronise
+           them. A negative one starts the particle as if it had already
+           been burning that long, so the very first frame is already
+           mid-cycle and scattered. */
+        'animation-delay:-'+((((i+0.37)*0.6180339887)%1)*dur).toFixed(2)+'s">'+
         '<svg viewBox="0 0 14 19" width="'+px+'" height="'+Math.round(px*1.36)+'">'+
         '<path d="'+FLAME_P+'" fill="'+col+'"/></svg></i>'}
     return '<div class="lead-fire" style="width:'+w+'px;height:'+h+'px" aria-hidden="true">'+m+'</div>'}
@@ -10804,30 +10818,48 @@ function fuelWins(){
    floor. */
 function romSetupSvg(){
   const G='var(--green)',L='var(--line)',F='var(--faint)',T='var(--text)';
+  /* THE DIAGRAM MOVES (owner ask, 11 Sep: "can you make the diagram a
+     moving animation"). A still picture shows the POSITION; the motion
+     shows the ACTION, which is the half people get wrong — they hold a
+     bend and wait, when the measurement wants a slow bend all the way in
+     and a full straighten back out. The leg does exactly that, on a
+     loop, so the instruction is demonstrated rather than described.
+     Reduced motion gets the bent frame, held still. */
+  let still=false;
+  try{still=!!(window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches)}catch(e){}
+  /* two poses: knee up (deepest bend) and leg flat (fully straight) */
+  const FEM_B='M232 105 L196 78',FEM_S='M232 105 L200 105';
+  const TIB_B='M196 78 L168 106',TIB_S='M200 105 L168 105';
+  const DUR='3.6s',SPL='.45 0 .55 1;.45 0 .55 1';
+  const anim=(attr,vals)=>still?'':
+    '<animate attributeName="'+attr+'" dur="'+DUR+'" repeatCount="indefinite" '+
+    'calcMode="spline" keyTimes="0;0.5;1" keySplines="'+SPL+'" values="'+vals+'"/>';
   return '<svg viewBox="0 0 320 132" width="100%" style="display:block;margin-top:10px" aria-hidden="true">'+
-    /* the floor */
     '<line x1="8" y1="112" x2="312" y2="112" stroke="'+L+'" stroke-width="1.5"/>'+
     /* the phone, propped, lens level with the knee */
     '<g>'+
       '<rect x="18" y="64" width="26" height="46" rx="5" fill="none" stroke="'+G+'" stroke-width="2.5"/>'+
-      '<circle cx="31" cy="74" r="2.6" fill="'+G+'"/>'+
-      '<path d="M44 78 L44 104" stroke="'+G+'" stroke-width="1" opacity=".5"/>'+
+      '<circle cx="31" cy="74" r="2.6" fill="'+G+'">'+
+        (still?'':'<animate attributeName="opacity" dur="1.4s" repeatCount="indefinite" values="1;.3;1"/>')+
+      '</circle>'+
       '<text x="31" y="126" font-size="8" fill="'+G+'" text-anchor="middle" font-family="ui-monospace,monospace">PHONE</text>'+
     '</g>'+
-    /* the sight line + distance */
     '<path d="M48 88 L150 88" stroke="'+F+'" stroke-width="1" stroke-dasharray="3 3"/>'+
     '<text x="99" y="82" font-size="8" fill="'+F+'" text-anchor="middle" font-family="ui-monospace,monospace">about 2 m</text>'+
-    /* the person, lying on their back, knee bent, seen from the side */
+    /* the person, lying on their back, seen from the side, bending and
+       straightening the knee the way the measurement asks for */
     '<g stroke="'+T+'" stroke-width="2.5" fill="none" stroke-linecap="round">'+
-      '<circle cx="292" cy="99" r="8" fill="'+T+'" stroke="none"/>'+      /* head */
-      '<path d="M284 105 L232 105"/>'+                                    /* torso */
-      '<path d="M232 105 L196 78" stroke="'+G+'"/>'+                      /* femur */
-      '<path d="M196 78 L168 106" stroke="'+G+'"/>'+                      /* tibia */
-      '<circle cx="232" cy="105" r="3.5" fill="'+G+'" stroke="none"/>'+   /* hip */
-      '<circle cx="196" cy="78" r="4.5" fill="'+G+'" stroke="none"/>'+    /* knee */
-      '<circle cx="168" cy="106" r="3.5" fill="'+G+'" stroke="none"/>'+   /* ankle */
+      '<circle cx="292" cy="99" r="8" fill="'+T+'" stroke="none"/>'+
+      '<path d="M284 105 L232 105"/>'+
+      '<path d="'+FEM_B+'" stroke="'+G+'">'+anim('d',FEM_B+';'+FEM_S+';'+FEM_B)+'</path>'+
+      '<path d="'+TIB_B+'" stroke="'+G+'">'+anim('d',TIB_B+';'+TIB_S+';'+TIB_B)+'</path>'+
+      '<circle cx="232" cy="105" r="3.5" fill="'+G+'" stroke="none"/>'+
+      '<circle cx="196" cy="78" r="4.5" fill="'+G+'" stroke="none">'+
+        anim('cx','196;200;196')+anim('cy','78;105;78')+'</circle>'+
+      '<circle cx="168" cy="106" r="3.5" fill="'+G+'" stroke="none">'+anim('cy','106;105;106')+'</circle>'+
     '</g>'+
-    '<text x="196" y="66" font-size="8" fill="'+G+'" text-anchor="middle" font-family="ui-monospace,monospace">KNEE</text>'+
+    '<text x="196" y="66" font-size="8" fill="'+G+'" text-anchor="middle" font-family="ui-monospace,monospace">KNEE'+
+      anim('x','196;200;196')+anim('y','66;95;66')+'</text>'+
     '</svg>'}
 function romSetupSteps(){
   const S9=[
