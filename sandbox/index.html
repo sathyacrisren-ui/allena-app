@@ -792,7 +792,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='4a8d02';  // stamped by tools/build.py with the content hash
+const BUILD_ID='78596f';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -5707,8 +5707,18 @@ function dataPoints(){
       if(wkStart&&day>=wkStart){weekLive+=race9;weekSess++}
       else if(pvStart&&day>=pvStart&&day<wkStart)prevWeekLive+=race9}
     if(wkStart&&day>=wkStart){
+      /* SAY THE ACTUAL RULE (owner-caught, 12 Sep). The old line led with
+         "avg HR unknown", which reads as "record your heart rate and this
+         will count" — and to someone whose physio has not cleared them to
+         run, it reads as being shut out. Name the kind of activity first,
+         then the one thing that would change it, then where the work does
+         count. */
       const why9=races9?'':(!runLive(r)?'typed in by hand — no watch or phone recorded it'
-        :'avg HR '+(+r.hr||0?(+r.hr||0):'unknown')+' — a walk or stroll is recovery, not a race entry');
+        :(!isRunType(String(r.type||'easy'))
+          ? cardioLabel(r.type)+'s only race when they are hard enough to be training'+
+            ((+r.hr||0)?' — this one averaged '+Math.round(+r.hr)+' bpm':' — no heart rate came with it')+
+            '. It still counts toward your data and your trend.'
+          : 'avg HR '+(+r.hr||0?Math.round(+r.hr):'unknown')+' — not enough behind it to race'));
       raceItems.push({k:'run',id:String(r.id||''),date:day,
         t:(r.type?String(r.type).charAt(0).toUpperCase()+String(r.type).slice(1):'Run'),
         sub:(+r.km?uwNum(Math.round((+r.km)*10)/10)+' km':'')+(mins9?(+r.km?' · ':'')+Math.round(mins9)+' min':''),
@@ -7415,7 +7425,12 @@ function runDetail(kind){
       '<p class="eyebrow mt2">Run by run</p><div style="margin-top:8px;display:flex;flex-direction:column;gap:7px">'+
       withZ.slice().reverse().map(r=>{const z=zoneMins(r),t=z.z1+z.z2+z.z3+z.z4+z.z5;
         const hard=Math.round((z.z3+z.z4+z.z5)/t*100);
-        const label=(RUN_TYPES.find(x=>x[0]===r.type)||['','run'])[1];
+        /* a WALK IS NOT A RUN, including in its own label (owner-caught, 12
+           Sep: the month header said "1 walk" and the row underneath it said
+           "run"). RUN_TYPES holds running only; walks, rides, swims and rows
+           live in CARDIO_TYPES, so this fallback renamed every one of them
+           "run". cardioLabel reads both. */
+        const label=cardioLabel(r.type);
         const off=(r.type==='easy'||r.type==='recovery')&&hard>35;
         return '<div class="card" style="padding:12px 14px'+(off?';border-color:var(--amber)':'')+'">'+
           '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px">'+
@@ -7514,7 +7529,7 @@ function runGroups(R,mode){
   return out}
 function runRow(r){
   const open=!!S.openSec['run:'+r.id];
-  const label=(RUN_TYPES.find(t2=>t2[0]===r.type)||['','run'])[1];
+  const label=cardioLabel(r.type);
   const z=zoneMins(r);
   return '<div class="card" style="padding:0;overflow:hidden'+(open?';border-color:var(--text);border-width:2px':'')+'">'+
     '<button data-a="secToggle" data-v="run:'+esc(r.id)+'" style="width:100%;text-align:left;padding:12px 14px;display:flex;align-items:center;gap:10px">'+
@@ -21661,7 +21676,7 @@ function sheetHtml(){
           l.slice(0,6).map(r=>'<div class="card" style="padding:11px 14px">'+
             '<span class="mono" style="font-size:12.5px;display:block">'+udNum(r.km)+' '+udUnit()+' · '+paceStr(r.mins,r.km)+'</span>'+
             '<span class="mono" style="color:var(--faint);font-size:10.5px">'+esc(fmtDate(r.date+'T12:00'))+' · '+
-            esc((RUN_TYPES.find(t2=>t2[0]===r.type)||['','run'])[1].toLowerCase())+(r.hr?' · '+Math.round(r.hr)+' bpm':'')+'</span></div>').join('')+
+            esc(cardioLabel(r.type).toLowerCase())+(r.hr?' · '+Math.round(r.hr)+' bpm':'')+'</span></div>').join('')+
           (l.length>6?'<p class="mono" style="color:var(--faint);font-size:10.5px">and '+(l.length-6)+' more.</p>':'')+'</div>'+
           '<button data-a="rimpGo" class="big disp mt2" style="background:var(--amber);color:var(--bg);font-size:15px">Import all '+l.length+'</button>'
           :'<p style="color:var(--dim);font-size:13px;line-height:1.6">Nothing usable in that. '+
