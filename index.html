@@ -792,7 +792,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='896265';  // stamped by tools/build.py with the content hash
+const BUILD_ID='2c4818';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -12783,8 +12783,20 @@ function correlations(){
        all real, all gated. The reveal ceremony drains them one per
        app-open, so a rich account has a fresh constellation waiting
        for weeks, and every one of them is true. */
+    /* ONE RELATIONSHIP IS ONE FINDING (measured 12 Sep against a real
+       five-month account: of six findings, FOUR were two relationships
+       each reported twice — weekend→top set at lag 1 and lag 2, resting
+       HR→incline press at lag 1 and lag 2). The same fact wearing two
+       delays is not two discoveries, and worse: the per-outcome cap of
+       two was being eaten by a single signal, crowding out every other
+       signal that had something to say about that outcome. Collapse to
+       the strongest lag per signal-outcome pair FIRST, then let the cap
+       spend its two slots on two DIFFERENT signals. */
+    const bySig={};
+    const distinct=found.filter(f=>{const k=f.sig+'|'+f.out;
+      if(bySig[k])return false;bySig[k]=1;return true});
     const seen={};
-    const v=found.filter(f=>{const n9=(seen[f.out]||0);if(n9>=2)return false;seen[f.out]=n9+1;return true}).slice(0,20);
+    const v=distinct.filter(f=>{const n9=(seen[f.out]||0);if(n9>=2)return false;seen[f.out]=n9+1;return true}).slice(0,20);
     S._corrMemo={stamp:stamp,v:v};
     return v;
   }catch(e){return[]}}
