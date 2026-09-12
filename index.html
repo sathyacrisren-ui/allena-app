@@ -792,7 +792,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='2b1496';  // stamped by tools/build.py with the content hash
+const BUILD_ID='7e26aa';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -11072,6 +11072,101 @@ function romSetupSteps(){
     '<span style="flex:1;min-width:0"><span style="display:block;font-size:13px;font-weight:600">'+esc(s[0])+'</span>'+
     '<span style="display:block;color:var(--faint);font-size:11.5px;line-height:1.5;margin-top:2px">'+esc(s[1])+'</span></span></div>').join('')}
 
+/* ══ WHERE TO STAND FOR THE SQUAT SCAN ═══════════════════════
+   Owner ask, 12 Sep: the knee protractor has a drawn, animated setup
+   scene and the squat scan had a paragraph. Same problem, same answer —
+   nobody reads prose while propping a phone against a water bottle.
+
+   This one is FACE ON, because that is the only angle the measurement
+   works from: the camera has to see both hips and both feet at once to
+   know where the middle is. The figure squats and drifts slightly off
+   the midline as it goes down, which demonstrates the actual thing
+   being measured rather than describing it. Reduced motion gets the
+   standing frame, held still. */
+function squatSetupSvg(){
+  const G='var(--green)',L='var(--line)',F='var(--faint)',T='var(--text)';
+  let still=false;
+  try{still=!!(window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches)}catch(e){oops('squatSvg.rm',e)}
+  const DUR='4s',SPL='.45 0 .55 1;.45 0 .55 1';
+  const anim=(attr,vals)=>still?'':
+    '<animate attributeName="'+attr+'" dur="'+DUR+'" repeatCount="indefinite" '+
+    'calcMode="spline" keyTimes="0;0.5;1" keySplines="'+SPL+'" values="'+vals+'"/>';
+  /* standing → bottom of the squat. The hips drop AND slide a few px
+     left, which is the drift the scan reads. */
+  return '<svg viewBox="0 0 320 150" width="100%" style="display:block;margin-top:10px" aria-hidden="true">'+
+    '<line x1="8" y1="130" x2="312" y2="130" stroke="'+L+'" stroke-width="1.5"/>'+
+    /* the phone, propped, facing the person */
+    '<g>'+
+      '<rect x="16" y="78" width="26" height="46" rx="5" fill="none" stroke="'+G+'" stroke-width="2.5"/>'+
+      '<circle cx="29" cy="88" r="2.6" fill="'+G+'">'+
+        (still?'':'<animate attributeName="opacity" dur="1.4s" repeatCount="indefinite" values="1;.3;1"/>')+
+      '</circle>'+
+      '<text x="29" y="144" font-size="8" fill="'+G+'" text-anchor="middle" font-family="ui-monospace,monospace">PHONE</text>'+
+    '</g>'+
+    '<path d="M46 104 L150 104" stroke="'+F+'" stroke-width="1" stroke-dasharray="3 3"/>'+
+    '<text x="98" y="98" font-size="8" fill="'+F+'" text-anchor="middle" font-family="ui-monospace,monospace">about 2 m</text>'+
+    /* the midline of the feet — the thing everything is measured against */
+    '<line x1="232" y1="38" x2="232" y2="130" stroke="'+F+'" stroke-width="1" stroke-dasharray="3 4"/>'+
+    /* the person, face on: head, shoulders, hips, two legs, two feet */
+    '<g stroke="'+T+'" stroke-width="2.5" fill="none" stroke-linecap="round">'+
+      '<circle cx="232" cy="52" r="8" fill="'+T+'" stroke="none">'+anim('cy','52;70;52')+'</circle>'+
+      /* shoulders */
+      '<path d="M216 68 L248 68">'+anim('d','M216 68 L248 68;M214 86 L246 86;M216 68 L248 68')+'</path>'+
+      /* trunk down to the hip line */
+      '<path d="M232 68 L232 92">'+anim('d','M232 68 L232 92;M230 86 L229 103;M232 68 L232 92')+'</path>'+
+      /* the hip line, and the marker that rides it */
+      '<path d="M220 92 L244 92" stroke="'+G+'">'+anim('d','M220 92 L244 92;M217 103 L241 103;M220 92 L244 92')+'</path>'+
+      /* left leg and right leg, feet planted */
+      '<path d="M220 92 L218 130">'+anim('d','M220 92 L218 130;M217 103 L218 130;M220 92 L218 130')+'</path>'+
+      '<path d="M244 92 L246 130">'+anim('d','M244 92 L246 130;M241 103 L246 130;M244 92 L246 130')+'</path>'+
+      '<circle cx="232" cy="92" r="3.5" fill="'+G+'" stroke="none">'+
+        anim('cx','232;229;232')+anim('cy','92;103;92')+'</circle>'+
+    '</g>'+
+    /* the feet, and the label for what the dashed line means */
+    '<path d="M210 130 L254 130" stroke="'+T+'" stroke-width="3" stroke-linecap="round"/>'+
+    '<text x="232" y="30" font-size="8" fill="'+F+'" text-anchor="middle" font-family="ui-monospace,monospace">MIDLINE OF YOUR FEET</text>'+
+    '<text x="232" y="144" font-size="8" fill="'+F+'" text-anchor="middle" font-family="ui-monospace,monospace">stand facing the phone</text>'+
+    '</svg>'}
+function squatSetupSteps(){
+  const S9=[
+    ['Prop the phone facing you','About two metres away, leaning on something, roughly waist height. Your whole body has to fit \u2014 head down to both feet.'],
+    ['Stand square to it','Face the camera, feet about shoulder width. It needs to see both hips and both feet at once to know where your middle is.'],
+    ['Start it, then get comfortable','Ten seconds to settle into a stance you would actually squat in, then it says go. Squat as many times as you comfortably can. You never touch the phone.']];
+  return S9.map((s,i)=>'<div style="display:flex;gap:11px;margin-top:12px">'+
+    '<span class="mono" style="width:20px;height:20px;border-radius:20px;flex:none;display:inline-flex;align-items:center;justify-content:center;font-size:10.5px;font-weight:700;background:var(--raised);color:var(--green);border:1px solid var(--line)">'+(i+1)+'</span>'+
+    '<span style="flex:1;min-width:0"><span style="display:block;font-size:13px;font-weight:600">'+esc(s[0])+'</span>'+
+    '<span style="display:block;color:var(--faint);font-size:11.5px;line-height:1.5;margin-top:2px">'+esc(s[1])+'</span></span></div>').join('')}
+/* THE RESULT, DRAWN (owner ask, 12 Sep). A percentage on its own does
+   not tell you what it is a percentage OF. This puts the number back
+   where it came from: the dashed midline of the feet, the stance it is
+   measured against, and the hips sitting off it by the amount measured.
+   `shift` is signed, positive toward the person's own right, as a share
+   of stance width. */
+function squatShiftSvg(shift,label){
+  try{
+    const G='var(--green)',F='var(--faint)',T='var(--text)',A='var(--amber)';
+    const sh=+shift||0;
+    const pct=Math.round(Math.abs(sh)*100);
+    const even=pct<4;
+    const col=even?G:A;
+    /* the stance is drawn 96px wide, so one stance width = 96px and the
+       marker lands at exactly the measured share of it. Clamped so a
+       misread rep cannot draw outside the picture. */
+    const mid=160,stance=96;
+    const dx=Math.max(-stance*0.6,Math.min(stance*0.6,sh*stance));
+    return '<svg viewBox="0 0 320 118" width="100%" style="display:block;margin-top:12px" aria-hidden="true">'+
+      '<line x1="'+mid+'" y1="12" x2="'+mid+'" y2="92" stroke="'+F+'" stroke-width="1" stroke-dasharray="3 4"/>'+
+      '<line x1="'+(mid-stance/2)+'" y1="92" x2="'+(mid+stance/2)+'" y2="92" stroke="'+T+'" stroke-width="3" stroke-linecap="round"/>'+
+      /* the hips, off the middle by the measured amount */
+      '<line x1="'+mid+'" y1="46" x2="'+(mid+dx).toFixed(1)+'" y2="46" stroke="'+col+'" stroke-width="1.5" stroke-dasharray="2 2"/>'+
+      '<line x1="'+(mid+dx).toFixed(1)+'" y1="46" x2="'+(mid+dx).toFixed(1)+'" y2="78" stroke="'+col+'" stroke-width="4" stroke-linecap="round"/>'+
+      '<circle cx="'+(mid+dx).toFixed(1)+'" cy="46" r="5" fill="'+col+'"/>'+
+      '<text x="'+(mid+dx+(dx<0?-12:12)).toFixed(1)+'" y="42" font-size="13" font-weight="700" fill="'+col+
+        '" text-anchor="'+(dx<0?'end':'start')+'" font-family="ui-monospace,monospace">'+esc(label||(even?'centred':pct+'%'))+'</text>'+
+      '<text x="'+mid+'" y="110" font-size="8" fill="'+F+'" text-anchor="middle" font-family="ui-monospace,monospace">midline of the feet \u00b7 stance width</text>'+
+      '</svg>'}
+  catch(e){oops('squatShiftSvg',e);return ''}}
+
 /* ══ THE SQUAT SCAN ═════════════════════════════════════════
    Owner ask, 11 Sep: "should also do a scan for squatting to see if
    you're leaning to the uninjured side, and it tracks as many squats as
@@ -21328,7 +21423,13 @@ function sheetHtml(){
         '<p style="color:var(--dim);font-size:13px;line-height:1.6;margin-top:6px">Averaged over '+s9.kept+
         (s9.kept===s9.total?' squat'+(s9.kept===1?'':'s'):' of '+s9.total)+
         (s9.away===true?'. That is away from the reconstructed side.':s9.away===false?'. That is onto the reconstructed side.':'.')+
-        (!s9.even&&s9.onsetTxt?' The drift starts '+s9.onsetTxt+'.':'')+'</p>'
+        (!s9.even&&s9.onsetTxt?' The drift starts '+s9.onsetTxt+'.':'')+'</p>'+
+        /* a percentage on its own does not say what it is a percentage
+           OF — this puts it back on the midline it was measured from
+           (owner ask, 12 Sep) */
+        (typeof squatShiftSvg==='function'
+          ?squatShiftSvg(s9.even?0:((s9.toward==='right'?1:-1)*s9.pct/100),
+             s9.even?'centred':s9.pct+'% '+s9.toward):'')
         :'<p style="color:var(--dim);font-size:13px;line-height:1.6;margin-top:10px">Every rep is set aside, so there is no average to take.</p>')+
       '<p class="eyebrow mt2">Each squat</p>'+
       '<p style="color:var(--faint);font-size:11.5px;line-height:1.55;margin-top:4px">Set aside any the camera misread — it can lose a hip if you drift out of frame. The average follows what is left.</p>'+
@@ -21345,8 +21446,12 @@ function sheetHtml(){
   if(S.sheet.t==='squat'){
     const L9=squatStore().list.slice(-8).reverse();
     return wrapSheet('Squat symmetry',
-      '<p style="color:var(--dim);font-size:13px;line-height:1.65;margin-top:6px">Face the camera, whole body in frame. You get ten seconds to get into a comfortable squat stance, then squat as many times as you comfortably can. Allena counts them and watches which way your hips drift off the middle at the bottom of each one.</p>'+
-      '<p style="color:var(--faint);font-size:11.5px;line-height:1.55;margin-top:8px">Weight-shifting away from the reconstructed leg is close to universal after surgery, and invisible without measuring. That is why phase 2 gates on it.</p>'+
+      '<p style="color:var(--dim);font-size:13px;line-height:1.65;margin-top:6px">Allena counts every squat and measures how far your hips sit off the midline of your feet at the bottom of each one.</p>'+
+      /* the drawn scene beats the paragraph, same as the protractor
+         (owner ask, 12 Sep) */
+      (typeof squatSetupSvg==='function'?squatSetupSvg():'')+
+      (typeof squatSetupSteps==='function'?squatSetupSteps():'')+
+      '<p style="color:var(--faint);font-size:11.5px;line-height:1.55;margin-top:14px">Weight-shifting away from the reconstructed leg is close to universal after surgery, and invisible without measuring. That is why phase 2 gates on it.</p>'+
       '<button data-a="squatStart" class="big disp mt2" style="background:var(--amber);color:var(--bg);font-size:15px">Start capturing</button>'+
       (L9.length?'<p class="eyebrow" style="margin-top:16px">Scanned so far</p>'+
         L9.map(e9=>{const s9=squatSummary(e9)||{};const idx9=squatStore().list.indexOf(e9);
