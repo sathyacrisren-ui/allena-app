@@ -792,7 +792,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='9f35df';  // stamped by tools/build.py with the content hash
+const BUILD_ID='4a8d02';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -1847,9 +1847,13 @@ function lastFor(ex,no){
       if(!H||H.id===cid||!Array.isArray(H.log))return;
       const rows=H.log.filter(l=>l&&l.ex===ex&&(l.w!=null||l.secs!=null));
       if(!rows.length)return;
-      /* date first, then finished over abandoned — so a session started
-         and binned on the same day never outranks the one that counted */
-      const key=String(H.date||'')+(H.complete?'1':'0');
+      /* DAY first, then finished over abandoned, then the clock. Ordering
+         on the full timestamp before completeness was wrong: two sessions
+         on the same day differ by milliseconds, so a session you started
+         and binned at 6pm outranked the one you actually finished at 5pm.
+         Compare the local day (hKey, never the UTC slice), let complete
+         break that tie, and only then the time. */
+      const key=hKey(H)+(H.complete?'1':'0')+String(H.date||'');
       if(best&&key<=bestKey)return;
       rows.sort((a,b)=>Math.abs((+a.setNo||0)-no)-Math.abs((+b.setNo||0)-no)
         ||(+a.setNo||0)-(+b.setNo||0));
@@ -2364,18 +2368,24 @@ function overtakeCard(){
   const myI=String(a.display||'Y').slice(0,1).toUpperCase();
   const rvI=String(o.name||'?').slice(0,1).toUpperCase();
   return '<div class="card stg" style="border-color:var(--green);overflow:hidden;position:relative">'+
-   '<style>@keyframes ovp9{0%{left:4%;transform:scale(1)}42%{left:52%;transform:scale(1.22)}68%{left:74%;transform:scale(1)}88%{left:74%;opacity:1}100%{left:74%;opacity:0}}'+
-   '@keyframes ovt9{0%{width:0;opacity:0}30%{opacity:.55}68%{width:70%;opacity:.55}88%{width:70%;opacity:.4}100%{opacity:0}}'+
+   /* PROPORTIONS (owner-caught, 12 Sep): the whole pass used to happen
+      between 52% and 74%, so the two marks bunched in the right third
+      with dead track either side, and 38-46px avatars floated in a 68px
+      band. The run now starts at the left edge and finishes near the
+      right, the marks are big enough to read at a glance, and the band
+      is tall enough that the glow is not clipped. */
+   '<style>@keyframes ovp9{0%{left:1%;transform:scale(1)}44%{left:40%;transform:scale(1.16)}70%{left:74%;transform:scale(1)}88%{left:74%;opacity:1}100%{left:74%;opacity:0}}'+
+   '@keyframes ovt9{0%{width:0;opacity:0}30%{opacity:.55}70%{width:76%;opacity:.55}88%{width:76%;opacity:.4}100%{opacity:0}}'+
    '@keyframes ovr9{0%,40%{transform:scale(1)}52%{transform:scale(.92)}66%,100%{transform:scale(.92)}}'+
    '@media (prefers-reduced-motion: reduce){.ovme9,.ovtr9,.ovrv9{animation:none!important}}</style>'+
    '<p class="mono" style="font-size:10px;letter-spacing:.14em;color:var(--green)">✦ THE OVERTAKE</p>'+
    '<h3 class="disp" style="font-size:21px;font-weight:650;margin-top:5px">You passed '+esc(o.name)+'</h3>'+
    '<p class="mono" style="font-size:13px;margin-top:3px;color:var(--dim)"><b style="color:var(--green);font-size:16px">'+(+o.mine||0)+'</b> – '+(+o.theirs||0)+' · witnessed points, this week</p>'+
-   '<div style="position:relative;height:68px;margin-top:12px">'+
-    '<div style="position:absolute;left:4%;right:4%;top:50%;height:1px;background:var(--line)"></div>'+
-    '<div class="ovtr9" style="position:absolute;left:4%;top:50%;height:2px;background:linear-gradient(90deg,transparent,var(--green));animation:ovt9 3.2s ease-in-out infinite"></div>'+
-    '<div class="ovrv9" style="position:absolute;left:60%;top:50%;margin-top:-19px;animation:ovr9 3.2s ease-in-out infinite;filter:grayscale(.4);opacity:.85">'+avHtml(o.av,rvI,38,'var(--line)',15)+'</div>'+
-    '<div class="ovme9" style="position:absolute;left:4%;top:50%;margin-top:-23px;animation:ovp9 3.2s ease-in-out infinite;filter:drop-shadow(0 0 10px color-mix(in srgb, var(--green) 55%, transparent))">'+avHtml(a.av,myI,46,'var(--green)',18)+'</div>'+
+   '<div style="position:relative;height:88px;margin-top:15px">'+
+    '<div style="position:absolute;left:1%;right:1%;top:50%;height:1px;background:var(--line)"></div>'+
+    '<div class="ovtr9" style="position:absolute;left:1%;top:50%;height:2px;background:linear-gradient(90deg,transparent,var(--green));animation:ovt9 3.2s ease-in-out infinite"></div>'+
+    '<div class="ovrv9" style="position:absolute;left:56%;top:50%;margin-top:-23px;animation:ovr9 3.2s ease-in-out infinite;filter:grayscale(.4);opacity:.85">'+avHtml(o.av,rvI,46,'var(--line)',18)+'</div>'+
+    '<div class="ovme9" style="position:absolute;left:1%;top:50%;margin-top:-28px;animation:ovp9 3.2s ease-in-out infinite;filter:drop-shadow(0 0 12px color-mix(in srgb, var(--green) 55%, transparent))">'+avHtml(a.av,myI,56,'var(--green)',22)+'</div>'+
    '</div>'+
    '<div style="display:flex;gap:8px;margin-top:10px">'+
     '<button data-a="nav" data-v="social" class="btn disp" style="flex:1;background:var(--raised);font-size:13px">See the board</button>'+
@@ -18208,7 +18218,6 @@ function todayOrder(){
   const cand=[];
   const bid=(html,score)=>{if(html)cand.push({h:html,s:score})};
   try{const cb=cbState();bid(comebackCard(),cb&&cb.state==='offered'?88:55)}catch(e){}
-  try{bid((typeof overtakeCard==='function'?overtakeCard():''),86)}catch(e){}
   try{const W9=watchList().filter(w=>!w.gated);
     const nr=W9.slice().sort((a,b)=>(a.need-a.have)-(b.need-b.have)||b.pct-a.pct)[0];
     bid((typeof fuseCard==='function'?fuseCard():''),nr&&nr.need-nr.have===1?87:70)}catch(e){}
@@ -18306,6 +18315,14 @@ function viewToday(){
           '<p class="mono" style="font-size:8.5px;letter-spacing:.08em;color:var(--faint)">'+notifEchoKind(x.id)+'</p>'+
           '<p style="font-size:13px;line-height:1.55;margin-top:2px">'+esc(String(x.body).slice(0,180))+'</p></button>').join('')+
         (ec.length>3?'<p class="mono" style="color:var(--faint);font-size:9.5px;margin-top:7px">and '+(ec.length-3)+' more</p>':'')+'</div>'}}catch(e){}
+  /* THE OVERTAKE SITS ABOVE THE BOARD IT IS ABOUT (owner call, 12 Sep).
+     It used to bid for the one story slot below, which put it under the
+     race — so the moment you passed someone was announced beneath the
+     table showing you had. It is a real event, it happens at most once
+     a day per rival, and it is gone at midnight, so it earns the place
+     rather than competing for it. Removed from the slot so it can never
+     render twice. */
+  try{h+=(typeof overtakeCard==='function'?overtakeCard():'')}catch(e){oops('overtakeCard',e)}
   try{
     let L=(typeof raceField==='function')?raceField():((typeof frLinked==='function')?frLinked():[]);
     let pinned=false;
