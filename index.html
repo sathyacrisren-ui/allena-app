@@ -792,7 +792,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='81317b';  // stamped by tools/build.py with the content hash
+const BUILD_ID='896265';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -5759,7 +5759,11 @@ function dataPoints(){
 function dpLevel(n){
   let lv=1,need=50,at=0;
   while(n>=at+need&&lv<200){at+=need;lv++;need=Math.min(900,Math.round(need*1.12))}
-  return{lv:lv,into:n-at,need:need,left:Math.max(0,at+need-n),floor:at}}
+  /* points carry fractions (the precision layer, 3 Sep), so the raw
+     remainder reaches a user as 136.39999999999998 (owner-caught, 12
+     Sep). Round UP: "136 to the next" must not be reachable at 135.6.
+     into/need stay exact — they drive progress bars, not sentences. */
+  return{lv:lv,into:n-at,need:need,left:Math.max(0,Math.ceil(at+need-n)),floor:at}}
 function dpTier(n){let t=DP_TIERS[0];DP_TIERS.forEach(x=>{if(n>=x[0])t=x});return t}
 function dpNext(n){const nx=DP_TIERS.find(x=>x[0]>n);return nx||null}
 function dpLabels(){return{sets:'Sets logged',effort:'Efforts recorded',sessions:'Sessions completed',
@@ -18817,9 +18821,15 @@ function viewSession(){
           return{m:m,stim:Math.round(muscleStimUnits(cnt[m])*2*q)}});
       if(rows.length||gained!=null){
         h+='<div class="card mt2 an-hero" style="padding:16px;border-radius:18px">';
-        if(lvUp)h+='<div class="an-pop an-glow" style="text-align:center;padding:10px 0 14px">'+
+        /* an-glow pulses a box-shadow with no radius, so on a full-width
+           block it drew a hard rectangle inside the rounded card
+           (owner-caught, 12 Sep). an-pop alone carries the celebration.
+           The remainder line moved up here from the duplicate card
+           below, which is now gone. */
+        if(lvUp)h+='<div class="an-pop" style="text-align:center;padding:10px 0 14px">'+
           '<p class="mono" style="color:var(--amber);font-size:9.5px;letter-spacing:.14em">LEVEL UP</p>'+
           '<p class="disp grad" style="font-size:34px;font-weight:600;line-height:1.1;margin-top:2px">Level '+L1.lv+'</p>'+
+          '<p style="color:var(--dim);font-size:12px;margin-top:6px">'+L1.left+' to the next \u2014 every point of it real.</p>'+
           '<button data-a="shareLevel" data-v="'+(gained||0)+':'+L1.lv+'" class="btn mt" style="width:auto;padding:9px 18px;color:var(--amber);border-color:color-mix(in srgb, var(--text) 42%, transparent);font-size:12.5px">Share the level-up</button></div>';
         if(gained!=null)h+='<div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px">'+
           '<p class="eyebrow" style="margin:0">Banked this session</p>'+
@@ -18844,15 +18854,15 @@ function viewSession(){
           '<p class="mono" style="color:var(--faint);font-size:8.5px;letter-spacing:.05em;margin-top:2px">THIS SESSION\u2019S DOSE, BANKED \u2014 THE DASHES, FILLED</p></div>';
         h+='</div>'}
      }catch(e){}}
-    /* the level-up burst — the volume knob (owner call, 2 Sep) */
+    /* ONE LEVEL-UP, NOT TWO (owner-caught, 12 Sep: the completion screen
+       announced Level 11 in the points card and again in a card of its
+       own, right under it). This second card said the same thing with
+       none of the context and no share button. The haptic and the
+       level snapshot stay — only the duplicate announcement goes. */
     try{const lvN=dpLevel(dataPoints().total).lv;
       if(A._lv0!=null&&lvN>A._lv0){
-        try{hapticRun('find')}catch(e9){}
-        h+='<div class="card mt2 an-hero an-ceremony an-pop" style="padding:20px;border-radius:22px;border-color:var(--amber);text-align:center">'+
-          '<p class="mono" style="font-size:10px;color:var(--amber);letter-spacing:.12em">LEVEL UP</p>'+
-          '<p class="disp gradhead" style="font-size:44px;line-height:1;margin-top:8px">'+lvN+'</p>'+
-          '<p style="color:var(--dim);font-size:12.5px;margin-top:8px">'+dpLevel(dataPoints().total).left+' to the next — every point of it real.</p></div>';
-        A._lv0=lvN}}catch(e){}
+        try{hapticRun('find')}catch(e9){oops('lvHaptic',e9)}
+        A._lv0=lvN}}catch(e){oops('lvSnap',e)}
     try{h+=tomorrowHook()}catch(e){}
     {const rev=S.sessReveal;
      if(rev&&rev.show){const r=rarityOf(rev.show.rar);
