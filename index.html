@@ -792,7 +792,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='7e26aa';  // stamped by tools/build.py with the content hash
+const BUILD_ID='d0e878';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -1823,11 +1823,40 @@ async function askClaude(q){
     const el3=document.getElementById('coachThread');
     if(el3)el3.scrollTop=el3.scrollHeight;
     if(++k>=10)clearInterval(iv)},350)}catch(e3){}}
-function lastFor(ex,no){const cid=S.sess?String(S.sess.startedAt):null;
-  for(let i=S.history.length-1;i>=0;i--){const H=S.history[i];
-    if(H.id===cid)continue;
-    const h=H.log.find(l=>l.ex===ex&&l.setNo===no);
-    if(h)return Object.assign({},h,{date:H.date,week:H.week,day:H.dayTitle})}return null}
+function lastFor(ex,no){
+  /* "LAST TIME" IS THE LATEST SESSION, NOT THE LAST ARRAY SLOT
+     (owner-caught, 12 Sep: the set screen showed WEEK 1 while he was
+     training week 3, with a real week 2 session in between).
+
+     Two things were wrong. It scanned S.history backwards and took the
+     first hit, which is only the most recent session while the array
+     happens to be date-sorted — imports, restores and run mirrors all
+     re-sort it, and nothing guarantees it between those. And it demanded
+     an EXACT setNo, so if the newer session had a different number of
+     sets, or a superset renumbered them, that whole session was skipped
+     and the answer fell back weeks.
+
+     Now: find the newest session that has this exercise at all, then
+     take the closest set inside THAT session. A finished session beats
+     an abandoned one at the same date, and a set with a real weight
+     beats a placeholder. */
+  try{
+    const cid=S.sess?String(S.sess.startedAt):null;
+    let best=null,bestKey='';
+    (S.history||[]).forEach(H=>{
+      if(!H||H.id===cid||!Array.isArray(H.log))return;
+      const rows=H.log.filter(l=>l&&l.ex===ex&&(l.w!=null||l.secs!=null));
+      if(!rows.length)return;
+      /* date first, then finished over abandoned — so a session started
+         and binned on the same day never outranks the one that counted */
+      const key=String(H.date||'')+(H.complete?'1':'0');
+      if(best&&key<=bestKey)return;
+      rows.sort((a,b)=>Math.abs((+a.setNo||0)-no)-Math.abs((+b.setNo||0)-no)
+        ||(+a.setNo||0)-(+b.setNo||0));
+      best=Object.assign({},rows[0],{date:H.date,week:H.week,day:H.dayTitle});
+      bestKey=key});
+    return best}
+  catch(e){oops('lastFor',e);return null}}
 
 /* ══ actions ════════════════════════════════════════════ */
 
