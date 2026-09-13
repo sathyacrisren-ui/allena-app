@@ -129,6 +129,12 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
 @media (prefers-reduced-motion:reduce){.irev{animation:none}}
 @keyframes findDust{0%{opacity:0;transform:translateY(3px)}30%{opacity:.85}100%{opacity:0;transform:translateY(-15px)}}
 .find-glow{box-shadow:0 0 20px 0 rgba(48,209,88,.18),0 0 4px 0 rgba(48,209,88,.28)}
+/* the points pill (owner ask, 13 Sep): the one number that is all real,
+   so it gets to glow. Slow on purpose \u2014 3.4s reads as alive, anything
+   faster reads as a notification demanding something. */
+@keyframes ptsGlow{0%,100%{box-shadow:0 0 15px -2px rgba(48,209,88,.20),0 0 3px 0 rgba(48,209,88,.30)}50%{box-shadow:0 0 27px 0 rgba(48,209,88,.34),0 0 5px 0 rgba(48,209,88,.44)}}
+.pts-glow{animation:ptsGlow 3.4s ease-in-out infinite}
+@media (prefers-reduced-motion:reduce){.pts-glow{animation:none;box-shadow:0 0 18px -2px rgba(48,209,88,.22),0 0 4px 0 rgba(48,209,88,.32)}}
 .find-dust{position:absolute;width:3px;height:3px;border-radius:3px;background:var(--green);opacity:0;pointer-events:none;z-index:6;animation:findDust 2.8s ease-out infinite}
 @media (prefers-reduced-motion:reduce){.find-dust{display:none}.find-glow{box-shadow:0 0 12px 0 rgba(48,209,88,.18)}}
 /* THE LEADER'S FIRE (owner ask 11 Sep, settled after three passes).
@@ -632,7 +638,7 @@ const LSFAIL={};
 function lset(k,v){try{localStorage.setItem(k,JSON.stringify(v));return true}
   catch(e){oops('lset:'+k,e);
     if(!LSFAIL[k]){LSFAIL[k]=1;
-      try{flash('This phone would not save that \u2014 free up some space, then back up from Settings.')}catch(_){}}
+      try{flash('This phone couldn\u2019t save that \u2014 free up some space, then back up from Settings.')}catch(_){}}
     return false}}
 function ldel(k){try{localStorage.removeItem(k)}catch(e){}}
 function migrate(){
@@ -792,7 +798,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='62fe47';  // stamped by tools/build.py with the content hash
+const BUILD_ID='eebffe';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -2227,7 +2233,7 @@ async function frJoin(code){
          body:JSON.stringify({friend_id:S.frMe,linked_at:new Date().toISOString()})});
       const rows=r.ok?await r.json():[];
       if(rows.length){acctSync(false);frLoad(true);return}}
-    flash('That code did not match an open invite.')}catch(e){flash('No connection.')}}
+    flash('That code doesn\u2019t match an open invite.')}catch(e){flash('No connection.')}}
 /* IN-APP ACCOUNT DELETION (audit S1, 10 Sep 2026). App Store guideline
    5.1.1(v): an app that lets you create an account must let you delete
    it from inside the app — a "email us" line is an explicit rejection.
@@ -2361,10 +2367,24 @@ function avInner(av,init,col){const a=avParse(av);
   const g9=a&&(a.t?avTreeSvg(a.t):(a.g&&AV_GLYPHS[a.g]));
   return g9?'<span style="display:flex;align-items:center;justify-content:center;width:100%;height:100%;color:'+col+'">'+g9+'</span>':esc(init)}
 function avHtml(av,init,size,ringDefault,fs){
-  const a=avParse(av);
-  const ring=a?AV_COLS[a.c]||ringDefault:ringDefault;
-  const body=(a&&a.g&&AV_GLYPHS[a.g])?'<span style="display:flex;align-items:center;justify-content:center;width:100%;height:100%;color:'+(ring==='var(--line)'?'var(--dim)':ring)+'">'+AV_GLYPHS[a.g]+'</span>':esc(init);
-  return '<div style="position:relative;width:'+size+'px;height:'+size+'px;border-radius:'+size+'px;background:var(--raised);border:2.5px solid '+ring+';display:flex;align-items:center;justify-content:center;font-size:'+fs+'px;font-weight:700;flex:none">'+body+'</div>'}
+  /* THIS USED TO REIMPLEMENT avInner AND DROP HALF OF IT (owner-caught,
+     13 Sep: the overtake card's marks were "out of proportion"). It
+     tested `a.g` only, and a TREE avatar parses to g:0 with a t — so
+     anyone wearing their own tree rendered here as a bare initial while
+     rendering as a tree everywhere avInner is used. Same input, two
+     answers, which is the duplicate-logic disease this repo already has
+     a gate for. One renderer now.
+
+     The border also scales. At 2.5px flat it was 6% of a 42px mark and
+     4.5% of a 56px one, so the same avatar changed weight depending on
+     which surface drew it. */
+  const ring=avRing(av,ringDefault);
+  const bw=Math.max(2,Math.round(size*0.052*10)/10);
+  return '<div style="position:relative;width:'+size+'px;height:'+size+'px;border-radius:'+size+
+    'px;background:var(--raised);border:'+bw+'px solid '+ring+
+    ';display:flex;align-items:center;justify-content:center;font-size:'+fs+
+    'px;font-weight:700;flex:none">'+
+    avInner(av,init,ring==='var(--line)'?'var(--dim)':ring)+'</div>'}
 function overtakeCard(){
  /* the crush card (owner ask, 9 Sep): the day you pass a rival, Today
     loops the moment — your avatar sweeping past theirs on a track,
@@ -2389,11 +2409,15 @@ function overtakeCard(){
    '<p class="mono" style="font-size:10px;letter-spacing:.14em;color:var(--green)">✦ THE OVERTAKE</p>'+
    '<h3 class="disp" style="font-size:21px;font-weight:650;margin-top:5px">You passed '+esc(o.name)+'</h3>'+
    '<p class="mono" style="font-size:13px;margin-top:3px;color:var(--dim)"><b style="color:var(--green);font-size:16px">'+(+o.mine||0)+'</b> – '+(+o.theirs||0)+' · witnessed points, this week</p>'+
-   '<div style="position:relative;height:88px;margin-top:15px">'+
+   '<div style="position:relative;height:76px;margin-top:14px">'+
     '<div style="position:absolute;left:1%;right:1%;top:50%;height:1px;background:var(--line)"></div>'+
     '<div class="ovtr9" style="position:absolute;left:1%;top:50%;height:2px;background:linear-gradient(90deg,transparent,var(--green));animation:ovt9 3.2s ease-in-out infinite"></div>'+
-    '<div class="ovrv9" style="position:absolute;left:56%;top:50%;margin-top:-23px;animation:ovr9 3.2s ease-in-out infinite;filter:grayscale(.4);opacity:.85">'+avHtml(o.av,rvI,46,'var(--line)',18)+'</div>'+
-    '<div class="ovme9" style="position:absolute;left:1%;top:50%;margin-top:-28px;animation:ovp9 3.2s ease-in-out infinite;filter:drop-shadow(0 0 12px color-mix(in srgb, var(--green) 55%, transparent))">'+avHtml(a.av,myI,56,'var(--green)',22)+'</div>'+
+    /* BOTH MARKS ARE THE SAME SIZE (owner-caught, 13 Sep). 56 against 46
+       read as a rendering fault rather than as emphasis — a pass is
+       about POSITION, and the green ring, the glow and the trail already
+       say which one is yours. */
+    '<div class="ovrv9" style="position:absolute;left:56%;top:50%;margin-top:-24px;animation:ovr9 3.2s ease-in-out infinite;filter:grayscale(.4);opacity:.85">'+avHtml(o.av,rvI,48,'var(--line)',19)+'</div>'+
+    '<div class="ovme9" style="position:absolute;left:1%;top:50%;margin-top:-24px;animation:ovp9 3.2s ease-in-out infinite;filter:drop-shadow(0 0 12px color-mix(in srgb, var(--green) 55%, transparent))">'+avHtml(a.av,myI,48,'var(--green)',19)+'</div>'+
    '</div>'+
    '<div style="display:flex;gap:8px;margin-top:10px">'+
     '<button data-a="nav" data-v="social" class="btn disp" style="flex:1;background:var(--raised);font-size:13px">See the board</button>'+
@@ -2523,8 +2547,8 @@ function raceMineRows(){
 
 const NUDGE_MSGS=[
   'One session flips it. Tonight?',
-  'The week is watching. Get one in.',
-  'You are clear of me and I do not like it. Respect.',
+  'Still time this week. Get one in.',
+  'You\u2019re clear of me and I don\u2019t like it. Respect.',
   'That was a real week. Seen.'];
 async function nudgeSend(toId,msgI){
   try{
@@ -2542,7 +2566,7 @@ async function nudgeSend(toId,msgI){
       if(S.sheet&&S.sheet.t==='nudge'){S.sheet.sentI=+msgI||0;render();
         setTimeout(()=>{if(S.sheet&&S.sheet.t==='nudge'){S.sheet=null;render()}},900)}
       else{flash('Sent.');render()}}
-    else if(r.status===404)flash('The nudge table is not set up yet \u2014 one SQL paste turns it on.');
+    else if(r.status===404)flash('The nudge table isn\u2019t set up yet \u2014 one SQL paste turns it on.');
     else if(r.status===409||r.status===400){sent[toId]=today();lset(K_ACCT,Object.assign({},a9,{nudgeSent:sent}));flash('One nudge per mate per day \u2014 the server holds that line too.')}
     else flash('Could not send \u2014 try again in a minute.')
   }catch(e){flash('No connection.')}}
@@ -4381,7 +4405,7 @@ function impNew(){S.imp={step:'pick',text:'',img:null,busy:false,draft:null,err:
 function impApplyParsed(f,o){
   /* one router for a fresh conversion and a cached one alike */
     if(f.kindHint==='hist'&&!(o.history&&o.weeks&&o.weeks.length)){
-      f.err='You said this is logged history, but the conversion came back as a plan. Tap Read it again — the instruction is now firmer — or trim the text to just the logged weeks.';
+      f.err='You said this is logged history, but the conversion came back as a plan. Tap Read it again, with a firmer instruction this time, or trim the text to just the logged weeks.';
       f.busy=false;if(S.think&&S.think.key==='impread')S.think=null;return render()}
     if(o.history&&o.weeks&&o.weeks.length){
       // logged history, no dates: one question and Allena deduces them
@@ -5335,8 +5359,13 @@ function noticedPool(){
     Object.keys(dows).forEach(dw=>{const ds=[...new Set(dows[dw])].sort().reverse();
       let run=0;for(let i=0;i<ds.length;i++){const expect=dayKey(new Date(new Date(ds[0]+'T12:00')-i*7*864e5));
         if(ds[i]===expect)run++;else break}
+      /* TEXTURE, NOT OBSERVATION (owner call, 13 Sep). This adds ONE entry
+         per weekday with a run, so a consistent trainer got up to seven
+         near-identical headlines ("5 Mondays in a row", "5 Tuesdays in a
+         row"...) competing with real findings at tier 2. Tier 3 is the
+         bookkeeping shelf: reached only when there is nothing else to say. */
       if(run>=4)add(run+' '+names[dw]+' in a row',
-        'The same day, week after week \u2014 scheduling is the strongest predictor of long-term progress there is.',2)})}catch(e){}
+        'The same day, week after week \u2014 scheduling is the strongest predictor of long-term progress there is.',3)})}catch(e){}
   return out}
 function noticedToday(){
   /* the boredom fuse (owner call, 7 Sep: 'reps fade by the end' every
@@ -5363,24 +5392,49 @@ function noticedToday(){
       .filter(x=>x.found===today()&&RANKF(x)<9&&x.tag!=='call'&&!x.contra)   // a backwards pattern never headlines
       .sort((a,b)=>RANKF(a)-RANKF(b))
       .map(f=>({t:f.t,d:f.d,tier:0,find:1,id:f.id}))}catch(e){oops('noticedFinds',e)}
-  let ntc={};try{S.daily.ntc=S.daily.ntc||{};ntc=S.daily.ntc}catch(e){}
+  /* S.daily carries the fuse counter, so it must EXIST before ntc points
+     at it — a detached ntc counts into a throwaway object and the fuse
+     silently stops counting (13 Sep review). */
+  let ntc={};try{S.daily=S.daily||{days:{}};S.daily.ntc=S.daily.ntc||{};ntc=S.daily.ntc}catch(e){oops('noticedNtc',e)}
   const cut14=dayKey(new Date(Date.now()-14*864e5));
   const tired=k9=>{const r=ntc[k9];return !!(r&&r.n>=3&&r.last>cut14)};
   const pool=finds0.concat(noticedPool().filter(p2=>!tired(p2.t)));
-  if(!pool.length){
-    try{const B=(typeof brewingQs==='function')?brewingQs():[];
-      if(B.length){const b0=B[0];
-        return{t:'\u201c'+b0.q.replace(/^Does /,'Does ')+'\u201d',tier:1,brew:1,
-          d:'A real question, '+b0.have+' of 12 evidence days in \u2014 '+b0.left+' more and your own engine answers it.'+(B[1]?' Also brewing: \u201c'+B[1].q+'\u201d ('+B[1].left+' days out).':'')+' Nothing here is invented \u2014 the cool ones arrive when the data proves them.'}}}catch(e){}
-    return{t:'A quiet day \u2014 honestly',tier:3,brew:1,
-      d:'Nothing new is true about you today, and Allena does not invent. Log on \u2014 the next find is being earned right now.'}}
   /* A NEW ONE EVERY TIME YOU OPEN THE APP (owner ask, 11 Sep: "the today
      finding should be scrolling through a new one every time you open the
      app, but not stupid findings"). It used to pin one observation for the
      whole day. Now a genuinely new open (bootStart / dayCheck, 30-minute
      rule) releases the pin and the next one steps up. Within one open it
-     still holds still — the hero must not change under a scroll. */
-  try{if(S._openNew){S._openNew=0;t.noticedT=null;t.seenIdx=null;t.noticedRepeat=false;todaySave(t)}}catch(e){oops('noticedOpen',e)}
+     still holds still — the hero must not change under a scroll.
+     Moved ABOVE the empty-pool branch (13 Sep) so the brewing floor below
+     rotates on a new open too — it was unreachable on a drained day. */
+  try{if(S._openNew){S._openNew=0;t.noticedT=null;t.seenIdx=null;t.noticedRepeat=false;t.brewT=null;todaySave(t)}}catch(e){oops('noticedOpen',e)}
+  if(!pool.length){
+    /* THE FLOOR MUST ROTATE TOO (13 Sep, found by replaying the hero
+       forward fourteen days): this branch always took B[0], never joined
+       the recent list and never stamped the fuse — so once the pool ran
+       dry the SAME sentence came back on every open, 39 times in 112
+       views on a mature account. That repeat is what the beta called
+       "ai slop". brewingQs returns up to three; walk them the way the
+       main pool is walked, and hold still within one open. */
+    try{const B=(typeof brewingQs==='function')?brewingQs():[];
+      if(B.length){
+        const ttl=b=>'“'+b.q+'”';
+        let rec=[];try{rec=(S.daily&&S.daily.noticedRecent)||[]}catch(e){oops('brewRecent',e)}
+        let bi=t.brewT?B.findIndex(b=>ttl(b)===t.brewT):-1;   /* held for this open */
+        if(bi<0){
+          bi=0;let hops=0;
+          while(hops<B.length&&rec.indexOf(ttl(B[bi]))>=0){bi=(bi+1)%B.length;hops++}
+          if(hops>=B.length){   /* all seen: take the oldest, never fake freshness */
+            let best=1e9;B.forEach((b,i)=>{const r=rec.indexOf(ttl(b));if(r>=0&&r<best){best=r;bi=i}})}
+          try{S.daily=S.daily||{days:{}};
+            S.daily.noticedRecent=rec.filter(x=>x!==ttl(B[bi])).concat(ttl(B[bi])).slice(-14);
+            lset(K_DAILY,S.daily)}catch(e){oops('brewSeen',e)}
+          try{t.brewT=ttl(B[bi]);todaySave(t)}catch(e){oops('brewPin',e)}}
+        const b0=B[bi],b1=B.length>1?B[(bi+1)%B.length]:null;
+        return{t:ttl(b0),tier:1,brew:1,
+          d:'A real question, '+b0.have+' of 12 evidence days in — '+b0.left+' more and your own engine answers it.'+(b1?' Also brewing: “'+b1.q+'” ('+b1.left+' days out).':'')+' Nothing here is invented — the cool ones arrive when the data proves them.'}}}catch(e){oops('noticedBrew',e)}
+    return{t:'A quiet day — honestly',tier:3,brew:1,
+      d:'Nothing new is true about you today, and Allena does not invent. Log on — the next find is being earned right now.'}}
   if(t.noticedT){const f9=pool.find(p2=>p2.t===t.noticedT);if(f9)return f9}
   if(t.seenIdx!=null)return pool[Math.min(t.seenIdx,pool.length-1)];
   const seed=today().split('-').join('');
@@ -5416,11 +5470,11 @@ function noticedToday(){
     S.daily=S.daily||{days:{}};
     S.daily.noticedRecent=recent.filter(x=>x!==list[idx].t).concat(list[idx].t).slice(-14);
     lset(K_DAILY,S.daily);
-  }catch(e){}
+  }catch(e){oops('noticedRotate',e)}
   const chosen=list[idx];
   t.seenIdx=pool.indexOf(chosen);t.noticedT=chosen.t;todaySave(t);
   try{const r=ntc[chosen.t]||{n:0};
-    if(r.last!==today()){r.n=(r.n||0)+1;r.last=today();ntc[chosen.t]=r;lset(K_DAILY,S.daily)}}catch(e){}
+    if(r.last!==today()){r.n=(r.n||0)+1;r.last=today();ntc[chosen.t]=r;lset(K_DAILY,S.daily)}}catch(e){oops('noticedStamp',e)}
   return chosen}
 
 /* ══ data points ════════════════════════════════════════════
@@ -5544,6 +5598,31 @@ function runLive(r){
   try{if(!r)return false;
     if(String(r.id||'').slice(0,2)==='hk')return true;
     return (+r.hr>=80)&&(+r.km>0)}catch(e){return false}}
+/* ══ DOES THIS RIDE OR RUN RACE? ═══════════════════════════════
+   ONE function, because the race and weeksRaced() each computed this
+   their own way and disagreed \u2014 the exact "two readouts, two ways"
+   bug, caught twice in one day on 13 Sep. Anything that wants to know
+   whether a cardio row competes asks here. */
+function runRaces(r){
+  try{
+    if(!r||!runLive(r))return false;
+    const mins=+r.mins||0,hr=+r.hr||0,hk=String(r.id||'').slice(0,2)==='hk';
+    if(isRunType(String(r.type||'easy')))return true;
+    if(hr>=95)return true;
+    /* UNKNOWN HR IS NOT LOW HR, for rides too. The native bridge sends
+       no HR field at all, so every Apple Watch ride scored zero while a
+       Strava-imported ride raced \u2014 the less verifiable path was the one
+       competing. A KNOWN low HR still refuses: a stroll is recovery. */
+    if(hr===0&&hk&&mins>=20)return true;
+    /* AND THE GATE MUST NOT SHUT OUT THE PERSON IT WAS BUILT FOR. A
+       post-op patient riding at HR 88 is doing their hardest available
+       work; cardiac-rehab trials had to relax exactly this threshold.
+       Rides only \u2014 a strolled hour is recovery whoever is doing it. */
+    const inRehab=(function(){try{return !!((S.acl&&S.acl.on)||
+      ((typeof activeProtocols==='function')&&activeProtocols().length))}catch(e){return false}})();
+    if(inRehab&&String(r.type||'')==='ride'&&hk&&mins>=10&&(hr===0||hr>=80))return true;
+    return false}
+  catch(e){oops('runRaces',e);return false}}
 function srpeStrain(){
   /* Foster 1998: illness and overtraining cluster after MONOTONOUS
      heavy weeks — load × sameness, not big load alone. Cross-domain by
@@ -5624,6 +5703,7 @@ function dpPlausible(h){
 function dataPoints(){
   const B={sets:0,effort:0,sessions:0,runs:0,zones:0,readiness:0,bodyweight:0,scans:0,rehab:0,notes:0};
   let live=0,byDay={},weekLive=0,weekSess=0,prevWeekLive=0;
+  const cardioDay={};   // cardio race points already paid out per day
   /* THE RACE, ITEMISED (beta ask from Angus, 10 Sep: 'you should be
      able to click on yourselves to see how you're getting your
      points'). Collected inside the same loop that scores the week, so
@@ -5655,7 +5735,12 @@ function dataPoints(){
         if(l.r!=null){sets+=1+Math.min(0.06,Math.abs(+l.r||0)/500)}}
       if(l.rpe!=null){effort+=1+Math.min(0.05,Math.abs(+l.rpe||0)/200)}
       if(l.note)notes+=1});
-    if(h.note&&Object.keys(h.note).length)notes+=Object.keys(h.note).length;
+    /* POINTS COST ONE PER HONEST NUMBER (the Rules section). S.note is
+       created as {sleep:'',fatigue:'',knee:''} the moment a session
+       starts, so counting KEYS paid 3 points for three empty strings on
+       every session ever logged \u2014 found 13 Sep by the cycling audit.
+       Count the ones the user actually filled in. */
+    if(h.note)notes+=Object.keys(h.note).filter(k9=>String(h.note[k9]||'').trim()).length;
     let earned=sets+effort+notes+sess;
     // a day is worth at most one honest day, however many sessions are filed against it
     const used=byDay[day]||0,room=Math.max(0,dpDayCap()-used);
@@ -5699,21 +5784,46 @@ function dataPoints(){
        zone bonuses), capped at 40 a run. The DATA economy (B.runs,
        day caps, the tree) keeps the information price unchanged. */
     const mins9=+r.mins||0;
-    const race9=mins9>0?Math.min(40,0.8*mins9+(r.hr?1:0)+(r.rpe?1:0)+zearn):earn+zearn;
+    /* A BIKE MINUTE IS NOT A RUN MINUTE, AND THE CAP HAS TO KNOW IT.
+       cardioAcwr() has always billed rides at 0.6 leg cost; the race
+       never did. The published cycling-to-running conversion is 0.54
+       (n=55, Frontiers 2026) and coaches use 0.67-0.80, so 0.6 sits
+       inside every range and matches what the rest of the app already
+       believes. Scaling the RATE alone changes nothing above ~50
+       minutes because the cap binds first, so the cap scales with it:
+       40 for a run, 24 for a ride. */
+    const isRide9=String(r.type||'')==='ride';
+    const rate9=isRide9?0.48:0.8, cap9=isRide9?24:40;
+    const race9=mins9>0?Math.min(cap9,rate9*mins9+(r.hr?1:0)+(r.rpe?1:0)+zearn):earn+zearn;
     /* THE WALK SEAM (owner-caught, 10 Sep: 'logging a walk on your
        wearable... 0.8/min'): a RUN races on the device witness alone
        (unknown HR is not low HR — the Angus law); every OTHER cardio
        type must show working effort (avg HR 95+) to enter the race.
        A stroll is recovery, not a race entry — and never a session. */
-    const races9=runLive(r)&&(isRunType(String(r.type||'easy'))||(+r.hr||0)>=95);
+    /* UNKNOWN HR IS NOT LOW HR \u2014 FOR RIDES TOO (13 Sep). That law was
+       written on 8 Sep for lifting after a Garmin workout with no avg
+       HR scored zero. It was never extended to cardio, and the native
+       bridge sends no HR field at all, so EVERY Apple Watch ride scored
+       zero while a Strava-imported ride raced \u2014 the less verifiable
+       path was the one competing. A device-witnessed ride of real
+       length is witnessed by the clock, exactly as a session is.
+       A KNOWN low HR still refuses: a stroll is recovery, not a race. */
+    const races9=runRaces(r);
     /* the ALL-TIME live figure (the score card's 'all-time live')
        counts the DATA earn only — race9 is the weekly race's price
        and nothing else's (owner-caught, 10 Sep: a mate with 1,158 km
        of witnessed runs showed all-time live == total points because
        the race score outran the data and hit the cap) */
+    /* A DAY IS WORTH AT MOST ONE HONEST DAY \u2014 for cardio too. The cap
+       was PER RIDE, so five rides was 200 points and nothing stopped
+       it. Lifting has had a day cap since the beginning; cardio never
+       did. A second session still counts as showing up in the sessions
+       line, which is where showing up belongs. */
+    const paid9=Math.min(race9,Math.max(0,40-(cardioDay[day]||0)));
+    cardioDay[day]=(cardioDay[day]||0)+(races9?paid9:0);
     if(races9){live+=earn+zearn;
-      if(wkStart&&day>=wkStart){weekLive+=race9;weekSess++}
-      else if(pvStart&&day>=pvStart&&day<wkStart)prevWeekLive+=race9}
+      if(wkStart&&day>=wkStart){weekLive+=paid9;weekSess++}
+      else if(pvStart&&day>=pvStart&&day<wkStart)prevWeekLive+=paid9}
     if(wkStart&&day>=wkStart){
       /* SAY THE ACTUAL RULE (owner-caught, 12 Sep). The old line led with
          "avg HR unknown", which reads as "record your heart rate and this
@@ -6516,14 +6626,14 @@ function pointsChip(){
      on the same scale. Grey = what remains after even a perfect day. */
   const thr=L.floor+L.need;
   const pct=Math.min(100,d.total/thr*100);
-  const C=2*Math.PI*13;
-  return '<button data-a="drawerNav" data-v="points" style="display:flex;align-items:center;gap:9px;padding:6px 13px 6px 7px;border-radius:999px;'+
+  const C=2*Math.PI*17;
+  return '<button data-a="drawerNav" data-v="points" class="pts-glow" style="display:flex;align-items:center;gap:11px;padding:8px 17px 8px 8px;border-radius:999px;'+
     'background:var(--raised);border:1px solid var(--line);flex:none">'+
-    '<span style="position:relative;width:30px;height:30px;flex:none;display:block">'+
-    '<img class="mk" src="'+MARK+'" alt="" style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:14px;height:14px;object-fit:contain;opacity:.9">'+
-    '<svg viewBox="0 0 30 30" style="width:30px;height:30px;transform:rotate(-90deg);display:block">'+
-    '<circle cx="15" cy="15" r="13" fill="none" stroke="var(--line)" stroke-width="2.5"/>'+
-    '<circle cx="15" cy="15" r="13" fill="none" stroke="var(--green)" stroke-width="2.5" stroke-linecap="round" '+
+    '<span style="position:relative;width:38px;height:38px;flex:none;display:block">'+
+    '<img class="mk" src="'+MARK+'" alt="" style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:18px;height:18px;object-fit:contain;opacity:.95">'+
+    '<svg viewBox="0 0 38 38" style="width:38px;height:38px;transform:rotate(-90deg);display:block">'+
+    '<circle cx="19" cy="19" r="17" fill="none" stroke="var(--line)" stroke-width="3"/>'+
+    '<circle cx="19" cy="19" r="17" fill="none" stroke="var(--green)" stroke-width="3" stroke-linecap="round" '+
     'stroke-dasharray="'+C.toFixed(1)+'" stroke-dashoffset="'+(C*(1-pct/100)).toFixed(1)+'"/>'+
     (function(){/* the SOLID blue continuation (owner call, Sep 2026):
         where the arc lands if today's remaining room is fully earned.
@@ -6534,11 +6644,11 @@ function pointsChip(){
       if(addPct<=0)return '';
       addPct=Math.max(addPct,2);
       const a0=(pct/100)*2*Math.PI,a1=(Math.min(100,pct+addPct)/100)*2*Math.PI;
-      const px=v=>(15+13*Math.cos(v)).toFixed(2),py=v=>(15+13*Math.sin(v)).toFixed(2);
+      const px=v=>(19+17*Math.cos(v)).toFixed(2),py=v=>(19+17*Math.sin(v)).toFixed(2);
       const large=(a1-a0)>Math.PI?1:0;
-      return '<path d="M'+px(a0)+' '+py(a0)+' A13 13 0 '+large+' 1 '+px(a1)+' '+py(a1)+'" '+
-        'fill="none" stroke="var(--blue)" stroke-width="2.5" stroke-linecap="round" opacity=".95"/>'})()+'</svg></span>'+
-    '<span style="text-align:left;line-height:1.15"><span class="mono" style="display:block;font-size:14px;font-weight:600;color:var(--green)">'+d.total.toLocaleString()+'</span>'+
+      return '<path d="M'+px(a0)+' '+py(a0)+' A17 17 0 '+large+' 1 '+px(a1)+' '+py(a1)+'" '+
+        'fill="none" stroke="var(--blue)" stroke-width="3" stroke-linecap="round" opacity=".95"/>'})()+'</svg></span>'+
+    '<span style="text-align:left;line-height:1.15"><span class="mono" style="display:block;font-size:16.5px;font-weight:600;color:var(--green)">'+d.total.toLocaleString()+'</span>'+
     '<span class="mono" style="display:block;color:var(--faint);font-size:8.5px;letter-spacing:.08em">LEVEL '+L.lv+'</span></span></button>'}
 
 /* ══ the climb — rehab as the game it already is ═════════════
@@ -8162,6 +8272,56 @@ function rpCombinedWeek(days,longDay){
     if(runSet.has(d9))return DN7[d9]+' — '+(d9===li?'long run':'run');
     return null}).filter(Boolean);
   return{template:template,conflict:conflict}}catch(e){return null}}
+/* ══ WEEKS RACED ═══════════════════════════════════════════════
+   The honest form of Dafydd's rank idea, and the one both research
+   tracks endorsed: a LIFETIME COUNTER, not a cohort rank.
+
+   "24 weeks raced" is a fact about you. Nobody has to be below you
+   for it to be true, it never falls, and no season resets it. That
+   is the promotion-only half of the economy the research says
+   Allena can carry (research §4.3, council sitting 3) — as
+   against a tiered ladder, which needs demotion to work and would
+   put a permanent label reading "trains less than you" on the exact
+   audience the app exists for.
+
+   Counted from WITNESSED work only, so it means the same thing the
+   race means. Typed history earns points; it does not race.
+   ══════════════════════════════════════════════════════════════ */
+function weeksRaced(){
+  /* READ RUNS FROM runs(), NOT FROM THE HISTORY MIRRORS (caught in the
+     browser, 13 Sep). Every run is mirrored into S.history so recovery
+     and tonnage see it, but the mirror is a history row and runLive()
+     expects a RUN \u2014 so a mirror always returned false and this counter
+     silently disagreed with the race, which reads runs() in dataPoints.
+     Two readouts of the same idea must never be computed two ways. */
+  try{
+    const wk={},put=d=>{if(d)wk[questWeekKey(new Date(String(d).slice(0,10)+'T12:00'))]=1};
+    (S.history||[]).forEach(h=>{
+      if(!h.complete||h.run)return;                 // mirrors handled below
+      try{if((typeof sessionLive==='function')&&sessionLive(h))put(hKey(h))}catch(e){}});
+    /* ASK THE RACE, DO NOT RE-DERIVE IT. This used runLive() alone while
+       the race also demanded working effort, so a ride that could not
+       race still counted as a week raced \u2014 the same "two readouts, two
+       ways" bug as the mirror above, found the same day. runRaces() is
+       the one computation. */
+    try{const R=(typeof runs==='function')?runs():[];
+      R.forEach(r=>{try{if((typeof runRaces==='function')?runRaces(r)
+        :((typeof runLive==='function')&&runLive(r)))put(r.date)}catch(e){}})}
+    catch(e){oops('weeksRacedRuns',e)}
+    return Object.keys(wk).length}
+  catch(e){oops('weeksRaced',e);return 0}}
+function weeksRacedCard(){
+  try{
+    const n=weeksRaced();
+    if(!n)return '';   /* silent until it is true — never a zero to stare at */
+    return '<div class="card mt" style="padding:16px">'+
+      '<div style="display:flex;align-items:baseline;gap:9px;flex-wrap:wrap">'+
+      '<span class="disp" style="font-size:26px;font-weight:700">'+n+'</span>'+
+      '<span style="font-size:14px;font-weight:600">'+(n===1?'week raced':'weeks raced')+'</span></div>'+
+      '<p style="color:var(--dim);font-size:12.5px;line-height:1.6;margin-top:7px">'+
+      'Weeks you showed up with work the clock witnessed. It only ever goes up — '+
+      'no season resets it and nobody can take it off you.</p></div>'}
+  catch(e){oops('weeksRacedCard',e);return ''}}
 function viewPoints(){
   const d=dataPoints(),t=dpTier(d.total),nx=dpNext(d.total),L=dpLabels(),st=weekStreak();
   const keys=Object.keys(d.by).filter(k=>d.by[k]).sort((a,b)=>d.by[b]-d.by[a]);
@@ -8169,6 +8329,7 @@ function viewPoints(){
   const tr=treeData(),stg=treeStage(tr);
   let h='<div class="view pad stg" style="padding-top:24px">'+
    '<button data-a="back" class="btn" style="width:auto;padding:8px 14px;color:var(--dim);font-size:12.5px;margin-bottom:14px">‹ Back</button>'+
+   weeksRacedCard()+
    '<div class="card an-hero" style="padding:18px 18px 22px;border-radius:22px;text-align:center;border-color:'+t[2]+'">'+
    '<div class="an-rise" data-treetap="1" style="margin:0 auto;max-width:300px">'+growTree(300,270)+'</div>'+
    '<p class="disp" style="font-size:17px;font-weight:600;margin-top:6px">'+esc(stg[0])+'</p>'+
@@ -8215,13 +8376,26 @@ function viewPoints(){
        :['runLog','','Go for a run','arrives from Health on its own — or log it here; distance, time, heart rate and zones all count',doneRun]),
      ['todayOpen','','The daily check-ins','readiness, weight, check-in — small, but they compound',doneChecks],
      ['drawerNav','findings','Visit your findings','new discoveries bank into the collection when seen',doneFinds]];
+   /* EVERY DOOR DONE IS NOT THE SAME AS ROOM LEFT (owner-caught, 13 Sep:
+      "how is there still room for 179 points today" \u2014 with all four
+      rows ticked). Room is simply cap minus earned, so a 40-point day
+      leaves 179 on a 220 cap. But the cap is a CEILING, not a target: a
+      good day lands 60-120, and once every row here is done the only
+      way to reach the rest is more training, which this card does not
+      offer. Shouting a big blue number over four greyed-out rows is
+      exactly the dead offer this repo bans \u2014 so when the list is
+      finished the card says that instead, and stops listing doors
+      nobody can walk through. */
+   const allDone=earn.every(e9=>!!e9[4]);
    h+='<div class="card mt2" style="padding:15px 16px">'+
      '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px">'+
      '<p class="eyebrow" style="margin:0">Keep it climbing</p>'+
-     '<span class="mono" style="color:var(--blue);font-size:10px">'+(room>0?('ROOM FOR +'+room+' TODAY'):'TODAY IS FULL')+'</span></div>'+
-     (room>0?'<p style="color:var(--dim);font-size:12px;line-height:1.5;margin-top:5px">The blue ring on your points chip is this — what today could still earn. A day caps at '+dpDayCap()+' so the number stays honest.</p>'
-       :'<p style="color:var(--dim);font-size:12px;line-height:1.5;margin-top:5px">You have hit today\u2019s cap — one honest day, fully banked. It resets at midnight.</p>')+
-     (room>0?'<div style="margin-top:10px">'+earn.map((e9,i9)=>
+     '<span class="mono" style="color:'+(room>0&&!allDone?'var(--blue)':'var(--green)')+';font-size:10px">'+
+       (room<=0?'TODAY IS FULL':allDone?'EVERY DOOR DONE':('ROOM FOR +'+room+' TODAY'))+'</span></div>'+
+     (room<=0?'<p style="color:var(--dim);font-size:12px;line-height:1.5;margin-top:5px">You have hit today\u2019s cap \u2014 one honest day, fully banked. It resets at midnight.</p>'
+      :allDone?'<p style="color:var(--dim);font-size:12px;line-height:1.5;margin-top:5px">Everything on this list is done. The day caps at '+dpDayCap()+', but that is a ceiling, not a target \u2014 most good days land between 60 and 120. More points from here means more training, not more tapping.</p>'
+       :'<p style="color:var(--dim);font-size:12px;line-height:1.5;margin-top:5px">The blue ring on your points chip is this \u2014 what today could still earn. A day caps at '+dpDayCap()+' so the number stays honest.</p>')+
+     (room>0&&!allDone?'<div style="margin-top:10px">'+earn.map((e9,i9)=>
        '<button data-a="'+e9[0]+'"'+(e9[1]?' data-v="'+e9[1]+'"':'')+' style="width:100%;text-align:left;display:flex;align-items:center;gap:10px;padding:10px 0'+(i9?';border-top:1px solid var(--line)':'')+(e9[4]?';opacity:.5':'')+'">'+
        '<span style="width:18px;flex:none;text-align:center;color:'+(e9[4]?'var(--green)':'var(--line)')+';font-size:12px">'+(e9[4]?'\u2713':'\u25cb')+'</span>'+
        '<span style="flex:1;min-width:0"><span style="display:block;font-size:13px;font-weight:600">'+e9[2]+'</span>'+
@@ -10518,7 +10692,7 @@ function notifPlan(){
       const noon=new Date(today()+'T12:00:00').getTime();
       const ts9=Math.max(noon,Date.now()+45*60000);
       items.push({id:'dr'+today(),ts:Math.round(ts9/1000),title:'Allena',
-        body:'Your deep read is ready.'})}}catch(e){}}
+        body:'This week\u2019s read is ready.'})}}catch(e){}}
   /* the fuse (owner ruling, 3 Sep): when an analysis is ONE unit
      from unlocking, that is the most motivating true fact the app
      holds — it gets the 11:00 slot. Real threshold, filled by
@@ -10608,7 +10782,7 @@ function notifPreviewHtml(){
   try{
     const P=notifPrefs();
     if(!P.asked||!P.on)return '<p style="color:var(--faint);font-size:11.5px;line-height:1.55;margin-top:10px">Turn notifications on and this shows exactly what is queued, when, and why.</p>';
-    const KIND={am:'Morning call',ap:'Physio',dr:'Deep read ready',fu:'One away',nf:'Reachable find',dc:'The day\u2019s call',rv:'Evening reveal',q:'New quest',wr:'Monthly wrap',hc:'Health link',re:'Rest timer'};
+    const KIND={am:'Morning call',ap:'Physio',dr:'This week\u2019s read',fu:'One away',nf:'Reachable find',dc:'The day\u2019s call',rv:'Evening reveal',q:'New quest',wr:'Monthly wrap',hc:'Health link',re:'Rest timer'};
     const kindOf=id=>/^ap/.test(id)?'ap':/^am/.test(id)?'am':/^dr/.test(id)?'dr':/^fu/.test(id)?'fu':/^nf/.test(id)?'nf':/^dc/.test(id)?'dc':/^rv/.test(id)?'rv':/^q\d/.test(id)?'q':/^wr/.test(id)?'wr':/^rest/.test(id)?'re':'hc';
     const items=notifPlan().slice().sort((a,b)=>a.ts-b.ts).slice(0,8);
     if(!items.length)return '<div class="card mt" style="padding:13px 15px"><p class="eyebrow">Queued right now</p>'+
@@ -11307,9 +11481,45 @@ function squatSummary(e9){
     return{reps:kept.length,pct:pct,toward:toward,even:pct<4,away:away,
       kept:kept.length,total:total,onset:onset,onsetTxt:squatOnsetTxt(onset)}}
   catch(e){oops('squatSummary',e);return null}}
-const RARITY=[['common','#8A8782','Noticed'],['uncommon','var(--green)','Worth knowing'],
-  ['rare','#D9D6CD','Rare find'],['epic','#FFFFFF','Big one']];
+/* THE RARITY LADDER (owner, 13 Sep 2026: "Big one / Epic / Rare /
+   Noticed should have a colour system, otherwise they're all the same").
+   They were: the old ladder ran stone, green, #D9D6CD, #FFFFFF — the top
+   two were near-identical off-whites, so the rarest thing in the app
+   looked the same as the second-rarest.
+
+   It is a WARM METAL ladder now: stone, bronze, gold, incandescent. It
+   climbs in warmth and brightness at once, which is the one ordering
+   everybody reads without being told. It is warm on purpose — every
+   domain colour on the tree is cool (green lifting, rose rehab, blue
+   running, slate cycling, violet trunk), so a find can never be mistaken
+   for a kind of work, on any surface.
+
+   This is an owner amendment to decision 6c, which had rarity as a muted
+   monochrome ladder. The ladder survives; it stopped being monochrome
+   because monochrome could not carry four steps.
+
+   Index: [key, colour, label, glow, rank]. Consumers read [1] and [2],
+   so the two new fields are additive and nothing had to change.
+   NEVER add a fifth tier without a real fifth rarity behind it. */
+const RARITY=[
+  ['common',  '#8A8782','Noticed',      'transparent',                  0],
+  ['uncommon','#B98A4B','Worth knowing','rgba(185,138,75,.10)',         1],
+  ['rare',    '#E8B84B','Rare find',    'rgba(232,184,75,.13)',         2],
+  ['epic',    '#FFF0C0','Big one',      'rgba(255,240,192,.16)',        3]];
 function rarityOf(k){return RARITY.find(x=>x[0]===k)||RARITY[0]}
+/* THE TIER SHOWS IN THE CHROME, NOT ONLY THE WORD (same ruling: "make it
+   look better, demonstrate their ranking with colour and UI design
+   tier"). A Noticed is a plain row; a Big one is bordered, lit and
+   lettered. The step between them is the point — rarity you can see
+   before you have read anything. */
+function rarChrome(k){
+  const r=rarityOf(k),n=r[4]||0;
+  return{col:r[1],label:r[2],rank:n,
+    border:n>=2?r[1]:(n===1?'color-mix(in srgb,'+r[1]+' 45%,transparent)':'var(--line)'),
+    glow:n>=2?'0 0 0 1px '+r[3]+',0 6px 22px -8px '+r[3]:'none',
+    fill:n>=1?r[3]:'transparent',
+    weight:n>=3?700:600,
+    track:n>=3?'.10em':'.06em'}}
 function discoveries(){
   const D=[];
   const H=(S.history||[]).filter(h=>h.complete&&!h.run).slice();
@@ -12803,8 +13013,17 @@ function correlations(){
     const bySig={};
     const distinct=found.filter(f=>{const k=f.sig+'|'+f.out;
       if(bySig[k])return false;bySig[k]=1;return true});
+    /* THE RESERVOIR WIDENED AGAIN (owner, 13 Sep: "loving the top four
+       findings, more of them please"). THREE per outcome, thirty-two
+       kept. Not one gate moved to do it: |rho| >= 0.5, n >= 12,
+       t >= 2.8, both-halves stability and the priors layer all still
+       decide WHETHER something is a finding. This only changes how many
+       of the ones that already passed get kept instead of thrown away,
+       which is the only honest way to make more of them. The
+       per-outcome cap stays a cap so one outcome cannot take the page,
+       and one relationship is still one finding — both pinned. */
     const seen={};
-    const v=distinct.filter(f=>{const n9=(seen[f.out]||0);if(n9>=2)return false;seen[f.out]=n9+1;return true}).slice(0,20);
+    const v=distinct.filter(f=>{const n9=(seen[f.out]||0);if(n9>=3)return false;seen[f.out]=n9+1;return true}).slice(0,32);
     S._corrMemo={stamp:stamp,v:v};
     return v;
   }catch(e){return[]}}
@@ -13032,7 +13251,7 @@ function whisperGen(){
       if(c9&&c9.remaining&&c9.remaining.length){
         const f=corr.find(c=>/^sleep/.test(c.sig)&&/(topset|tonnage|benchtop|squattop|deadtop|ex:)/.test(c.out)&&c.lag>=1);
         if(f)out.push({slot:at(20,30),id:'wh-night'+today(),
-          body:'Training tomorrow. In your data: '+f.t.toLowerCase()+'.'})}}catch(e){}
+          body:'You train tomorrow. Worth knowing: '+f.t.toLowerCase()+'.'})}}catch(e){}
     // 3. THE EDGE — today's call includes a goal lift; replay the last PR's real context
     try{const rec=(typeof recommendToday==='function')?recommendToday():null;
       if(rec&&rec.top&&!rec.empty){
@@ -13272,7 +13491,7 @@ function analystSection(){
     if(exp9){const x9=(typeof expStatus==='function')?expStatus():null;
       h+='<div class="card mt" style="padding:11px 14px;border-color:var(--greensoft)">'+
       '<div style="display:flex;align-items:center;gap:10px">'+
-      '<span style="flex:1;font-size:12.5px">\u2697 Experiment \u2014 day '+(x9?x9.day:'?')+' of 14. '+esc(exp9.plan&&exp9.plan.ex||'The addition')+' rides your '+esc(exp9.plan&&exp9.plan.anchor||'anchor')+' days; the engine is watching '+esc(x9&&x9.watch||'the anchor')+' e1RM against the month before.</span>'+
+      '<span style="flex:1;font-size:12.5px">\u2697 Experiment \u2014 day '+(x9?x9.day:'?')+' of 14. '+esc(exp9.plan&&exp9.plan.ex||'The addition')+' rides your '+esc(exp9.plan&&exp9.plan.anchor||'anchor')+' days; Allena is comparing '+esc(x9&&x9.watch||'the anchor')+' e1RM against the month before.</span>'+
       '<button data-a="analystRemove" class="mono" style="color:var(--red);font-size:11px;flex:none">Remove</button></div>'+
       (x9&&!x9.ripe&&x9.day>=14?'<p style="color:var(--faint);font-size:10.5px;margin-top:6px">Window done \u2014 needs '+Math.max(0,3-x9.n)+' more '+esc(x9.watch)+' session'+(3-x9.n===1?'':'s')+' to verdict honestly.</p>':'')+'</div>'}
     const le9=st.lastExp;
@@ -13653,6 +13872,63 @@ function shareLevelRun(gained,lv){
         else openSheet()}catch(e){openSheet()}},'image/png')}
     else openSheet()
   }catch(e){flash('Could not draw the card.')}}
+/* ══ WHEN THE TREE ACTUALLY CHANGED ════════════════════════════
+   Owner call, 13 Sep: the tree was the lowest-priority surface in
+   the app \u2014 collectTeaser bids 15, behind everything, so it only
+   ever appeared when nothing else had anything to say. It is also
+   the most distinctive thing Allena has, and the thing a print is
+   sold from.
+
+   The fix is not to park it on Today permanently, which would go
+   back on the v107 decluttering. It is to let it bid HIGH on the
+   days it genuinely grew \u2014 the rule the rest of the app already
+   follows: only changing data earns dashboard space.
+
+   STRUCTURAL changes only: a new branch (a lift trained for the
+   first time), a blossom (a rare or epic find), a root (another
+   consistent week), or a new stage. Points tick up constantly and
+   are NOT a change \u2014 otherwise this fires every session and the
+   surface goes stale, which is the thing it is meant to avoid. */
+const K_TREESEEN='training-treeseen-v1';
+function treeSnap(){
+  try{const t=treeData();
+    return{stage:treeStage(t)[0],branches:t.liftCount|0,blossom:t.rare|0,roots:t.weeks|0}}
+  catch(e){oops('treeSnap',e);return null}}
+function treeChange(){
+  try{
+    const now=treeSnap();if(!now)return null;
+    const seen=lget(K_TREESEEN,null);
+    /* FIRST RUN STAMPS SILENTLY. An existing user opening a new build
+       must not be told their tree "just grew" \u2014 nothing happened. */
+    if(!seen){lset(K_TREESEEN,now);return null}
+    const bits=[];
+    if(now.stage!==seen.stage)bits.push('it reached '+String(now.stage).toLowerCase());
+    const nb=now.branches-(seen.branches|0);
+    if(nb>0)bits.push(nb===1?'a new branch':nb+' new branches');
+    const nf=now.blossom-(seen.blossom|0);
+    if(nf>0)bits.push(nf===1?'a blossom':nf+' blossoms');
+    const nr=now.roots-(seen.roots|0);
+    if(nr>0)bits.push(nr===1?'another root':nr+' more roots');
+    if(!bits.length)return null;
+    return{now:now,bits:bits,stage:now.stage!==seen.stage}}
+  catch(e){oops('treeChange',e);return null}}
+function treeSeen(){try{const n=treeSnap();if(n)lset(K_TREESEEN,n)}catch(e){oops('treeSeen',e)}}
+function treeGrewCard(){
+  try{
+    const c=treeChange();if(!c)return '';
+    const line=c.bits.length===1?c.bits[0]
+      :c.bits.slice(0,-1).join(', ')+' and '+c.bits[c.bits.length-1];
+    return '<button data-a="drawerNav" data-v="points" class="card" '+
+      'style="width:100%;text-align:left;padding:16px;margin-top:14px;display:block">'+
+      '<div style="display:flex;align-items:center;gap:9px">'+
+      '<span class="mono" style="font-size:10px;letter-spacing:.14em;color:var(--green)">YOUR TREE</span></div>'+
+      '<p style="font-size:14.5px;font-weight:600;line-height:1.4;margin-top:7px">'+
+      esc(c.stage?'Your tree reached '+String(c.now.stage).toLowerCase():'Your tree grew')+'</p>'+
+      '<p style="color:var(--dim);font-size:12.5px;line-height:1.55;margin-top:5px">'+
+      esc('Since you last looked: '+line+'. Drawn from what you actually did \u2014 nobody else has this one.')+
+      '</p></button>'}
+  catch(e){oops('treeGrewCard',e);return ''}}
+
 function growTree(W,Hh){
   const t=treeData(),R=seedRand(t.seed);
   W=W||300;Hh=Hh||300;
@@ -13755,6 +14031,747 @@ function growTree(W,Hh){
    four cards, they want a verdict.
    ══════════════════════════════════════════════════════════ */
 
+/* ══ THE CHRONOLOGICAL TREE ═══════════════════════════════════
+   Owner call, 13 Sep 2026, lifting the standing rule that the
+   renderer's character must not change. Defaults settled by council
+   sitting 4 (COUNCIL-tree-v1.md, five advisors).
+
+   HEIGHT IS TIME. Base = your first logged day, tip = today.
+
+   Why it still reads drawn rather than charted: TIME FIXES EXACTLY
+   ONE NUMBER — the y where a branch meets the trunk. Side, angle,
+   length, kink and leaf spray still come from the same profile-
+   seeded PRNG they always did. The August redraw was reverted
+   because it changed line QUALITY; this changes only where a line
+   starts.
+
+   LINEAR TIME, NEVER COMPRESSED (unanimous). The bare stretch of
+   trunk IS the injured months, and that is the whole point. Squashing
+   quiet periods would reward recency, which is the fake-progress
+   instinct the charter bans.
+
+   THE TRUNK CARRIES THE WORK. A data point is not a leaf here — a
+   thousand dated leaves at fixed heights is a dense band, the
+   opposite of sparse. Work in a period thickens the trunk at that
+   height, so a rehab gap draws as a WAIST that widens again over the
+   following year. That silhouette is the ACL story with no caption.
+
+   COLOUR BY DOMAIN, NEVER BY AGE. Green is met/held and dominates
+   early because early growth genuinely is roots and criteria. Blue
+   arrives when running exists, amber when a rare find lands,
+   terracotta when a phase is cleared. So the tree does get more
+   colourful over time — because more KINDS of thing happened, not
+   because time passed. Decision 6c holds: colour still means one
+   thing. A lifting-only tree stays two-tone for ten years, and that
+   is honest.
+   ══════════════════════════════════════════════════════════════ */
+function treeTimeData(){
+  try{
+    const H=(S.history||[]).filter(h=>h.complete&&!h.run);
+    const R9=(S.runs||[]).slice();
+    /* A RUN IS A SESSION HERE TOO (13 Sep, found while tracing why a
+       marathon year drew as lifting). The floor counted lifting only, so
+       someone who had run three times a week for a year and lifted twice
+       got no chronological tree at all; and the base day came from
+       lifting only, so a runner who lifted late had their tree start at
+       the wrong date and every branch sat at the wrong height. Both read
+       the whole ledger now. The trunk already billed runs — it was only
+       these two that did not, which is how it stayed hidden. */
+    const rDays=R9.map(r=>String(r.date||'').slice(0,10)).filter(Boolean);
+    if(H.length+R9.length<6)return null;             // below the floor, the old tree renders
+    const days=H.map(hKey).filter(Boolean).concat(rDays).sort();
+    if(!days.length)return null;
+    const first=days[0],last=today();
+    const d0=new Date(first+'T12:00'),d1=new Date(last+'T12:00');
+    const span=Math.max(1,Math.round((d1-d0)/864e5));
+    if(span<14)return null;                          // and below 14 days too
+    const frac=k=>{try{const d=new Date(String(k).slice(0,10)+'T12:00');
+      return Math.max(0,Math.min(1,(d-d0)/864e5/span))}catch(e){return 0}};
+
+    /* BRANCHES RECUR UP THE TRUNK. First-appearance was the obvious
+       mapping and it is wrong: everyone starts a program with all
+       their lifts, so every branch lands in week one and the tree
+       draws as a bush at the base under a bare pole. Drawn on real
+       data it was exactly the bottlebrush the council predicted.
+
+       A real tree does not branch once either. So: each PERIOD gets a
+       branch for the lift that carried it, and a lift you keep coming
+       back to branches again higher up. The debut still shows \u2014 it is
+       simply the lowest of its branches, not its only one. */
+    const PER=Math.max(10,Math.ceil(span/14));     // ~14 branch levels
+    const per={};
+    H.forEach(h=>{
+      const k=hKey(h);if(!k)return;
+      const i=Math.floor(frac(k)*span/PER);
+      /* REHAB GROWS IN THE TREE, NOT UNDER IT (owner call, 13 Sep).
+         The aggregate tree drew rehab as sage sprigs at the base, which
+         says rehab is something that happened before the real training.
+         On a time axis that is plainly false \u2014 rehab happens at a
+         HEIGHT, often in the middle of a life, and it is the work that
+         got someone back. So the period it happened in carries it, and
+         the branch drawn there is sage. */
+      let isReh=false;
+      try{const p9=(S.lib&&S.lib.programs||[]).filter(x=>x.id===h.progId)[0];
+        isReh=!!(p9&&(p9.acl||p9.rehabProto))}catch(e){}
+      (h.log||[]).forEach(l=>{
+        if(!(l.w||l.r||l.secs))return;
+        const b=gBase(l.ex);
+        per[i]=per[i]||{f:frac(k),c:{},reh:false,run:0};
+        per[i].c[b]=(per[i].c[b]||0)+1;
+        if(isReh)per[i].reh=true;
+        if(frac(k)<per[i].f)per[i].f=frac(k)})});
+    /* RUNNING IS A BRANCH, NOT A DECORATION (owner-caught, 13 Sep: "why
+       is running just a single blue limb"). It used to work two ways and
+       both were wrong. The DOMAIN of a period was decided once for the
+       whole period, so a week of lifting AND running came out entirely
+       blue or entirely bark — never both. And separately a handful of
+       bare blue arcs were drawn on the trunk, carrying nothing but a
+       bucketed count of runs, which is what read as a single blue limb.
+
+       Now a period grows a branch for the lifts that carried it AND its
+       own branch for the running in it, at the same height, each forking
+       through the full recursion in its own colour. Two kinds of work on
+       one week means two branches, which is what actually happened. */
+    /* CARDIO IS BILLED TO ITS PERIOD BEFORE ANY BRANCH IS DECIDED
+       (owner-caught, 13 Sep: "the marathon year person did all lifting
+       and no running"). This loop used to sit TWENTY LINES BELOW the
+       branch loop, so per[i].run was still undefined at the moment a
+       branch chose its domain — every test of it read zero and running
+       has never coloured a branch since the chronological tree shipped.
+       It also skipped a period with no lifting in it, so a pure running
+       week created nothing at all. It creates the period now. */
+    R9.forEach(r=>{try{
+      const k=String(r.date).slice(0,10);if(!k)return;
+      const f9=frac(k),i=Math.floor(f9*span/PER);
+      per[i]=per[i]||{f:f9,c:{},reh:false,run:0};
+      per[i].run=(per[i].run||0)+(+r.km||0);
+      if(String(r.type||'')==='ride')per[i].ride=(per[i].ride||0)+(+r.km||0);
+      if(f9<per[i].f)per[i].f=f9}catch(e){}});
+
+    /* AND THE BRANCHES ARE SHARED OUT BY WHAT ACTUALLY HAPPENED. Lifting
+       used to take up to three branches per period and cardio one, so a
+       marathon year came out three-quarters bark even once the ordering
+       was fixed. Each period now has three slots and they are dealt by
+       each domain's share of that period's work, on the same scale the
+       trunk is billed in (a set, or half a kilometre). Largest remainder,
+       so the slots always add up and a domain with no work never gets
+       one. A lifting year still draws as a lifting year; a running year
+       finally draws as a running year. */
+    const branches=[];
+    Object.keys(per).sort((a,b)=>a-b).forEach(i=>{
+      const c=per[i].c,P9=per[i];
+      const U={lift:Object.keys(c).reduce((t,k9)=>t+c[k9],0),
+               ride:(P9.ride||0)/2,
+               run :Math.max(0,(P9.run||0)-(P9.ride||0))/2};
+      const tot=U.lift+U.ride+U.run;
+      if(tot<=0)return;
+      const SLOTS=3,give={},want={};
+      let used=0;
+      ['lift','run','ride'].forEach(k9=>{want[k9]=U[k9]/tot*SLOTS;
+        give[k9]=Math.floor(want[k9]);used+=give[k9]});
+      ['lift','run','ride'].sort((a,b)=>(want[b]-give[b])-(want[a]-give[a]))
+        .forEach(k9=>{if(used<SLOTS&&U[k9]>0){give[k9]++;used++}});
+      let slot=0;
+      Object.keys(c).sort((a,b)=>c[b]-c[a]).slice(0,give.lift).forEach(nm=>{
+        branches.push({n:nm,k:'',f:Math.min(1,P9.f+slot++*0.008),reh:!!P9.reh,
+          dom:P9.reh?'reh':'lift'})});
+      for(let q=0;q<give.run;q++)
+        branches.push({n:'Running',k:'',f:Math.min(1,P9.f+slot++*0.008),dom:'run'});
+      for(let q=0;q<give.ride;q++)
+        branches.push({n:'Cycling',k:'',f:Math.min(1,P9.f+slot++*0.008),dom:'ride'})});
+
+    /* girth: work per week, which is what thickens the trunk */
+    const BUCK=Math.max(7,Math.ceil(span/48));       // ~48 rings max, min a week
+    const nb=Math.ceil(span/BUCK)+1;
+    const load=new Array(nb).fill(0);
+    const put=(k,w)=>{const i=Math.min(nb-1,Math.max(0,Math.floor(frac(k)*span/BUCK)));load[i]+=w};
+    H.forEach(h=>put(hKey(h),(h.log||[]).length||1));
+    R9.forEach(r=>put(String(r.date).slice(0,10),Math.max(1,(+r.km||0)/2)));
+    const peak=Math.max.apply(null,load.concat([1]));
+
+    /* blossoms: rare and epic finds, at the day they were banked.
+       The found-date contract (AUDIT.md, test-enforced) guarantees
+       that date is never rewritten, so a blossom never moves. */
+    let blossom=[];
+    try{blossom=bankList().filter(x=>(x.rar==='rare'||x.rar==='epic')&&x.found)
+      .map(x=>({f:frac(x.found),k:x.found,epic:x.rar==='epic'}))}catch(e){oops('treeBloom',e)}
+
+    /* the scar: surgery or injury date, and the phases cleared above it */
+    let scar=null,phases=[];
+    try{const a=S.acl||{};
+      if(a.on&&a.date&&a.date>=first)scar={f:frac(a.date),k:a.date};
+      (a.tests||[]).filter(t=>t.date&&t.phase).forEach(t=>{
+        if(t.date>=first)phases.push({f:frac(t.date),p:t.phase})})}catch(e){oops('treeScar',e)}
+
+    const t=treeData();
+    return{first:first,last:last,span:span,frac:frac,branches:branches,
+      load:load,peak:peak,buck:BUCK,blossom:blossom,scar:scar,phases:phases,
+      runs:R9.length,rehab:t.rehab,weeks:t.weeks,days:t.days,
+      tier:t.tier,seed:t.seed,pts:t.pts}}
+  catch(e){oops('treeTimeData',e);return null}}
+
+/* THE STAGE RAMPS live at module level so the LEGEND and the RENDERER
+   read the same numbers. A legend that drifts from the drawing is worse
+   than no legend: it does not just fail to explain, it misinforms. */
+const TREE_STAGES=['A seed','Taking root','Growing','Established','Mature','Old growth','Ancient'];
+const TREE_STAGE_PTS=[0,60,250,1000,3000,8000,20000];
+/* FIVE SCHEMES, AND THE CLIMB IS ITS OWN (owner, 13 Sep: "the climb and
+   lifting have to be different colour schemes" — they were the same
+   ramp, so the legend's first row and its lifting row were identical and
+   said nothing — and "lifting can be green").
+
+   `climb` is the TRUNK: the spine, and it is PURPLE (owner's call). It
+   belongs to no domain on purpose — it reports the stage of the whole
+   tree, so it must not look like any one kind of work.
+
+   BOTH GREENS ARE GREEN, AND THEY ARE SEPARATED BY DEPTH, NOT HUE
+   (owner, 13 Sep: "rehab can be the green colour you chose for lifting,
+   I meant lifting should be the green like what we use for the Allena
+   app"). Two greens cannot be told apart by hue, so they do not try:
+   REHAB owns the dark half of green and never gets bright, LIFTING owns
+   the bright half and never gets dark. On a comeback tree the rehab
+   months read as deep forest and the training above them reads as the
+   app's own vivid green, which is also the right story. Running is blue,
+   cycling slate. */
+const TREE_RAMP={
+  n:{climb:['#241B3D','#382A5E','#4E3A80','#6A50A6','#8A6FC6','#AE95DE','#D6C6F0'],
+     /* TWO GREENS SEPARATE BY VIVIDNESS, NOT LIGHTNESS. Separating them
+        by depth alone failed the moment twigs and leaves were allowed to
+        climb their own ramp: rehab's bright end walked straight into
+        lifting's dark end and the whole tree went one colour again
+        (seen by rendering it, 13 Sep). Lifting is vivid all the way up;
+        rehab is muted all the way up. Now they stay apart no matter how
+        far a twig climbs. */
+     lift :['#0F8A3F','#12A64B','#16C258','#1FDD68','#4FEA8C','#88F4B2','#C4FCDA'],
+     /* REHAB IS NOT GREEN (owner, 13 Sep, after three attempts: "rehab
+        and lifting too similar"). Two greens were tried teal-against-
+        green, dark-against-bright and muted-against-vivid. None
+        separated: at a glance, across a whole tree, two greens read as
+        one colour whatever you do to their lightness or saturation, and
+        each fix to one walked into the other. Lifting is green, which is
+        the owner's call, so rehab is ROSE — the only family left that is
+        not amber or gold (a find), not terracotta (a phase cleared), and
+        not red, which means stop and must never be aimed at someone who
+        is injured. */
+     reh  :['#5E1148','#84195F','#AC2277','#D42F92','#F056AE','#FA8FC9','#FFC4E4'],
+     run  :['#1B2A6E','#2B49B8','#2B8CF0','#4FB6FF','#86D6FF','#B6E9FF','#E0F6FF'],
+     ride :['#2E3A48','#465668','#647689','#8496A8','#A4B4C4','#C2CEDA','#E2E9F0']},
+  m:{climb:['#3B3350','#473D5F','#544A6E','#63587E','#766C90','#908AA6','#BDB8C9'],
+     lift :['#3D5E4B','#456854','#4F745E','#5C826B','#6D937B','#87AA93','#B2CDBC'],
+     reh  :['#4A2B3E','#553146','#613950','#6F425B','#805069','#98657F','#C094A8'],
+     run  :['#2A5C86','#2F6E9E','#3A84BC','#4C9AD4','#6FB2E4','#97C9EE','#C2E0F7'],
+     ride :['#4A5460','#5C6874','#6E7C8A','#8093A2','#95A7B6','#B0BECA','#CFD8E0']}};
+/* THE COLOUR MOVES CONTINUOUSLY (owner, 13 Sep: "slow progression in
+   colour, not sudden"). Stepping the ramp once per stage drew seven flat
+   bands with visible seams. The stage is a FRACTION now — how far
+   through its own band the banked work sits, on a log scale because the
+   bands are roughly geometric — and the colour is mixed between two
+   stops. The meaning is unchanged; only the seams are gone. */
+function treeMixHex(a,b,t){
+  try{
+    const hx=c=>[parseInt(c.slice(1,3),16),parseInt(c.slice(3,5),16),parseInt(c.slice(5,7),16)];
+    const A=hx(a),B=hx(b),f=v=>('0'+Math.max(0,Math.min(255,Math.round(v))).toString(16)).slice(-2);
+    return '#'+f(A[0]+(B[0]-A[0])*t)+f(A[1]+(B[1]-A[1])*t)+f(A[2]+(B[2]-A[2])*t)}
+  catch(e){return a}}
+function treeRampCol(ramp,sf){
+  const r=ramp||TREE_RAMP.m.lift;
+  const k=Math.max(0,Math.min(6,Math.floor(sf)));
+  if(k>=6)return r[6];
+  return treeMixHex(r[k],r[k+1],Math.max(0,Math.min(1,sf-k)))}
+function treeStageFrac(pts){
+  const p=+pts||0,B=TREE_STAGE_PTS;
+  for(let k=6;k>=0;k--){
+    if(p>=B[k]){
+      if(k===6)return 6;
+      const lo=B[k],hi=B[k+1];
+      const t=k===0?(p/hi):(Math.log(Math.max(lo,p)/lo)/Math.log(hi/lo));
+      return k+Math.max(0,Math.min(0.999,t))}}
+  return 0}
+
+/* THE LEGEND (owner, 13 Sep 2026: "add a colour legend for what all
+   these different colours mean, rehab, leaves, all of it, so someone who
+   comes across that and doesn't know what it is can marvel at it and
+   interpret it").
+
+   It reads TREE_RAMP, the same constant the renderer draws from, so it
+   cannot drift. A legend that disagrees with its picture does not merely
+   fail to explain — it misinforms, which is worse than saying nothing.
+
+   `poster` picks the vibrant ramps and the standalone-page colours (a
+   print has no CSS tokens to inherit). */
+function treeTimeLegend(poster){
+  try{
+    const R9=TREE_RAMP[poster?'n':'m'];
+    const ink=poster?'#EFEDE6':'var(--text)';
+    const dim=poster?'#9B968D':'var(--faint)';
+    const line=poster?'#2A2A2A':'var(--line)';
+    const bar=cs=>'<span style="display:block;width:52px;height:10px;border-radius:5px;flex:none;'+
+      'background:linear-gradient(90deg,'+cs.join(',')+')"></span>';
+    const dot=(c,r,ring)=>'<span style="display:flex;width:52px;justify-content:center;flex:none">'+
+      '<span style="width:'+(r*2)+'px;height:'+(r*2)+'px;border-radius:50%;background:'+c+
+      (ring?';box-shadow:0 0 0 2.5px '+(poster?'#0B0B0B':'var(--bg)')+',0 0 0 3.5px '+ring:'')+'"></span></span>';
+    const rule=(c,w,h)=>'<span style="display:flex;width:52px;justify-content:center;flex:none">'+
+      '<span style="width:'+w+'px;height:'+h+'px;border-radius:2px;background:'+c+'"></span></span>';
+    const row=(sw,t,sub)=>'<div style="display:flex;gap:12px;align-items:flex-start;padding:7px 0;'+
+      'border-top:1px solid '+line+'">'+sw+
+      '<span style="min-width:0"><b style="display:block;font-size:12px;font-weight:600;color:'+ink+'">'+esc(t)+'</b>'+
+      '<span style="display:block;font-size:11px;line-height:1.5;color:'+dim+';margin-top:1px">'+esc(sub)+'</span></span></div>';
+    const rows=[
+      row(bar([R9.climb[0],R9.climb[2],R9.climb[4],R9.climb[6]]),
+        'The trunk: a seed to ancient',
+        'The trunk climbs through its own colours as the tree grows. Deep at the start, bright once there is work behind it. It tracks work banked, not time passed — a tree that stalls stays where it is.'),
+      row(bar([R9.lift[1],R9.lift[3],R9.lift[5]]),'Lifting','Sessions in the gym. Most trees are mostly this.'),
+      row(bar([R9.reh[1],R9.reh[3],R9.reh[5]]),'Rehab','Injury work, growing at the height it actually happened.'),
+      row(bar([R9.run[1],R9.run[3],R9.run[5]]),'Running','Weeks with real distance in them. A week of both lifting and running grows a branch of each.'),
+      row(bar([R9.ride[1],R9.ride[3],R9.ride[5]]),'Cycling','Logged rides.'),
+      row(rule(poster?'#8D8A84':'var(--dim)',9,26),'Height is time',
+        'The base is the first day ever logged, the tip is today, and the scale is even. The dates up the side read it.'),
+      row(rule(poster?'#8D8A84':'var(--dim)',14,9),'Trunk width is work',
+        'Thick where the training was, narrow where it stopped. A waist is a gap — often an injury.'),
+      row(dot(R9.lift[5],2.4),'The small dots','Branch tips. The newest wood on that limb.'),
+      row(dot(rarityOf('rare')[1],3),rarityOf('rare')[2],'Something the engine proved in this person’s own numbers.'),
+      row(dot(rarityOf('epic')[1],3.6,rarityOf('epic')[1]),rarityOf('epic')[2],'The rarest kind. The circled ones are the moments worth naming.'),
+      row(dot(poster?'#FF7A45':'#C96442',3),'Terracotta','A rehab phase cleared.'),
+      row(rule(poster?'#8D8A84':'var(--faint)',26,2),'The faint line','Surgery, or the day an injury started.'),
+      row(rule(poster?'#6E6A63':'var(--faint)',22,3),'Roots','Weeks trained without a gap.')];
+    return '<div style="max-width:340px">'+
+      '<div style="font-size:10.5px;letter-spacing:.08em;color:'+dim+';text-transform:uppercase;padding-bottom:4px">How to read it</div>'+
+      rows.join('')+'</div>'}
+  catch(e){oops('treeLegend',e);return ''}}
+
+function growTreeTime(W,Hh,opts){
+  opts=opts||{};
+  const POSTER=!!opts.poster;   /* the wrought-iron reference: pure structure, no buds */
+  const d=treeTimeData();
+  if(!d)return growTree(W,Hh);          // under the floor, the old tree, unchanged
+  const R=seedRand(d.seed);
+  W=W||300;Hh=Hh||300;
+  const col=d.tier[2],leafCol=treeSeason().leaf;
+  const groundY=Hh-26,topY=22,usable=groundY-topY;
+  const yAt=f=>groundY-f*usable;         // LINEAR. f=0 first day, f=1 today.
+  const cx=W/2;
+  /* THE TRUNK MEANDERS (owner call, 13 Sep). A dead-straight column
+     reads as a mast. Three seeded sine components, damped to nothing at
+     the ground so the tree stands on its base, and everything that
+     attaches to the trunk \u2014 branches, scar, runs, blossom \u2014 hangs off
+     THIS line rather than off the centre. */
+  /* The first cut ran three fairly quick sines and read as a wiggle in
+     a post rather than a lean in a tree (owner, 13 Sep: the trunk looks
+     unnaturally truncated). A trunk's wander is SLOW — one long
+     sweep over its whole height with smaller corrections riding on it
+     — so the dominant term is now under two cycles top to bottom. */
+  const MND=opts.meander==null?1:+opts.meander;
+  const ph1=R()*6.283,ph2=R()*6.283,ph3=R()*6.283,amp=(25+R()*14)*MND;
+  const tx=f=>{const g=Math.max(0,Math.min(1,f));
+    return cx+amp*g*(Math.sin(g*4.2+ph1)*0.70+Math.sin(g*7.3+ph2)*0.22+Math.sin(g*11.5+ph3)*0.08)};
+  /* COLOUR PROGRESSES THROUGH THE TREE'S OWN STAGES (owner, 13 Sep:
+     "colours should be assigned and show progression throughout the
+     tree, should be a transition in colour from growing, to established
+     to ancient — it is a progressive thing").
+
+     Seven ramps, one per domain, indexed by WHICH STAGE THE TREE WAS AT
+     when that branch grew. Not by age. The stage comes from points, and
+     points come from work: someone who trains hard for six months
+     crosses Established LOWER on their trunk than someone who logged
+     twice a month for three years, and a tree that stalls stays one
+     colour however many years pass over it. That is the difference
+     between this and the thing decision 6c bans, and it is the whole
+     reason it is allowed — the colour is reporting what they had
+     banked, not how long they have owned the app.
+
+     The DOMAIN still picks the family, so a lifting-only life is still
+     one family however far it climbs. The STAGE picks the position in
+     it. Both meanings survive.
+
+     POSTER RUNS THE VIBRANT SET, the app the muted one. Decision 6c
+     governs surfaces someone lives in; a print is not one. */
+  const RAMP=TREE_RAMP[POSTER?'n':'m'];
+  /* what this person had BANKED by a given height. The load ledger is
+     work per bucket; its cumulative share, scaled by today's points, is
+     what they had on that date. Interpolated between buckets as well as
+     between stages, so nothing in the climb is a step. */
+  const CUM=(function(){const a9=[];let t9=0;
+    for(let i=0;i<d.load.length;i++){t9+=d.load[i];a9.push(t9)}return a9})();
+  const CUMT=CUM.length?CUM[CUM.length-1]:0;
+  const ptsAt=f=>{
+    if(!CUMT||!CUM.length)return 0;
+    const x=Math.max(0,Math.min(1,f))*(CUM.length-1);
+    const i=Math.floor(x),t=x-i;
+    const a9=CUM[i],b9=CUM[Math.min(CUM.length-1,i+1)];
+    return (d.pts||0)*((a9+(b9-a9)*t)/CUMT)};
+  const sfAt=f=>{try{return treeStageFrac(ptsAt(f))}catch(e){oops('treeStageAt',e);return 0}};
+  const domOf=b=>RAMP[b&&b.dom]?b.dom:'lift';
+  /* DEPTH INSIDE ONE FAMILY (owner, 13 Sep: "the tree shouldn't all be
+     one colour — the leaves and branches and trunk all must differ from
+     each other"). The stage picks WHERE on a domain's ramp the wood
+     sits; everything after that is distance from the trunk. A limb is
+     darkest where it leaves the trunk and pales as it divides, and the
+     leaves at the tips are the brightest thing on the tree — which is
+     how a real canopy reads, because new growth is always the lightest.
+     Each branch carries a small seeded offset of its own so two limbs at
+     one height are siblings rather than copies, and no two leaves match.
+     The trunk keeps its purple ramp and belongs to none of this. */
+  const branchCol=b=>treeRampCol(RAMP[domOf(b)],sfAt(b.f)+(b._j||0));
+  const woodCol=(b,depth)=>treeRampCol(RAMP[domOf(b)],
+    Math.min(6,sfAt(b.f)+(b._j||0)+0.18+depth*0.24));
+  const leafColOf=(b,k)=>treeRampCol(RAMP[domOf(b)],
+    Math.min(6,sfAt(b.f)+(b._j||0)+1.25+(+k||0)));
+  const gdefs=[];
+  const gpre='tg'+String(d.seed||0).replace(/[^0-9]/g,'').slice(0,7)+'_';
+  /* neon needs bloom or it is just a bright dot. Two circles beat an
+     SVG filter here: a filter on several hundred leaves across four
+     trees is a slideshow, and this costs one extra path each. */
+  const bloom=(x,y,r,c)=>POSTER?'<circle cx="'+x.toFixed(1)+'" cy="'+y.toFixed(1)+'" r="'+
+    (r*2.1).toFixed(1)+'" fill="'+c+'" opacity=".11"/>':'';
+  let out='';
+  let mnX=W*0.12,mxX=W*0.88,mnY=topY,mxY=groundY;
+  const bd=(x,y,r)=>{r=r||2;if(x-r<mnX)mnX=x-r;if(x+r>mxX)mxX=x+r;
+    if(y-r<mnY)mnY=y-r;if(y+r>mxY)mxY=y+r};
+
+  /* roots — consistency below the surface, unchanged in character */
+  /* ROOTS FORK LIKE ROOTS (owner, 13 Sep). Straight spokes off a point
+     read as a starburst. A root leaves the trunk almost flat, runs, then
+     splits into finer ones \u2014 same recursion as the canopy, mirrored and
+     flattened, and it fades as it goes because it is underground. */
+  const rootN=Math.min(9,3+Math.floor(d.weeks/2));
+  (function(){
+    for(let i=0;i<rootN;i++){
+      const dir=(i%2?1:-1)*(0.6+R()*0.7);
+      const a0=(4+R()*30)*Math.PI/180;                 // shallow, like a real root
+      const l0=12+R()*16+Math.min(12,d.weeks*0.35);
+      (function dig(px,py,ang,ln,depth,wid,op){
+        if(depth>2||ln<3)return;
+        const nx=px+dir*Math.cos(ang)*ln, ny=Math.min(Hh-2,py+Math.sin(ang)*ln);
+        const mx=px+dir*Math.cos(ang)*ln*0.5, my=py+Math.sin(ang)*ln*0.22;
+        bd(nx,ny,2);
+        out+='<path data-tp="root" d="M'+px.toFixed(1)+' '+py.toFixed(1)+' Q'+mx.toFixed(1)+' '+
+          my.toFixed(1)+' '+nx.toFixed(1)+' '+ny.toFixed(1)+'" stroke="'+col+'" stroke-width="'+
+          wid.toFixed(2)+'" fill="none" opacity="'+op.toFixed(2)+'" stroke-linecap="round"/>';
+        const kids=depth===0?2:(R()<0.45?1:2);
+        for(let k=0;k<kids;k++)
+          dig(nx,ny,ang+((k?1:-1)*(9+R()*22))*Math.PI/180,ln*(0.52+R()*0.22),
+              depth+1,Math.max(0.35,wid*0.6),op*0.68);
+      })(tx(0)+dir*2,groundY+1,a0,l0,0,1.5+R()*0.5,0.34);
+    }})();
+  out+='<line x1="'+(W*0.12)+'" y1="'+groundY+'" x2="'+(W*0.88)+'" y2="'+groundY+
+    '" stroke="var(--line)" stroke-width="1" opacity=".5"/>';
+
+  /* THE TRUNK, WIDTH = WORK. Quiet months narrow it; a return widens
+     it again. The waist is the injury, drawn without being labelled. */
+  /* THE TRUNK IS OPTIONS NOW (owner, 13 Sep: "trunk is still terrible
+     and thick and not the same as this trunk", with a wrought-iron
+     reference whose trunk is slim, tapers the whole way, and divides
+     low). Six variants get rendered to a board and the owner picks;
+     these are the knobs that differ between them. Defaults are the
+     current drawing so nothing moves until a choice is made. */
+  /* SAPLING (owner's pick off the six-trunk board, 13 Sep 2026). Slim,
+     tapering the whole way, a small foot rather than a flare. The fat
+     defaults it replaced are what the wrought-iron reference ruled out.
+     These are the settled numbers; the opts stay so another board can
+     be rendered without touching the renderer. */
+  const wMax=+opts.trunkMax||11.0, wMin=+opts.trunkMin||1.8;
+  const TPR=opts.taper==null?0.50:+opts.taper;
+  const FLR=opts.flare==null?0.55:+opts.flare;
+  const N=d.load.length;
+  const halfAt=i=>{
+    const v=d.load[Math.max(0,Math.min(N-1,i))]/d.peak;
+    return (wMin+(wMax-wMin)*Math.pow(v,0.75))/2};
+  /* work sets the width, but a trunk also TAPERS \u2014 without it the
+     drawing reads as a pole with twigs rather than a tree (caught by
+     looking at it, 13 Sep). Taper is shape; the wobble in it is the
+     work, and a quiet stretch still narrows visibly. */
+  const taper=i=>1-TPR*Math.pow(N<2?0:i/(N-1),0.7);
+  const smooth=i=>((halfAt(i-1)+halfAt(i)*2+halfAt(i+1))/4)*taper(i);
+  const L=[],Rt=[];
+  /* BOTH ENDS OF THE TRUNK ARE GROWN, NOT CUT (owner, 13 Sep: "a more
+     natural start and ending to the trunk — right now they look
+     unnaturally truncated"). Two separate faults were doing it.
+
+     THE BASE. Vertical sides meeting a horizontal ground line read as
+     a post driven into soil. A real trunk SPREADS over its last few
+     inches, and that spread is the thing that joins it to its roots —
+     so the width flares hard through the bottom tenth and the polygon
+     carries on a few pixels UNDER the ground line, where the roots
+     already are.
+
+     THE TOP. Tapering linearly to zero left a needle standing above
+     the canopy; stopping at a height left a flat sawn cut. Neither is
+     how a trunk ends. It holds most of its width up the climb and then
+     goes in a hurry, inside its own crown, and the branches take over. */
+  const TTOP=opts.trunkTop==null?0.88:+opts.trunkTop;
+  const NT=Math.max(28,N*4);
+  const flare=u=>FLR<=0?1:(u<0.11?1+FLR*Math.pow(1-u/0.11,2.0):1);
+  (function(){const h0=smooth(0)*flare(0);
+    L.push([tx(0)-h0,groundY+4]);Rt.push([tx(0)+h0,groundY+4])})();
+  for(let i=0;i<NT;i++){
+    const u=i/(NT-1),f=u*TTOP,y=yAt(f),xc=tx(f);
+    const h=smooth(Math.min(N-1,Math.round(u*(N-1))))*
+      Math.max(0,1-Math.pow(u,2.6))*flare(u);
+    L.push([xc-h,y]);Rt.push([xc+h,y]);bd(xc-h,y,1.5);bd(xc+h,y,1.5)}
+  /* THE TRUNK CARRIES THE TRANSITION. It is the one part that spans
+     every stage, so its gradient's STOPS SIT AT THE REAL CROSSINGS —
+     it climbs through the same ramp the branches use, sampled evenly so
+     the crossings arrive as a fade rather than a seam. userSpaceOnUse,
+     so the axis is the tree's own height rather than each path's box. */
+  const trunkG=(function(){
+    try{
+      const NS=20,ramp=RAMP.climb,id=gpre+'tr';
+      let sv='',moved=false,first=null;
+      for(let i=0;i<=NS;i++){
+        const f=i/NS,c=treeRampCol(ramp,sfAt(f*TTOP));
+        if(first===null)first=c;else if(c!==first)moved=true;
+        sv+='<stop offset="'+f.toFixed(3)+'" stop-color="'+c+'"/>'}
+      if(!moved)return null;
+      gdefs.push('<linearGradient id="'+id+'" gradientUnits="userSpaceOnUse" x1="0" y1="'+
+        groundY.toFixed(1)+'" x2="0" y2="'+topY.toFixed(1)+'">'+sv+'</linearGradient>');
+      return id}
+    catch(e){oops('treeTrunkGrad',e);return null}})();
+  const trunkPaint=trunkG?'url(#'+trunkG+')':col;
+  out+='<path data-tp="trunk" d="M'+L.map(p=>p[0].toFixed(1)+' '+p[1].toFixed(1)).join(' L')+
+    ' L'+Rt.slice().reverse().map(p=>p[0].toFixed(1)+' '+p[1].toFixed(1)).join(' L')+
+    ' Z" fill="'+trunkPaint+'" opacity="'+(POSTER?'.72':'.5')+'" stroke-linejoin="round"/>'+
+    /* the tier colour is near-white at the top tiers. On the old tree the
+       trunk was a thin stem so that read as delicate; here it is a thick
+       tapering column and full opacity reads as a fluorescent tube (seen,
+       13 Sep). Bark is the ground showing through, with a lit edge. */
+    /* THE TIP IS NOT SQUARED (owner, 13 Sep). The fill already tapers to
+       nothing; it was the bark strokes, butt-capped and run to the very
+       top, that drew a hard line past the canopy. They stop at 80% of
+       the height, round-capped, and the fill dissolves the rest. */
+    (function(){const cut=Math.round(L.length*0.74);
+      return '<path data-tp="bark" d="M'+L.slice(0,cut).map(p=>p[0].toFixed(1)+' '+p[1].toFixed(1)).join(' L')+
+      '" fill="none" stroke="'+trunkPaint+'" stroke-width="1" opacity=".55" stroke-linecap="round" stroke-linejoin="round"/>'+
+      '<path data-tp="bark" d="M'+Rt.slice(0,cut).map(p=>p[0].toFixed(1)+' '+p[1].toFixed(1)).join(' L')+
+      '" fill="none" stroke="'+trunkPaint+'" stroke-width="1" opacity=".42" stroke-linecap="round" stroke-linejoin="round"/>'})();
+
+  /* THE TRUNK DIVIDES — OFF BY DEFAULT (owner, 13 Sep). Three or four
+     heavy limbs low down were added to stop the drawing reading as a
+     mast with twigs stapled on. They did that, but they also sat ON TOP
+     of the branches and flattened them, and when the owner picked the
+     render he wanted it was the one without them: "the branches look
+     nice". They carry no data either — pure structure in the trunk's
+     own colour — so nothing is lost by leaving them out. Pass
+     {limbs:true} to get them back. */
+  if(opts.limbs)(function(){
+    const limbs=3+Math.floor(R()*2);
+    for(let i=0;i<limbs;i++){
+      const f0=0.30+ (i/limbs)*0.34 + R()*0.05;
+      const side2=(i%2?1:-1)*(R()<0.18?-1:1);
+      const a=(30+R()*26)*Math.PI/180;
+      const ln=W*(POSTER?0.26:0.20)+R()*W*0.10;
+      const x0=tx(f0),y0=yAt(f0);
+      const x1=x0+side2*Math.cos(a)*ln, y1=y0-Math.sin(a)*ln;
+      const mx=x0+side2*Math.cos(a)*ln*0.45, my=y0-Math.sin(a)*ln*0.22;
+      bd(x1,y1,4);
+      out+='<path data-tp="limb" d="M'+x0.toFixed(1)+' '+y0.toFixed(1)+' Q'+mx.toFixed(1)+' '+
+        my.toFixed(1)+' '+x1.toFixed(1)+' '+y1.toFixed(1)+'" stroke="'+trunkPaint+'" stroke-width="'+
+        ((POSTER?7.5:4.6)-i*0.5).toFixed(2)+'" fill="none" opacity=".85" stroke-linecap="round"/>';
+      /* and each heavy limb carries its own fan of finer wood */
+      (function spur(px,py,ang,ln2,depth,wid){
+        if(depth>(POSTER?5:4)||ln2<(POSTER?1.8:2.6))return;
+        const kids=depth<2?2:(R()<0.28?1:(R()<0.9?2:3));
+        for(let k=0;k<kids;k++){
+          const a2=ang+((k?1:-1)*(10+R()*26)+depth*3)*Math.PI/180;
+          const l2=ln2*(0.5+R()*0.28);
+          const nx=px+side2*Math.cos(a2)*l2, ny=py-Math.sin(a2)*l2;
+          bd(nx,ny,3);
+          out+='<path data-tp="twig" d="M'+px.toFixed(1)+' '+py.toFixed(1)+' Q'+
+            (px+side2*Math.cos(a2)*l2*0.5).toFixed(1)+' '+(py-Math.sin(a2)*l2*0.34).toFixed(1)+' '+
+            nx.toFixed(1)+' '+ny.toFixed(1)+'" stroke="'+trunkPaint+'" stroke-width="'+
+            Math.max(0.35,wid*0.58).toFixed(2)+'" fill="none" opacity="'+(0.8-depth*0.1).toFixed(2)+
+            '" stroke-linecap="round"/>';
+          if(!POSTER&&R()>0.3){bd(nx,ny,1.6);
+            out+='<circle data-tp="leaf" cx="'+nx.toFixed(1)+'" cy="'+ny.toFixed(1)+'" r="'+
+              (0.7+R()*0.6).toFixed(1)+'" fill="'+leafCol+'" opacity="'+(0.5+R()*0.35).toFixed(2)+'"/>'}
+          spur(nx,ny,a2,l2,depth+1,wid*0.58)}
+      })(x1,y1,a,ln,0,(POSTER?7.5:4.6)-i*0.5);
+    }})();
+
+  /* the scar: a real date, drawn faint and flat. Nothing else in the
+     app draws a horizontal line, so it reads as an event. */
+  if(d.scar){
+    const y=yAt(d.scar.f);
+    const sx=tx(d.scar.f);
+    out+='<line data-tp="scar" x1="'+(sx-14).toFixed(1)+'" y1="'+y.toFixed(1)+'" x2="'+(sx+14).toFixed(1)+'" y2="'+y.toFixed(1)+
+      '" stroke="var(--faint)" stroke-width="1.2" opacity=".55" stroke-linecap="round"/>'}
+
+  /* branches. Time fixes y and NOTHING else. */
+  let side=-1;const usedY={};
+  d.branches.slice(0,30).forEach((b,i)=>{
+    let f=b.f;
+    const CF=opts.crownFrom==null?0.10:+opts.crownFrom;
+    if(f<CF)f=CF+f*0.5;                          // nothing sprouts off the ankle
+    const key=Math.round(f*48);
+    if(usedY[key]){f=Math.min(1,f+(usedY[key]*0.006));side=-side}else side=(R()<0.5?-1:1);
+    usedY[key]=(usedY[key]||0)+1;
+    const y0=yAt(f),bx=tx(f);
+    /* sage healed you, blue ran, steel rode, bark lifted — and the
+       sage says WHICH PHASE, because that is the progression */
+    b._j=(R()-0.5)*0.55;                  /* siblings, not copies */
+    const bc=branchCol(b),bstroke=bc;
+    /* THE CROWN IS MADE BY ONE RULE (13 Sep, owner reference: a bare
+       wrought-iron tree). Low branches are LONG and near-horizontal;
+       high branches are SHORT and steep. That alone turns a column
+       into a spreading round canopy \u2014 it is how real trees fill out,
+       and it costs nothing but two numbers that vary with height. */
+    const up=f;                                   // 0 at the base, 1 at the tip
+    /* THE CROWN IS A BELL, NOT A CONE (13 Sep, second pass). Making
+       length fall with height built a conifer. A deciduous crown is
+       WIDEST about two-thirds up, with a bare lower trunk and a
+       narrowing head \u2014 so length peaks there and tapers both ways. */
+    const bell=Math.sin(Math.PI*Math.pow(Math.max(0,Math.min(1,up)),1.25));
+    const ang=((26+up*30)+R()*18)*Math.PI/180;    // flatter low, steeper high
+    /* SHORT FIRST LIMB, THEN RECURSION. Long smooth arcs all curving
+       the same way read as a fern frond. A tree's mass comes from
+       subdividing early and often, not from the length of the first
+       stroke. */
+    const len=(9+20*(0.18+0.82*bell))*(0.72+R()*0.62);
+    const x1=bx+side*Math.cos(ang)*len,y1=y0-Math.sin(ang)*len;
+    /* a real limb leaves the trunk almost flat and SWEEPS up */
+    /* and the sweep varies per limb, in BOTH directions, so no two
+       branches share a silhouette */
+    const bow=(R()-0.35)*0.7;
+    const mx=bx+side*Math.cos(ang)*len*(0.5+bow*0.5),
+          my=y0-Math.sin(ang)*len*(0.34-bow*0.5);
+    bd(x1,y1,3);
+    out+='<path data-tp="branch" data-tn="'+esc(b.n)+'" data-tk="'+esc(b.k)+
+      '" d="M'+bx.toFixed(1)+' '+y0.toFixed(1)+' Q'+mx.toFixed(1)+' '+my.toFixed(1)+' '+
+      x1.toFixed(1)+' '+y1.toFixed(1)+'" stroke="'+bstroke+'" stroke-width="'+((POSTER?4.0:2.4)-i*0.06).toFixed(2)+
+      '" fill="none" opacity="'+(0.9-i*0.02).toFixed(2)+'" stroke-linecap="round"/>';
+    /* A BRANCH FORKS. Time still fixes only where it MEETS the trunk;
+       everything above that point is the same seeded recursion the
+       original tree used, which is the thing that makes it read as
+       drawn rather than as a chart with bark on it. */
+    const tips=[];
+    (function fork(px,py,ax,ay,ln,depth,wid){
+      /* FOUR LEVELS, not two. The lacy quality of a bare tree is
+         entirely in the terminal twigs \u2014 stop at two and it reads as a
+         pole with spurs, which is what it did (owner, 13 Sep). */
+      if(depth>(POSTER?5:4)||ln<(POSTER?1.8:2.4)){tips.push([px,py]);return}
+      const n2=depth>=2?(R()<0.22?1:(R()<0.9?2:3)):(R()<0.1?1:2);
+      for(let k=0;k<n2;k++){
+        const spread=(k===0?-1:1)*(9+R()*30+depth*5)*Math.PI/180*(0.6+R()*0.9);
+        const base=Math.atan2(py-ay,px-ax);
+        const a2=base+spread*(n2===1?R()-0.5:1);
+        const l2=ln*(0.56+R()*0.28);
+        const nx=px+Math.cos(a2)*l2,ny=py+Math.sin(a2)*l2;
+        bd(nx,ny,3);
+        out+='<path data-tp="twig" d="M'+px.toFixed(1)+' '+py.toFixed(1)+' Q'+
+          (px+Math.cos(a2)*l2*0.5).toFixed(1)+' '+(py+Math.sin(a2)*l2*0.55).toFixed(1)+' '+
+          nx.toFixed(1)+' '+ny.toFixed(1)+'" stroke="'+woodCol(b,depth)+'" stroke-width="'+
+          Math.max(0.3,wid*0.62).toFixed(2)+'" fill="none" opacity="'+(POSTER?0.92:0.85-depth*0.09).toFixed(2)+
+          '" stroke-linecap="round"/>';
+        fork(nx,ny,px,py,l2,depth+1,wid*0.62)}})(x1,y1,bx,y0,len,0,(POSTER?4.2:2.6)-Math.min(1.4,i*0.045));
+    /* leaves cluster at the tips, the way they actually do */
+    /* BUDS, NOT FOLIAGE. The reference is a bare winter tree and the
+       beauty is all structure; fat leaf blobs buried it. One small bud
+       per tip keeps the seasonal colour meaningful without hiding the
+       twigs that took the work to draw. */
+    tips.forEach(tp=>{
+      if(R()<(POSTER?0.62:0.20))return;
+      const rr=(POSTER?0.62:0.8)+R()*(POSTER?0.5:0.6);
+      const lc=leafColOf(b,(R()-0.5)*0.9);   /* no two leaves the same */
+      bd(tp[0],tp[1],POSTER?3.4:1.8);
+      out+=bloom(tp[0],tp[1],rr,lc)+
+        '<circle data-tp="leaf" cx="'+tp[0].toFixed(1)+'" cy="'+tp[1].toFixed(1)+'" r="'+rr.toFixed(1)+
+        '" fill="'+lc+'" opacity="'+((POSTER?0.8:0.55)+R()*0.2).toFixed(2)+'"/>'});
+    /* keep EVERY tip, not just the first. Two moments a fortnight apart
+       used to resolve to the same nearest branch and then to that
+       branch's tips[0] — the identical pixel — so two labels pointed
+       at one dot (owner-caught, 13 Sep: "the indicators sometimes point
+       to the same spots as other milestones"). With the whole spray
+       kept, each find can take a tip of its own on the branch that
+       actually carries its date. */
+    b._tips=tips.slice(0,16);
+    b._x=tips.length?tips[0][0]:x1;b._y=tips.length?tips[0][1]:y1});
+
+  /* the old run SWEEPS were deleted here (owner, 13 Sep: "ugly", "why is
+     running just a single blue limb"). They were bare arcs off the
+     trunk whose only content was a bucketed count of runs, and running
+     now grows proper branches in treeTimeData instead. */
+
+  /* ONE FIND, ONE SPOT. Branches are ranked by how close they sit to
+     the find's own date and the first free tip on the closest one wins;
+     a branch that runs out hands the next find to the next branch along.
+     The date still decides the height — only the exact tip moves, and
+     only far enough to stop two labels pointing at one dot. */
+  const takenTip={},takenPt={};
+  const BRS=d.branches.slice(0,30);
+  /* THE TREE READS THE SAME RARITY LADDER AS EVERY OTHER SURFACE (owner,
+     13 Sep: "once you have those colours implement them into the tree as
+     well"). rarityOf is the one constant; a find is gold and the rarest
+     kind is incandescent, here and in the findings list and in the
+     collection, or the ladder teaches nothing. */
+  const rarCol=ep=>{try{return rarityOf(ep?'epic':'rare')[1]}
+    catch(e){return ep?'#FFF0C0':'#E8B84B'}};
+  /* the cap is about SPACE, not about truth: fourteen is right on a
+     300px card and mean on an A2 sheet, where the finds are half the
+     reason to look (owner, 13 Sep: "where have all the epic finds and
+     the rare finds gone"). */
+  d.blossom.slice(0,POSTER?44:14).slice().sort((a,b)=>a.f-b.f).forEach(bl=>{
+    /* a find is amber, always. On the poster it glows; it never turns
+       into another colour, because amber means one thing. */
+    let bx=null,by=null;
+    const order=BRS.map((b,ix)=>({b:b,ix:ix,dd:Math.abs(b.f-bl.f)}))
+      .filter(o=>o.b._tips&&o.b._tips.length).sort((a,b)=>a.dd-b.dd);
+    for(let oi=0;oi<order.length&&bx===null;oi++){
+      const o=order[oi],tps=o.b._tips;
+      for(let ti=0;ti<tps.length;ti++){
+        const key=o.ix+':'+ti;
+        if(takenTip[key])continue;
+        const pk=tps[ti][0].toFixed(0)+','+tps[ti][1].toFixed(0);
+        if(takenPt[pk])continue;
+        takenTip[key]=1;takenPt[pk]=1;bx=tps[ti][0];by=tps[ti][1];break}}
+    if(bx===null){bx=tx(bl.f)+(R()-0.5)*22;by=yAt(bl.f)}
+    bd(bx,by,3.5);
+    out+=bloom(bx,by,bl.epic?3.8:2.7,rarCol(bl.epic))+
+      '<circle data-tp="bloom" data-tk="'+esc(bl.k)+'" cx="'+bx.toFixed(1)+'" cy="'+by.toFixed(1)+
+      '" r="'+(bl.epic?(POSTER?3.8:3.2):(POSTER?2.7:2.2))+'" fill="'+rarCol(bl.epic)+
+      '" opacity="'+(bl.epic?'.97':'.85')+'"/>'+
+      /* the epic ring is the ladder's top step made visible at a glance */
+      (bl.epic?'<circle cx="'+bx.toFixed(1)+'" cy="'+by.toFixed(1)+'" r="'+(POSTER?6.4:5.4)+
+        '" fill="none" stroke="'+rarCol(true)+'" stroke-width=".6" opacity="'+
+        (POSTER?'.5':'.35')+'"/>':'')});
+
+  /* a cleared phase is terracotta — the app's one warm signature,
+     spent on the thing the wedge user is actually here for */
+  d.phases.slice(0,5).forEach(ph=>{
+    const y=yAt(ph.f),x=tx(ph.f)+(ph.p%2?1:-1)*9;
+    bd(x,y,POSTER?5:3);
+    const pc=POSTER?'#FF7A45':'#C96442';       /* terracotta, lit, never red */
+    out+=bloom(x,y,2.9,pc)+'<circle data-tp="phase" cx="'+x.toFixed(1)+'" cy="'+y.toFixed(1)+
+      '" r="'+(POSTER?2.9:2.6)+'" fill="'+pc+'" opacity=".92"/>'});
+
+  /* FOUR DATES UP THE TREE (owner, 13 Sep). Height is time and nothing
+     in the drawing said so, so a stranger could not read the axis at
+     all. Evenly spaced, drawn outside the crown so they never sit on
+     the wood, and they are REAL dates off the first logged day — never
+     rounded to something tidier than the data. */
+  if(opts.dates!==false)(function(){
+    const MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const lab=f=>{try{const t9=new Date(d.first+'T12:00');
+      t9.setDate(t9.getDate()+Math.round(f*d.span));
+      return MON[t9.getMonth()]+' \u2019'+String(t9.getFullYear()).slice(2)}catch(e){return ''}};
+    const dc=POSTER?'#8D8A84':'var(--faint)';
+    const fs=POSTER?10:7.5, lx=mnX-7;
+    [0.2,0.4,0.6,0.8].forEach(f=>{
+      const y=yAt(f),tx9=lx-11;
+      out+='<line data-tp="dtick" x1="'+(lx-8).toFixed(1)+'" y1="'+y.toFixed(1)+'" x2="'+lx.toFixed(1)+
+        '" y2="'+y.toFixed(1)+'" stroke="'+dc+'" stroke-width=".8" opacity=".55"/>'+
+        '<text data-tp="dlab" x="'+tx9.toFixed(1)+'" y="'+(y+fs*0.34).toFixed(1)+
+        '" text-anchor="end" font-size="'+fs+'" fill="'+dc+'" opacity=".78" letter-spacing=".04em">'+
+        esc(lab(f))+'</text>';
+      bd(tx9-fs*3.5,y,fs*0.8)})})();
+  if(gdefs.length)out='<defs>'+gdefs.join('')+'</defs>'+out;
+  const pad=8;
+  const vb=[(mnX-pad).toFixed(1),(mnY-pad).toFixed(1),
+    (mxX-mnX+pad*2).toFixed(1),(mxY-mnY+pad*2).toFixed(1)].join(' ');
+  return '<svg viewBox="'+vb+'" style="width:100%;height:auto;display:block;overflow:visible">'+out+'</svg>'}
+
+/* the switch. OFF by default, on the profile blob so no storage key
+   is added, and the old tree is never touched. */
+function treeTimeOn(){try{return !!(S.prof&&S.prof.treeT)}catch(e){return false}}
+function treeSvg(W,Hh){return treeTimeOn()?growTreeTime(W,Hh):growTree(W,Hh)}
 /* ══ rest-day content (prompt 2) ════════════════════════════
    Rest days were dead air: "week complete", nothing else. Now
    the verdict card serves one rotating piece of the user's own
@@ -14580,7 +15597,7 @@ function verdictCard(){
          not itself tappable was a small target and a hidden one */
       '<button data-a="todayOpen" style="display:flex;align-items:center;gap:9px;width:100%;text-align:left;padding:0;margin-top:13px;padding-top:12px;border-top:1px solid var(--line)" aria-label="Today’s check-ins">'+dots+
       '<span class="mono" style="flex:1;min-width:0;color:var(--faint);font-size:10.5px">'+pr.done+' of '+pr.total+
-        (skipN?' · '+skipN+' skipped, still open':' · finishing the small ones is what unlocks tonight’s find')+'</span>'+
+        (skipN?' · '+skipN+' skipped, still open':' · finishing the small ones is what earns tonight’s find')+'</span>'+
       '<span class="mono" style="color:var(--amber);font-size:11px;flex:none">All ›</span></button>'}
   return '<div class="card an-hero" style="padding:18px;border-radius:22px;margin-top:16px;border-color:'+(done?'var(--greensoft)':'var(--line)')+'">'+
     inner+
@@ -14913,7 +15930,7 @@ function watchList(){
   /* the refill: a deep read ages, and new training re-arms the next one */
   try{const ins=bankList().filter(d=>d.tag==='insight').map(d=>d.found).sort().pop();
    if(ins){const since=H.filter(h=>h.date>ins).length;
-     add('What changed since your last deep read',Math.min(8,since),8,
+     add('What changed since your last read',Math.min(8,since),8,
        'Eight sessions of new evidence since the last read — enough for the next one to say something new.',since>=8)}}catch(e){}
   /* which day of the week suits you */
   {const byDow={};H.forEach(h=>{const r=h.log.filter(l=>l.rpe!=null);
@@ -15022,7 +16039,7 @@ const DISC_CATALOG=[
  ['milestone','Milestones','Sessions, sets and kilometres, totted up.','Just keep going.'],
  ['streak','Consistency','Runs of days and weeks without missing one.','Log something most days.'],
  ['quest','Quests','Weekly challenges taken on and finished.','Accept a weekly quest and see it through.'],
- ['insight','Deep reads','What the model found between your numbers.','Run a deep read from Findings.'],
+ ['insight','Your reads','What the model found between your numbers.','Run this week\u2019s read from Findings.'],
  ['signal','Insights','The patterns hiding between your numbers — heart, sleep, engine, and the links only your data reveals.','Sync a watch through Apple Health.'],
  ['timing','Timing','When in the day and week your training goes best.','Log effort across different days and times.'],
  ['block','Blocks','How one block compares with the last.','Finish a block and start another.'],
@@ -15864,12 +16881,23 @@ function analyseCard(){
           b.total+' found in total · see the collection ›</button>':''})()+
       ((P.length||shown.length)?
         (function(){
-          const dCard=d=>{const r=rarityOf(d.rar),isNew=fresh.indexOf(d)>=0;
-            return '<div class="card" style="padding:13px 15px;border-color:'+(isNew?r[1]:'var(--line)')+'">'+
+          /* THE CARD WEARS ITS TIER (owner, 13 Sep). A Noticed is a plain
+             row; a Big one is bordered, lit, and lettered heavier. The
+             pips on the left are the ladder made countable — you can see
+             the rank before you have read the word. */
+          const dCard=d=>{const c=rarChrome(d.rar),isNew=fresh.indexOf(d)>=0;
+            const pips=[0,1,2,3].map(i=>'<span style="width:'+(i<=c.rank?5:3)+'px;height:'+
+              (i<=c.rank?5:3)+'px;border-radius:50%;background:'+
+              (i<=c.rank?c.col:'var(--line)')+';opacity:'+(i<=c.rank?1:.55)+'"></span>').join('');
+            return '<div class="card" style="padding:13px 15px;border-color:'+c.border+
+              ';background:'+(c.rank>=1?'linear-gradient(180deg,'+c.fill+',transparent 68%),var(--surface)':'var(--surface)')+
+              (c.rank>=2?';box-shadow:'+c.glow:'')+'">'+
               '<div style="display:flex;align-items:center;gap:8px">'+
-              '<span class="mono" style="color:'+r[1]+';font-size:9px;letter-spacing:.06em">'+esc(r[2].toUpperCase())+'</span>'+
-              (isNew?'<span class="mono an-pop" style="background:'+r[1]+';color:#1F1E1D;font-size:8.5px;padding:2px 6px;border-radius:999px;letter-spacing:.05em">NEW</span>':'')+'</div>'+
-              '<p style="font-size:14px;font-weight:600;margin-top:5px">'+esc(d.t)+'</p>'+
+              '<span style="display:flex;align-items:center;gap:3px;flex:none">'+pips+'</span>'+
+              '<span class="mono" style="color:'+c.col+';font-size:9px;letter-spacing:'+c.track+
+                ';font-weight:'+c.weight+'">'+esc(c.label.toUpperCase())+'</span>'+
+              (isNew?'<span class="mono an-pop" style="background:'+c.col+';color:#1F1E1D;font-size:8.5px;padding:2px 6px;border-radius:999px;letter-spacing:.05em">NEW</span>':'')+'</div>'+
+              '<p style="font-size:'+(c.rank>=3?15:14)+'px;font-weight:'+(c.rank>=3?700:600)+';margin-top:5px">'+esc(d.t)+'</p>'+
               '<p style="color:var(--dim);font-size:12.5px;line-height:1.6;margin-top:3px">'+esc(d.d)+'</p></div>'};
           const grp=(key,label,color,items,render)=>{
             if(!items.length)return '';
@@ -16611,7 +17639,7 @@ function recommendCalc(){
     // week's work is done — offer recovery instead
     const fresh=muscleFresh(),low=fresh.filter(x=>x.fresh<70).sort((a,b)=>a.fresh-b.fresh)[0];
     return{empty:true,low:low,
-      msg:'Every session in week '+S.week+' is logged. Today is better spent on easy movement — a walk, a bike spin, mobility — than on adding a session the block did not ask for.'}}
+      msg:'Every session in week '+S.week+' is logged. Today is better spent on easy movement. A walk, a bike spin, some mobility, rather than a session the block did not ask for.'}}
   if(hardDaysRun()>=3)return{empty:true,rest:true,
     msg:'Three hard days back to back. A day off now returns more than a fourth session — frequency only pays when each session can be trained hard.'};
   opts.sort((a,b)=>b.score-a.score);
@@ -17655,7 +18683,7 @@ function viewFindings(){
      speaks:'The moment a record falls or a real threshold is crossed — never on a schedule',
      makes:'The collection, plus patterns that always carry a what-to-do line',
      h:discCard()+patListCard()},
-    {k:'deep',name:'The deep read',tag:'LENS 2 · THE MODEL',f:deepFresh,n:'●',
+    {k:'deep',name:'This week\u2019s read',tag:'LENS 2 · THE MODEL',f:deepFresh,n:'●',
      one:'A model reads what the engines proved — the story, the mechanisms, and one experiment your own engine referees.',
      reads:'Everything the statistics found since the last read — and only that',
      speaks:'About once a week — when enough new evidence has landed',
@@ -17838,7 +18866,7 @@ function deepReadyInfo(){
   const rn=(typeof runs==='function'?runs():[]).filter(r=>String(r.date).slice(0,10)>since).length;
   if(!st.last){
     if(sess+rn<8)return null; // a first read needs something to read
-    return {first:true,sess:sess,runs:rn,line:'First deep read ready — '+sess+' sessions and '+rn+' runs waiting'}}
+    return {first:true,sess:sess,runs:rn,line:'Your first read is ready — '+sess+' sessions and '+rn+' runs waiting'}}
   if(sess+rn<1)return null;
   /* the quantum (owner call, 3 Sep): a deep read must be WORTH being
      impressed by. One new session cannot change the story — six new
@@ -17851,7 +18879,7 @@ function deepReadyInfo(){
   const bits=[];
   if(sess)bits.push(sess+' session'+(sess===1?'':'s'));
   if(rn)bits.push(rn+' run'+(rn===1?'':'s'));
-  return {sess:sess,runs:rn,line:'Deep read ready — '+bits.join(' and ')+' it has not seen'}}
+  return {sess:sess,runs:rn,line:'This week\u2019s read — '+bits.join(' and ')+' it has not seen'}}
 function deepLine(){
   const r=deepReadyInfo();if(!r)return '';
   return '<button data-a="deepGo" style="display:flex;align-items:center;gap:9px;margin-top:12px;padding-top:12px;border-top:1px solid var(--line);width:100%;text-align:left">'+
@@ -17965,13 +18993,56 @@ function deepAnimHtml(){
     '<circle class="an-ring" cx="150" cy="150" r="24" fill="none" stroke="var(--amber)" stroke-width="1.4" stroke-linecap="round" stroke-dasharray="36 115" opacity=".85"/></svg>';
   return '<div id="deepanim"><div style="position:relative;display:inline-block">'+svg+
     '<img class="mk" src="'+MARK+'" alt="" style="position:absolute;width:22px;height:22px;object-fit:contain;top:calc(50% - 11px);left:calc(50% - 11px)"></div>'+
-    '<p class="disp" style="font-size:16px;font-weight:600;margin-top:22px">The deep read</p>'+
+    '<p class="disp" style="font-size:16px;font-weight:600;margin-top:22px">This week\u2019s read</p>'+
     '<p class="mono" style="color:var(--amber);font-size:11px;margin-top:8px;min-height:16px">'+esc((da.steps[Math.min(da.i,da.steps.length-1)]||[''])[0])+'\u2026</p>'+
     '<p class="mono" style="color:var(--faint);font-size:9px;margin-top:4px;min-height:12px">'+esc((da.steps[Math.min(da.i,da.steps.length-1)]||['',''])[1]||'')+'</p></div>'}
+/* ══ THE READ HAS A HOME ═══════════════════════════════════════
+   The beta could not find this feature. It lived behind an
+   unlabelled brain icon, a page, a scroll, and a second section \u2014
+   which by NN/g's numbers is hidden navigation PLUS a scroll PLUS an
+   unlabelled affordance (>20% findability drop, used 27% of the time
+   against 48-50% for visible). So it bids for the Today story slot
+   like everything else, and it says its own name.
+
+   It stays silent unless a read is genuinely available. The one-story
+   law holds: it competes, it does not stack. */
+function readCard(){
+  try{
+    const info=deepReadyInfo();
+    if(!info)return '';
+    const st=deepStore();
+    const free=(typeof isPremium==='function')&&!isPremium();
+    const usedThisMonth=free&&st.last&&String(st.last).slice(0,7)===today().slice(0,7);
+    const sub=info.first
+      ?'Your first one. '+info.sess+' sessions and '+info.runs+' runs are waiting to be read.'
+      :'New numbers have landed since the last one.';
+    return '<button data-a="'+(usedThisMonth?'upgradeOpen':'deepRun')+'"'+
+      (usedThisMonth?' data-v="read"':'')+
+      ' class="card" style="width:100%;text-align:left;padding:16px;margin-top:14px;display:block">'+
+      '<div style="display:flex;align-items:center;gap:9px">'+
+      '<span class="mono" style="font-size:10px;letter-spacing:.14em;color:var(--amber)">THIS WEEK\u2019S READ</span>'+
+      (usedThisMonth?'<span class="mono" style="margin-left:auto;flex:none;color:var(--faint);font-size:10px">PREMIUM</span>':'')+'</div>'+
+      '<p style="font-size:14.5px;font-weight:600;line-height:1.4;margin-top:7px">'+
+      (usedThisMonth?'Your next read is ready':'Allena reads your last few weeks back to you')+'</p>'+
+      '<p style="color:var(--dim);font-size:12.5px;line-height:1.55;margin-top:5px">'+
+      esc(usedThisMonth
+        ?'You have had this month\u2019s. Premium reads every week.'
+        :sub)+'</p></button>'}
+  catch(e){oops('readCard',e);return ''}}
+
 async function deepRun(){
   { // the same gate the card shows — no button path spends tokens on old data
     const st0=deepStore();
-    if(st0.last===today())return flash('Today\u2019s read is done — a fresh one unlocks tomorrow.');
+    if(st0.last===today())return flash('Today\u2019s read is done. There\u2019s a fresh one tomorrow.');
+    /* CADENCE, NOT A WALL (research \u00a75.1 + decision 0c: never a cold
+       wall on the signature feature \u2014 a taste converts, a wall
+       deletes). Free gets a read every calendar month; Premium gets
+       one a week. Nothing found is ever hidden either way. */
+    try{if(typeof isPremium==='function'&&!isPremium()&&st0.last&&
+      String(st0.last).slice(0,7)===today().slice(0,7)){
+      S.sheet={t:'upgrade',v:'read'};render();
+      return flash('You\u2019ve had this month\u2019s read. Premium reads every week.')}}
+    catch(e){oops('deepCadence',e)}
     if(!deepReadyInfo())return flash(st0.last?'Not enough new evidence yet — six new sessions or runs re-arm the read.':'Not enough logged data for a first read yet.');
     if(!aiSpend('deep'))return}
   { // the constellation: real sources, real counts, drawn while the model works
@@ -17992,9 +19063,9 @@ async function deepRun(){
     const tick=()=>{if(!S.deepAnim)return;
       if(S.deepAnim.i<S.deepAnim.steps.length-1){S.deepAnim.i++;render();setTimeout(tick,1150)}};
     setTimeout(tick,1150);render()}
-  if(!aiReady()){flash('Sign in (or add a key) first — the deep read uses your coach connection.');return}
+  if(!aiReady()){flash('Sign in (or add a key) first — the read uses your coach connection.');return}
   const st=deepStore();
-  if(st.last===today()){flash('One deep read a day — tomorrow brings new data to read.');return}
+  if(st.last===today()){flash('One read a day. Tomorrow brings new data.');return}
   if((S.history||[]).filter(h=>h.complete).length<8){flash('Too little data for nuance yet — log a couple more weeks first.');return}
   S.deepBusy=true;render();
   try{
@@ -18041,13 +19112,13 @@ function deepCard(){
       '<p class="mono" style="color:var(--faint);font-size:10px;margin-top:9px">Banked in your collection. The next read opens when it has something new to see — train, run or check in, and it reads again.</p>';
   else if(!aiReady())
     inner='<p style="color:var(--dim);font-size:12.5px;line-height:1.6;margin-top:8px;opacity:.7">The rule engines find what was pre-imagined; the model finds the rest — lags, thresholds, relationships between your signals.</p>'+
-      aiLockHtml('The deep read');
+      aiLockHtml('This week\u2019s read');
   else{
     const rdy=deepReadyInfo();
     if(rdy)
       inner='<p style="color:var(--dim);font-size:12.5px;line-height:1.6;margin-top:8px">Ten weeks of your numbers, handed to the model with one demand: find what the rules cannot, and cite the figures it stands on. Interpretation, clearly labelled — never dressed up as measurement.</p>'+
         '<p class="mono" style="color:var(--amber);font-size:10.5px;margin-top:8px">'+esc(rdy.line)+'</p>'+
-        '<button data-a="deepRun" class="big disp mt" style="background:var(--amber);color:var(--bg)">Run a deep read</button>'+
+        '<button data-a="deepRun" class="big disp mt" style="background:var(--amber);color:var(--bg)">Read my week</button>'+
 
         '<p class="mono" style="color:var(--faint);font-size:10px;margin-top:8px;text-align:center">once a day · only when there is new data to read</p>';
     else if(!st.last){
@@ -18064,13 +19135,362 @@ function deepCard(){
   return '<div class="card mt2 an-hero an-glow" style="padding:19px 18px;border-radius:22px;border-color:color-mix(in srgb, var(--text) 42%, transparent)">'+
     '<div style="display:flex;align-items:center;gap:16px">'+
     '<div style="transform:scale(1.8);transform-origin:left center;width:80px;flex:none">'+depthGlyph(3)+'</div>'+
-    '<span style="flex:1;min-width:0"><span class="disp gradhead" style="display:block;font-size:24px;line-height:1.1">The deep read</span>'+
+    '<span style="flex:1;min-width:0"><span class="disp gradhead" style="display:block;font-size:24px;line-height:1.1">This week\u2019s read</span>'+
     '<span class="mono" style="color:var(--faint);font-size:9px;letter-spacing:.08em;display:block;margin-top:4px">MODEL \u00b7 NOT RULES \u00b7 THE DEEPEST LENS</span></span></div>'+
     inner+
     /* the strategist's last pass and its running experiment live on
        the card between reads — an applied experiment must never
        vanish behind a gate */
     (S.deepBusy?'':(typeof analystSection==='function'?analystSection():''))+'</div>'}
+/* ══ PREMIUM ═══════════════════════════════════════════════════
+   The paywall, built dark. Nothing in this file charges anyone and
+   nothing talks to Apple: isPremium() reads a local flag until the
+   owner supplies App Store Connect product ids and a server-side
+   entitlement. A localStorage flag is bypassed with one curl — the
+   Rules section says so — which is exactly why this ships OFF.
+
+   What it gates comes from MONETIZATION-RESEARCH.md §5 (twelve
+   research tracks, ~1,100 sources) and council sitting 3:
+
+   FREE FOREVER — logging and the wall-clock witness, the whole
+   rehab pathway and check-in, the ENTIRE race (board, podium,
+   crown, duel, invites), the tree, points, today's verdict, the
+   daily find, a rolling window of history. Nothing that grows the
+   friend graph is ever gated: at n=3 a paywalled race is an empty
+   room, and Strava's own 2020 experiment returned <5% conversion
+   intent and ~30% stated attrition.
+
+   PREMIUM — depth and breadth. Never the loop.
+
+   THE ANCHOR IS THE ENGINE, NEVER THE AI (the strongest finding
+   across two tracks): nobody has ever sold an LLM insight layer as
+   its own SKU, AI subscriptions churn ~30% faster (21.1% vs 30.7%
+   annual retention), and Garmin made one the headline of a new tier
+   and is still being mocked a year later. The deterministic
+   correlation engine costs $0 to run, cannot be copied without the
+   cross-domain model, and is not an "AI app" for retention
+   purposes. The word "AI" appears on no surface in this file.
+
+   HONEST BY CONSTRUCTION, because it is also now the law:
+   - Cancel is one tap from the subscription screen and says where
+     Apple actually keeps it. Obstructed cancellation cost Amazon
+     $2.5bn and Adobe $150m under ROSCA.
+   - No countdown, no "today only", no artificial scarcity. The
+     ACCC took A$15m off Emma Sleep on 24 Apr 2026 for timers that
+     reset, and Australia's Unfair Trading Practices Act 2026
+     commences 1 Jul 2027 with A$2.5m per contravention for
+     individuals. The owner is a Melbourne sole trader.
+   - The billed amount is always the most prominent price. Never a
+     weekly-equivalent figure shown larger. Apple pulled Cal AI
+     ($50m ARR, #4 in Health & Fitness) for that in April 2026 and
+     has mass-rejected toggle paywalls under 3.1.2 since Jan 2026.
+   - The locked list states what is locked and how many. No blurred
+     fake text, no invented counts.
+   ══════════════════════════════════════════════════════════════ */
+
+/* NOT K_PREM \u2014 that is 'training-subs-v1', the exercise-substitutions
+   key, and two names a letter apart is how a storage key gets
+   clobbered. The Rules section forbids renaming or dropping a key;
+   this one is new, so it gets an unmistakable name now. */
+const K_PREM='training-premium-v1';
+
+/* Prices from MONETIZATION-RESEARCH.md §5.2. USD is the base
+   storefront (NA year-one LTV per payer $32 vs $23 global median).
+   AUD is the observed 1.50x ladder, VERIFIED against Runna and
+   Strong on both durations — but read the real tiers out of App
+   Store Connect before shipping; Apple never auto-adjusts
+   subscription prices. 7x monthly sits inside the category's
+   6x-10x convention. */
+const PRICE={
+  mo:{usd:'$9.99',aud:'A$14.99'},
+  yr:{usd:'$69.99',aud:'A$104.99'},
+  yrPerMo:{usd:'$5.83',aud:'A$8.75'},
+  saveP:42,
+  trialDays:14};
+
+/* 14 days, on the annual only. The category consensus is 5-9 days
+   and the conversion peak is 10-32 days (42.5% vs 25.5% under
+   four) — but the product-specific reason is stronger: Allena's own
+   honesty thresholds are 14 mornings for a readiness baseline, n>=12
+   for a correlation, 14 days for the form model. A 7-day trial
+   STRUCTURALLY CANNOT show the thing being sold. */
+
+const PREM_FEATURES=[
+  {k:'insights',n:'Insights',
+   d:'The engine tests every signal against every outcome instead of the short list, so it finds links a smaller search never reaches.'},
+  {k:'history',n:'All-time history',
+   d:'Past the last twelve weeks. Every session you have ever logged, charted.'},
+  {k:'form',n:'The form model',
+   d:'Fitness, fatigue and form across lifting, running and rehab on one ledger.'},
+  {k:'board',n:'The week board',
+   d:'All three placed against each other, with legs held clear of the long run.'},
+  {k:'raceplan',n:'Race plans',
+   d:'Built backwards from your date, at paces taken from your own runs.'},
+  {k:'imports',n:'Unlimited imports',
+   d:'Every spreadsheet, export and watch file, as often as you like.'},
+  {k:'read',n:'A read every week',
+   d:'Your numbers written up each Monday instead of once a month.'}];
+
+/* TWO THINGS DELIBERATELY NOT GATED, and the reasons are load-bearing.
+
+   1. THE QUALITY GATE IS NOT FOR SALE. MONETIZATION-RESEARCH.md listed
+      it as premium and that was wrong. It is the 48-hour rule that
+      refuses a hard run on legs that squatted heavy, plus the readiness
+      and HRV refusals. That is injury prevention, in an app whose wedge
+      audience is post-operative. Charging an ACL patient to be told not
+      to run is indefensible, and it is the one item where the research
+      and the charter's rehab-safety rules disagree. The charter wins.
+
+   2. A FINDING IS NEVER LOCKED AFTER IT IS FOUND. Decision 6 in
+      CLAUDE.md: point-gating findings was shipped once and reversed
+      within hours — "nothing is withheld" stands. So Premium buys a
+      WIDER SEARCH, not a curtain over results. A free user sees every
+      finding their engine reaches; a premium engine simply reaches
+      further. That distinction is the whole difference between selling
+      depth and selling access to the user's own data, which is the one
+      monetisation this app can never touch (AUDIT.md, never-build #5).
+
+   Implementing the wider search is an ENGINE change, not a UI one, and
+   it needs the owner's call on where the free grid stops. The lock copy
+   below is written for that design and is honest about it today:
+   nothing is hidden, the search is just narrower. */
+
+const FREE_FEATURES=[
+  'Logging, and the clock that witnesses it',
+  'The whole rehab pathway, check-ins and physio plans',
+  'The race, the board, the crown and your friends',
+  'Your tree, your points and your collection',
+  'Today’s call, and the daily find',
+  'Every finding the engine reaches — findings are never locked',
+  'The quality gate, and every safety refusal',
+  'Twelve weeks of history',
+  'A written read once a month'];
+
+/* Apple bills every storefront in its own currency, so this only
+   decides which number to PRINT before payment exists. Timezone is
+   the least intrusive signal available and it needs no permission. */
+function priceCur(){
+  try{const tz=Intl.DateTimeFormat().resolvedOptions().timeZone||'';
+    return /Australia/i.test(tz)?'aud':'usd'}
+  catch(e){return 'usd'}}
+function subStore(){
+  try{return S._sub||(S._sub=lget(K_PREM,{tier:'free',since:null,trialEnds:null,source:null}))}
+  catch(e){oops('subStore',e);return{tier:'free',since:null,trialEnds:null,source:null}}}
+function subSave(s){try{S._sub=s;lset(K_PREM,s)}catch(e){oops('subSave',e)}}
+
+/* PREMIUM IS NOT LIVE, AND MUST NOT SHIP LIVE (decision 0, 8 Sep:
+   "LAUNCH FREE-ONLY — no IAP at launch; premium ships in a later
+   build; halves review risk and setup").
+
+   The whole paywall was built on 13 Sep and it was REACHABLE: Settings
+   carried a Your plan row into a subscription screen quoting $9.99 and
+   $69.99, and the week board and the form model were locked behind this
+   function — with no StoreKit behind any of it. Shipping that would
+   have shown real prices with no way to pay them (App Review 3.1.1, and
+   a plain lie to the user), and it would have taken two working features
+   away from every launch user in exchange for nothing.
+
+   While PREM_LIVE is false: nothing gates, no lock card draws, no price
+   is shown, and the plan row is not rendered. The UI stays in the
+   codebase, finished, waiting for products in App Store Connect.
+   FLIP THIS ONLY when StoreKit is wired AND the products exist. */
+const PREM_LIVE=false;
+function premLive(){return PREM_LIVE}
+
+/* ENTITLEMENT and THE LAUNCH FLAG are two different questions, and they
+   are two functions so both stay testable. subEntitled() answers "has
+   this person paid" and is the logic StoreKit will feed; isPremium()
+   answers "should anything be locked right now", which before launch is
+   always no. Folding them into one left the entitlement tests asserting
+   the flag instead of the logic. */
+function subEntitled(){
+  try{const s=subStore();
+    if(s.tier==='premium')return true;
+    if(s.trialEnds&&today()<=s.trialEnds)return true;
+    return false}
+  catch(e){oops('subEntitled',e);return false}}
+
+/* the single gate. Everything that locks reads through here, so
+   wiring StoreKit later touches exactly one function. */
+function isPremium(){
+  try{return PREM_LIVE?subEntitled():true}   // nothing gates before launch
+  catch(e){oops('isPremium',e);return true}}
+
+function subState(){
+  try{const s=subStore(),on=subEntitled();
+    const trial=!!(s.trialEnds&&today()<=s.trialEnds&&s.tier!=='premium');
+    let left=null;
+    if(trial)left=Math.max(0,Math.round((new Date(s.trialEnds+'T12:00')-new Date(today()+'T12:00'))/864e5));
+    return{on:on,trial:trial,trialLeft:left,plan:s.plan||null,since:s.since||null,
+      label:trial?'Trial':on?'Premium':'Free'}}
+  catch(e){oops('subState',e);return{on:false,trial:false,trialLeft:null,plan:null,since:null,label:'Free'}}}
+
+/* ══ the lock ══════════════════════════════════════════════════
+   One pattern, used wherever something is gated. It never hides
+   what it is: it names the feature, says plainly that it is part of
+   Premium, and offers the door. `n` is a REAL count supplied by the
+   caller — never invented, never padded. */
+function lockCard(featKey,opts){
+  opts=opts||{};
+  const f=PREM_FEATURES.filter(x=>x.k===featKey)[0]||{n:opts.name||'This',d:''};
+  const n=opts.n;
+  return '<div class="card" style="padding:14px 16px;margin-top:10px;border:1px solid var(--line);background:var(--surface)">'+
+    '<div style="display:flex;align-items:center;gap:9px">'+
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" style="width:15px;height:15px;color:var(--faint);flex:none">'+
+    '<rect x="4.5" y="10.5" width="15" height="10" rx="2"/><path d="M8 10.5V7a4 4 0 0 1 8 0v3.5"/></svg>'+
+    '<span style="font-size:13.5px;font-weight:600">'+esc(f.n)+'</span>'+
+    '<span class="mono" style="margin-left:auto;color:var(--faint);font-size:10px;letter-spacing:.06em">PREMIUM</span></div>'+
+    '<p style="color:var(--dim);font-size:12.5px;line-height:1.55;margin-top:7px">'+esc(opts.d||f.d)+'</p>'+
+    (n!=null?'<p class="mono" style="color:var(--faint);font-size:11px;margin-top:6px">'+
+      esc(n===1?'1 more is waiting in your data.':n+' more are waiting in your data.')+'</p>':'')+
+    '<button data-a="upgradeOpen" data-v="'+esc(featKey)+'" class="btn" style="margin-top:11px;width:100%">See what Premium adds</button>'+
+    '</div>'}
+
+/* a quiet one-liner for dense surfaces where a card is too loud */
+function premLine(featKey,txt){
+  return '<button data-a="upgradeOpen" data-v="'+esc(featKey)+'" class="hit" style="display:block;width:100%;text-align:left;color:var(--faint);font-size:11.5px;margin-top:8px">'+
+    esc(txt)+' ›</button>'}
+
+/* ══ the paywall sheet ═════════════════════════════════════════
+   Reusable. S.sheet.v carries WHICH feature sent the user here, so
+   the sheet leads with the thing they actually wanted rather than a
+   generic pitch. */
+function upgradeSheet(){
+  const key=(S.sheet&&S.sheet.v)||null;
+  const f=PREM_FEATURES.filter(x=>x.k===key)[0];
+  const st=subState();
+  const cur=priceCur();
+  const yr=PRICE.yr[cur],mo=PRICE.mo[cur],per=PRICE.yrPerMo[cur];
+  let h='';
+  if(f)h+='<p style="font-size:15px;font-weight:600;line-height:1.4">'+esc(f.n)+'</p>'+
+    '<p style="color:var(--dim);font-size:13px;line-height:1.6;margin-top:6px">'+esc(f.d)+'</p>';
+  else h+='<p style="font-size:15px;font-weight:600;line-height:1.4">Premium</p>'+
+    '<p style="color:var(--dim);font-size:13px;line-height:1.6;margin-top:6px">Depth and breadth. The loop stays free.</p>';
+
+  h+='<p class="eyebrow" style="margin-top:20px">What it adds</p><div class="card" style="margin-top:8px;padding:12px 14px">'+
+    PREM_FEATURES.map(x=>'<div style="display:flex;gap:9px;padding:5px 0;align-items:baseline">'+
+      '<span class="mono" style="color:'+(x.k===key?'var(--green)':'var(--faint)')+';font-size:10px;flex:none">+</span>'+
+      '<span style="font-size:12.5px;'+(x.k===key?'font-weight:600':'color:var(--dim)')+'">'+esc(x.n)+'</span></div>').join('')+
+    '</div>';
+
+  /* THE BILLED AMOUNT IS THE PROMINENT ONE. The per-month figure is
+     present because it is true and useful, and it is deliberately
+     smaller and quieter than the number that leaves the account. */
+  h+='<p class="eyebrow" style="margin-top:20px">Price</p>'+
+    '<div class="card" style="padding:14px 16px;margin-top:8px">'+
+    '<div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap">'+
+      '<span style="font-size:22px;font-weight:700">'+esc(yr)+'</span>'+
+      '<span style="color:var(--dim);font-size:13px">a year</span></div>'+
+    '<p style="color:var(--faint);font-size:11.5px;margin-top:4px">Works out at '+esc(per)+' a month. Save '+PRICE.saveP+'%.</p>'+
+    '<p style="color:var(--dim);font-size:12.5px;margin-top:10px;line-height:1.6">'+
+      esc('Or '+mo+' a month, billed monthly.')+'</p>'+
+    '<p style="color:var(--dim);font-size:12.5px;margin-top:10px;line-height:1.6">'+
+      PRICE.trialDays+' days free on the yearly plan. '+
+      'Allena needs about a fortnight before a readiness baseline or a correlation means anything, so that\u2019s how long the trial is.</p>'+
+    '</div>';
+
+  h+='<button data-a="plansOpen" class="btn primary" style="margin-top:14px;width:100%">See both plans</button>';
+  if(!st.on)h+='<button data-a="closeSheet" class="btn" style="margin-top:8px;width:100%">Not now</button>';
+  h+='<p style="color:var(--faint);font-size:11px;margin-top:14px;line-height:1.6">'+
+    'Payment is not connected yet, so nothing here can charge you. Cancel any time from Settings → Your plan.</p>';
+  return wrapSheet('PREMIUM',h)}
+
+/* ══ the plans page ════════════════════════════════════════════ */
+function viewPlans(){
+  const st=subState();
+  const cur=priceCur();
+  let h='<div class="view pad stg" style="padding-top:24px">'+
+   '<button data-a="back" class="btn" style="width:auto;padding:8px 14px;color:var(--dim);font-size:12.5px;margin-bottom:14px">\u2039 Back</button>'+
+   '<h1 class="disp" style="font-size:25px;font-weight:600">Plans</h1>'+
+   '<p style="color:var(--dim);font-size:13px;line-height:1.65;margin-top:4px">'+
+   'The loop is free forever. Premium is depth: everything the engine works out about you, and the whole record rather than the last twelve weeks.</p>';
+
+  h+='<p class="eyebrow" style="margin-top:22px">Free</p>'+
+    '<div class="card" style="padding:14px 16px;margin-top:8px">'+
+    '<div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap">'+
+      '<span style="font-size:20px;font-weight:700">Free</span>'+
+      '<span style="color:var(--dim);font-size:12.5px">forever, not a trial</span>'+
+      (!st.on?'<span class="mono" style="margin-left:auto;flex:none;color:var(--green);font-size:10px">CURRENT</span>':'')+'</div>'+
+    '<div style="margin-top:11px">'+FREE_FEATURES.map(x=>
+      '<div style="display:flex;gap:9px;padding:4px 0;align-items:baseline">'+
+      '<span class="mono" style="color:var(--green);font-size:10px;flex:none">✓</span>'+
+      '<span style="color:var(--dim);font-size:12.5px;line-height:1.5;min-width:0;flex:1">'+esc(x)+'</span></div>').join('')+'</div></div>';
+
+  h+='<p class="eyebrow" style="margin-top:22px">Premium</p>'+
+    '<div class="card" style="padding:14px 16px;margin-top:8px">'+
+    '<div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap">'+
+      '<span style="font-size:22px;font-weight:700">'+esc(PRICE.yr[cur])+'</span>'+
+      '<span style="color:var(--dim);font-size:13px">a year</span>'+
+      (st.on?'<span class="mono" style="margin-left:auto;flex:none;color:var(--green);font-size:10px">CURRENT</span>':'')+'</div>'+
+    '<p style="color:var(--faint);font-size:11.5px;margin-top:4px">'+esc(PRICE.yrPerMo[cur])+' a month. Save '+PRICE.saveP+'%.</p>'+
+    '<p style="color:var(--dim);font-size:12.5px;margin-top:8px">Or '+esc(PRICE.mo[cur])+' a month, billed monthly.</p>'+
+    '<div style="margin-top:12px">'+PREM_FEATURES.map(x=>
+      '<div style="display:flex;gap:9px;padding:5px 0;align-items:baseline">'+
+      '<span class="mono" style="color:var(--green);font-size:10px;flex:none">+</span>'+
+      '<span style="min-width:0"><span style="display:block;font-size:12.5px;font-weight:600">'+esc(x.n)+'</span>'+
+      '<span style="display:block;color:var(--faint);font-size:11.5px;line-height:1.5;margin-top:1px">'+esc(x.d)+'</span></span></div>').join('')+'</div>'+
+    '<p style="color:var(--dim);font-size:12.5px;margin-top:12px;line-height:1.6">'+
+      PRICE.trialDays+' days free on the yearly plan, then '+esc(PRICE.yr[cur])+'. Cancel any time.</p>'+
+    '</div>';
+
+  h+='<div class="card" style="padding:14px 16px;margin-top:14px;background:var(--surface)">'+
+    '<p style="font-size:12.5px;font-weight:600">Payment isn\u2019t connected yet</p>'+
+    '<p style="color:var(--dim);font-size:12px;line-height:1.6;margin-top:5px">'+
+    'Nothing on this screen can charge you. The prices are set and the App Store side is not built.</p></div>';
+
+  h+='<button data-a="myPlanOpen" class="btn" style="margin-top:14px;width:100%">Your plan</button>';
+  h+='</div>';
+  return h}
+
+/* ══ subscription management ═══════════════════════════════════
+   Cancel is ONE TAP from here and it tells the truth about where
+   Apple keeps it. On iOS the developer cannot cancel for you — the
+   honest thing is to say so and hand over the real route, not to
+   bury it or pretend. */
+function viewSub(){
+  const st=subState(),s=subStore();
+  const cur=priceCur();
+  let h='<div class="view pad stg" style="padding-top:24px">'+
+   '<button data-a="back" class="btn" style="width:auto;padding:8px 14px;color:var(--dim);font-size:12.5px;margin-bottom:14px">\u2039 Back</button>'+
+   '<h1 class="disp" style="font-size:25px;font-weight:600">Your plan</h1>';
+
+  h+='<div class="card" style="padding:14px 16px;margin-top:10px">'+
+    '<div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap">'+
+    '<span style="font-size:20px;font-weight:700">'+esc(st.label)+'</span>'+
+    (st.trial&&st.trialLeft!=null?'<span class="mono" style="margin-left:auto;flex:none;color:var(--green);font-size:11px">'+
+      esc(st.trialLeft===0?'ends today':st.trialLeft+(st.trialLeft===1?' day left':' days left'))+'</span>':'')+'</div>'+
+    '<p style="color:var(--dim);font-size:12.5px;line-height:1.6;margin-top:7px">'+
+    (st.on
+      ?(st.trial
+        ?esc('Your trial runs to '+(s.trialEnds||'')+'. After that it is '+PRICE.yr[cur]+' a year unless you cancel.')
+        :esc('Premium. '+(s.plan==='mo'?PRICE.mo[cur]+' a month.':PRICE.yr[cur]+' a year.')))
+      :'Everything in the loop, twelve weeks of history, a read once a month.')+'</p></div>';
+
+  if(!st.on)h+='<button data-a="plansOpen" class="btn primary" style="margin-top:12px;width:100%">See Premium</button>';
+
+  h+=setGroup('MANAGE',[
+    navRow('<rect x="4" y="5" width="16" height="15" rx="2"/><path d="M8 3v4M16 3v4M4 10h16"/>','Compare plans',null,'plansOpen'),
+    navRow('<path d="M4 12h16"/>','Cancel or change',st.on?null:'nothing to cancel','subCancel')]);
+
+  h+='<div class="card" style="padding:14px 16px;margin-top:14px;background:var(--surface)">'+
+    '<p style="font-size:12.5px;font-weight:600">Where cancelling actually happens</p>'+
+    '<p style="color:var(--dim);font-size:12px;line-height:1.6;margin-top:5px">'+
+    'Apple holds the subscription, so cancelling happens in iPhone Settings under your name → Subscriptions. '+
+    'Allena can\u2019t do it for you, and can\u2019t stop you. Tap above and it opens that screen.</p></div>';
+
+  /* the dark-ship switch: this is how the owner and the sandbox see
+     the locked and unlocked states before StoreKit exists. It is
+     visible on purpose — a hidden entitlement toggle is the thing a
+     reviewer should never find. */
+  h+='<p class="eyebrow" style="margin-top:22px">BETA</p>'+
+    '<div class="card" style="padding:14px 16px;margin-top:8px">'+
+    '<p style="color:var(--dim);font-size:12px;line-height:1.6">'+
+    'Payment isn\u2019t connected. This switch previews the Premium state so the screens can be checked.</p>'+
+    '<button data-a="subDevToggle" class="btn" style="margin-top:10px;width:100%">'+
+    (st.on?'Switch back to Free':'Preview Premium')+'</button></div>';
+
+  h+='</div>';
+  return h}
 /* ══ the ghost (prompt 15) ══════════════════════════════════
    Your best-ever week, racing quietly beside this one. A
    target, never a judge: no red, no "behind", hidden until a
@@ -18264,6 +19684,9 @@ function todayOrder(){
   try{bid((typeof wrapCard==='function'?wrapCard():''),75)}catch(e){}
   try{bid((typeof recapCard==='function'?recapCard():''),74)}catch(e){}
   bid(newFindsCard(),85);
+  /* the read was unfindable (beta). It competes now, above the
+     monthly wrap and the recap, below a genuinely fresh find. */
+  try{bid((typeof readCard==='function'?readCard():''),78)}catch(e){oops('readBid',e)}
   try{const st=holdStates();
     const soon=HOLD_MUSCLES.some(m=>st[m]&&st[m].s==='held'&&(st[m].days||0)>=6);
     bid(holdCard(),soon?45:22)}catch(e){}
@@ -18272,6 +19695,9 @@ function todayOrder(){
       '<span style="width:8px;height:8px;border-radius:8px;background:var(--amber);flex:none"></span>'+
       '<span style="font-size:12.5px;color:var(--dim)">It\u2019s been '+backupDays()+' days since your last backup \u2014 tap to do it now.</span></button>',44);
   bid(unlockCard(),32);
+  /* the tree bids high ONLY on a real structural change (owner call,
+     13 Sep). Otherwise the collection teaser keeps its old floor. */
+  try{bid((typeof treeGrewCard==='function'?treeGrewCard():''),82)}catch(e){oops('treeBid',e)}
   bid(collectTeaser(),15);
   cand.sort((a,b)=>b.s-a.s);
   if(cand.length)out.push(cand[0].h);
@@ -18657,7 +20083,10 @@ function viewHome(){
      its special states (week complete, already trained, the week closer)
      — only the plain suggestion moved. */
   h+=recCard(true);
-  try{h+=(typeof weekBoardCard==='function'?weekBoardCard():'')}catch(e){}
+  try{const wb=(typeof weekBoardCard==='function')?weekBoardCard():'';
+    /* the board only exists with an active program; the lock only
+       shows when there IS something to lock (never a dead tease) */
+    if(wb)h+=(typeof isPremium==='function'&&!isPremium())?lockCard('board'):wb}catch(e){oops('boardLock',e)}
   /* the learned-adjustments ledger (8 Sep, after Dafydd's backup
      showed +12.5 on a skullcrusher and −5 on his key bench): what
      regulation has moved is VISIBLE and reversible in one place —
@@ -19803,6 +21232,13 @@ function viewProgress(){
   SECREF.form=SEC.form=()=>{
     const F=(typeof formModel==='function')?formModel():null;
     if(!F)return '';
+    /* THE TASTE IS REAL (research \u00a74): a free user gets the actual
+       state word computed from their actual data \u2014 not a blurred
+       placeholder. Premium buys the chart, the numbers and the trend. */
+    try{if(typeof isPremium==='function'&&!isPremium())
+      return lockCard('form',{d:'Right now you are '+String(F.state).toLowerCase()+
+        '. The chart, the fitness and fatigue numbers, and the 90-day trend are part of Premium.'})}
+    catch(e){oops('formLock',e)}
     const pts=F.series.slice(-91).map(x=>({t:x.t,v:x.ctl}));
     const hi=Math.max(50,Math.ceil(Math.max.apply(null,pts.map(p=>p.v))/50)*50);
     return '<div class="card mt" style="padding:16px">'+
@@ -20062,6 +21498,13 @@ function viewData(){
   h+=setGroup('Equipment',eqRows);
   if(inWrapper())h+=setGroup('Notifications',[
     setRow(I.bell,'What Allena tells you',notifPrefs().on?'On':'Off','Notifications')]);
+  /* Your plan sits ABOVE 'Allena' on purpose: a user looking for
+     what they pay for should not have to read past the chat row. */
+  /* the plan row is hidden until premium is real (PREM_LIVE in 19c). A
+     row quoting a price nobody can pay is worse than no row. */
+  if(typeof premLive==='function'&&premLive())h+=setGroup('Your plan',[
+    navRow('<path d="M3 10h18M5 6h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2z"/>',
+      'Plan',(function(){try{return subState().label}catch(e){return 'Free'}})(),'myPlanOpen')]);
   h+=setGroup('Allena',[
     setRow('logo','Allena chat',
       ((S.ai&&(S.ai.proxy||'').trim())?'Cloud link':(S.ai&&S.ai.key)?'Own key':signed?'Signed in':'Claude app'),
@@ -20078,7 +21521,8 @@ function viewData(){
   h+=setGroup('Beta testing',[
     setRow(I.bug,'Report a problem','','__report'),
     setRow(I.demo,'Demo data',demoPresent()?'loaded':'','Demo data'),
-    setRow(I.demo,'Demo mode for filming',localStorage.getItem('allena-demo-live')?'ON':'','__demomode')]);
+    setRow(I.demo,'Demo mode for filming',localStorage.getItem('allena-demo-live')?'ON':'','__demomode'),
+    navRow(SET_ICONS.trend,'Chronological tree',(function(){try{return treeTimeOn()?'ON':'preview'}catch(e){return 'preview'}})(),'treeCompare')]);
   const KNOWN=['You','Get help','Account & sync','Program library','Your own block','Rehab pathway','Running','Daily check-in','Profile','Barbell weight','Available equipment','Units','Notifications','Report a problem','Allena — AI coach','Export','Restore','Demo data','Start fresh'];
   const left=Object.keys(byTitle).filter(k=>KNOWN.indexOf(k)<0);
   if(left.length)h+=setGroup('More',left.map(k=>setRow(I.prog,k,'',k)));
@@ -20395,14 +21839,14 @@ function sheetHtml(){
     const val=(s9.exNotes||{})[b9]||'';
     const pain=/hurt|pain|sharp|numb|swell|tweak|pinch/i.test(val);
     return wrapSheet('Note on '+b9,
-      '<p style="color:var(--dim);font-size:12.5px;line-height:1.55">Saved with today\u2019s session, kept in History, and every Allena in the app reads it \u2014 the coach, the deep read, next time\u2019s set screen.</p>'+
+      '<p style="color:var(--dim);font-size:12.5px;line-height:1.55">Saved with today\u2019s session, kept in History, and every Allena in the app reads it \u2014 the coach, the read, next time\u2019s set screen.</p>'+
       '<textarea data-exnote="1" rows="3" placeholder="e.g. felt strong \u00b7 grip slipping \u00b7 hurts lower back" style="margin-top:10px">'+esc(val)+'</textarea>'+
       (pain?'<div class="card mt" style="padding:12px 14px;border-color:var(--amber)">'+
         '<p style="color:var(--dim);font-size:12px;line-height:1.6">Noted \u2014 Allena will ask about this next time this exercise comes up. If it hurts again, ease the load or swap the movement. Anything sharp, swelling or numb is a health professional\u2019s call, not an app\u2019s.</p></div>':'')+
       '<button data-a="closeSheet" class="big disp mt" style="background:var(--text);color:var(--bg);font-size:15px">Save note</button>')}
   if(S.sheet.t==='exportsave'){
     return wrapSheet('Save your export',
-      '<p style="color:var(--dim);font-size:13px;line-height:1.6">iOS would not hand this build the share sheet, so here is the honest route'+(S.exportText?'':' — a fresh tap usually unlocks it')+'.</p>'+
+      '<p style="color:var(--dim);font-size:13px;line-height:1.6">iOS would not hand this build the share sheet, so here is the honest route'+(S.exportText?'':' — a fresh tap usually fixes it')+'.</p>'+
       (S.exportText
         ?'<button data-a="exportCopy" class="big disp mt" style="background:var(--amber);color:var(--bg);font-size:15px">Copy the backup to the clipboard</button>'+
          '<p style="color:var(--dim);font-size:12.5px;line-height:1.6;margin-top:10px">Then open <b style="color:var(--text)">Files</b> (or Notes), make a new file and paste. Name it <span class="mono" style="font-size:11px">'+esc(S.exportName||'backup.json')+'</span> and keep it in iCloud Drive — that file restores everything.</p>'
@@ -20547,7 +21991,7 @@ function sheetHtml(){
         return b9?'<div class="card" style="padding:12px 14px;margin-top:8px"><p class="mono" style="color:var(--faint);font-size:9px;letter-spacing:.06em">'+lab+'</p>'+b9+'</div>':''}
       if(r.kind==='bw')return '<div style="margin-top:8px">'+(bwCard()||'')+'</div>';
       return ''}catch(e){return ''}};
-    return wrapSheet('The deep read',
+    return wrapSheet('This week\u2019s read',
       '<p class="mono" style="color:'+rc+';font-size:9px;letter-spacing:.06em">'+esc(it.rar.toUpperCase())+' \u00b7 MODEL READ \u00b7 INTERPRETATION, NOT MEASUREMENT</p>'+
       '<p class="disp" style="font-size:18px;font-weight:600;margin-top:6px;line-height:1.3">'+esc(it.t)+'</p>'+
       (it.plain?'<p class="eyebrow mt2">In plain words</p>'+
@@ -20558,9 +22002,9 @@ function sheetHtml(){
         it.refs.map(inline).join(''):'')+
       (function(){const watching=deepStore().watches.some(w=>w.t===it.t);
         return '<button data-a="deepWatch" data-v="'+S.sheet.i+'" class="btn mt2" style="'+(watching?'border-color:var(--blue);color:var(--blue)':'color:var(--dim)')+'">'+
-          (watching?'Watching \u2014 the next deep read reports on it \u2713':'Watch this \u2014 make the next read follow it up')+'</button>'})()+
+          (watching?'Watching \u2014 the next read reports on it \u2713':'Watch this \u2014 make the next read follow it up')+'</button>'})()+
       '<button data-a="deepAsk" data-v="'+S.sheet.i+'" class="btn mt" style="border-color:var(--amber);color:var(--amber)">Ask Allena about this finding</button>'+
-      '<p style="color:var(--faint);font-size:11px;line-height:1.5;margin-top:12px">A deep read is the model\u2019s interpretation of your own numbers \u2014 clearly labelled, never dressed up as a measurement. The charts are the raw truth it read from.</p>')}
+      '<p style="color:var(--faint);font-size:11px;line-height:1.5;margin-top:12px">A read is the model\u2019s interpretation of your own numbers \u2014 clearly labelled, never dressed up as a measurement. The charts are the raw truth it read from.</p>')}
   if(S.sheet.t==='pvsub'){
     const e=S.prev&&S.prev.ex[S.sheet.i];if(!e)return '';
     const f=subsFor(e.origName||e.name);if(!f)return '';
@@ -20954,6 +22398,35 @@ function sheetHtml(){
             '<div class="an-bar" style="height:4px;width:'+Math.min(100,Math.round((d.total-t[0])/(nx[0]-t[0])*100))+'%;background:'+t[2]+'"></div></div>'+
             '<p class="mono" style="color:var(--faint);font-size:10px;margin-top:6px">'+(nx[0]-d.total).toLocaleString()+' to '+esc(nx[1].toLowerCase())+'</p>':'')+
           '</button>'})())}
+  if(S.sheet.t==='treecmp'){
+    /* SIDE BY SIDE, ON HIS OWN DATA (council sitting 4, the Contrarian's
+       no-revert condition): the August redraw was reverted after it
+       shipped. This one cannot be, because nothing changes until he
+       looks at both and picks. */
+    const on=(typeof treeTimeOn==='function')&&treeTimeOn();
+    let older='',newer='',note='';
+    try{older=growTree(260,300)}catch(e){oops('cmpOld',e)}
+    try{const d=(typeof treeTimeData==='function')?treeTimeData():null;
+      if(!d)note='Not enough logged yet for the chronological version \u2014 it needs 14 days and 6 sessions. The one below is what renders until then.';
+      newer=(typeof growTreeTime==='function')?growTreeTime(260,300):''}
+    catch(e){oops('cmpNew',e)}
+    const pane=(title,svg,sub)=>'<div class="card" style="padding:14px 16px;margin-top:10px">'+
+      '<div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap">'+
+      '<span style="font-size:13.5px;font-weight:600">'+esc(title)+'</span>'+
+      '<span class="mono" style="margin-left:auto;flex:none;color:var(--faint);font-size:10px">'+esc(sub||'')+'</span></div>'+
+      '<div style="margin-top:10px">'+svg+'</div></div>';
+    return wrapSheet('YOUR TREE',
+      '<p style="color:var(--dim);font-size:12.5px;line-height:1.6">'+
+      'The chronological version puts time up the trunk: your first logged day at the base, today at the tip. '+
+      'Work thickens the trunk, so a quiet stretch shows as a narrowing. Nothing changes until you pick one.</p>'+
+      (note?'<p style="color:var(--faint);font-size:11.5px;line-height:1.55;margin-top:9px">'+esc(note)+'</p>':'')+
+      pane('Chronological','<div style="max-width:260px;margin:0 auto">'+newer+'</div>'+
+        (note?'':'<div style="margin-top:14px">'+
+          ((typeof treeTimeLegend==='function')?treeTimeLegend(false):'')+'</div>'),on?'CURRENT':'')+
+      pane('The one you have','<div style="max-width:260px;margin:0 auto">'+older+'</div>',on?'':'CURRENT')+
+      '<button data-a="treeTimePick" data-v="'+(on?'0':'1')+'" class="btn primary" style="margin-top:14px;width:100%">'+
+      (on?'Go back to the one you have':'Keep the chronological one')+'</button>')}
+  if(S.sheet.t==='upgrade')return upgradeSheet();
   if(S.sheet.t==='today'){
     const pr=todayProgress(),st=dayStreak(),pts=todayPoints();
     return wrapSheet('Today',
@@ -21020,7 +22493,7 @@ function sheetHtml(){
       '<p style="color:var(--dim);font-size:13.5px;line-height:1.6">'+
       (hd.sessions?hd.sessions.length:0)+' sessions, '+(hd.totalSets||0)+' sets, '+
       esc(String(hd.from||''))+' to '+esc(String(hd.to||''))+' — read straight off the file with their real dates. '+
-      'Trends, patterns and deep reads start working on it the moment it lands.</p>'+
+      'Trends, patterns and reads start working on it the moment it lands.</p>'+
       '<button data-a="histDatedGo" class="big disp mt2" style="background:var(--amber);color:var(--bg);font-size:15px">Bring it in</button>'+
       '<p style="color:var(--faint);font-size:11.5px;line-height:1.55;margin-top:10px">Importing the same file again replaces these — nothing ever doubles up. Sessions you logged yourself always outrank an import.</p>')}
   if(S.sheet.t==='histdate'){
@@ -21039,7 +22512,7 @@ function sheetHtml(){
       :'When did you TRAIN the first session of week 1 \u2014 the real-world gym date it happened? Roughly is fine: any day of that week works.';
     return wrapSheet('One date and it all lands',
       '<p style="color:var(--dim);font-size:13.5px;line-height:1.6">'+esc(hi.block)+' \u2014 '+nW+' week'+(nW===1?'':'s')+', '+nS+' sessions of lifting, but no calendar dates. One real-world date lets Allena place all of it.'+iBtn('hdatewhy')+'</p>'+
-      iBody('hdatewhy','The dates are deduced from your anchor, spread across each week, and marked approximate \u2014 honest labels, real data. Trends, patterns, deep reads and the next block all start working on it immediately. Close enough is genuinely fine; nothing here needs to be exact.')+
+      iBody('hdatewhy','The dates are deduced from your anchor, spread across each week, and marked approximate \u2014 honest labels, real data. Trends, patterns, reads and the next block all start working on it immediately. Close enough is genuinely fine; nothing here needs to be exact.')+
       '<p class="eyebrow mt2">Which date do you know?</p>'+
       '<div class="row" style="gap:8px;margin-top:8px">'+
       [['end','My last session'],['start','Week 1\u2019s first session']].map(m2=>
@@ -22494,13 +23967,13 @@ function viewGuide(){
     watch:{name:'Apple Watch',addr:'',steps:[
       ['Nothing to set up','Apple Watch writes workouts, heart rate and sleep straight into Health on its own.',''],
       ['Just check Allena\u2019s access','iPhone Settings \u2192 Apps \u2192 Health \u2192 Data Access & Devices \u2192 Allena \u2192 Turn All Categories On.',''],
-      ['Track sleep to unlock the good stuff','Wear the watch overnight with Sleep tracking on \u2014 the sleep\u2013strength insights need the nights.','']]},
+      ['Track sleep and the strength finds follow','Wear the watch overnight with Sleep tracking on \u2014 the sleep\u2013strength insights need the nights.','']]},
     strava:{name:'Strava',addr:'',steps:[
       ['Strava usually is not the source','If a watch records the run, its own app (Garmin Connect etc.) already writes to Health. Allena de-duplicates what it reads \u2014 but Apple Health itself will show the workout twice, so one writer keeps things clean.','Connect Strava only if you record IN the Strava app itself.'],
       ['Connect Strava to Health','Strava \u2192 You \u2192 Settings \u2192 Applications, Services & Devices \u2192 Health app \u2192 Connect.',''],
       ['Allow writing workouts','Turn on the workout categories when iOS asks \u2014 runs then land in Health and Allena reads them.','']]},
     food:{name:'Food apps',addr:'',steps:[
-      ['Macros unlock a whole engine','Calories, protein and carbs feed the insights nothing else can make \u2014 what fuels your best sessions.',''],
+      ['Macros turn on a whole engine','Calories, protein and carbs feed the insights nothing else can make \u2014 what fuels your best sessions.',''],
       ['MyFitnessPal','More \u2192 Settings \u2192 Sharing & Devices (or Apps & Devices) \u2192 Health \u2192 turn nutrition ON.',''],
       ['Any other tracker','Look for \u201cApple Health\u201d in its settings and allow it to WRITE nutrition. Then log meals as normal \u2014 Allena picks the totals up daily.','']]}};
   const src=health?(S.impg&&HG[S.impg]?S.impg:'garmin'):(S.impg||'garmin');
@@ -22593,6 +24066,8 @@ function render(){
   else if(S.view==='today')body=viewToday();
   else if(S.view==='findings')body=viewFindings();
   else if(S.view==='territory')body=viewTerritory();
+  else if(S.view==='plans')body=viewPlans();
+  else if(S.view==='sub')body=viewSub();
   else if(S.view==='home')body=viewHome();
   else if(S.view==='session')body=S.sess?viewSession():viewHome();
   else if(S.view==='history')body=viewHistory();
@@ -22694,6 +24169,7 @@ function render(){
       drow('progress','Progress',ICONS.progress)+
       ((hasFinds||hasColl||hasStand||hasHealth)?'<div style="display:flex;align-items:center;gap:8px;margin:12px 13px 4px"><span style="flex:1;height:1px;background:var(--line)"></span><span class="mono" style="color:var(--faint);font-size:9px;letter-spacing:.12em">YOUR DATA</span><span style="flex:1;height:1px;background:var(--line)"></span></div>':'')+
       (hasFinds?drow('findings','Patterns in your data',I2.spark):'')+
+      drow('points','Your tree and points',I2.trend)+
       (hasColl?drow('collection','The collection',I2.star):'')+
       (hasHealth?drow('signals','Synced health data',I2.heart):'')+
       (hasFinds?drow('history','Workout log',I2.save):'');
@@ -22731,10 +24207,10 @@ function render(){
   const tourHtml=()=>{
     if(!S.tour)return '';
     const STEPS=[
-      ['One answer, every day','The big card on Today is the verdict \u2014 what today should be, and why. Everything else on this page supports it. The four dots underneath are today\u2019s small check-ins; finishing them unlocks what Allena noticed in your data.'],
+      ['One answer, every day','The big card on Today is the verdict \u2014 what today should be, and why. Everything else on this page supports it. The four dots underneath are today\u2019s small check-ins; finish them and Allena tells you what it noticed in your data.'],
       ['The menu is the map','The \u2630 button, top left, holds every page. It starts small on purpose \u2014 new pages appear as your data earns them, so nothing here is ever an empty room.'],
       ['Program is the plan','Your sessions live under Program. Tap a day to start it \u2014 Allena adjusts future loads from how your sets actually felt, one honest rep at a time.'],
-      ['Findings is where Allena thinks','The network icon on Today opens two lenses \u2014 your discoveries and patterns, and the weekly deep read. A red dot means something genuinely new; no dot, nothing new. It fills as you train.'],
+      ['Findings is where Allena thinks','The network icon on Today opens two lenses \u2014 your discoveries and patterns, and the weekly read. A red dot means something genuinely new; no dot, nothing new. It fills as you train.'],
       ['Everything explains itself','Any \u24d8 opens the why behind a number in plain words. If something confuses you and has no \u24d8, that\u2019s a bug \u2014 tell us from Settings \u2192 Report a problem.']];
     const st=STEPS[Math.min(S.tour.i,STEPS.length-1)];
     return '<div style="position:fixed;inset:0;z-index:120;background:color-mix(in srgb, var(--bg) 82%, black);display:flex;align-items:center;justify-content:center;padding:26px">'+
@@ -23954,6 +25430,33 @@ function runAction(a,v,t,e){
         render();setTimeout(tick,620+Math.random()*260)};
       setTimeout(tick,700);break}
     case 'anReset':S.anState='idle';S.anStep=0;S.discShow=null;render();break;
+    /* ══ premium (built dark: no payment is wired) ══════════════
+       upgradeOpen carries WHICH feature sent the user here, so the
+       sheet leads with the thing they wanted. */
+    case 'treeCompare':{S.sheet={t:'treecmp'};render();break}
+    case 'treeTimePick':{
+      S.prof=Object.assign({},S.prof||{},{treeT:v==='1'});
+      lset(K_PROF,S.prof);S.sheet=null;render();
+      flash(v==='1'?'Chronological tree on. Time runs up the trunk.':'Back to the tree you had.');break}
+    case 'upgradeOpen':{S.sheet={t:'upgrade',v:v||null};render();break}
+    case 'plansOpen':S._navQuiet=1;{if(S.view!=='plans'){S.backTo=S.view;S.backDrawer=false}S.sheet=null;S.view='plans';render();break}
+    case 'myPlanOpen':S._navQuiet=1;{if(S.view!=='sub'){S.backTo=S.view;S.backDrawer=false}S.sheet=null;S.view='sub';render();break}
+    /* CANCEL IS ONE TAP AND IT TELLS THE TRUTH. Apple owns the
+       subscription, so the honest route is Apple's own screen — never
+       a retention flow, never an "are you sure" maze. ROSCA cost
+       Amazon $2.5bn for the opposite. */
+    case 'subCancel':{
+      if(!isPremium()){flash('You\u2019re on Free. Nothing to cancel.');break}
+      try{if(window.open)window.open('https://apps.apple.com/account/subscriptions','_blank')}catch(e){oops('subCancel',e)}
+      flash('Apple keeps subscriptions under your name \u2192 Subscriptions.');break}
+    /* the dark-ship preview switch. Visible on purpose: a hidden
+       entitlement toggle is the thing a reviewer should never find. */
+    case 'subDevToggle':{
+      const s9=subStore();
+      const on=isPremium();
+      subSave(on?{tier:'free',since:null,trialEnds:null,source:null}
+               :{tier:'premium',since:today(),trialEnds:null,plan:'yr',source:'preview'});
+      render();flash(on?'Back to Free.':'Previewing Premium. Nothing was charged.');break}
     case 'findingsOpen':S._navQuiet=1;{if(S.view!=='findings'){S.backTo=S.view;S.backDrawer=false}S.sheet=null;S.view='findings';render();break}
     case 'findingsGo':S._navQuiet=1;{if(S.view!=='findings'){S.backTo=S.view;S.backDrawer=false}S.sheet=null;S.view='findings';runAction('anRun');break}
     case 'prioSet':{S.prof=Object.assign({},S.prof||{},{prio:v});lset(K_PROF,S.prof);render();
@@ -24015,7 +25518,7 @@ function runAction(a,v,t,e){
       S.gform={am:''};S.sheet={t:'gam'};render();break}
     case 'bwSave':{const v2=parseFloat((S.gform&&S.gform.bw)||'');
       {const kg9=uwIn(v2);
-      if(!(kg9>20&&kg9<400)){flash('That does not look like a bodyweight.');break}
+      if(!(kg9>20&&kg9<400)){flash('That doesn\u2019t look like a bodyweight.');break}
       S.daily.days[today()]=S.daily.days[today()]||{};
       S.daily.days[today()].bw=Math.round(kg9*10)/10;S.daily.days[today()].bwSrc='me';lset(K_DAILY,S.daily);
       S.gform=null;S.sheet=null;render();flash('Logged '+v2+' '+uwUnit()+'.')}break}
@@ -24063,7 +25566,7 @@ function runAction(a,v,t,e){
       if(id.indexOf('bw:')===0){S.sheet={t:'editpt',id:id,kind:'bw',val:(S.daily.days[id.slice(3)]||{}).bw||''};render();break}
       if(id.indexOf('bb:')===0){const d=S.gar.days[id.slice(3)]||{};S.sheet={t:'editpt',id:id,kind:'bb',val:d.am!=null?d.am:(d.day!=null?d.day:'')};render();break}
       if(id.indexOf('scan:')===0){const sc=S.scans.find(x=>x.id===id.slice(5));if(sc){S.sform=Object.assign({img:null,busy:false},sc,{w:sc.w!=null?uwNum(sc.w):'',smm:sc.smm!=null?uwNum(sc.smm):''});S.sheet={t:'scan'};render()}break}
-      if(id.indexOf('t:')===0){flash('Retest from the Rehab tab — test results are not edited by hand.');break}
+      if(id.indexOf('t:')===0){flash('Retest from the Rehab tab — test results aren\u2019t edited by hand.');break}
       const [hid,li]=id.split(':');const rec=S.history.find(h=>h.id===hid);
       if(rec){S.open=hid;S.chart=null;S.view='history';S.histTab='sessions';render();flash('Opened that session — tap the set to correct it.')}
       break}
@@ -24732,7 +26235,7 @@ function runAction(a,v,t,e){
       e.eased=true;logIssue(e.name,'reduced to '+half+' sets',S.acl&&S.acl.phase);
       flash('Halved for today and noted.');render();break}
     case 'rehabSwap':{const e=S.prev.ex[+v];if(!e)break;
-      if(e.clinical){flash('Not while it is hurting — leave it out and raise it with your physio.');break}
+      if(e.clinical){flash('Not while it\u2019s hurting — leave it out and raise it with your physio.');break}
       S.swapFor={name:e.name,i:+v};S.sheet={t:'rehabswap'};render();break}
     case 'rehabSwapPick':{const n=t.dataset.v,sw=S.swapFor;if(!sw)break;
       const e2=S.prev.ex[sw.i];if(!e2)break;
@@ -24932,7 +26435,7 @@ function runAction(a,v,t,e){
         flash('Linked — racing '+f.n+'’s best week from now on.')
       }).catch(function(){flash('Could not read the clipboard — paste it into the box instead.')});break}
     case 'fghostGo':{const f=fghostParse(S.fgIn);
-      if(!f){flash('That does not read as a ghost code — it starts with AG1.');break}
+      if(!f){flash('That doesn\u2019t read as a ghost code — it starts with AG1.');break}
       S.fghost=f;lset('training-fghost-v1',f);S.fgIn='';S.sheet=null;render();
       flash('Racing '+f.n+'’s best week from now on.');break}
     case 'fghostOff':S.fghost=null;ldel('training-fghost-v1');render();flash('Ghost removed.');break;
@@ -24994,7 +26497,7 @@ function runAction(a,v,t,e){
       flash(S.rform.km&&S.rform.mins?('Read '+S.rform.km+' '+udUnit()+' in '+S.rform.mins+' min — check it before saving.')
         :'Could not find a distance and a time in that. Type them in instead.');break}
     case 'runSaveGo':{const f=S.rform;
-      if(!(f.km>0&&f.mins>0)){flash('A distance and a time, and it is logged.');break}
+      if(!(f.km>0&&f.mins>0)){flash('A distance and a time, and it\u2019s logged.');break}
       const zt=['z1','z2','z3','z4','z5'].reduce((a,k)=>a+(+f[k]||0),0);
       if(f.id)runDel(f.id);
       runAdd({id:f.id||Date.now().toString(36),date:f.date||today(),type:f.type,km:udIn(+f.km),mins:+f.mins,
@@ -26158,6 +27661,23 @@ function doScroll(){
       window.scrollTo(0,0);
       S.lensIdx=Math.max(0,Math.min(3,+id.slice(5)||0));
       try{render()}catch(e9){}}
+    /* CENTRING A TALL TARGET LANDS YOU IN THE MIDDLE OF IT (owner-caught,
+       13 Sep: the drawer's route to a new finding "routes you to the
+       middle and not to the actual new finding at the top"). A shelf
+       that auto-opened with thirty entries is several screens tall, so
+       block:'center' put its MIDDLE at the viewport centre and the new
+       entry — which sits at the top of the shelf — was already scrolled
+       past. Anything taller than most of the screen is aligned to its
+       top instead, under the header. Short targets still centre, which
+       is right for them. */
+    else if(el.getBoundingClientRect&&window.scrollTo){
+      const r=el.getBoundingClientRect();
+      const vh=window.innerHeight||640;
+      const y=(window.pageYOffset||(document.documentElement&&document.documentElement.scrollTop)||0)+r.top;
+      const tall=r.height>vh*0.7;
+      const to=tall?y-64:y-Math.max(0,(vh-r.height)/2);
+      try{window.scrollTo({top:Math.max(0,to),behavior:'smooth'})}
+      catch(e9){window.scrollTo(0,Math.max(0,to))}}
     else if(el.scrollIntoView)el.scrollIntoView({behavior:'smooth',block:'center'})}catch(e){}}
 try{navigator.storage&&navigator.storage.persist&&navigator.storage.persist().then(function(g){S.persisted=!!g})}catch(e){}
 try{sanityWeeks()}catch(e){}
