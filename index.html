@@ -821,7 +821,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='c3d39c';  // stamped by tools/build.py with the content hash
+const BUILD_ID='a1b87e';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -2715,7 +2715,8 @@ function friendsSection(){
     if(!acctReady()||!acct())return '';
     if(S._frCap==null){if(!S._frKick){S._frKick=1;setTimeout(function(){frLoad()},80)}return ''}
     if(S._frCap===false)return '';
-    const mine=Math.round((dataPoints().weekLive)||0);
+    const dp0=dataPoints();
+    const mine=Math.round((dp0.weekLive)||0);
     const L=raceField();
     const open=(S.frRows||[]).filter(x=>!x.linked_at&&x.owner_id===S.frMe);
     /* the profile card — who you are on the board */
@@ -2794,7 +2795,7 @@ function friendsSection(){
            one-shot on Today that yields to the morning ask; by the
            time he was on Social it had nowhere to be. The settled
            finals sit here under the board all week. */
-        try{const mineL=Math.round((dataPoints().prevWeekLive)||0);
+        try{const mineL=Math.round((dp0.prevWeekLive)||0);
           const LW=[{me:1,name:'You',v:mineL}].concat(L.filter(f=>f.last!=null).map(f=>({me:0,id:f.id,name:f.name,v:Math.round(f.last)})))
             .sort((a,b)=>b.v-a.v||(a.me?-1:1));
           if(LW.some(x=>x.v>0)){
@@ -2898,7 +2899,7 @@ function duelVerdict(){
        before the judged week began is in it now; a fetch that predates
        joined_at leaves them out, which is the safe direction. */
     (S.crewRows||[]).forEach(m=>{const id=m&&m.user_id;
-      if(id&&id!==S.frMe&&String(m.joined_at||'').slice(0,10)<wk0)eligible[id]=1});
+      if(id&&id!==S.frMe&&m.joined_at&&String(m.joined_at).slice(0,10)<wk0)eligible[id]=1});
     const nEl=Object.keys(eligible).length;
     if(!nEl)return;
     const rows=(S.frSnaps||[]).filter(s9=>eligible[s9.user_id]&&snWeeks(s9).prev!=null);
@@ -3120,7 +3121,18 @@ async function podLoad(h){
         (rows||[]).forEach(x=>{if(x.pod_id)board.push({id:x.pod_id,members:+x.members||0,score:+x.score||0,mine:!!x.mine});waiting=+x.waiting||waiting})}}
     catch(e){oops('podLoad.board',e)}
     S.pod=Object.assign({},pod||{},{board:board,waiting:waiting,bracket:(pod&&pod.bracket)||pool[0].bracket,at:Date.now()});
-    try{lset(K_ACCT,Object.assign({},acct()||{},{podCache:S.pod}))}catch(e){oops('podLoad.cache',e)}
+    try{
+      /* THE MONDAY CEREMONY NEEDS LAST WEEK'S BOARD (FRONT-DOOR: "Monday
+         replays your bracket's pod podium"). The board is this week's,
+         as of now; the last fetch of a week is that week's final as of
+         your last open. Keep the current one stamped with its week, and
+         when the week turns, the stamped one becomes last week's. */
+      const a8=acct()||{};const wk8=questWeekKey();
+      let prev8=a8.podBoardPrev||null;
+      if(a8.podBoardCur&&a8.podBoardCur.wk!==wk8)prev8=a8.podBoardCur;
+      lset(K_ACCT,Object.assign({},a8,{podCache:S.pod,podBoardPrev:prev8,
+        podBoardCur:(pod&&pod.id&&board.length)?{wk:wk8,board:board}:(a8.podBoardCur&&a8.podBoardCur.wk===wk8?a8.podBoardCur:null)}))}
+    catch(e){oops('podLoad.cache',e)}
     render()}
   catch(e){oops('podLoad',e)}}
 function podHydrate(){
@@ -3267,6 +3279,21 @@ function podPanel(){
       '<button data-a="podOptOut" class="btn" style="flex:1;font-size:12px;color:var(--faint)">Stop racing strangers</button></div>';
     return h}
   catch(e){oops('podPanel',e);return ''}}
+function podCeremony(){
+  /* last week's bracket, as of your last open — pods as bars, mine
+     named, the rest a number. Once per week, same stamp the friends
+     ceremony uses, and it takes the Monday while a series is running. */
+  try{
+    const a=acct();if(!a||!podOn())return null;
+    const wk=questWeekKey();if(a.cerWk===wk)return null;
+    const pv=dayKey(new Date(new Date(wk+'T12:00').getTime()-7*864e5));
+    const pb=a.podBoardPrev;if(!pb||pb.wk!==pv||!Array.isArray(pb.board)||pb.board.length<2)return null;
+    if(!pb.board.some(x=>x.mine))return null;
+    const rows=pb.board.slice().sort((x,y)=>(y.score||0)-(x.score||0)||(x.mine?-1:1))
+      .map(x=>({me:x.mine?1:0,name:x.mine?'Your pod':'A pod of '+(x.members||3),pts:+x.score||0,av:'',init:String(x.members||3)}));
+    if(!(rows[0].pts>0))return null;
+    return{wk:wk,pod:true,rows:rows.slice(0,3),iWon:!!rows[0].me,reign:0}}
+  catch(e){oops('podCeremony',e);return null}}
 function podSheet(){
   /* the opt-in: the rule, and the one thing a stranger will learn */
   const b=podBracket();
@@ -8747,9 +8774,10 @@ function weeksRaced(){
      Two readouts of the same idea must never be computed two ways. */
   try{
     const wk={},put=d=>{if(d)wk[questWeekKey(new Date(String(d).slice(0,10)+'T12:00'))]=1};
+    let warned=0;
     (S.history||[]).forEach(h=>{
       if(!h.complete||h.run)return;                 // mirrors handled below
-      try{if((typeof sessionLive==='function')&&sessionLive(h))put(hKey(h))}catch(e){}});
+      try{if((typeof sessionLive==='function')&&sessionLive(h))put(hKey(h))}catch(e){if(!warned++)oops('weeksRaced.row',e)}});
     /* ASK THE RACE, DO NOT RE-DERIVE IT. This used runLive() alone while
        the race also demanded working effort, so a ride that could not
        race still counted as a week raced \u2014 the same "two readouts, two
@@ -8757,13 +8785,18 @@ function weeksRaced(){
        the one computation. */
     try{const R=(typeof runs==='function')?runs():[];
       R.forEach(r=>{try{if((typeof runRaces==='function')?runRaces(r)
-        :((typeof runLive==='function')&&runLive(r)))put(r.date)}catch(e){}})}
+        :((typeof runLive==='function')&&runLive(r)))put(r.date)}catch(e){if(!warned++)oops('weeksRaced.run',e)}})}
     catch(e){oops('weeksRacedRuns',e)}
     return Object.keys(wk).length}
   catch(e){oops('weeksRaced',e);return 0}}
 function weeksRacedCard(){
   try{
-    const n=weeksRaced();
+    /* the copy promises a number that only goes up; re-dating or
+       deleting a session could recompute it lower, so the card shows a
+       high-water mark held on the account record (daily review, 14 Sep) */
+    let n=weeksRaced();
+    try{const a9=acct();if(a9){const hi=Math.max(n,+a9.wrHi||0);
+      if(hi>(+a9.wrHi||0))lset(K_ACCT,Object.assign({},a9,{wrHi:hi}));n=hi}}catch(e){oops('weeksRacedHi',e)}
     if(!n)return '';   /* silent until it is true — never a zero to stare at */
     return '<div class="card mt" style="padding:16px">'+
       '<div style="display:flex;align-items:baseline;gap:9px;flex-wrap:wrap">'+
@@ -12311,7 +12344,10 @@ function discoveries(){
   /* ── body ── */
   try{const sc=scansSorted();
     if(sc.length>=2){const d=scanDelta(sc[0],sc[sc.length-1]);
-      if(d.smm>0.5&&d.fm<-0.5)add('epic','Muscle up, fat down',
+      /* F11's bar (14 Sep): under a kilo of lean or a kilo of fat is
+         inside the machine's own wobble, and the library says so
+         instead of this saying "muscle up" */
+      if(d.smm>=1&&d.fm<=-1)add('epic','Muscle up, fat down',
         'Skeletal muscle '+(d.smm>0?'+':'')+uwNum(d.smm)+' '+uwUnit()+' while fat mass '+uwNum(d.fm)+' '+uwUnit()+'. Doing both at once is the hardest outcome to get.','body');
       else if(d.smm>1)add('rare','+'+uwNum(d.smm)+' '+uwUnit()+' of muscle','Skeletal muscle gained since your first scan.','body','body:muscle')}}catch(e){}
 
@@ -14950,13 +14986,35 @@ function libA2(){
       ev:{sigs:['bw'],lag:0,n:A.n+B.n,how:'The mean of the last fourteen mornings against the fourteen before, compared with the band from A1.'}}}
   catch(e){oops('libA2',e);return null}}
 
+/* ── F11: the scan says nothing changed ──────────────────────
+   Looney 2024: same-machine body-fat wobble 0.3-0.6 points, SEE 2.6 vs
+   DXA; Siedler 2023: fifteen consumer devices, SEE 3.1-7.5; Bone 2017:
+   glycogen moves "lean" on every device. No peer-reviewed Evolt
+   validation exists. So a body-fat change under 1.5 points or a lean
+   change under a kilo is reported as UNCHANGED, and that is the
+   finding — the default honest read of two scans. */
+function libF11(){
+  try{
+    const sc=(typeof scansSorted==='function')?scansSorted():[];
+    if(sc.length<2)return null;
+    const a=sc[sc.length-2],b=sc[sc.length-1];
+    if(a.bf==null||b.bf==null||a.smm==null||b.smm==null)return null;
+    const dBf=Math.round((+b.bf-+a.bf)*10)/10,dSm=Math.round((+b.smm-+a.smm)*10)/10;
+    if(Math.abs(dBf)>=1.5||Math.abs(dSm)>=1)return null;
+    const wLine=(a.w!=null&&b.w!=null)?' Weight '+(Math.abs(+b.w-+a.w)<1?'agrees ('+uwNum(+a.w)+' \u2192 '+uwNum(+b.w)+' '+uwUnit()+').':'moved '+uwNum(Math.round(Math.abs(+b.w-+a.w)*10)/10)+' '+uwUnit()+', which the scan does not explain.'):'';
+    return{rar:'common',t:'The scan says nothing changed',
+      d:'Body fat '+a.bf+' \u2192 '+b.bf+'% and skeletal muscle '+uwNum(+a.smm)+' \u2192 '+uwNum(+b.smm)+' '+uwUnit()+' between '+fmtDate(a.date+'T12:00')+' and '+fmtDate(b.date+'T12:00')+'. Both inside the machine\u2019s own wobble (about half a point of body fat, about a kilo of lean), so call it unchanged.'+wLine,
+      tag:'body',id:'lib:f11:'+String(b.date).slice(0,10),   // auditcheck-allow: utc-day-key — a scan row stores a local YYYY-MM-DD
+      x:'Consumer body-composition machines drift by about half a point of body fat between two scans of the same person, and glycogen and water move the lean number on every one of them. There is no published validation of the Evolt against a reference method. A change smaller than the machine\u2019s own wobble is not a change, and saying so is the honest read.',
+      ev:{sigs:['bw'],lag:0,n:2,how:'The two latest scans, side by side, against the published same-machine wobble.'}}}
+  catch(e){oops('libF11',e);return null}}
 function libFindings(){
   /* the five, memoized per day and per amount of data behind them */
   try{
     const dd=(S.daily&&S.daily.days)||{};
-    const stamp=today()+':'+(S.history||[]).length+':'+Object.keys(hkDailyStore().days||{}).length+':'+Object.keys(dd).length;
+    const stamp=today()+':'+(S.history||[]).length+':'+Object.keys(hkDailyStore().days||{}).length+':'+Object.keys(dd).length+':'+((S.scans||[]).length);
     if(S._libMemo&&S._libMemo.stamp===stamp)return S._libMemo.v;
-    const v=[libB2(),libB3(),libD1(),libA1(),libA2()].filter(Boolean);
+    const v=[libB2(),libB3(),libD1(),libA1(),libA2(),libF11()].filter(Boolean);
     S._libMemo={stamp:stamp,v:v};return v}
   catch(e){oops('libFindings',e);return []}}
 function libEvidence(id){
@@ -15328,7 +15386,7 @@ function treeTimeData(){
          the branch drawn there is sage. */
       let isReh=false;
       try{const p9=(S.lib&&S.lib.programs||[]).filter(x=>x.id===h.progId)[0];
-        isReh=!!(p9&&(p9.acl||p9.rehabProto))}catch(e){}
+        isReh=!!(p9&&(p9.acl||p9.rehabProto))}catch(e){oops('treeTime.prog',e)}
       (h.log||[]).forEach(l=>{
         if(!(l.w||l.r||l.secs))return;
         const b=gBase(l.ex);
@@ -15362,7 +15420,7 @@ function treeTimeData(){
       per[i]=per[i]||{f:f9,c:{},reh:false,run:0};
       per[i].run=(per[i].run||0)+(+r.km||0);
       if(String(r.type||'')==='ride')per[i].ride=(per[i].ride||0)+(+r.km||0);
-      if(f9<per[i].f)per[i].f=f9}catch(e){}});
+      if(f9<per[i].f)per[i].f=f9}catch(e){oops('treeTime.run',e)}});
 
     /* AND THE BRANCHES ARE SHARED OUT BY WHAT ACTUALLY HAPPENED. Lifting
        used to take up to three branches per period and cardio one, so a
@@ -21090,6 +21148,9 @@ function ceremonyDue(){
   const a=acct();if(!a)return null;
   const wk=questWeekKey();
   if(a.cerWk===wk)return null;
+  /* a running pod series takes the Monday (FRONT-DOOR conflicts: the
+     pod wins the slot while a series is running) */
+  try{if(typeof podCeremony==='function'){const pc=podCeremony();if(pc)return pc}}catch(e9){oops('podCeremony',e9)}
   const pv=dayKey(new Date(new Date(wk+'T12:00').getTime()-7*864e5));
   const rows=[];
   const mineP=Math.round((dataPoints().prevWeekLive)||0);
@@ -21117,17 +21178,18 @@ function ceremonyHtml(c){
  const CR='<svg width="26" height="17" viewBox="0 0 20 13" aria-hidden="true"><path d="M2.2 12 L1.4 3.6 L6 7.2 L10 1.2 L14 7.2 L18.6 3.6 L17.8 12 Z" fill="var(--gold)"/><circle cx="1.4" cy="3" r="1.2" fill="var(--gold)"/><circle cx="10" cy="1.2" r="1.3" fill="var(--gold)"/><circle cx="18.6" cy="3" r="1.2" fill="var(--gold)"/></svg>';
  return '<div data-a="cerDone" style="position:fixed;inset:0;z-index:90;background:rgba(20,19,18,.97);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:30px">'+
   '<style>@keyframes cerb{from{transform:scaleY(0)}to{transform:scaleY(1)}}@keyframes cerc{0%{opacity:0;transform:translateY(-26px)}60%{opacity:1;transform:translateY(4px)}100%{transform:translateY(0)}}@keyframes cerf{from{opacity:0}to{opacity:1}}@media (prefers-reduced-motion: reduce){.cerB,.cerC,.cerF{animation:none!important}}</style>'+
-  '<p class="mono cerF" style="font-size:10px;letter-spacing:.16em;color:var(--faint);animation:cerf .5s both">LAST WEEK · THE RACE</p>'+
+  '<p class="mono cerF" style="font-size:10px;letter-spacing:.16em;color:var(--faint);animation:cerf .5s both">'+(c.pod?'LAST WEEK · PODS AT YOUR STAGE':'LAST WEEK · THE RACE')+'</p>'+
   '<div style="display:flex;align-items:flex-end;gap:14px;margin-top:26px">'+
   ord.map(i=>{const r=c.rows[i];if(!r)return '';const win=i===0;
    return '<div style="display:flex;flex-direction:column;align-items:center;gap:8px;width:86px">'+
     '<div class="cerC" style="position:relative;animation:cerc .7s '+(win?'1.1s':'2s')+' both">'+(win?'<div style="display:flex;justify-content:center;margin-bottom:4px">'+CR+'</div>':'')+
     avHtml(r.av,r.init,win?52:42,'var(--line)',win?20:16)+'</div>'+
-    '<p style="font-size:12.5px;font-weight:650;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(r.me?'You':r.name)+'</p>'+
+    '<p style="font-size:12.5px;font-weight:650;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(r.me?(c.pod?'Your pod':'You'):r.name)+'</p>'+
     '<div class="cerB" style="width:64px;height:'+hs[i]+'px;border-radius:10px 10px 0 0;background:'+(win?'var(--green)':'var(--raised)')+';transform-origin:bottom;animation:cerb .8s '+(0.15+i*0.18)+'s both;display:flex;align-items:flex-start;justify-content:center;padding-top:8px">'+
     '<span class="mono" style="font-size:14px;font-weight:700;color:'+(win?'var(--bg)':'var(--dim)')+'">'+r.pts+'</span></div></div>'}).join('')+
   '</div>'+
   ((c.iWon&&c.reign>=1)?'<p class="mono cerF" style="font-size:10px;letter-spacing:.14em;color:var(--gold);margin-top:22px;animation:cerf .6s 1.6s both">CROWN HELD '+c.reign+' WEEK'+(c.reign===1?'':'S')+'</p>':'')+
+  (c.pod?'<p class="cerF" style="color:var(--faint);font-size:11px;margin-top:14px;animation:cerf .6s 2s both">Each bar is a pod\u2019s lowest member, as of your last open. Nobody is named.</p>':'')+
   '<p class="cerF" style="color:var(--faint);font-size:12px;margin-top:26px;animation:cerf .6s 2.4s both">Fresh week. Tap to start it.</p></div>'}
 function viewToday(){
   const dateLine=new Date().toLocaleDateString(undefined,{weekday:'long',day:'numeric',month:'long'});
