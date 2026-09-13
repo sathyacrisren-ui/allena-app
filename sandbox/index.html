@@ -798,7 +798,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='3a92b4';  // stamped by tools/build.py with the content hash
+const BUILD_ID='87073b';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -2412,7 +2412,18 @@ function overtakeCard(){
      to welcome line"). Same omission as the padding, one level out: this
      card is the first thing under the greeting and it carried neither.
      Every other card on Today wears mt or mt2; this one wore nothing. */
-  return '<div class="card stg mt" style="border-color:var(--green);overflow:hidden;position:relative;padding:16px 17px 15px">'+
+  /* NO `stg` ON A CARD (owner, 13 Sep, with a screen recording: the
+     Today screen stutters). `.stg>*` starts every CHILD invisible and
+     rises it with delays out to 0.33s, and render() only strips `.stg`
+     from the VIEW — never from a card. So every re-render of Today wiped
+     this card's contents and replayed the entrance, which is exactly
+     what the recording shows: a green outlined box with nothing in it.
+     Today re-renders often (the per-second tick, a sync, any tap), so it
+     was flashing several times a minute.
+     It loses nothing: the card is a direct child of `.view.stg` and
+     still gets the page's entry animation on a real navigation. This was
+     the only card in the app carrying `stg`, and now there is a gate. */
+  return '<div class="card mt" style="border-color:var(--green);overflow:hidden;position:relative;padding:16px 17px 15px">'+
    /* PROPORTIONS (owner-caught, 12 Sep): the whole pass used to happen
       between 52% and 74%, so the two marks bunched in the right third
       with dead track either side, and 38-46px avatars floated in a 68px
