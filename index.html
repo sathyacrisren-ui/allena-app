@@ -798,7 +798,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='6e2bc9';  // stamped by tools/build.py with the content hash
+const BUILD_ID='8feed5';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -11501,12 +11501,17 @@ function squatSummary(e9){
    two were near-identical off-whites, so the rarest thing in the app
    looked the same as the second-rarest.
 
-   It is a WARM METAL ladder now: stone, bronze, gold, incandescent. It
-   climbs in warmth and brightness at once, which is the one ordering
-   everybody reads without being told. It is warm on purpose — every
-   domain colour on the tree is cool (green lifting, rose rehab, blue
-   running, slate cycling, violet trunk), so a find can never be mistaken
-   for a kind of work, on any surface.
+   BLUE → PERIWINKLE → PURPLE → GOLD (owner's call, 13 Sep: "low is
+   common blue, mid is purple and high is gold"). It climbs in lightness
+   AND in heat at the same time, which is the one ordering everybody
+   reads without being told, and it is the loot ladder every game has
+   trained people on.
+   KNOWN COLLISION, recorded on purpose: on the TREE, blue is running and
+   the trunk is violet, so a blue or purple find sits in the same family
+   as a kind of work. The finds are saved by shape rather than hue there
+   — they are filled dots with rings, and nothing else on the tree is a
+   dot. If it ever reads badly, the trunk moves to graphite before the
+   ladder moves, because the ladder is the thing four surfaces share.
 
    This is an owner amendment to decision 6c, which had rarity as a muted
    monochrome ladder. The ladder survives; it stopped being monochrome
@@ -11516,10 +11521,10 @@ function squatSummary(e9){
    so the two new fields are additive and nothing had to change.
    NEVER add a fifth tier without a real fifth rarity behind it. */
 const RARITY=[
-  ['common',  '#8A8782','Noticed',      'transparent',                  0],
-  ['uncommon','#B98A4B','Worth knowing','rgba(185,138,75,.10)',         1],
-  ['rare',    '#E8B84B','Rare find',    'rgba(232,184,75,.13)',         2],
-  ['epic',    '#FFF0C0','Big one',      'rgba(255,240,192,.16)',        3]];
+  ['common',  '#3C6FB8','Noticed',      'rgba(60,111,184,.10)',  0],
+  ['uncommon','#6E7FE8','Worth knowing','rgba(110,127,232,.12)', 1],
+  ['rare',    '#C46BFF','Rare find',    'rgba(196,107,255,.14)', 2],
+  ['epic',    '#F5C542','Big one',      'rgba(245,197,66,.16)',  3]];
 function rarityOf(k){return RARITY.find(x=>x[0]===k)||RARITY[0]}
 /* THE TIER SHOWS IN THE CHROME, NOT ONLY THE WORD (same ruling: "make it
    look better, demonstrate their ranking with colour and UI design
@@ -16903,24 +16908,51 @@ function analyseCard(){
           b.total+' found in total · see the collection ›</button>':''})()+
       ((P.length||shown.length)?
         (function(){
-          /* THE CARD WEARS ITS TIER (owner, 13 Sep). A Noticed is a plain
-             row; a Big one is bordered, lit, and lettered heavier. The
-             pips on the left are the ladder made countable — you can see
-             the rank before you have read the word. */
-          const dCard=d=>{const c=rarChrome(d.rar),isNew=fresh.indexOf(d)>=0;
+          /* A PILL, THEN THE TITLE, AND THE WRITING ONLY IF YOU ASK
+             (owner, 13 Sep: "just have these pills show the title and
+             upon clicking will they reveal the writing underneath").
+             Thirty findings each carrying a paragraph is a wall nobody
+             reads; thirty titles is a list you can scan, and the body is
+             one tap away. A fresh find opens itself — it is the one
+             you came for.
+             The tier shows in the pill, in the border and in the pips,
+             so the rank is countable before the word is read. */
+          const dCard=d=>{
+            const c=rarChrome(d.rar),isNew=fresh.indexOf(d)>=0;
+            const key='fnd:'+(d.id||d.t);
+            /* EVERYTHING STARTS SHUT, including a new one. Auto-opening
+               the fresh ones sounded kind and wasn't: on a day with six
+               new findings the wall came straight back, which is the
+               thing the pills exist to remove. NEW is marked on the
+               pill instead — the badge tells you where to tap. */
+            const open=!!S.openSec[key];
             const pips=[0,1,2,3].map(i=>'<span style="width:'+(i<=c.rank?5:3)+'px;height:'+
               (i<=c.rank?5:3)+'px;border-radius:50%;background:'+
-              (i<=c.rank?c.col:'var(--line)')+';opacity:'+(i<=c.rank?1:.55)+'"></span>').join('');
-            return '<div class="card" style="padding:13px 15px;border-color:'+c.border+
-              ';background:'+(c.rank>=1?'linear-gradient(180deg,'+c.fill+',transparent 68%),var(--surface)':'var(--surface)')+
-              (c.rank>=2?';box-shadow:'+c.glow:'')+'">'+
-              '<div style="display:flex;align-items:center;gap:8px">'+
-              '<span style="display:flex;align-items:center;gap:3px;flex:none">'+pips+'</span>'+
-              '<span class="mono" style="color:'+c.col+';font-size:9px;letter-spacing:'+c.track+
-                ';font-weight:'+c.weight+'">'+esc(c.label.toUpperCase())+'</span>'+
-              (isNew?'<span class="mono an-pop" style="background:'+c.col+';color:#1F1E1D;font-size:8.5px;padding:2px 6px;border-radius:999px;letter-spacing:.05em">NEW</span>':'')+'</div>'+
-              '<p style="font-size:'+(c.rank>=3?15:14)+'px;font-weight:'+(c.rank>=3?700:600)+';margin-top:5px">'+esc(d.t)+'</p>'+
-              '<p style="color:var(--dim);font-size:12.5px;line-height:1.6;margin-top:3px">'+esc(d.d)+'</p></div>'};
+              (i<=c.rank?c.col:'var(--line)')+';opacity:'+(i<=c.rank?1:.5)+'"></span>').join('');
+            return '<div class="card" style="padding:0;overflow:hidden;border-color:'+
+              (open?c.border:'var(--line)')+
+              (c.rank>=2&&open?';box-shadow:'+c.glow:'')+'">'+
+              '<button data-a="findCard" data-v="'+esc(key)+'" style="width:100%;text-align:left;'+
+                'padding:12px 14px;display:block;background:'+
+                (c.rank>=1?'linear-gradient(180deg,'+c.fill+',transparent 70%)':'transparent')+'">'+
+                '<div style="display:flex;align-items:center;gap:8px">'+
+                  '<span style="display:flex;align-items:center;gap:3px;flex:none">'+pips+'</span>'+
+                  '<span class="mono" style="flex:none;color:'+c.col+';background:color-mix(in srgb,'+
+                    c.col+' 15%,transparent);border:1px solid color-mix(in srgb,'+c.col+
+                    ' 45%,transparent);border-radius:999px;padding:3px 9px;font-size:8.5px;'+
+                    'letter-spacing:'+c.track+';font-weight:'+c.weight+'">'+
+                    esc(c.label.toUpperCase())+'</span>'+
+                  (isNew?'<span class="mono an-pop" style="background:'+c.col+
+                    ';color:#1F1E1D;font-size:8.5px;padding:2px 6px;border-radius:999px;letter-spacing:.05em">NEW</span>':'')+
+                  '<span class="mono" style="flex:1;text-align:right;color:var(--faint);font-size:12px">'+
+                    (open?'\u2013':'+')+'</span>'+
+                '</div>'+
+                '<p style="font-size:'+(c.rank>=3?15:14)+'px;font-weight:'+(c.rank>=3?700:600)+
+                  ';margin-top:7px;line-height:1.35">'+esc(d.t)+'</p>'+
+              '</button>'+
+              (open?'<p style="color:var(--dim);font-size:12.5px;line-height:1.6;padding:0 14px 13px">'+
+                esc(d.d)+'</p>':'')+
+              '</div>'};
           const grp=(key,label,color,items,render)=>{
             if(!items.length)return '';
             const on=!!S.openSec['an:'+key];
@@ -17028,7 +17060,7 @@ function patDetail(title){
   return h+'</div>'}
 function patAction(p){
   const t=p.t.toLowerCase();
-  if(/heavy and the same/.test(t))return 'Keep the hard days hard \u2014 and make one day genuinely easy. Contrast is what lets a heavy week land as fitness instead of fatigue.';
+  if(/heavy and the same/.test(t))return 'Keep the hard days hard — and make one day genuinely easy. Contrast is what lets a heavy week land as fitness instead of fatigue.';
   if(/easy runs are not easy/.test(t))return 'Pick a pace you can hold a conversation at and stay there, even if it feels absurdly slow. The point of an easy run is that it costs almost nothing, so the hard sessions can cost a lot.';
   if(/load jumped|climbing fast/.test(t))return 'Keep next week at the same distance rather than building on it. If it already hurts somewhere, take 20% off instead.';
   if(/follows a hard run/.test(t))return 'Either move that session later in the week, or keep it and drop the top set by about 10%. Doing both hard is the version that goes wrong.';
@@ -17543,8 +17575,8 @@ function muscleRowsHtml(p,i,forceOpen){
           '<div style="height:5px;width:'+donePct+'%;background:var(--blue)"></div>'+
           '<div style="height:5px;width:'+addPct+'%;background:repeating-linear-gradient(90deg,var(--blue) 0 3px,transparent 3px 6px);opacity:.85"></div></div>'+
           '<span class="mono" style="color:var(--blue);font-size:9.5px;font-weight:600;width:28px;text-align:right;flex:none">+'+r9.stim+'</span></div>'}).join('')+
-      '<p style="color:var(--faint);font-size:10.5px;margin-top:4px;line-height:1.5">Green: how recovered each muscle is. Blue: work landing on it over the last 7 days \u2014 assisting work included.'+iBtn('recbars')+'</p>'+
-      iBody('recbars','Each row is a muscle this session trains. The green bar fills as it recovers from its last work \u2014 full green means fresh. The blue bar is how much it has already worked this week, and the dashed part is what this session would add. The +number is the growth stimulus this session gives that muscle. Freshest muscles first is the whole logic.')+'</div>'
+      '<p style="color:var(--faint);font-size:10.5px;margin-top:4px;line-height:1.5">Green: how recovered each muscle is. Blue: work landing on it over the last 7 days — assisting work included.'+iBtn('recbars')+'</p>'+
+      iBody('recbars','Each row is a muscle this session trains. The green bar fills as it recovers from its last work — full green means fresh. The blue bar is how much it has already worked this week, and the dashed part is what this session would add. The +number is the growth stimulus this session gives that muscle. Freshest muscles first is the whole logic.')+'</div>'
   }catch(e){return ''}}
 function dayReadiness(prog,di,wk){
   const load=dayMuscles(prog,di,wk);
@@ -17668,20 +17700,20 @@ function recommendCalc(){
   const top=opts[0],rest=opts.slice(1);
   let why='';
   if(top.r.worst&&top.r.worstV<75){
-    const SUF=['Nothing is locked \u2014 just go about 10% lighter.',
+    const SUF=['Nothing is locked — just go about 10% lighter.',
       'Ease the loads ~10% and stop a rep earlier.',
-      'Go a little lighter today \u2014 the plan adapts.'];
-    why=top.r.worst.toLowerCase()+' is at '+top.r.worstV+'% \u2014 the freshest option you have, but not fully fresh. '+SUF[Math.floor(Date.now()/864e5)%SUF.length]}
+      'Go a little lighter today — the plan adapts.'];
+    why=top.r.worst.toLowerCase()+' is at '+top.r.worstV+'% — the freshest option you have, but not fully fresh. '+SUF[Math.floor(Date.now()/864e5)%SUF.length]}
   else why='the muscles it trains are the freshest of what you have left';
   const hold=rest.filter(o=>o.r.worst&&o.r.worstV<65).map(o=>{
     const h=hoursSinceMuscle(o.r.worst);
     const need=Math.max(0,Math.round((48-(h||0))/24*10)/10);
-    return o.name+' \u2014 '+o.r.worst.toLowerCase()+' at '+o.r.worstV+'%'+(need>0?', about '+(need<1?'a day':need+' days')+' away':'')});
+    return o.name+' — '+o.r.worst.toLowerCase()+' at '+o.r.worstV+'%'+(need>0?', about '+(need<1?'a day':need+' days')+' away':'')});
   if(raceDd!=null){
-    const seen9=new Set(hold.map(x=>x.split(' \u2014 ')[0]));
+    const seen9=new Set(hold.map(x=>x.split(' — ')[0]));
     rest.forEach(o=>{const m9=o.r.load||{};
       if((m9.Quads||m9.Hamstrings||m9.Glutes||m9.Calves)&&!seen9.has(o.name))
-        hold.push(o.name+' \u2014 legs wait, race in '+raceDd+' day'+(raceDd===1?'':'s'))})}
+        hold.push(o.name+' — legs wait, race in '+raceDd+' day'+(raceDd===1?'':'s'))})}
   return{top:top,rest:rest,why:why,hold:hold,bb:bbToday,base:base}}
 
 /* ══ the week clock ═════════════════════════════════════════
@@ -17831,10 +17863,10 @@ function weekBoard(){
     let reason='';let conflict='';
     const cw=rp?rpCombinedWeek(rp.days,rp.longDay):null;
     if(cw&&cw.conflict)conflict=cw.conflict;
-    const remNames={};remaining.forEach(r=>remNames[String(r.name).replace(/ \u2014 .*/,'')]=r);
+    const remNames={};remaining.forEach(r=>remNames[String(r.name).replace(/ — .*/,'')]=r);
     const placedNames={};
     if(cw&&cw.template)cw.template.forEach(row=>{
-      const m=String(row).match(/^(\w{3}) \u2014 (.*)$/);if(!m)return;
+      const m=String(row).match(/^(\w{3}) — (.*)$/);if(!m)return;
       const i=DN7.indexOf(m[1]);if(i<0)return;
       const d=days[i];if(d.key<tk)return;
       const raw=m[2];if(/run$/.test(raw))return;
@@ -17857,7 +17889,7 @@ function weekBoard(){
     try{
       const rec=(typeof recommendToday==='function')?recommendToday():null;
       const di9=rec?(rec.dayIdx!=null?rec.dayIdx:(rec.top&&rec.top.i)):null;
-      const recName=(di9!=null&&p.days[di9])?String(p.days[di9].name||'').replace(/ \u2014 .*/,''):null;
+      const recName=(di9!=null&&p.days[di9])?String(p.days[di9].name||'').replace(/ — .*/,''):null;
       const tD=byKey[tk];
       if(recName&&tD&&!tD.items.some(x=>x.k==='lift')){
         const hit=unplaced.find(n=>n===recName||recName.indexOf(n)>=0||n.indexOf(recName)>=0);
@@ -17889,7 +17921,7 @@ function weekBoard(){
         if(!d){unfit++;return}
         if(!rec9)lastIdx=days.indexOf(d);
         d.items.push({k:rec9?'rehab':'lift',l:String(n).split(' ')[0].slice(0,10).toLowerCase(),done:0,rec:rec9})})}
-    if(unfit&&!conflict&&!reason)reason=unfit+' session'+(unfit===1?'':'s')+' left over \u2014 a rest day belongs between them, so they place as days open.';
+    if(unfit&&!conflict&&!reason)reason=unfit+' session'+(unfit===1?'':'s')+' left over — a rest day belongs between them, so they place as days open.';
     // remaining rehab fills the quietest days ahead
     /* TWICE A DAY IS TWICE A DAY (owner-caught, 11 Sep: "not showing my 2
        rehab sessions per day"). The fill capped at two items per day, so
@@ -17944,7 +17976,7 @@ function weekBoardCard(){
           :'<p style="text-align:center;color:'+(past?'var(--line)':'var(--faint)')+';font-size:13px;margin-top:6px">\u00b7</p>')+
         '</div>'}).join('')+'</div>'+
     (B.reason?'<p style="color:'+(B.conflict?'var(--amber)':'var(--dim)')+';font-size:12px;line-height:1.55;margin-top:10px">'+esc(B.reason)+'</p>':'')+
-    '<p style="color:var(--faint);font-size:10.5px;line-height:1.5;margin-top:7px">Filled means done. Outlined is the suggested shape \u2014 nothing is locked to a day.</p>'+
+    '<p style="color:var(--faint);font-size:10.5px;line-height:1.5;margin-top:7px">Filled means done. Outlined is the suggested shape — nothing is locked to a day.</p>'+
     '</div>'}
 function weekChip(){
   /* the week clock, shrunk to an instrument reading (owner call,
@@ -18189,14 +18221,14 @@ function recCard(quiet){
       if(m9)return '<button data-a="mergeOpen" class="card mt" style="width:100%;text-align:left;padding:15px 16px;border-color:var(--amber);display:block">'+
         '<p class="eyebrow" style="color:var(--amber);margin:0">Allena suggests today</p>'+
         '<span class="disp" style="font-size:18px;font-weight:600;display:block;margin-top:6px">The week closer</span>'+
-        '<span style="color:var(--dim);font-size:12.5px;line-height:1.5;display:block;margin-top:4px">One day, two sessions left \u2014 '+esc(m9.names[0])+' and '+esc(m9.names[1])+' merged into one honest session. '+m9.work+' sets, ~'+m9.mins+' min. \u203a</span></button>'}}catch(e){}
+        '<span style="color:var(--dim);font-size:12.5px;line-height:1.5;display:block;margin-top:4px">One day, two sessions left — '+esc(m9.names[0])+' and '+esc(m9.names[1])+' merged into one honest session. '+m9.work+' sets, ~'+m9.mins+' min. \u203a</span></button>'}}catch(e){}
   /* already trained today? Then the card's job is done — acknowledge,
      never keep suggesting (owner-caught, 3 Sep: "I already did my
      workout today"). Tomorrow it reads the map fresh. */
   try{const td=S.history.filter(h=>!h.run&&h.complete&&(h.log||[]).length&&dayKey(new Date(h.date))===today()).slice(-1)[0];
     if(td)return '<div class="card mt" style="padding:15px 16px;border-color:var(--green)">'+
       '<p class="eyebrow" style="color:var(--green)">Today</p>'+
-      '<p style="font-size:14px;font-weight:600;margin-top:4px">'+esc(td.dayTitle||'Session')+' \u2014 done</p>'+
+      '<p style="font-size:14px;font-weight:600;margin-top:4px">'+esc(td.dayTitle||'Session')+' — done</p>'+
       '<p style="color:var(--dim);font-size:12.5px;line-height:1.55;margin-top:5px">'+td.log.length+' sets banked'+(td.minutes?' in '+td.minutes+' min':'')+'. The suggestion engine reads the recovery map again tomorrow.</p></div>'}catch(e){}
   const r=recommendToday();if(!r)return '';
   if(r.empty)return '<div class="card mt" style="padding:15px 16px;border-color:var(--green)">'+
@@ -18280,7 +18312,7 @@ function secProgram(p,ws){
       h+='<button class="mono" data-a="week" data-v="'+w+'" style="flex:1 0 12%;padding:9px 0;border-radius:9px;font-weight:600;font-size:13px;'+css+'">'+
         'W'+w+(weekClosed(p,w)&&w!==S.week?' \u2713':st.full&&w!==S.week?' \u2713':'')+'</button>'}
     h+='</div>';
-    h+='<p class="mono" style="color:var(--faint);font-size:9px;letter-spacing:.06em;margin-top:8px">THE BLOCK\u2019S WEEKS \u2014 YOU ARE IN W'+S.week+'. TAP ONE TO LOOK BACK.</p>';
+    h+='<p class="mono" style="color:var(--faint);font-size:9px;letter-spacing:.06em;margin-top:8px">THE BLOCK\u2019S WEEKS — YOU ARE IN W'+S.week+'. TAP ONE TO LOOK BACK.</p>';
     /* the week-1 clock explainer (owner call, 3 Sep, after Angus
        mislogged a week): a NEW block explains the clock before it
        starts ticking — and offers to start it now or on first
@@ -18298,7 +18330,7 @@ function secProgram(p,ws){
     if(!clkChosen)
       h+='<div style="border-top:1px solid var(--line);margin-top:12px;padding-top:12px">'+
         '<p class="eyebrow" style="color:var(--amber)">Before week 1 starts</p>'+
-        '<p style="color:var(--dim);font-size:12.5px;line-height:1.6;margin-top:6px">Each week of this block is a <b style="color:var(--text)">7-day clock</b>. It starts the day of your first session (or right now, your call), counts your sessions against the week\u2019s plan, and when it runs out you close the week and the next one starts clean. The W-pills above are the block\u2019s weeks \u2014 train in the one that is lit.</p>'+
+        '<p style="color:var(--dim);font-size:12.5px;line-height:1.6;margin-top:6px">Each week of this block is a <b style="color:var(--text)">7-day clock</b>. It starts the day of your first session (or right now, your call), counts your sessions against the week\u2019s plan, and when it runs out you close the week and the next one starts clean. The W-pills above are the block\u2019s weeks — train in the one that is lit.</p>'+
         '<div class="row mt" style="gap:8px">'+
         '<button data-a="clkNow" class="btn" style="flex:1;border-color:var(--amber);color:var(--amber);font-size:12.5px">Start the clock today</button>'+
         '<button data-a="clkFirst" class="btn" style="flex:1;color:var(--dim);font-size:12.5px">When I first train</button></div></div>';
@@ -18376,7 +18408,7 @@ function secSessions(p,ws){
   h+='<button data-a="quickOpen" class="btn" style="margin-top:12px;width:100%;color:var(--dim);font-size:13px;text-align:left">Trained without the app? Log a past session ›</button>';
   /* another day in the week (owner ask, 11 Sep) — repeat one you already
      have, or build one from what you actually train */
-  h+='<button data-a="addDayOpen" class="btn" style="margin-top:8px;width:100%;color:var(--dim);font-size:13px;text-align:left">Add another day \u2014 repeat one, or build your own \u203a</button>';
+  h+='<button data-a="addDayOpen" class="btn" style="margin-top:8px;width:100%;color:var(--dim);font-size:13px;text-align:left">Add another day — repeat one, or build your own \u203a</button>';
   const isRecDay9=d=>d&&(d.recday||String(d.name||'').trim().toLowerCase()==='recovery');
   if(!p.days.some(isRecDay9))
     h+='<button data-a="recDayOpen" class="btn" style="margin-top:8px;width:100%;color:var(--dim);font-size:13px;text-align:left">Want a rehab / recovery day in the week? Add one ›</button>';
@@ -18504,13 +18536,13 @@ function findingsBtn(){
     (n?'<span class="mono" style="position:absolute;top:-5px;right:-2px;min-width:17px;height:17px;padding:0 4px;border-radius:10px;background:var(--red);color:#fff;font-size:9.5px;font-weight:700;display:flex;align-items:center;justify-content:center">'+(n>9?'9+':n)+'</span>':'')+
     '</button>'}
 const EV_MECH={
-  sleep:'Sleep is when the repair happens \u2014 heavy sets the day after long nights tend to cost less.',
-  sleep2:'Two good nights in a row compound \u2014 recovery debt clears slowly.',
+  sleep:'Sleep is when the repair happens — heavy sets the day after long nights tend to cost less.',
+  sleep2:'Two good nights in a row compound — recovery debt clears slowly.',
   carb:'Carbs refill the fuel lifting actually burns. A fed day usually lifts better than a fasted one.',
-  kcal:'Total fuel matters \u2014 hard training on a big deficit is where strength leaks.',
-  protein:'Protein is the building material \u2014 strength tends to hold better after high-protein days.',
-  ready:'Readiness is your own morning signal \u2014 the high days are days the body already said yes.',
-  hrv:'Higher HRV usually means the nervous system has recovered \u2014 heavy work lands better.',
+  kcal:'Total fuel matters — hard training on a big deficit is where strength leaks.',
+  protein:'Protein is the building material — strength tends to hold better after high-protein days.',
+  ready:'Readiness is your own morning signal — the high days are days the body already said yes.',
+  hrv:'Higher HRV usually means the nervous system has recovered — heavy work lands better.',
   rhr:'A low resting heart rate that morning usually means you were recovered.'};
 function evidenceData(id){
   /* what stands behind a linked find: the lift, the day, the signals */
@@ -18549,7 +18581,7 @@ function viewEvidence(){
   if(ev.corr){
     ev.sigs.forEach(s9=>{
       h+='<div class="card mt2" style="padding:14px 16px">'+
-        '<p class="eyebrow">'+esc(s9.label)+' \u2014 the last 90 days</p>';
+        '<p class="eyebrow">'+esc(s9.label)+' — the last 90 days</p>';
       try{if(s9.kind){const pts=sigSeries(s9.kind);
         if(pts.length>=3){const vs=pts.map(p=>p.v),lo=Math.min.apply(null,vs),hi=Math.max.apply(null,vs);
           h+=lineChart(pts,{min:Math.floor(lo*0.9),max:Math.ceil(hi*1.05)||10,color:'var(--chart)'})}
@@ -18558,13 +18590,13 @@ function viewEvidence(){
       h+='</div>'});
     h+='<div class="card mt" style="padding:13px 15px">'+
       '<p class="eyebrow">How this was found</p>'+
-      '<p style="color:var(--dim);font-size:12.5px;line-height:1.65;margin-top:6px">The engine lines up every '+esc(ev.sigs[0].label.toLowerCase())+' day against what followed'+(ev.lag?' '+ev.lag+' day'+(ev.lag===1?'':'s')+' later':' the same day')+'. This link cleared every statistical gate \u2014 strength, sample size, stability across halves of your data \u2014 before it was allowed to say a word.</p></div>';
-    h+='<p style="color:var(--faint);font-size:11.5px;line-height:1.6;margin-top:14px">A pattern in your own days, not proof of cause \u2014 worth testing on purpose.</p>';
+      '<p style="color:var(--dim);font-size:12.5px;line-height:1.65;margin-top:6px">The engine lines up every '+esc(ev.sigs[0].label.toLowerCase())+' day against what followed'+(ev.lag?' '+ev.lag+' day'+(ev.lag===1?'':'s')+' later':' the same day')+'. This link cleared every statistical gate — strength, sample size, stability across halves of your data — before it was allowed to say a word.</p></div>';
+    h+='<p style="color:var(--faint);font-size:11.5px;line-height:1.6;margin-top:14px">A pattern in your own days, not proof of cause — worth testing on purpose.</p>';
     return h+'</div>'}
   // 1. the lift itself
   try{const ch=liftChart(ev.ex,null);
     if(ch)h+='<div class="card mt2" style="padding:14px 16px">'+
-      '<p class="eyebrow">'+esc(ev.ex)+' \u2014 your trend</p>'+ch+
+      '<p class="eyebrow">'+esc(ev.ex)+' — your trend</p>'+ch+
       '<p style="color:var(--faint);font-size:10.5px;margin-top:4px">The PR this recipe fed landed '+esc(fmtDate(ev.date+'T12:00'))+'.</p></div>'}catch(e9){}
   // 2. each signal: that day's value, its own chart, the plain mechanism
   ev.sigs.forEach(s9=>{
@@ -18577,7 +18609,7 @@ function viewEvidence(){
         h+=lineChart(pts,{min:Math.floor(lo*0.9),max:Math.ceil(hi*1.05)||10,color:'var(--chart)'})}}}catch(e9){}
     if(EV_MECH[s9.k])h+='<p style="color:var(--dim);font-size:12.5px;line-height:1.6;margin-top:8px">'+EV_MECH[s9.k]+'</p>';
     h+='</div>'});
-  h+='<p style="color:var(--faint);font-size:11.5px;line-height:1.6;margin-top:14px">Lined up, not proven \u2014 these are your own days set side by side. The honest test is recreating the recipe on the next attempt and seeing if it repeats.</p>';
+  h+='<p style="color:var(--faint);font-size:11.5px;line-height:1.6;margin-top:14px">Lined up, not proven — these are your own days set side by side. The honest test is recreating the recipe on the next attempt and seeing if it repeats.</p>';
   return h+'</div>'}
 function newFindsCard(){
   /* the day's finds, in full, ON Today (owner ruling, 8 Sep) — no
@@ -18688,7 +18720,7 @@ function viewFindings(){
   /* what's NEW leads and glows (owner call, 4 Sep): a page of pills
      must say which pill holds the new thing, or the visit is a hunt */
   const dot9=n=>'<span style="position:absolute;top:-6px;right:-4px;min-width:19px;height:19px;border-radius:19px;background:#FF453A;color:#fff;font-size:10.5px;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 5px;z-index:6;box-shadow:0 2px 8px rgba(0,0,0,.4)">'+n+'</span>';
-  /* the glow shadow lives on this wrapper \u2014 it must share the card's
+  /* the glow shadow lives on this wrapper — it must share the card's
      20px radius or the pulse traces a sharp-cornered RECTANGLE around
      the rounded pill (owner-caught, 6 Sep: "dark rectangle artefact") */
   const wrapF=(html,fresh,n)=>html?'<div style="position:relative;border-radius:20px">'+(fresh?dot9(n||'\u25cf'):'')+html+'</div>':'';
@@ -18802,7 +18834,7 @@ function nearRings(){
     return '<div class="card mt2" style="padding:14px 16px">'+
       '<p class="mono" style="color:var(--faint);font-size:9px;letter-spacing:.06em">ALMOST READABLE \u00b7 REAL THRESHOLDS</p>'+
       '<div style="display:flex;gap:10px;margin-top:12px">'+near.map(ring).join('')+'</div>'+
-      '<p style="color:var(--faint);font-size:10.5px;line-height:1.5;margin-top:10px">The number is what is still missing \u2014 sessions, mornings, days. Log them and the analysis opens on its own.</p></div>'}catch(e){return ''}}
+      '<p style="color:var(--faint);font-size:10.5px;line-height:1.5;margin-top:10px">The number is what is still missing — sessions, mornings, days. Log them and the analysis opens on its own.</p></div>'}catch(e){return ''}}
 
 
 
@@ -18853,7 +18885,7 @@ function mergeCard(){
     return '<button data-a="mergeOpen" class="card mt an-glow" style="width:100%;text-align:left;padding:15px 16px;border-color:var(--amber);display:block">'+
       '<p class="mono" style="font-size:9.5px;color:var(--amber);letter-spacing:.1em">ONE DAY \u00b7 TWO SESSIONS LEFT</p>'+
       '<p class="disp" style="font-size:17px;font-weight:600;margin-top:5px">Close the week in one honest session</p>'+
-      '<p style="color:var(--dim);font-size:12.5px;line-height:1.55;margin-top:5px">'+esc(m.names[0])+' + '+esc(m.names[1])+', merged at real per-muscle ceilings \u2014 '+m.work+' sets, ~'+m.mins+' min, the overlap cut and named. \u203a</p></button>'
+      '<p style="color:var(--dim);font-size:12.5px;line-height:1.55;margin-top:5px">'+esc(m.names[0])+' + '+esc(m.names[1])+', merged at real per-muscle ceilings — '+m.work+' sets, ~'+m.mins+' min, the overlap cut and named. \u203a</p></button>'
   }catch(e){return ''}}
 
 /* ══ the deep read (prompt 19) ══════════════════════════════
@@ -25525,6 +25557,10 @@ function runAction(a,v,t,e){
       if(S.view!=='sigdetail'){S.backTo=S.view;S.backDrawer=false}
       S.sigK=v;S._navQuiet=1;S.view='sigdetail'}else S.sheet={t:'signal'};render();break}
     case 'dpOpen':S.sheet=null;S.view='points';render();break;
+    /* a finding opens and closes in place. secToggle was close but it
+       also sets a scroll target, which on a list of thirty jumps the
+       page every time you open one. */
+    case 'findCard':{if(v){if(S.openSec[v])delete S.openSec[v];else S.openSec[v]=1}render();break}
     case 'collOpen':{S.backTo=S.view;S.backDrawer=false;S._navQuiet=1;S.sheet=null;S.view='collection';
       /* a group key lands the tap on its shelf (owner-caught, 7 Sep:
          '6 GATES' dumped the reader at the top of everything found) */
