@@ -131,6 +131,12 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
 .find-glow{box-shadow:0 0 20px 0 rgba(48,209,88,.18),0 0 4px 0 rgba(48,209,88,.28)}
 .tx-new{animation:txPulse 1.6s ease-in-out infinite}@keyframes txPulse{0%,100%{opacity:.25}50%{opacity:.95}}
 .tx-guide{filter:drop-shadow(0 0 5px currentColor) drop-shadow(0 0 12px currentColor);animation:txPulse 1s ease-in-out 3}
+.tx-glow{filter:drop-shadow(0 0 2.5px currentColor) drop-shadow(0 0 7px currentColor)}
+.tx-glow-epic{filter:drop-shadow(0 0 3px currentColor) drop-shadow(0 0 10px currentColor) drop-shadow(0 0 18px currentColor)}
+.tx-shim{transform-box:fill-box;transform-origin:center;animation:txShim 3.4s ease-in-out infinite}
+.tx-epic{animation-duration:2.3s}
+@keyframes txShim{0%,100%{transform:scale(1);opacity:.10}50%{transform:scale(1.4);opacity:.3}}
+@media (prefers-reduced-motion:reduce){.tx-shim{animation:none;opacity:.14}}
 .txpop{position:fixed;top:calc(env(safe-area-inset-top, 10px) + 54px);left:0;right:0;display:flex;justify-content:center;z-index:94;pointer-events:none}
 .txpop>div{pointer-events:auto;display:flex;align-items:center;gap:6px;background:color-mix(in srgb, var(--raised) 94%, #000);border:1px solid color-mix(in srgb, var(--text) 30%, transparent);border-radius:16px;box-shadow:0 12px 34px rgba(0,0,0,.5);padding:10px 12px 10px 14px;max-width:400px;width:calc(100% - 28px);margin:0 14px;animation:capDrop .42s cubic-bezier(.32,1.3,.5,1)}
 @media (prefers-reduced-motion:reduce){.txpop>div{animation:none}.tx-guide{animation:none}}
@@ -827,7 +833,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='22675a';  // stamped by tools/build.py with the content hash
+const BUILD_ID='779862';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -16114,8 +16120,10 @@ const TX_PPD=5;               // pixels per day at zoom 1 (a year ≈ 1,800px)
 const TX_MINH=720;
 function txSeenIds(){try{return (lget('training-collseen-v1',{})||{}).ids||{}}catch(e){return {}}}
 function treeXNewN(){
-  /* the icon's badge: finds nobody has looked at yet */
-  try{const seen=txSeenIds();return bankList().filter(x=>x.t&&!seen[x.id]).length}catch(e){oops('treeXNewN',e);return 0}}
+  /* the icon's badge: finds nobody has looked at yet, and patterns too */
+  try{const seen=txSeenIds();let n=bankList().filter(x=>x.t&&!seen[x.id]).length;
+    try{n+=(typeof unseenPatterns==='function')?unseenPatterns():0}catch(e){oops('treeXNewN.pat',e)}
+    return n}catch(e){oops('treeXNewN',e);return 0}}
 function treeXFocusId(){
   try{const seen=txSeenIds();
     const L=bankList().filter(x=>x.t&&!seen[x.id]);
@@ -16131,6 +16139,7 @@ function treeXMarkSeen(){
     let n=0;bankList().forEach(x=>{if(x.t&&!st.ids[x.id]){st.ids[x.id]=today();n++}});
     if(n)lset('training-collseen-v1',st);
     try{if(typeof markDiscoveries==='function')markDiscoveries()}catch(e){oops('treeXMark.disc',e)}
+    try{if(typeof markPatternsSeen==='function')markPatternsSeen()}catch(e){oops('treeXMark.pat',e)}
     try{if(typeof notifSync==='function')notifSync()}catch(e){oops('treeXMark.notif',e)}
     return n}catch(e){oops('treeXMarkSeen',e);return 0}}
 /* THE WINDOW (owner, 14 Sep: "should be able to discard old data like my
@@ -16157,7 +16166,8 @@ function treeXModel(){
     const bank=from?bankAll.filter(x=>String(x.found||'')>=from):bankAll;
     const seen=txSeenIds();
     const newN=bankAll.filter(x=>!seen[x.id]).length;
-    const stamp=today()+':'+H.length+':'+R9.length+':'+bank.length+':'+newN+':'+String(S.treeFocus||'')+':'+String(from||'');
+    let patN=0;try{patN=(typeof allPatterns==='function')?allPatterns().length:0}catch(e){}
+    const stamp=today()+':'+H.length+':'+R9.length+':'+bank.length+':'+newN+':'+String(S.treeFocus||'')+':'+String(from||'')+':p'+patN;
     if(S._txModel&&S._txModel.stamp===stamp)return S._txModel;
     if(!H.length&&!R9.length)return{stamp:stamp,empty:true,sessions:0,runs:0,finds:bank.length,folded:folded,from:from};
     const days=H.map(hKey).concat(R9.map(r=>String(r.date).slice(0,10))).filter(Boolean).sort();
@@ -16251,6 +16261,21 @@ function treeXModel(){
       const x0=tx(f)+sd*halfW(f)*0.8,y0=yAt(f);
       return{id:x.id,k:k,f:f,rank:rank,rar:x.rar,t:x.t,tag:x.tag||'',isNew:!seen[x.id],
         x0:x0,y0:y0,a:a,stem:stem,x1:x0+sd*Math.cos(a)*stem,y1:y0-Math.sin(a)*stem,side:sd}});
+    /* PATTERNS ARE SEEDS (owner, 14 Sep: "put patterns as leaves"). A
+       pattern is live and undated — it is true now — so it grows on the
+       day Allena first showed it (the seen stamp), or today if it has
+       not been looked at yet. A lozenge, not a blossom: a find is a
+       thing that happened, a pattern is a thing that is the case. Amber
+       when it carries a warning, green when it is good news. */
+    let patterns=[];
+    try{const P=(typeof allPatterns==='function')?allPatterns():[];const ps=S.patSeen||{};const byD={};
+      patterns=P.map(p=>{const key=p.pid||p.t;const sv=ps[key];
+        const k=(typeof sv==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(sv))?sv:today();
+        if(from&&k<from)return null;
+        const f=k<first?0:frac(k);const n=byD[k]=(byD[k]||0)+1;
+        const sd=(n%2?-1:1);const a=(20+((n-1)*29)%50)*Math.PI/180;const stem=12+((n-1)%4)*7;
+        return{key:key,t:p.t,tone:p.tone||'',dom:p.dom||'',k:k,f:f,isNew:!sv,x0:tx(f)+sd*halfW(f)*0.8,y0:yAt(f),a:a,stem:stem,side:sd}}).filter(Boolean)}
+    catch(e){oops('treeX.patterns',e)}
     let scar=null,phases=[];
     try{const a=S.acl||{};
       if(a.on&&a.date&&a.date>=first)scar={f:frac(a.date),k:a.date};
@@ -16260,7 +16285,7 @@ function treeXModel(){
     const setsN=branches.reduce((a,b)=>a+(b.sets||0),0);
     const m={stamp:stamp,empty:false,first:first,last:last,span:span,W:TX_W,H:Hh,groundY:groundY,topY:topY,
       yAt:yAt,tx:tx,halfW:halfW,sfAt:sfAt,frac:frac,load:load,nb:nb,branches:branches,blossoms:blossoms,scar:scar,phases:phases,
-      sessions:sessions,runs:runs,sets:setsN,finds:bank.length,newN:newN,domRamp:domRamp,folded:folded,from:from,firstEver:days[0]};
+      sessions:sessions,runs:runs,sets:setsN,finds:bank.length,newN:newN,domRamp:domRamp,folded:folded,from:from,firstEver:days[0],patterns:patterns};
     S._txModel=m;return m}
   catch(e){oops('treeXModel',e);return{stamp:'err',empty:true,sessions:0,runs:0,finds:0}}}
 function txCol(m,dom,sf,k){return treeRampCol(m.domRamp(dom),Math.min(6,Math.max(0,sf+(k||0))))}
@@ -16332,6 +16357,9 @@ function treeXSvg(m,zIn){
        tips — so the page reads as the tree the owner chose, not a chart */
     const leafEl=(lx,ly,r,c,op,v,pr)=>'<circle data-a="txTap" data-v="'+esc(v)+'" data-tp="leaf" pointer-events="all" stroke="transparent" stroke-width="'+f1(7*G)+'" cx="'+f1(lx)+'" cy="'+f1(ly)+'" r="'+r.toFixed(2)+'" fill="'+c+'" opacity="'+op.toFixed(2)+'"/>'+
       (pr?'<circle cx="'+f1(lx)+'" cy="'+f1(ly)+'" r="'+(r+1.4*G).toFixed(2)+'" fill="none" stroke="#F0EEE6" stroke-width="'+f1(0.6*SW)+'" opacity=".8"/>':'');
+    /* THE BRANCHES DO NOT MOVE (owner, 14 Sep, within the hour: "the
+       branches don't have to move"). A sway was built and cut the same
+       hour; the movement lives on the special blossoms only. */
     m.branches.forEach(b=>{
       const R=seedRand('branch:'+b.id);
       const wood=txCol(m,b.dom,b.sf,0.2),twigC=txCol(m,b.dom,b.sf,0.9),leafC=txCol(m,b.dom,b.sf,1.9);
@@ -16379,6 +16407,15 @@ function treeXSvg(m,zIn){
           const lx=Q[0]-Math.sin(b.ang)*perp*b.side*0.3,ly=Q[1]-Math.cos(b.ang)*perp;
           const r=(b.dom==='walk'?1.3:(1.9+(b.hr>0?0.5:0)))*G;
           o.push(leafEl(lx,ly,r,leafC,b.dom==='walk'?0.5:0.8,b.kind+':'+b.id,false))}}});
+    /* patterns: seeds on short stems, tappable into the pattern page */
+    (m.patterns||[]).forEach(pt=>{
+      const c=pt.tone==='warn'?'var(--amber)':pt.tone==='good'?'var(--green)':'var(--dim)';
+      const sx=X(pt.x0),sy=Y(pt.y0),stem=pt.stem*SP;
+      const bx=sx+pt.side*Math.cos(pt.a)*stem,by=sy-Math.sin(pt.a)*stem;
+      const r=3.2*G;
+      o.push('<path data-tp="pstem" d="M'+f1(sx)+' '+f1(sy)+' L'+f1(bx)+' '+f1(by)+'" stroke="'+c+'" stroke-width="'+f1(0.7*SW)+'" opacity=".45" stroke-linecap="round"/>'+
+        (pt.isNew?'<circle class="tx-new" cx="'+f1(bx)+'" cy="'+f1(by)+'" r="'+f1(r+4*G)+'" fill="none" stroke="'+c+'" stroke-width="'+f1(1*SW)+'"/>':'')+
+        '<path data-a="txTap" data-v="'+esc('pat:'+pt.t)+'" data-tp="pattern" pointer-events="all" stroke="'+c+'" stroke-width="'+f1(0.9*SW)+'" d="M'+f1(bx)+' '+f1(by-r)+' L'+f1(bx+r*0.62)+' '+f1(by)+' L'+f1(bx)+' '+f1(by+r)+' L'+f1(bx-r*0.62)+' '+f1(by)+' Z" fill="'+c+'" fill-opacity=".35" opacity=".95"/>')});
     /* phases cleared */
     m.phases.slice(0,8).forEach(ph=>{const y=Y(m.yAt(ph.f)),x=X(m.tx(ph.f))+(ph.p%2?1:-1)*(m.halfW(ph.f)*SW+6*G);
       o.push('<circle data-tp="phase" cx="'+f1(x)+'" cy="'+f1(y)+'" r="'+f1(3.4*G)+'" fill="#C96442" opacity=".92"/>'+
@@ -16389,10 +16426,15 @@ function treeXSvg(m,zIn){
       const focus=S.treeFocus&&S.treeFocus===bl.id;
       const sx=X(bl.x0),sy=Y(bl.y0),stem=bl.stem*SP;
       const bx=sx+bl.side*Math.cos(bl.a)*stem,by=sy-Math.sin(bl.a)*stem;
+      /* THE SPECIAL ONES GLOW AND SHIMMER (owner, 14 Sep: "special leaves
+         have a nice glow, common finds don't need any"). A Rare find
+         breathes a soft halo; a Big one breathes a bigger, quicker one
+         and glows. Noticed and Worth knowing stay plain. */
+      const special=bl.rank>=2;
       o.push('<path data-tp="stem" d="M'+f1(sx)+' '+f1(sy)+' L'+f1(bx)+' '+f1(by)+'" stroke="'+c+'" stroke-width="'+f1(0.8*SW)+'" opacity=".55" stroke-linecap="round"/>'+
-        (bl.rank>=2?'<circle cx="'+f1(bx)+'" cy="'+f1(by)+'" r="'+f1(r*2.2)+'" fill="'+c+'" opacity=".12"/>':'')+
+        (special?'<circle class="tx-shim'+(bl.rank===3?' tx-epic':'')+'" cx="'+f1(bx)+'" cy="'+f1(by)+'" r="'+f1(r*2.2)+'" fill="'+c+'" opacity=".12"/>':'')+
         (bl.isNew?'<circle class="tx-new" cx="'+f1(bx)+'" cy="'+f1(by)+'" r="'+f1(r+4*G)+'" fill="none" stroke="'+c+'" stroke-width="'+f1(1*SW)+'"/>':'')+
-        '<circle data-a="txTap" data-v="'+esc('find:'+bl.id)+'" data-tp="bloom" pointer-events="all" stroke="transparent" stroke-width="'+f1(8*G)+'" id="'+txElId('find',bl.id)+'" cx="'+f1(bx)+'" cy="'+f1(by)+'" r="'+f1(r)+'" fill="'+c+'" opacity="'+(bl.rank>=2?'.97':'.85')+'"/>'+
+        '<circle data-a="txTap" data-v="'+esc('find:'+bl.id)+'" data-tp="bloom"'+(special?' class="tx-glow'+(bl.rank===3?' tx-glow-epic':'')+'" style="color:'+c+'"':'')+' pointer-events="all" stroke="transparent" stroke-width="'+f1(8*G)+'" id="'+txElId('find',bl.id)+'" cx="'+f1(bx)+'" cy="'+f1(by)+'" r="'+f1(r)+'" fill="'+c+'" opacity="'+(special?'.97':'.85')+'"/>'+
         (bl.rank>=2?'<circle cx="'+f1(bx)+'" cy="'+f1(by)+'" r="'+f1(r+2.2*G)+'" fill="none" stroke="'+c+'" stroke-width="'+f1(0.6*SW)+'" opacity=".45"/>':'')+
         (focus?'<circle class="tx-new" cx="'+f1(bx)+'" cy="'+f1(by)+'" r="'+f1(r+9*G)+'" fill="none" stroke="'+c+'" stroke-width="'+f1(1.4*SW)+'"/>'+
           '<text x="'+f1(bx+bl.side*(r+12*G))+'" y="'+f1(by+3)+'" text-anchor="'+(bl.side>0?'start':'end')+'" font-size="'+f1(8*FS)+'" fill="'+c+'" font-family="-apple-system,system-ui,sans-serif" style="paint-order:stroke;stroke:#1F1E1D;stroke-width:3px">'+esc(String(bl.t).slice(0,34))+'</text>':''))});
@@ -16408,6 +16450,7 @@ function treeXLegend(){
     [dot(TREE_RAMP.m.lift[5]),'A twig is an exercise','In the order you did them, off the session it belongs to.'],
     [dot(TREE_RAMP.m.lift[6]),'A leaf is a set','On its exercise’s twig, in set order. Bigger when it was heavier against your best ever on that lift. A thin ring means a PR. On a run, a leaf is a kilometre.'],
     [dot(rarityOf('common')[1])+dot(rarityOf('uncommon')[1])+dot(rarityOf('rare')[1])+dot(rarityOf('epic')[1]),'A blossom is a finding','At the day it was found, coloured by the same ladder as everywhere else: Noticed, Worth knowing, Rare find, Big one. A new one pulses until you look.'],
+    ['<span style="display:inline-block;width:8px;height:12px;background:var(--amber);opacity:.7;transform:rotate(45deg) scale(.7);vertical-align:-2px;margin-right:6px"></span>','A seed is a pattern','Something that is the case right now, on the day Allena first showed it. Amber when it carries a warning, green when it is good news. Tap it for what to do.'],
     [dot('#C96442'),'A rehab phase cleared','The flat grey line is the surgery or injury date.']];
   return rows.map(r=>'<div style="display:flex;gap:10px;align-items:flex-start;margin-top:9px"><span style="flex:none;padding-top:2px">'+r[0]+'</span><span style="flex:1;min-width:0"><b style="font-size:12.5px">'+r[1]+'</b><span style="display:block;color:var(--dim);font-size:11.5px;line-height:1.5;margin-top:2px">'+r[2]+'</span></span></div>').join('')}
 function viewTree(){
@@ -16425,6 +16468,7 @@ function viewTree(){
     h+='<p class="mono" style="padding:6px 14px 0;font-size:9.5px;letter-spacing:.06em;color:var(--faint)">'+
       m.sessions+' SESSION'+(m.sessions===1?'':'S')+' · '+m.sets+' SET'+(m.sets===1?'':'S')+' · '+m.runs+' RUN'+(m.runs===1?'':'S')+' · '+m.finds+' FIND'+(m.finds===1?'':'S')+
       (m.newN?' · <span style="color:var(--green)">'+m.newN+' NEW</span>':'')+
+      ((m.patterns||[]).length?' · '+m.patterns.length+' PATTERN'+(m.patterns.length===1?'':'S'):'')+
       (m.folded?' · '+m.folded+' FOLDED':'')+'</p>';
     /* the window: fold the old years into the ground, nothing deleted */
     {const cur=(S.prof&&S.prof.treeFrom)||'all';
@@ -22945,7 +22989,9 @@ function markPatternsSeen(){
   // patterns permanently "new" (the badge counted live, marking used cache)
   S.patSeen=S.patSeen||{};
   let P=[];try{P=allPatterns()}catch(e){P=patternsCached()||[]}
-  P.forEach(p=>{S.patSeen[p.pid||p.t]=1});
+  /* the day it was first seen is the day it grows on the tree (14 Sep);
+     every reader only asks whether the key is set, so a date is safe */
+  P.forEach(p=>{const k=p.pid||p.t;if(!S.patSeen[k])S.patSeen[k]=today()});
   lset(K_PSEEN,S.patSeen)}
 function patternsCached(){
   try{
@@ -27596,6 +27642,7 @@ function runAction(a,v,t,e){
       else if(s9.indexOf('set:')===0){const q=s9.slice(4).split(':');S.sheet={t:'txset',id:q[0],i:+q[1]||0}}
       else if(s9.indexOf('sess:')===0)S.sheet={t:'txsess',id:s9.slice(5)};
       else if(s9.indexOf('run:')===0)S.sheet={t:'txrun',id:s9.slice(4)};
+      else if(s9.indexOf('pat:')===0){runAction('patOpen',s9.slice(4));break}
       else break;
       render();break}
     case 'txOpenLog':{S.sheet=null;S.backTo='tree';S.backDrawer=false;S.view='history';S.open=v;S.scrollTo='h'+v;render();break}
