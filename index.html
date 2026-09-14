@@ -912,7 +912,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='365408';  // stamped by tools/build.py with the content hash
+const BUILD_ID='97e8d3';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -14301,6 +14301,35 @@ function corrMaps(days){
   Object.keys(days).forEach(k=>Object.keys(days[k]).forEach(f=>{
     if(f.slice(0,3)==='ex:'&&!seenEx[f]){seenEx[f]=1;
       outs[f]={n:f.slice(3)+' top set',good:'up',dir:1,exo:1}}}));
+  /* ═══ ONE OUTCOME, ONE SERIES (15 Sep 2026, owner: "some are blocked/
+     not getting revealed") ═══════════════════════════════════════════
+     benchtop, squattop and deadtop are the day's best bench, squat and
+     deadlift. For anyone with one variant of each — which is most people
+     — the per-lift outcome built beside them is the SAME NUMBER on the
+     SAME DAYS. Measured on the demo account: benchtop === ex:Bench on
+     all twelve days, squattop === ex:Back squat on thirteen, deadtop ===
+     ex:Deadlift on thirteen. Every finding about a bench was therefore
+     reported TWICE, and on that account four of seventeen live findings
+     were duplicate pairs — burning slots in the three-per-outcome cap
+     and the keep-32 that real findings were queuing for.
+     The 12 Sep fix collapsed LAGS and the 14 Sep fix collapsed SIGNAL
+     families; nothing had ever collapsed OUTCOME twins.
+     Decided on the DATA, never on the name: an ex: outcome is dropped
+     only where it is value-for-value identical to a base outcome over
+     every day they share. Someone whose bench is split across two
+     aliases has two genuinely different series and keeps both. */
+  try{
+    const base=['benchtop','squattop','deadtop'].filter(b=>outs[b]);
+    const ks=Object.keys(days);
+    Object.keys(outs).forEach(f=>{
+      if(f.slice(0,3)!=='ex:')return;
+      base.some(b=>{
+        let both=0,same=0;
+        ks.forEach(k=>{const a=days[k][b],c=days[k][f];
+          if(a!=null&&c!=null){both++;if(Math.abs(a-c)<0.01)same++}});
+        if(both>=8&&same===both){delete outs[f];return true}
+        return false})})}
+  catch(e){oops('corrMaps.twins',e)}
   return{sigs:sigs,outs:outs}}
 const CORR_FAMILY={sleep2:'sleep',sleep3:'sleep',sleepvar:'sleep',sldeep:'sleep',slrem:'sleep',
   hrvswing:'hrv',rhr3:'rhr',bwtrend:'bw',steps3:'steps',msteps:'steps',kcal3:'kcal',
@@ -19012,7 +19041,26 @@ function watchList(){
         {act:'Tonight, asleep in the watch, moves it \u2014 nothing to log.'});
       add('A resting-heart baseline',Math.min(14,rdays),14,
         'Your watch shows the number \u2014 this teaches Allena YOUR normal. From then on a high morning gets flagged the day it happens, and resting HR joins the pattern search against your training.',rdays>=14,
-        {act:'Tonight, asleep in the watch, finishes it \u2014 nothing to log.'})}}}catch(e){}
+        {act:'Tonight, asleep in the watch, finishes it \u2014 nothing to log.'});
+      /* ═══ DEEP SLEEP AND REM WERE WATCHED AND NEVER MENTIONED (owner,
+         15 Sep 2026: "I've had the app for a while now and it's said
+         nothing about my deep sleep, REM sleep") ═══════════════════════
+         Both are collected, both are grid signals, and the engine can
+         report them properly \u2014 planted a deep-sleep-only relationship and
+         it came back "Top set runs higher after a deep-sleep-heavy
+         night", with REM riding under as also-seen. What was missing was
+         the watchlist entry. This list exists precisely so that what
+         Allena cannot say yet is VISIBLE rather than silently absent, and
+         it counted total nights and resting HR while the two signals
+         hardest to get went unnamed. Two ways it can be empty and they
+         need different words: no stages at all is a watch-in-bed problem,
+         and a handful of nights is just time. */
+      const stg=Object.keys(st9.days).filter(k=>st9.days[k].sldeep!=null||st9.days[k].slrem!=null).length;
+      if(nights>=3||stg>0)
+        add('Deep sleep and REM',Math.min(12,stg),12,
+          'Your watch splits the night into stages. Twelve of them beside your sessions and Allena can tell whether it is the LENGTH of your sleep that moves your lifting or the QUALITY \u2014 different questions, and the answer changes what you would do about it.',stg>=12,
+          stg?{act:'Tonight, asleep in the watch, moves it \u2014 nothing to log.'}
+             :{act:'Allena has your sleep but no stages yet. Stages need the watch worn in bed with sleep tracking on \u2014 worth checking in the Health app under Sleep.'})}}}catch(e){}
   if(S.runOn){const hrRuns=R.filter(r=>r.hr>0&&r.km>=3).length;
    add('The engine number',Math.min(6,hrRuns),6,
      'Six runs with heart rate and Allena can measure your aerobic engine itself — speed per heartbeat, not just pace.',hrRuns>=6,
