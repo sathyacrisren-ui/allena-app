@@ -912,7 +912,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='af7847';  // stamped by tools/build.py with the content hash
+const BUILD_ID='fa4342';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -20600,7 +20600,7 @@ function weekBoard(){
       if(h.run){d.items.push({k:'run',l:'ran',done:1})}
       else if(isRehabSess(h)){d.items.push({k:'rehab',l:'rehab',done:1});rehabDone++}
       else{const nm=String(h.dayTitle||'lifted').split(' ')[0].slice(0,6);
-        d.items.push({k:'lift',l:nm.toLowerCase(),done:1});
+        d.items.push({k:'lift',l:nm.toLowerCase(),done:1,nm:String(h.dayTitle||'')});
         if(h.dayTitle)liftedNames[String(h.dayTitle)]=1}});
     // planned runs on their fixed days
     let longIdx=-1;
@@ -20639,7 +20639,7 @@ function weekBoard(){
       if(legs&&longIdx>=0&&!reason){
         const dist=Math.min(Math.abs(i-longIdx),7-Math.abs(i-longIdx));
         if(dist>1)reason='Legs on '+DN7[i]+'. Long run '+DN7[longIdx]+'. Kept '+dist+' days apart on purpose.'}
-      d.items.push({k:'lift',l:String(base).split(' ')[0].slice(0,10).toLowerCase(),done:0,legs:legs})});
+      d.items.push({k:'lift',l:String(base).split(' ')[0].slice(0,10).toLowerCase(),done:0,legs:legs,nm:hit})});
     let unplaced=Object.keys(remNames).filter(n=>!placedNames[n]);
     /* THE VERDICT IS THE BRAIN (owner-caught, 9 Sep: the card said
        Heavy Press + Back while the board put Technique on today).
@@ -20656,7 +20656,7 @@ function weekBoard(){
         const hit=unplaced.find(n=>n===recName||recName.indexOf(n)>=0||n.indexOf(recName)>=0);
         if(hit){
           unplaced=unplaced.filter(n=>n!==hit);
-          tD.items.unshift({k:'lift',l:String(hit).split(' ')[0].slice(0,10).toLowerCase(),done:0})}
+          tD.items.unshift({k:'lift',l:String(hit).split(' ')[0].slice(0,10).toLowerCase(),done:0,nm:hit})}
         else{
           const dO=days.find(d2=>d2.key>tk&&d2.items.some(x=>x.k==='lift'&&!x.done&&(recName.toLowerCase().indexOf(x.l)>=0||x.l.indexOf(recName.slice(0,10).toLowerCase())>=0)));
           if(dO){const it9=dO.items.find(x=>x.k==='lift'&&!x.done);
@@ -20664,25 +20664,53 @@ function weekBoard(){
             tD.items.unshift(it9)}}}}catch(e){}
     let unfit=0,rehabOver=0;
     if(unplaced.length){
-      /* same-block days share muscles — the board must never SUGGEST
-         them back to back (owner-caught, 8 Sep: 'wants me to hit
-         three bench sessions in a row'). One clear day between
-         suggested sessions, counting from the last trained day; what
-         cannot fit stays honestly unplaced. */
-      let lastIdx=-2;
-      days.forEach((d,i)=>{if(d.items.some(x=>x.k==='lift'&&x.done))lastIdx=i});
+      /* ═══ THE GAP IS FOR SHARED MUSCLES, NOT FOR EVERY SESSION
+         (owner-caught, 13 Sep 2026: "why is it grouping my uppers closer
+         now and pushed my lowers far away") ═══════════════════════════
+         The 8 Sep rule — one clear day between any two suggested lifts,
+         counting from the last trained day — was written for the real
+         complaint behind it ('wants me to hit three bench sessions in a
+         row'), and the comment even said why: same-block days share
+         muscles. But it never asked whether they DID. An upper day and a
+         lower day share nothing and can sit on consecutive mornings; the
+         blanket rule burned a rest day between them, and on a four-day
+         split the last session — usually a lower day, because the block
+         orders uppers first — ran out of week and fell off the board.
+         The gap is now asked for per PAIR, from the exercises those two
+         days actually contain. Days whose muscles cannot be resolved
+         still keep the clear day, so nothing loosens where the board
+         cannot see. */
+      const musMemo={};
+      const norm=n=>String(n||'').replace(/ — .*/,'').trim();
+      const dayMus=n=>{const key=norm(n);
+        if(musMemo[key])return musMemo[key];
+        const set={};
+        try{const d9=(p.days||[]).find(x=>x&&norm(x.name)===key)||
+                     (p.days||[]).find(x=>x&&key&&norm(x.name).indexOf(key)>=0);
+          ((d9&&d9.exercises)||[]).forEach(e=>MUSCLE_RULES.forEach(r=>{
+            if(r[1].test(String(e.name||'')))set[r[0]]=1}))}catch(e){oops('weekBoard.mus',e)}
+        return musMemo[key]=set};
+      const clash=(a,b)=>{const A=dayMus(a),B=dayMus(b);
+        const ka=Object.keys(A),kb=Object.keys(B);
+        if(!ka.length||!kb.length)return true;      // cannot tell, so keep the gap
+        return ka.some(m=>B[m])};
+      const liftAt=i=>(days[i]&&days[i].items||[]).filter(x=>x.k==='lift');
+      const freeFor=(n,i)=>{
+        if(!days[i]||days[i].items.length)return false;
+        for(let j=i-1;j<=i+1;j+=2){
+          if(j<0||j>6)continue;
+          if(liftAt(j).some(x=>clash(n,x.nm)))return false}
+        return true};
       unplaced.forEach(n=>{
-        /* the gap exists because two block days share muscles. A
-           recovery day does not, so it never needs a clear day after
-           something — it fills a gap rather than consuming one. */
+        /* a recovery day shares nothing with anything — it fills a gap
+           rather than consuming one */
         const rec9=isRec(n);
         const d=rec9
           ? days.find(d2=>d2.key>=tk&&!d2.items.some(x=>x.k==='lift'))
-          : days.find((d2,i2)=>d2.key>=tk&&!d2.items.length&&i2>lastIdx+1);
+          : days.find((d2,i2)=>d2.key>=tk&&freeFor(n,i2));
         if(!d){unfit++;return}
-        if(!rec9)lastIdx=days.indexOf(d);
-        d.items.push({k:rec9?'rehab':'lift',l:String(n).split(' ')[0].slice(0,10).toLowerCase(),done:0,rec:rec9})})}
-    if(unfit&&!conflict&&!reason)reason=unfit+' session'+(unfit===1?'':'s')+' left over — a rest day belongs between them, so they place as days open.';
+        d.items.push({k:rec9?'rehab':'lift',l:String(n).split(' ')[0].slice(0,10).toLowerCase(),done:0,rec:rec9,nm:n})})}
+    if(unfit&&!conflict&&!reason)reason=unfit+' session'+(unfit===1?'':'s')+' left over — the days that share muscles need one clear day between them, so they place as room opens.';
     // remaining rehab fills the quietest days ahead
     /* TWICE A DAY IS TWICE A DAY (owner-caught, 11 Sep: "not showing my 2
        rehab sessions per day"). The fill capped at two items per day, so
