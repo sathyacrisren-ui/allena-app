@@ -912,7 +912,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='622b9c';  // stamped by tools/build.py with the content hash
+const BUILD_ID='43731a';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -6615,12 +6615,23 @@ function rehabPatterns(){
   const ad=rehabAdherence(28);
   if(ad.pct!=null&&ad.pct<60&&ad.target>4)out.push({pid:'rehab:adherence',t:'Adherence is '+ad.pct+'%',
     d:'You have done '+ad.done+' of about '+ad.target+' sessions over the '+ad.tracked+' days Allena has been watching. Adherence predicts outcome more strongly than which exercises you pick — a shorter programme you actually do beats a better one you skip.',tone:'warn'});
-  // strength stalling
+  /* ═══ A DECLINE IS NOT A PLATEAU (engine audit, 14 Sep 2026) ═══════
+     One branch covered everything under +2 points, so a knee that had
+     LOST eight points of symmetry was told "Quad symmetry has stalled…
+     that usually means load, not time — worth asking whether the
+     strength work is heavy enough." That is the exact thing this repo's
+     rules forbid: a falling number points at the physio, never at add
+     load. It also read "Only -8 points". A fall gets its own line, and
+     it is not gated on four weeks — losing ground fast is worse than
+     losing it slowly, not less worth saying. Five points is the bar
+     because quadriceps symmetry retests carry a few points of noise. */
   const q=(S.acl.tests||[]).filter(t=>t.kind==='quad');
   if(q.length>=2){const d=q[q.length-1].lsi-q[q.length-2].lsi;
     const wks=Math.round((new Date(q[q.length-1].date)-new Date(q[q.length-2].date))/6048e5);
-    if(wks>=4&&d<2)out.push({t:'Quad symmetry has stalled',
-      d:'Only '+Math.round(d)+' points in '+wks+' weeks. At this stage that usually means load, not time — worth asking whether the strength work is heavy enough.',tone:'warn'})}
+    if(wks>=2&&d<=-5)out.push({pid:'rehab:quadfall',t:'Quad symmetry has gone backwards',
+      d:'Down '+Math.round(-d)+' points over '+wks+' week'+(wks===1?'':'s')+', from '+Math.round(q[q.length-2].lsi)+'% to '+Math.round(q[q.length-1].lsi)+'%. Take this one to your physio before changing anything yourself — a number going the wrong way is a reason to be looked at, not a reason to train harder.',tone:'warn'});
+    else if(wks>=4&&d<2)out.push({t:'Quad symmetry has stalled',
+      d:'Symmetry has barely moved in '+wks+' weeks — '+Math.round(q[q.length-2].lsi)+'% to '+Math.round(q[q.length-1].lsi)+'%. At this stage that usually means load, not time, so it is worth asking whether the strength work is heavy enough.',tone:'warn'})}
   return out}
 
 /* ══ rehab protocols ════════════════════════════════════════
@@ -7064,16 +7075,16 @@ const ACL_PHASES=[
    {k:'coper',t:'Coper screening passed with your physio',src:null,only:'deficient',
     how:'The Delaware screen: timed hop ≥80% symmetry, knee-function questionnaire ≥80%, self-rated function ≥60%, and no more than one giving-way episode since the injury.',
     why:'It separates those who can genuinely function without an ACL from those who cannot. Failing it is not a personal failure — it is the strongest indication that reconstruction deserves a serious conversation.'},
-   {k:'quad90b',t:'Quadriceps ≥ 90%, held at retest',src:'quad',need:90,
+   {k:'quad90b',t:'Quadriceps ≥ 90%, held at retest',src:'quad',need:90,re:90,
     how:'Retest rather than reusing the phase 4 number.',
     why:'Strength drifts down once training turns toward speed and skill. The number has to be current on the day you return.'},
-   {k:'ham90b',t:'Hamstring ≥ 90%, held at retest',src:'ham',need:90,
+   {k:'ham90b',t:'Hamstring ≥ 90%, held at retest',src:'ham',need:90,re:90,
     how:'Retest.',
     why:'Same reasoning. Hamstring strength tends to fade first when sessions shift to sport.'},
-   {k:'hop90b',t:'Hop battery ≥ 90%, held at retest',src:'hop',
+   {k:'hop90b',t:'Hop battery ≥ 90%, held at retest',src:'hop',re:90,
     how:'Full four-hop battery again.',
     why:'Confirms that power and control survived the transition to sport-speed training.'},
-   {k:'rsi75',t:'ACL-RSI ≥ 75',src:'rsi',need:75,
+   {k:'rsi75',t:'ACL-RSI ≥ 75',src:'rsi',need:75,re:65,
     how:'Repeat the questionnaire.',
     why:'A higher bar than phase 4 because competition is unpredictable. Hesitating for a fraction of a second while planting is itself a risk.'},
    {k:'react',t:'Reactive agility and sport drills at full speed',src:null,
@@ -7089,6 +7100,36 @@ function logIssue(ex,kind,phase,type){
   aclSave()}
 function aclSave(){lset(K_ACL,S.acl)}
 function aclLatest(kind){const t=S.acl.tests.filter(x=>x.kind===kind);return t.length?t[t.length-1]:null}
+/* ═══ A RETEST IS A NEW NUMBER (14 Sep 2026, engine audit) ═══════════
+   Phase 5's copy promises it out loud — "Retest rather than reusing the
+   phase 4 number", "the number has to be current on the day you
+   return" — and the gate did nothing of the kind. Every src row read
+   aclLatest(), so the single quadriceps test that cleared phase 4 also
+   cleared phase 5's "held at retest", and the freshness window let it
+   stand for eight weeks. The last gate before return to sport was
+   reading a number taken before the phase began and telling the user it
+   had been re-measured.
+   Rows that must be retested carry `re` — the threshold of the row one
+   phase below. The FIRST test that cleared that lower row is the number
+   this one may not reuse, so only tests dated after it count. Derived
+   from the tests themselves, which means it is right for accounts that
+   reached phase 5 before this existed. If no such test can be found
+   (gates ticked by hand on old data) nothing is claimed and the row
+   behaves as it always did. */
+function aclTestVal(kind,t){
+  if(!t)return null;
+  if(kind==='hop')return Math.min(t.single,t.triple,t.cross,t.timed);
+  if(kind==='rsi')return t.score;
+  return t.lsi}
+function aclFirstMeeting(kind,need){
+  const ts=(S.acl.tests||[]).filter(x=>x.kind===kind);
+  for(let i=0;i<ts.length;i++){const v=aclTestVal(kind,ts[i]);if(v!=null&&v>=need)return ts[i]}
+  return null}
+function aclLatestRetest(kind,need){
+  const base=aclFirstMeeting(kind,need);
+  if(!base)return{t:aclLatest(kind),base:null};
+  const ts=(S.acl.tests||[]).filter(x=>x.kind===kind&&x.date>base.date);
+  return{t:ts.length?ts[ts.length-1]:null,base:base}}
 function aclMonths(){if(!S.acl.date)return null;
   return (Date.now()-new Date(S.acl.date+'T12:00').getTime())/(30.44*864e5)}
 function aclGateState(ph){
@@ -7098,14 +7139,22 @@ function aclGateState(ph){
     const key=row.k,src=row.src;
     let met=!!manual[ph+':'+key],auto=null,detail='',stale=false;
     const fresh=t=>{const d=(Date.now()-new Date(t.date+'T12:00').getTime())/864e5;return d<=56};
-    if(src==='quad'||src==='ham'){const t=aclLatest(src);
+    /* a row that must be retested never sees the test that cleared the
+       phase below it; when there is no newer one the row says so rather
+       than passing on a number it was told not to reuse */
+    let redue=null;
+    const src9=src?(row.re==null?{t:aclLatest(src),base:null}:aclLatestRetest(src,row.re)):null;
+    if(src9&&!src9.t&&src9.base)redue=src9.base;
+    if(src==='quad'||src==='ham'){const t=src9.t;
       if(t){auto=t.lsi;met=t.lsi>=row.need;stale=!fresh(t);
         detail=Math.round(t.lsi)+'% · '+t.method+' · '+fmtDate(t.date)}}
-    if(src==='hop'){const t=aclLatest('hop');
+    if(src==='hop'){const t=src9.t;
       if(t){const worst=Math.min(t.single,t.triple,t.cross,t.timed);auto=worst;met=worst>=90;stale=!fresh(t);
         detail='lowest of four '+Math.round(worst)+'% · '+fmtDate(t.date)}}
-    if(src==='rsi'){const t=aclLatest('rsi');
+    if(src==='rsi'){const t=src9.t;
       if(t){auto=t.score;met=t.score>=row.need;stale=!fresh(t);detail='ACL-RSI '+Math.round(t.score)+' · '+fmtDate(t.date)}}
+    if(redue){met=false;auto=null;
+      detail='the '+fmtDate(redue.date)+' test is the one that cleared the phase below — this gate needs a new one'}
     if(src==='time'){const mo=aclMonths();
       if(mo!=null){auto=mo;met=mo>=9;detail=mo.toFixed(1)+' months since surgery'}}
     if(stale)met=false;
@@ -8450,10 +8499,27 @@ function runQualityGate(){
      detraining — 3+ eaten quality days in 14 while easy running
      kept landing earns one moderate session anyway). */
   try{
+    /* ═══ HEAVY MEANS HEAVY (engine audit, 14 Sep 2026) ═══════════════
+       The test was `l.w > 0` on any quad, hamstring or glute prime mover
+       — ANY external load at all. A single 15 kg leg curl, or the light
+       loaded work a rehab programme prescribes daily, read as "heavy
+       legs in the last 48 h" and stood the quality session down. Doma &
+       Deakin's rule is about HEAVY resistance exercise, and the reason
+       Allena prints is a claim about the user's own session: saying
+       heavy about a rehab set is simply false, and on a programme with
+       light leg accessories through the week it is false every day,
+       which is how the never-spiral override ends up carrying a runner
+       who was never fatigued. Heavy is a leg set taken at RPE 7 or
+       above, or — when nothing was rated — six or more loaded leg sets
+       in one session, which is a leg day by volume. */
     const cut48=Date.now()-48*36e5;
+    const legSet=l=>l.w>0&&MUSCLE_RULES.some(r=>(r[0]==='Quads'||r[0]==='Hamstrings'||r[0]==='Glutes')&&r[1].test(l.ex));
     const heavyLegs=(S.history||[]).some(h=>{if(h.run||!h.complete)return false;
       const t=new Date(h.date).getTime();if(!(t>=cut48&&t<=Date.now()))return false;
-      return (h.log||[]).some(l=>l.w>0&&MUSCLE_RULES.some(r=>(r[0]==='Quads'||r[0]==='Hamstrings'||r[0]==='Glutes')&&r[1].test(l.ex)))});
+      const legs=(h.log||[]).filter(legSet);
+      if(!legs.length)return false;
+      if(legs.some(l=>l.rpe!=null&&l.rpe>=7))return true;
+      return legs.every(l=>l.rpe==null)&&legs.length>=6});
     if(heavyLegs)return{why:'heavy legs in the last 48 h. Hard running and heavy lifting need two clear days between them, either order'};
     const spiral=(function(){try{const rp=S.runplan;if(!rp)return false;
       const q=(rp.qSupp||[]);const cut14=dayKey(new Date(Date.now()-14*864e5));
@@ -8467,11 +8533,22 @@ function runQualityGate(){
     if(typeof hkDailyStore==='function'){
       const st=hkDailyStore(),days=(st&&st.days)||{};
       const ks=Object.keys(days).filter(k=>days[k]&&+days[k].hrv>0).sort();
-      if(ks.length>=21){
+      /* ═══ SEVEN DAYS, NOT SEVEN READINGS (engine audit, 14 Sep 2026) ═══
+         slice(-7) and slice(-60) counted SAMPLES. Someone who wore the
+         watch nine times in three months had their "7-day HRV" computed
+         from readings spanning a month and compared against a "60-day
+         band" spanning the better part of a year, and the gate spoke
+         about a week that was not a week. Both windows are days now, and
+         the seven-day mean needs four mornings in it before it is called
+         one. */
+      const dayAgo=n=>dayKey(new Date(Date.now()-n*864e5));
+      const c7=dayAgo(6),c60=dayAgo(59);
+      const recent=ks.filter(k=>k>=c7),band=ks.filter(k=>k>=c60);
+      if(band.length>=21&&recent.length>=4){
         const mean=a=>a.reduce((x,y)=>x+y,0)/a.length;
-        const base=ks.slice(-60).map(k=>Math.log(+days[k].hrv));
+        const base=band.map(k=>Math.log(+days[k].hrv));
         const m0=mean(base),sd=Math.sqrt(mean(base.map(x=>(x-m0)*(x-m0))));
-        const m7=mean(ks.slice(-7).map(k=>Math.log(+days[k].hrv)));
+        const m7=mean(recent.map(k=>Math.log(+days[k].hrv)));
         if(sd>0&&m7<m0-0.5*sd){
           if(spiral)return{free:true,note:'HRV is still under your band, but two quiet weeks is enough caution — one moderate session, stop if it feels wrong'};
           return{why:'your 7-day HRV is running below your own normal band. Easy running only until it comes back'}}}}
@@ -28961,6 +29038,14 @@ function runAction(a,v,t,e){
        for(let n=1;n<st.stage;n++){if(!stageMet(k2,n,pr)){flash('Stage '+n+' still has criteria outstanding — clear those first.');return}}}
       st.met=st.met||{};st.met[i2]=!st.met[i2];rehabSave();vib(10);render();break}
     case 'protoNext':{const st=rehabState(v),p2=protoFor(v);
+      /* the criteria are re-checked HERE, not only on the button. The ACL
+         path has always done this (aclAdvance asks aclReady again); the
+         protocols advanced on nothing but a stage number, so the only
+         thing keeping a staged injury criteria-gated was that one surface
+         chose to hide the button. A stage is earned, and the engine is
+         where that is true. (engine audit, 14 Sep 2026) */
+      if(!p2||!p2.stages||!p2.stages.length){flash('That protocol has no stages.');render();break}
+      if(!stageMet(v,st.stage,p2)){flash('Stage '+st.stage+' still has criteria outstanding.');render();break}
       if(st.stage<p2.stages.length){st.done=st.done||{};st.done[st.stage]=1;st.stage++;st.met={};rehabSave();flash('Stage '+st.stage+' — '+p2.stages[st.stage-1].n+'.')}
       render();break}
     case 'protoBack':{const st=rehabState(v);if(st.stage>1){st.done=st.done||{};delete st.done[st.stage-1];st.stage--;st.met={};rehabSave();flash('Back a stage.')}render();break}
