@@ -302,6 +302,13 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
 .pill{padding:10px 15px;border-radius:999px;font-size:13px;font-weight:600;white-space:nowrap;border:1px solid transparent;background:var(--raised);color:var(--dim);max-width:100%;overflow:hidden;text-overflow:ellipsis}
 .pill.on{background:var(--text);color:var(--bg);border-color:var(--text);font-weight:600}
 .scroller{display:flex;gap:8px;overflow-x:auto;overflow-y:hidden;padding-bottom:2px;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+/* A SCROLLER SCROLLS; IT DOES NOT SQUASH (owner-caught, 14 Sep 2026:
+   "can't read pills"). Flex children shrink by default, and .pill carries
+   overflow:hidden + text-overflow:ellipsis for long names — so six pills
+   in a row on a phone came out as "5... 6... 8... 1... 1... 1...", every
+   label destroyed, and the row never scrolled because nothing overflowed.
+   A row that is meant to scroll must let its children keep their width. */
+.scroller>*{flex:none}
 .scroller::-webkit-scrollbar{display:none}
 @keyframes spin{to{transform:rotate(360deg)}}
 /* stepped full-screen flows: content up top, the actions ALWAYS at
@@ -855,7 +862,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='0bb995';  // stamped by tools/build.py with the content hash
+const BUILD_ID='4c3383';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -16482,7 +16489,10 @@ function growTreeTime(W,Hh,opts){
     bd(bx,by,3.5);
     if(EX){const rk9=bl.rank|0;
       const br9=rk9>=2?([1.9,2.4,3.0,3.8][rk9])*G:sz(([1.9,2.4][rk9]||1.9)*G);
-      dots.push({x:bx,y:by,r:br9,pad:br9*(rk9>=2?1.1:0.7),kind:'bloom',c:rarityOf(bl.rar)[1],bl:bl});
+      /* how much elbow room a find claims. opts.fan turns it up so a
+         recent stretch with dozens of them spreads across the crown
+         instead of matting into one blob. */
+      dots.push({x:bx,y:by,r:br9,pad:br9*(rk9>=2?1.1:0.7)*(+opts.fan||1),kind:'bloom',c:rarityOf(bl.rar)[1],bl:bl});
       return}
     out+=bloom(bx,by,bl.epic?3.8:2.7,rarCol(bl.epic))+
       '<circle data-tp="bloom" data-tk="'+esc(bl.k)+'" cx="'+bx.toFixed(1)+'" cy="'+by.toFixed(1)+
@@ -24532,7 +24542,13 @@ function sheetHtml(){
     if(f.hold)inner+='<div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px;margin-top:12px">'+stepper('axf.sets','Sets',f.sets,1,'')+stepper('axf.secs','Seconds',f.secs,5,'s')+'</div>'+
       '<button data-a="axPerSide" class="pill mt" style="'+(f.perSide?onS:'')+'">Per side</button>';
     else inner+='<div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px;margin-top:12px">'+stepper('axf.sets','Sets',f.sets,1,'')+stepper('axf.w','Weight (opt.)',f.w,2.5,'kg')+'</div>'+
-      '<p class="eyebrow" style="margin-top:12px">Rep target</p><div class="scroller" style="margin-top:8px">'+['5','6-8','8-12','10-15','12-15','15-20'].map(r=>'<button data-a="axReps" data-v="'+r+'" class="pill" style="'+(f.reps===r?onS:'')+'">'+r+'</button>').join('')+'</div>';
+      /* A DROPDOWN, NOT SIX PILLS (owner, 14 Sep 2026: "can't read pills,
+         make drop down"). Six mutually-exclusive values with one answer is
+         what a select is for, it cannot truncate, and it is one tap on a
+         phone instead of a horizontal scrub. */
+      '<p class="eyebrow" style="margin-top:12px">Rep target</p>'+
+      '<select data-in="axf.reps" style="width:100%;margin-top:8px;font-size:15px">'+
+      ['5','6-8','8-12','10-15','12-15','15-20'].map(r=>'<option value="'+r+'"'+(f.reps===r?' selected':'')+'>'+r+' reps</option>').join('')+'</select>';
     inner+='<button data-a="axPerm" style="display:flex;align-items:center;gap:10px;width:100%;margin-top:16px;text-align:left">'+
       '<span style="width:22px;height:22px;border-radius:7px;flex:none;display:inline-flex;align-items:center;justify-content:center;font-size:12px;'+(f.perm?'background:var(--amber);color:var(--bg)':'border:1.5px solid var(--line)')+'">'+(f.perm?'✓':'')+'</span>'+
       '<span style="font-size:13px;color:var(--dim)">Also add to this day permanently (every week)</span></button>';
@@ -27695,7 +27711,11 @@ document.addEventListener('change',e=>{const d=e.target.dataset;
   if(d.in&&e.target.tagName==='SELECT'){
     if(d.in==='rform.type'&&S.rform){S.rform.type=e.target.value;
       S.rform.rpe=({easy:4,recovery:3,long:5,tempo:7,interval:8,hills:7,race:9})[e.target.value]||5;
-      render();return}}
+      render();return}
+    /* every other data-in select writes its own path, the same way every
+       data-in input does — a select that needed its own case each time is
+       how one gets added with nothing behind it */
+    try{setPath(d.in,e.target.value);render();return}catch(e9){oops('selectIn',e9)}}
   if(d.qrpe){const v=e.target.value;S.quick.rows[+d.qrpe].rpe=v===''?null:parseFloat(v);render();return}
   if(d.qweek){const wk=+e.target.value;quickInit(S.quick.dayIdx,wk,S.quick.date);render();return}});
 
