@@ -833,7 +833,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='58e6a4';  // stamped by tools/build.py with the content hash
+const BUILD_ID='9de75e';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -12222,7 +12222,18 @@ function discoveries(){
      now (bucketed where a threshold IS the point); a record that moves
      UPDATES its finding in place (bankDiscoveries) and never banks a
      second one. stableIdSweep() migrates the old title-keyed entries. */
-  const add=(rar,t,d,tag,id)=>D.push({rar:rar,t:t,d:d,tag:tag||'',id:id||t});
+  /* WHEN IT WOULD HAVE BEEN FOUND (owner, 14 Sep, after loading a demo
+     account: "new findings need to be placed where they would have been
+     made if the person always had the app"). Every generator names the
+     day of its EVENT — the PR's session, the 500th set, the run —
+     as `k`; the bank keeps it as `when` beside the found date, and the
+     tree places by it. `found` itself is never rewritten. */
+  const add=(rar,t,d,tag,id,k)=>D.push({rar:rar,t:t,d:d,tag:tag||'',id:id||t,k:k||null});
+  const Hs=H.slice().sort((a,b)=>hKey(a).localeCompare(hKey(b)));
+  const Rs=R.slice().sort((a,b)=>String(a.date).localeCompare(String(b.date)));
+  const rk=r=>String(r&&r.date||'').slice(0,10);   // auditcheck-allow: utc-day-key — a run row stores a local YYYY-MM-DD
+  const nthSetDay=n=>{let c=0;for(const h of Hs){c+=(h.log||[]).filter(l=>l.w&&l.r).length;if(c>=n)return hKey(h)}return null};
+  const nthKmDay=km=>{let c=0;for(const r of Rs){c+=(+r.km||0);if(c>=km)return rk(r)}return null};
   if(!H.length&&!R.length)return D;
   const sets=[];H.forEach(h=>h.log.forEach(l=>{if(l.w&&l.r)sets.push({l:l,h:h,e:e1rm(l.w,l.r,l.rpe),b:gBase(l.ex)})}));
   const byLift={};sets.forEach(x=>{(byLift[x.b]=byLift[x.b]||[]).push(x)});
@@ -12240,22 +12251,22 @@ function discoveries(){
     if(best===recent&&l.length>=5)
       add('rare','New best on '+b,'Your last set of '+b+' was the strongest you have logged — '+
         uwNum(Math.round(best.e))+' '+uwUnit()+' estimated max, past a previous best of '+
-        uwNum(Math.round(l.slice(0,-1).reduce((a,c)=>Math.max(a,c.e),0)))+' '+uwUnit()+'.','record');   // title is stable per lift already
+        uwNum(Math.round(l.slice(0,-1).reduce((a,c)=>Math.max(a,c.e),0)))+' '+uwUnit()+'.','record',null,hKey(best.h));   // title is stable per lift already
     // heaviest weight regardless of reps
     const hw=l.reduce((a,c)=>c.l.w>a.l.w?c:a,l[0]);
     if(hw.l.w>=100&&hw.l.w%20===0)
-      add('uncommon',b+' at '+uwNum(hw.l.w)+' '+uwUnit(),'A round number worth noting. '+hw.l.r+' reps at '+uwNum(hw.l.w)+' '+uwUnit()+' on '+fmtDate(hw.h.date)+'.','round','round:'+b+':'+hw.l.w);   // the plate crossed IS the threshold
+      add('uncommon',b+' at '+uwNum(hw.l.w)+' '+uwUnit(),'A round number worth noting. '+hw.l.r+' reps at '+uwNum(hw.l.w)+' '+uwUnit()+' on '+fmtDate(hw.h.date)+'.','round','round:'+b+':'+hw.l.w,hKey(hw.h));   // the plate crossed IS the threshold
     // most reps at a given weight
-    const byW={};l.forEach(x=>{(byW[x.l.w]=byW[x.l.w]||[]).push(x.l.r)});
+    const byW={},byWd={};l.forEach(x=>{(byW[x.l.w]=byW[x.l.w]||[]).push(x.l.r);(byWd[x.l.w]=byWd[x.l.w]||[]).push(hKey(x.h))});
     {let bestGain=null;
      Object.keys(byW).forEach(w=>{const rs=byW[w];
        if(rs.length<4)return;
        if(rs[rs.length-1]!==Math.max.apply(null,rs)||rs[rs.length-1]<=rs[0])return;
        const gain=rs[rs.length-1]-rs[0];
-       if(!bestGain||gain>bestGain.gain)bestGain={w:w,from:rs[0],to:rs[rs.length-1],gain:gain}});
+       if(!bestGain||gain>bestGain.gain)bestGain={w:w,from:rs[0],to:rs[rs.length-1],gain:gain,k:byWd[w][rs.length-1]}});
      if(bestGain)add('uncommon','More reps at '+uwNum(Math.round(bestGain.w))+' '+uwUnit()+' on '+b,
        'You got '+bestGain.to+' where you used to get '+bestGain.from+
-       '. Same weight, more work — that is progress that does not show up on the bar.','reps','reps:'+b)}
+       '. Same weight, more work — that is progress that does not show up on the bar.','reps','reps:'+b,bestGain.k)}
     // bodyweight ratio — rated on the ESTIMATED 1RM, never the raw
     // weight of a volume set (owner-caught: an 88 kg × 8 back-off was
     // announced as "1.06× bodyweight" when it estimates ~111 kg — the
@@ -12271,16 +12282,16 @@ function discoveries(){
         (best.l.r>1
           ?'Your best set ('+uwNum(best.l.w)+' '+uwUnit()+' × '+best.l.r+') works out to about '+uwNum(Math.round(best.e))+' '+uwUnit()+' — '
           :uwNum(best.l.w)+' '+uwUnit()+' straight up — ')+
-        em+'× your '+uwNum(bw)+' '+uwUnit()+' bodyweight. Ratios travel better than absolute numbers — this one holds up wherever you take it.','ratio')}
+        em+'× your '+uwNum(bw)+' '+uwUnit()+' bodyweight. Ratios travel better than absolute numbers — this one holds up wherever you take it.','ratio',null,hKey(best.h))}
   });
 
   /* ── cycling ── */
   try{const RD=(S.runs||[]).filter(r=>r.type==='ride'&&r.km>0);
     if(RD.length>=3){
       const long9=RD.reduce((a,r)=>r.km>a.km?r:a,RD[0]);
-      add('common','Longest ride: '+Math.round(long9.km*10)/10+' km',(long9.mins?Math.round(long9.mins)+' min on ':'On ')+fmtDate(long9.date+'T12:00')+'.','record','ride:longest');
+      add('common','Longest ride: '+Math.round(long9.km*10)/10+' km',(long9.mins?Math.round(long9.mins)+' min on ':'On ')+fmtDate(long9.date+'T12:00')+'.','record','ride:longest',rk(long9));
       const fast=RD.filter(r=>r.km>=10&&r.mins>0).sort((a,b)=>(b.km/b.mins)-(a.km/a.mins))[0];
-      if(fast)add('uncommon','Fastest ride: '+Math.round(fast.km/(fast.mins/60)*10)/10+' km/h','Over '+Math.round(fast.km*10)/10+' km on '+fmtDate(fast.date+'T12:00')+'.','record','ride:fastest');
+      if(fast)add('uncommon','Fastest ride: '+Math.round(fast.km/(fast.mins/60)*10)/10+' km/h','Over '+Math.round(fast.km*10)/10+' km on '+fmtDate(fast.date+'T12:00')+'.','record','ride:fastest',rk(fast));
       const effs=RD.map(r=>({r:r,e:(r.hr>0&&r.mins>0)?(r.km/(r.mins/60))/r.hr:null})).filter(x=>x.e);
       if(effs.length>=6){
         const half=Math.floor(effs.length/2);
@@ -12295,14 +12306,14 @@ function discoveries(){
       add('rare','Biggest session yet','You moved '+tonStr(big.t)+' today, more than any session you have logged.','record');
     const longest=H.reduce((a,c)=>(c.minutes||0)>(a.minutes||0)?c:a,H[0]);
     if(longest.minutes>=90)add('common','Longest session: '+longest.minutes+' minutes',
-      esc(longest.dayTitle||'A session')+' on '+fmtDate(longest.date)+'. Anything past about 90 minutes is usually rest, not work.','session','sess:longest');
+      esc(longest.dayTitle||'A session')+' on '+fmtDate(longest.date)+'. Anything past about 90 minutes is usually rest, not work.','session','sess:longest',hKey(longest));
     const totalSets=H.reduce((a,h)=>a+h.log.length,0);
     {const r9=[100,250,500,1000,2500,5000].filter(m=>totalSets>=m).pop();
       if(r9)add(r9>=1000?'rare':'uncommon',r9.toLocaleString()+' sets logged',
-        'You have crossed '+r9.toLocaleString()+' \u2014 '+totalSets.toLocaleString()+' now. Every one of them is in the model.','milestone','sets:'+r9)}
+        'You have crossed '+r9.toLocaleString()+' \u2014 '+totalSets.toLocaleString()+' now. Every one of them is in the model.','milestone','sets:'+r9,nthSetDay(r9))}
     {const r9=[10,25,50,100,200,365].filter(m=>H.length>=m).pop();
       if(r9)add(r9>=100?'epic':'uncommon',r9+' sessions',
-        'You have passed '+r9+' logged sessions \u2014 '+H.length+' now. Most people who start an app like this stop before ten.','milestone','sessions:'+r9)}}
+        'You have passed '+r9+' logged sessions \u2014 '+H.length+' now. Most people who start an app like this stop before ten.','milestone','sessions:'+r9,Hs[r9-1]?hKey(Hs[r9-1]):null)}}
 
   /* ── time of day ── */
   try{const byHr={};H.forEach(h=>{const hr=new Date(h.date).getHours();
@@ -12331,7 +12342,7 @@ function discoveries(){
       for(let i=1;i<days.length;i++){const g=Math.round((new Date(days[i])-new Date(days[i-1]))/864e5);
         if(g>maxGap)maxGap=g}
       if(maxGap<=3&&days.length>=12)add('rare','Never more than '+maxGap+' days off',
-        'Across '+days.length+' training days. Gaps are where blocks fall apart, and you have not had one.','streak','streak:gap')}}catch(e){}
+        'Across '+days.length+' training days. Gaps are where blocks fall apart, and you have not had one.','streak','streak:gap',days[days.length-1])}}catch(e){}
 
   /* ── comparisons between blocks ── */
   try{const blocks={};H.forEach(h=>{(blocks[h.progId]=blocks[h.progId]||[]).push(h)});
@@ -12343,9 +12354,9 @@ function discoveries(){
       const a=stat(ids[ids.length-2]),b2=stat(ids[ids.length-1]);
       const kg=v=>Math.round(v/100)/10+' t';
       if(b2.per>a.per*1.1)add('rare','This block is heavier than the last',
-        b2.name+' is averaging '+kg(b2.per)+' a session against '+kg(a.per)+' in '+a.name+'. That is a real step up in work.','block','block:heavier:'+ids[ids.length-1]);
+        b2.name+' is averaging '+kg(b2.per)+' a session against '+kg(a.per)+' in '+a.name+'. That is a real step up in work.','block','block:heavier:'+ids[ids.length-1],hKey(blocks[ids[ids.length-1]].slice(-1)[0]));
       else if(b2.per<a.per*0.85)add('uncommon','This block is lighter than the last',
-        kg(b2.per)+' a session against '+kg(a.per)+'. Deliberate is fine; drift is not.','block','block:lighter:'+ids[ids.length-1])}}catch(e){}
+        kg(b2.per)+' a session against '+kg(a.per)+'. Deliberate is fine; drift is not.','block','block:lighter:'+ids[ids.length-1],hKey(blocks[ids[ids.length-1]].slice(-1)[0]))}}catch(e){}
 
   /* ── ratios between lifts ── */
   try{const best=b=>{const l=byLift[b];return l?l.reduce((a,c)=>Math.max(a,c.e),0):0};
@@ -12368,12 +12379,12 @@ function discoveries(){
   try{if(R.length>=4){
     const km=R.reduce((a,r)=>a+(r.km||0),0);
     [50,100,250,500,1000].forEach(m=>{if(km>=m&&km<m*1.12)
-      add(m>=250?'rare':'uncommon',Math.round(km)+' km logged','You have passed '+m+' km. All of it feeding the same recovery model as your lifting.','milestone','run:km:'+m)});
+      add(m>=250?'rare':'uncommon',Math.round(km)+' km logged','You have passed '+m+' km. All of it feeding the same recovery model as your lifting.','milestone','run:km:'+m,nthKmDay(m))});
     const longest=R.reduce((a,r)=>r.km>a.km?r:a,R[0]);
-    add('common','Longest run: '+longest.km+' km',paceStr(longest.mins,longest.km)+' on '+fmtDate(longest.date+'T12:00')+'.','record','run:longest');
+    add('common','Longest run: '+longest.km+' km',paceStr(longest.mins,longest.km)+' on '+fmtDate(longest.date+'T12:00')+'.','record','run:longest',rk(longest));
     const fastest=R.filter(r=>r.km>=4).sort((a,b2)=>(a.mins/a.km)-(b2.mins/b2.km))[0];
     if(fastest)add('uncommon','Quickest sustained pace: '+paceStr(fastest.mins,fastest.km),
-      'Over '+fastest.km+' km on '+fmtDate(fastest.date+'T12:00')+'.','record','run:fastest');
+      'Over '+fastest.km+' km on '+fmtDate(fastest.date+'T12:00')+'.','record','run:fastest',rk(fastest));
     const wk=weeklyKm(8).map(x=>x.km);
     const bestWk=Math.max.apply(null,wk);
     if(wk[wk.length-1]===bestWk&&bestWk>0)add('rare','Biggest running week yet',
@@ -12386,16 +12397,16 @@ function discoveries(){
          inside the machine's own wobble, and the library says so
          instead of this saying "muscle up" */
       if(d.smm>=1&&d.fm<=-1)add('epic','Muscle up, fat down',
-        'Skeletal muscle '+(d.smm>0?'+':'')+uwNum(d.smm)+' '+uwUnit()+' while fat mass '+uwNum(d.fm)+' '+uwUnit()+'. Doing both at once is the hardest outcome to get.','body');
-      else if(d.smm>1)add('rare','+'+uwNum(d.smm)+' '+uwUnit()+' of muscle','Skeletal muscle gained since your first scan.','body','body:muscle')}}catch(e){}
+        'Skeletal muscle '+(d.smm>0?'+':'')+uwNum(d.smm)+' '+uwUnit()+' while fat mass '+uwNum(d.fm)+' '+uwUnit()+'. Doing both at once is the hardest outcome to get.','body',null,String(sc[sc.length-1].date).slice(0,10));   // auditcheck-allow: utc-day-key — a scan row stores a local YYYY-MM-DD
+      else if(d.smm>1)add('rare','+'+uwNum(d.smm)+' '+uwUnit()+' of muscle','Skeletal muscle gained since your first scan.','body','body:muscle',String(sc[sc.length-1].date).slice(0,10))}}catch(e){}   // auditcheck-allow: utc-day-key — a scan row stores a local YYYY-MM-DD
 
   /* ── rehab ── */
   try{const q=((S.acl&&S.acl.tests)||[]).filter(t=>t.kind==='quad');
     if(q.length>=2){const last=q[q.length-1].lsi;
       if(last>=90)add('epic','Quad symmetry at '+Math.round(last)+'%',
-        'Past the 90% gate. That is the number that separates a knee that is ready from one that is not.','rehab','rehab:lsi:90');
+        'Past the 90% gate. That is the number that separates a knee that is ready from one that is not.','rehab','rehab:lsi:90',String(q[q.length-1].date||'').slice(0,10));   // auditcheck-allow: utc-day-key — a test row stores a local YYYY-MM-DD
       else if(last>=80)add('rare','Quad symmetry at '+Math.round(last)+'%',
-        'Past 80%, which is where running usually becomes reasonable.','rehab','rehab:lsi:80')}
+        'Past 80%, which is where running usually becomes reasonable.','rehab','rehab:lsi:80',String(q[q.length-1].date||'').slice(0,10))}   // auditcheck-allow: utc-day-key — a test row stores a local YYYY-MM-DD
     const ch=checkTrend(28).filter(c=>c.pain!=null);
     if(ch.length>=10){const noPain=ch.filter(c=>c.pain<=1).length;
       if(noPain/ch.length>=0.7)add('rare','A near-painless month',
@@ -12411,7 +12422,7 @@ function discoveries(){
           const d9=hKey(h9);if(d9<rs9)return;
           (h9.log||[]).forEach(l9=>{if(l9.pr&&l9.w>0&&l9.r>0&&!l9.secs&&!hit)hit={ex:gBase(l9.ex),d:d9}})});
         if(hit)add('rare','A PR while healing',
-          'New best '+hit.ex+' on '+fmtDate(hit.d+'T12:00')+', set in the middle of rehab. Training kept moving.','rehab')}}catch(e9){}}catch(e){}
+          'New best '+hit.ex+' on '+fmtDate(hit.d+'T12:00')+', set in the middle of rehab. Training kept moving.','rehab',null,hit.d)}}catch(e9){}}catch(e){}
 
 
   /* ── bloodwork on record (counts only, by design) ── */
@@ -12431,44 +12442,44 @@ function discoveries(){
     const nSess=H.length,nSets=sets.length;
     const dates=[...new Set(H.map(h=>hKey(h)))].sort();
     if(nSess>=1)add('common','First session logged',
-      'The model starts here. Everything Allena tells you from now on is built on sessions like this one.','first');
+      'The model starts here. Everything Allena tells you from now on is built on sessions like this one.','first',null,hKey(Hs[0]));
     if(nSess>=2)add('common','You came back',
-      'Second session logged. Most of what separates people who progress from people who do not is this, repeated.','first');
+      'Second session logged. Most of what separates people who progress from people who do not is this, repeated.','first',null,hKey(Hs[1]));
     if(nSess>=3)add('uncommon','Three sessions in',
-      'Enough for Allena to start comparing like with like. From here the numbers begin to mean something.','first');
+      'Enough for Allena to start comparing like with like. From here the numbers begin to mean something.','first',null,hKey(Hs[2]));
     if(nSets>=1&&sets.some(x=>x.l.rpe!=null))add('common','First effort recorded',
-      'RPE is what turns a log into a coach. Without it Allena can see what you lifted but not what it cost.','first');
-    if(nSets>=25)add('common','25 sets in','Every set feeds the recovery and progression model \u2014 '+nSets+' so far.','first','first:25sets');
+      'RPE is what turns a log into a coach. Without it Allena can see what you lifted but not what it cost.','first',null,(function(){const h9=Hs.find(h=>(h.log||[]).some(l=>l.rpe!=null));return h9?hKey(h9):null})());
+    if(nSets>=25)add('common','25 sets in','Every set feeds the recovery and progression model \u2014 '+nSets+' so far.','first','first:25sets',nthSetDay(25));
     // first repeat of an exercise
     const repeated=lifts.filter(b=>new Set(byLift[b].map(x=>x.h.id)).size>=2);
     if(repeated.length)add('common','First lift with history',
-      esc(repeated[0])+' has now been trained in more than one session, which is the minimum Allena needs to see a direction.','first');
+      esc(repeated[0])+' has now been trained in more than one session, which is the minimum Allena needs to see a direction.','first',null,(function(){const l9=byLift[repeated[0]].slice().sort((a,c)=>a.h.date.localeCompare(c.h.date));const ids9=[];for(const x of l9){if(ids9.indexOf(x.h.id)<0)ids9.push(x.h.id);if(ids9.length===2)return hKey(x.h)}return null})());
     // first increase
     for(let i2=0;i2<lifts.length;i2++){
       const b=lifts[i2],l=byLift[b].slice().sort((a,c)=>a.h.date.localeCompare(c.h.date));
       if(new Set(l.map(x=>x.h.id)).size<2)continue;
       const startW=l[0].l.w,endW=l[l.length-1].l.w;
       if(endW>startW){add('uncommon','First weight increase',
-        esc(b)+' has gone from '+uwNum(startW)+' to '+uwNum(endW)+' '+uwUnit()+'. Weight on the bar, added and kept.','first-up','first:up');break}}
+        esc(b)+' has gone from '+uwNum(startW)+' to '+uwNum(endW)+' '+uwUnit()+'. Weight on the bar, added and kept.','first-up','first:up',hKey(l[l.length-1].h));break}}
     // first full week
     if(dates.length>=3){
       const wk={};H.forEach(h=>{wk[isoWeek(h.date)]=(wk[isoWeek(h.date)]||0)+1});
       const best=Math.max.apply(null,Object.keys(wk).map(k=>wk[k]));
       if(best>=3)add('uncommon','A full week done',
-        best+' sessions inside one week. Weekly volume is what drives adaptation, and you have now given Allena a real week to read.','first','first:week')}
+        best+' sessions inside one week. Weekly volume is what drives adaptation, and you have now given Allena a real week to read.','first','first:week',(function(){const cnt={};for(const h of Hs){const w9=isoWeek(h.date);cnt[w9]=(cnt[w9]||0)+1;if(cnt[w9]>=3)return hKey(h)}return null})())}
     // first readiness and first bodyweight
     const gk=Object.keys((S.gar&&S.gar.days)||{}).filter(k=>S.gar.days[k].am!=null);
     if(gk.length>=1)add('common','First readiness reading',
-      'Allena can now tell a hard day apart from a bad day, which is most of the value in a check-in.','first');
+      'Allena can now tell a hard day apart from a bad day, which is most of the value in a check-in.','first',null,gk.slice().sort()[0]);
     if(gk.length>=7)add('uncommon','A week of readiness',
-      'Seven mornings logged. That is enough for a baseline, which is when the number starts being useful rather than interesting.','first');
+      'Seven mornings logged. That is enough for a baseline, which is when the number starts being useful rather than interesting.','first',null,gk.slice().sort()[6]);
     const bwk=Object.keys((S.daily&&S.daily.days)||{}).filter(k=>S.daily.days[k].bw!=null);
     if(bwk.length>=1)add('common','First weigh-in',
-      'Bodyweight lets Allena separate a stall from a deficit. Holding strength while losing weight is a win, not a plateau.','first');
+      'Bodyweight lets Allena separate a stall from a deficit. Holding strength while losing weight is a win, not a plateau.','first',null,bwk.slice().sort()[0]);
     if(R.length>=1)add('common','First run logged',
-      'In the same recovery picture as your lifting, which is not true in any other app you could be using.','first');
+      'In the same recovery picture as your lifting, which is not true in any other app you could be using.','first',null,rk(Rs[0]));
     if((S.acl&&S.acl.on)&&((S.acl.checks||[]).length>=1))add('common','First rehab check-in',
-      'The start of the record your physio actually wants — dates and numbers rather than "it has been a bit sore".','first');
+      'The start of the record your physio actually wants — dates and numbers rather than "it has been a bit sore".','first',null,String((S.acl.checks||[]).slice().sort((a,c)=>String(a.date).localeCompare(String(c.date)))[0].date||'').slice(0,10));   // auditcheck-allow: utc-day-key — a check-in stores a local YYYY-MM-DD
   }catch(e){}
   /* ── the obscure tier: relationships a lifter would never compute ── */
   // the rest-gap sweet spot per lift: how many days off makes a lift move best
@@ -12488,7 +12499,7 @@ function discoveries(){
     const best=ks.sort((x,y)=>avg(y)-avg(x))[0],worst=ks[ks.length-1];
     if(avg(best)-avg(worst)>1.5)
       add('rare',b+' likes '+best+' days of rest',
-        'When you come back to '+b+' after '+best+' days it moves up by '+uwNum(Math.round(avg(best)*10)/10)+' '+uwUnit()+' est-max on average; after '+worst+' days it averages '+uwNum(Math.round(avg(worst)*10)/10)+' '+uwUnit()+'. Your recovery has a shape \u2014 this is it.','obscure','obscure:rest:'+b)})}catch(e){}
+        'When you come back to '+b+' after '+best+' days it moves up by '+uwNum(Math.round(avg(best)*10)/10)+' '+uwUnit()+' est-max on average; after '+worst+' days it averages '+uwNum(Math.round(avg(worst)*10)/10)+' '+uwUnit()+'. Your recovery has a shape \u2014 this is it.','obscure','obscure:rest:'+b,hKey(l[l.length-1].h))})}catch(e){}
   // set-order fade: where in an exercise your reps actually die
   try{const bySet={};
     H.forEach(h=>h.log.forEach(l=>{if(!(l.r>0)||l.secs)return;
@@ -12703,6 +12714,12 @@ function archiveSweep(){
     discoveries().forEach(d=>{if(d.tag==='signal')return;
       if(!seen[d.id]){seen[d.id]=today();n++}});
     lset('training-disc-v1',seen);
+    /* and the tree agrees: an archive is not 57 new leaves (owner, 14
+       Sep, after loading a demo account) — everything banked in the
+       catalogue counts as looked at */
+    try{const st=lget('training-collseen-v1',{})||{};st.ids=st.ids||{};
+      Object.keys(discBank()).forEach(id=>{if(!st.ids[id])st.ids[id]=today()});
+      lset('training-collseen-v1',st)}catch(e9){oops('archive.collseen',e9)}
     return n}catch(e){return 0}}
 function newDiscoveries(){
   const seen=discoverySeen();
@@ -12936,7 +12953,8 @@ function healthDiscoveries(){
      ceremony, another near-duplicate shelf entry. Ids are now stable
      per generator (bucketed where a threshold is the point), matching
      the found-date contract standing-test.js already enforces for 13d. */
-  const add=(rar,t,d,tag,id)=>D.push({rar:rar,t:t,d:d,tag:tag||'signal',id:id||('hkd:'+String(t).toLowerCase().replace(/[^a-z]+/g,'').slice(0,28))});
+  const add=(rar,t,d,tag,id,k)=>D.push({rar:rar,t:t,d:d,tag:tag||'signal',id:id||('hkd:'+String(t).toLowerCase().replace(/[^a-z]+/g,'').slice(0,28)),k:k||null});
+  const lastK=f=>{try{const s9=hkdSeries(f,90);return s9.length?s9[s9.length-1].date:null}catch(e){return null}};
   try{
     const ym=today().slice(0,7),mn=monthName(ym);
     /* THE find: sleep × strength — the cross no one else can make */
@@ -12959,11 +12977,11 @@ function healthDiscoveries(){
           'That is your own body saying sleep is training.','signal')}}catch(e){}
     /* sleep streaks — showing up for the pillow */
     try{
-      const sl=hkdSeries('sleep',40);let run=0,best=0;
-      sl.forEach(x=>{run=x.v>=420?run+1:0;best=Math.max(best,run)});
+      const sl=hkdSeries('sleep',40);let run=0,best=0,bestK=null;
+      sl.forEach(x=>{run=x.v>=420?run+1:0;if(run>best){best=run;bestK=x.date}});
       if(best>=5)add(best>=14?'epic':best>=7?'rare':'uncommon',
         best+' nights of 7+ hours running',
-        best+' straight nights of 7+ hours. Recovery the model can measure, night after night.','signal')}catch(e){}
+        best+' straight nights of 7+ hours. Recovery the model can measure, night after night.','signal',null,bestK)}catch(e){}
     /* resting HR trend — the engine idling cheaper */
     try{
       const r=hkdSeries('rhr',60);
@@ -12971,7 +12989,7 @@ function healthDiscoveries(){
         const now9=hkdMed(r.slice(-7).map(x=>x.v)),before=hkdMed(r.slice(0,-14).map(x=>x.v));
         if(now9&&before&&before-now9>=3)
           add('rare','Resting heart rate down '+Math.round(before-now9)+' bpm · '+mn,
-            'This week idles at ~'+Math.round(now9)+' bpm against ~'+Math.round(before)+' earlier — the classic signature of a growing aerobic base.','signal')}}catch(e){}
+            'This week idles at ~'+Math.round(now9)+' bpm against ~'+Math.round(before)+' earlier — the classic signature of a growing aerobic base.','signal',null,r[r.length-1].date)}}catch(e){}
     /* HRV × rest days — recovery visible in the nervous system */
     try{
       const st=hkDailyStore();
@@ -12992,13 +13010,13 @@ function healthDiscoveries(){
       if(v.length>=2){
         const first=v[0].v,last=v[v.length-1].v;
         if(last-first>=0.5)add('rare','VO₂max up '+(Math.round((last-first)*10)/10)+' · '+mn,
-          'Apple’s estimate has climbed from '+first+' to '+last+' — an estimate, but a moving one, and it moves on real work.','signal')}}catch(e){}
+          'Apple’s estimate has climbed from '+first+' to '+last+' — an estimate, but a moving one, and it moves on real work.','signal',null,v[v.length-1].date)}}catch(e){}
     /* steps — the quiet volume */
     try{
-      const sp=hkdSeries('steps',30);let run=0,best=0;
-      sp.forEach(x=>{run=x.v>=10000?run+1:0;best=Math.max(best,run)});
+      const sp=hkdSeries('steps',30);let run=0,best=0,bestK=null;
+      sp.forEach(x=>{run=x.v>=10000?run+1:0;if(run>best){best=run;bestK=x.date}});
       if(best>=5)add('uncommon',best+' days over 10,000 steps running',
-        'The training between the training. It shows up in recovery whether or not it shows up anywhere else.','signal')}catch(e){}
+        'The training between the training. It shows up in recovery whether or not it shows up anywhere else.','signal',null,bestK)}catch(e){}
     /* protein consistency (Health-synced macros) */
     try{
       const dd=(S.daily&&S.daily.days)||{};
@@ -13006,10 +13024,10 @@ function healthDiscoveries(){
         return ks.length?dd[ks[ks.length-1]].bw:null})();
       const target=bw?Math.round(bw*1.6):120;
       const ks=Object.keys(dd).sort().slice(-30);
-      let run=0,best=0;
-      ks.forEach(k=>{const p9=dd[k].pr;run=(p9!=null&&p9>=target)?run+1:0;best=Math.max(best,run)});
+      let run=0,best=0,bestK=null;
+      ks.forEach(k=>{const p9=dd[k].pr;run=(p9!=null&&p9>=target)?run+1:0;if(run>best){best=run;bestK=k}});
       if(best>=5)add(best>=10?'rare':'uncommon','Protein showed up '+best+' days running',
-        best+' straight days at or over ~'+target+' g'+(bw?' (1.6 g/kg of your logged weight)':'')+'. Muscle is built at the table as much as under the bar.','signal')}catch(e){}
+        best+' straight days at or over ~'+target+' g'+(bw?' (1.6 g/kg of your logged weight)':'')+'. Muscle is built at the table as much as under the bar.','signal',null,bestK)}catch(e){}
     /* protein → next-day recovery (nutrition × HRV) */
     try{
       const st=hkDailyStore(),dd=(S.daily&&S.daily.days)||{};
@@ -13046,11 +13064,11 @@ function healthDiscoveries(){
     try{
       const dd=(S.daily&&S.daily.days)||{};
       const ks=Object.keys(dd).sort().slice(-30);
-      let run=0,best=0;
+      let run=0,best=0,bestK=null;
       ks.forEach(k=>{const d=dd[k];const full=d.pr!=null&&d.carb!=null&&d.fat!=null;
-        run=full?run+1:0;best=Math.max(best,run)});
+        run=full?run+1:0;if(run>best){best=run;bestK=k}});
       if(best>=5)add(best>=14?'rare':'uncommon',best+' days of full fuel logged',
-        best+' straight days with protein, carbs and fat all in — the complete picture of what powers the training.','signal')}catch(e){}
+        best+' straight days with protein, carbs and fat all in — the complete picture of what powers the training.','signal',null,bestK)}catch(e){}
     /* VO2max × easy pace (the engine showing at easy effort) */
     try{
       const v=hkdSeries('vo2',90);
@@ -13834,14 +13852,14 @@ function correlations(){
           if((sig==='km'||sig==='km3')&&lag===0&&(out==='pace'||out==='beatkm'))return; // a run vs its own numbers
           if(sig==='ridekm'&&lag===0&&out==='rideeff')return;
           if(sig==='vo2'&&(out==='beatkm'||out==='rideeff'||out==='pace')&&lag===0)return; // engine measures agree by construction
-          const pairs=[];
+          const pairs=[],pdays=[];
           keys.forEach(k=>{
             const s=days[k]&&days[k][sig];
             if(s==null)return;
             const ok=days[dateAt(lag)(k)];
             const o=ok&&ok[out];
             if(o==null)return;
-            pairs.push([s,o])});
+            pairs.push([s,o]);pdays.push(k)});
           const r=spearman(pairs);
           if(!r)return;
           /* the strict gate — big effect, real sample, past the t-cut;
@@ -13852,7 +13870,7 @@ function correlations(){
           {const half=Math.floor(pairs.length/2);
             const r1=spearman(pairs.slice(0,half)),r2=spearman(pairs.slice(half));
             if(!r1||!r2||r1.rho*r2.rho<=0||Math.abs(r1.rho)<0.25||Math.abs(r2.rho)<0.25)return}
-          found.push({sig:sig,out:out,lag:lag,rho:r.rho,n:r.n,
+          found.push({sig:sig,out:out,lag:lag,rho:r.rho,n:r.n,k:pdays[11]||pdays[pdays.length-1],   // the twelfth paired day: when it could first have cleared the bar
             score:Math.abs(r.rho)*Math.sqrt(r.n)})})})});
     found.sort((a,b)=>b.score-a.score);
     /* the reservoir widened (owner call, 4 Sep: 'more insights every
@@ -13949,7 +13967,7 @@ function correlationDiscoveries(){
   const cur=correlations();
   cur.forEach(c=>{
     const p=corrPhrase(c);
-    D.push({rar:(p.contra||p.sched)?'common':(p.strong?'epic':'rare'),t:p.title,d:p.body,x:p.x||'',tag:'signal',contra:p.contra?1:0,sched:p.sched?1:0,id:corrIdentity(c)})});
+    D.push({rar:(p.contra||p.sched)?'common':(p.strong?'epic':'rare'),t:p.title,d:p.body,x:p.x||'',tag:'signal',contra:p.contra?1:0,sched:p.sched?1:0,id:corrIdentity(c),k:c.k||null})});
   /* the second harvest (owner call, 3 Sep — more, all day, honestly):
      a known link STRENGTHENING on new evidence, or a once-solid link
      BREAKING, is genuinely new information. Tracked against the last
@@ -16197,7 +16215,7 @@ function treeXModel(){
     const R9=from?Rall.filter(r=>String(r.date).slice(0,10)>=from):Rall;   // auditcheck-allow: utc-day-key — a run row stores a local YYYY-MM-DD
     const folded=(Hall.length-H.length)+(Rall.length-R9.length);
     const bankAll=bankList().filter(x=>x.t);
-    const bank=from?bankAll.filter(x=>String(x.found||'')>=from):bankAll;
+    const bank=from?bankAll.filter(x=>String(x.when||x.found||'')>=from):bankAll;
     const seen=txSeenIds();
     const newN=bankAll.filter(x=>!seen[x.id]).length;
     let patN=0;try{patN=(typeof allPatterns==='function')?allPatterns().length:0}catch(e){}
@@ -16289,8 +16307,12 @@ function treeXModel(){
     /* finds → blossoms on stems off the trunk */
     const ORDR={common:0,uncommon:1,rare:2,epic:3};
     const byDay={};
-    const blossoms=bank.slice().sort((a,b)=>String(a.found||'').localeCompare(String(b.found||''))).map(x=>{
-      const k=String(x.found||first).slice(0,10);const f=k<first?0:frac(k);
+    /* a blossom sits at the day its EVENT happened (`when`), not the day
+       the app got round to banking it (`found`) — so a bulk load spreads
+       its finds down the trunk where they belong */
+    const bday=x=>String(x.when||x.found||first).slice(0,10);
+    const blossoms=bank.slice().sort((a,b)=>bday(a).localeCompare(bday(b))).map(x=>{
+      const k=bday(x);const f=k<first?0:frac(k);
       const n=byDay[k]=(byDay[k]||0)+1;
       const rank=ORDR[x.rar]??0;
       /* MANY FINDS ON ONE DAY FAN INTO A CROWN (seen in the browser: an
@@ -16351,8 +16373,14 @@ function treeXSvg(m,zIn){
     if(S._txSvg&&S._txSvg.key===key)return S._txSvg.svg;
     const o=[];
     const climb=TREE_RAMP.m.climb;
-    const SP=Math.pow(z,1.05);          // branch spread (the spread pass does the separating)
-    const SPT=Math.pow(z,1.1);          // twig spread
+    /* ZOOM SPREADS HARDER THAN IT SCALES (owner, at 6× on a dense life:
+       "still very cluttered and close to each other"). Branches and
+       twigs stretch more than the zoom, the days pull apart vertically
+       more than the zoom, and the spread pass demands a full dot's
+       width of clear space between dots at full zoom. */
+    const SP=Math.pow(z,1.3);           // branch spread
+    const SPT=Math.pow(z,1.4);          // twig spread
+    const ZY=Math.pow(z,1.15);          // days pull apart faster than the zoom
     const G=Math.pow(z,0.35);           // dot growth
     /* EVERY DOT IS TAPPABLE AT FULL ZOOM (owner, 14 Sep, at 6×: "all dots
        must be equivalent to the size you made the purple dots, the
@@ -16373,8 +16401,8 @@ function treeXSvg(m,zIn){
     const BUDS=z<1.8;
     const SW=Math.pow(z,0.45);          // stroke growth
     const FS=Math.pow(z,0.25);          // text growth
-    const X=x=>x*z,Y=y=>y*z;
-    const W=m.W*z,Hh=m.H*z,groundY=Y(m.groundY),topY=Y(m.topY);
+    const X=x=>x*z,Y=y=>y*ZY;
+    const W=m.W*z,Hh=m.H*ZY,groundY=Y(m.groundY),topY=Y(m.topY);
     const f1=v=>v.toFixed(1);
     /* THE CANVAS GROWS TO ITS OWN BOUNDS (found at 3×: a big session near
        today fanned its twigs above the top edge and those leaves could
@@ -16507,7 +16535,7 @@ function treeXSvg(m,zIn){
       const c=rarityOf(bl.rar)[1],r=bl.rank>=2?([1.9,2.4,3.0,3.8][bl.rank])*G:sz(([1.9,2.4][bl.rank]||1.9)*G);
       const sx=X(bl.x0),sy=Y(bl.y0),stem=bl.stem*SP;
       dots.push({x:sx+bl.side*Math.cos(bl.a)*stem,y:sy-Math.sin(bl.a)*stem,r:r,kind:'bloom',c:c,sx:sx,sy:sy,bl:bl})});
-    txSpread(dots,2.2*G);
+    txSpread(dots,2.2*G+TAP*0.9*tz);
     dots.forEach(d=>bd(d.x,d.y,d.r*2.4+8));
     dots.forEach(d=>{
       if(d.kind==='leaf'){
@@ -18106,8 +18134,11 @@ function bankDiscoveries(){
          stamp and the rarity earned stay. */
       const b=bank[d.id];
       if(b.t!==d.t||b.d!==d.d){b.t=d.t;b.d=d.d;if(d.x)b.x=d.x;touched++}
+      /* the event day rides in (and backfills every older entry) — the
+         found date itself is never touched */
+      if(d.k&&b.when!==d.k){b.when=d.k;touched++}
       return}
-    bank[d.id]={t:d.t,d:d.d,rar:d.rar,tag:d.tag,found:today()};
+    bank[d.id]={t:d.t,d:d.d,rar:d.rar,tag:d.tag,found:today(),when:d.k||null};
     /* the backwards flag and the explainer ride into the bank — the
        flag was dropped here, so the hero exclusion and the nudge
        filter never saw it (owner-caught, 11 Sep) */
@@ -19241,6 +19272,7 @@ const DEMO_PROG={id:'demo-block',demo:true,block:'Demo — Bench Block',kind:'st
     {name:'Preacher curl',rest:90,sets:{'default':[{w:25,reps:'10-12',rpe:9},{w:25,reps:'10-12',rpe:9}]}},
     {name:'Overhead DB extension',rest:90,sets:{'default':[{w:22,reps:'10-12',rpe:9},{w:22,reps:'10-12',rpe:9}]}}]}]};
 function demoLoad(){
+  try{setTimeout(function(){try{archiveSweep()}catch(e9){oops('demo.archive',e9)}},50)}catch(e){}
   const iso=n=>new Date(Date.now()-n*864e5).toISOString();
   const day=n=>iso(n).slice(0,10);
   if(!S.lib.programs.some(p=>p.id==='demo-block')){S.lib.programs.push(DEMO_PROG);S.lib.activeId='demo-block';saveLib()}
