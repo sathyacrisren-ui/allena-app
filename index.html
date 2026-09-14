@@ -855,7 +855,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='0ee3a7';  // stamped by tools/build.py with the content hash
+const BUILD_ID='b19e82';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -15801,7 +15801,12 @@ function growTreeTime(W,Hh,opts){
      limb rather than adding one, so counting them was cutting the lace
      off a tree that had not actually got any busier at the trunk. */
   const NLIMB=EX?((d.branches||[]).filter(b9=>!b9.follow).length||(d.branches||[]).length):0;
-  const MAXD=EX?Math.min(z<2?4:(z<4?3:2),(NLIMB>34?3:4)):4;
+  /* the poster's crown is a full rounded mass because it forks one level
+     deeper than the card. Spacing the explorer's limbs out left gaps that
+     only more SUBDIVISION can fill — filling them with more limbs is what
+     drew the bottlebrush. Zoomed in it still eases, because that is where
+     a fifth level starts looking like data it is not. */
+  const MAXD=EX?Math.min(z<2?5:(z<4?3:2),(NLIMB>34?3:5)):4;
   const BUDS=!EX||z<1.8;
   /* BUDS ARE TEXTURE, AND TEXTURE HAS A BUDGET (owner, 14 Sep: "the tree
      is extremely laggy"). One bud per free tip is right for a fifteen-
@@ -15810,7 +15815,7 @@ function growTreeTime(W,Hh,opts){
      carrying no data, at the one zoom where nobody can tell them apart.
      The chance thins as the tree fills, so the look holds and the count
      does not run away. */
-  const BUDP=POSTER?0.38:(EX?Math.min(0.8,560/Math.max(1,(d.branches||[]).length*14)):0.80);
+  const BUDP=POSTER?0.38:(EX?Math.min(0.8,900/Math.max(1,(d.branches||[]).length*14)):0.80);
   const dots=[];                             // explore: every tappable dot, spread apart before it is drawn
   const col=d.tier[2],leafCol=treeSeason().leaf;
   const groundY=Hh-26,topY=22,usable=groundY-topY;
@@ -15934,8 +15939,15 @@ function growTreeTime(W,Hh,opts){
   /* neon needs bloom or it is just a bright dot. Two circles beat an
      SVG filter here: a filter on several hundred leaves across four
      trees is a slideshow, and this costs one extra path each. */
-  const bloom=(x,y,r,c)=>POSTER?'<circle cx="'+x.toFixed(1)+'" cy="'+y.toFixed(1)+'" r="'+
-    (r*2.1).toFixed(1)+'" fill="'+c+'" opacity=".11"/>':'';
+  /* THE EXPLORER GETS THE POSTER'S BLOOM (owner, 14 Sep 2026: "the in-app
+     version needs to look the same" as the hybrid poster). This is what
+     makes the poster's canopy read as lit rather than as dots on black,
+     and it is ONE EXTRA CIRCLE per lit tip — not a filter. The lag that
+     was fixed this morning came from CSS drop-shadow, which makes the
+     compositor re-blur a node every frame; a translucent circle is drawn
+     once and costs nothing after that. Never confuse the two again. */
+  const bloom=(x,y,r,c)=>(POSTER||EX)?'<circle cx="'+x.toFixed(1)+'" cy="'+y.toFixed(1)+'" r="'+
+    (r*(POSTER?2.1:1.9)).toFixed(1)+'" fill="'+c+'" opacity="'+(POSTER?'.11':'.13')+'"/>':'';
   let out='';
   let mnX=W*0.12,mxX=W*0.88,mnY=topY,mxY=groundY;
   const bd=(x,y,r)=>{r=r||2;if(x-r<mnX)mnX=x-r;if(x+r>mxX)mxX=x+r;
@@ -16126,6 +16138,26 @@ function growTreeTime(W,Hh,opts){
     /* [2] is the width of the wood there — a session joining a limb can
        never be drawn thicker than the piece it joins */
     return[v*v*q[0]+2*v*t*q[2]+t*t*q[4],v*v*q[1]+2*v*t*q[3]+t*t*q[5],q[6]||0,q[7]==null?0:q[7]]};
+  /* ═══ A LIMB MEANDERS TOO (owner, 14 Sep 2026: "I think the branches
+     also meander, that's what makes it look more natural") ═════════════
+     One quadratic is a C: it bends one way and keeps bending, which is
+     what a drawn arc looks like and not what a branch looks like. Wood
+     grows toward light, gets knocked off course, and corrects — so it
+     leaves the trunk one way and finishes the other. A cubic with its
+     two handles thrown to OPPOSITE sides of the line is that shape, and
+     it costs the same one path. The quadratic's own bow still sets how
+     far the first half swings, so nothing about the crown's spread
+     changes; only the line does. */
+  const limbPath=(x0,y0,mx,my,x1,y1,k)=>{
+    if(!(EX||POSTER))return 'M'+x0.toFixed(1)+' '+y0.toFixed(1)+' Q'+mx.toFixed(1)+' '+my.toFixed(1)+' '+x1.toFixed(1)+' '+y1.toFixed(1);
+    const dx=x1-x0,dy=y1-y0,L=Math.hypot(dx,dy)||1;
+    const px=-dy/L,py=dx/L;                      // perpendicular to the run
+    const s1=(0.16+0.16*Math.abs(k))*L*(k<0?-1:1);
+    const s2=-s1*0.62;
+    return 'M'+x0.toFixed(1)+' '+y0.toFixed(1)+
+      ' C'+(x0+dx*0.30+px*s1).toFixed(1)+' '+(y0+dy*0.30+py*s1+(my-(y0+dy*0.30))*0.55).toFixed(1)+
+      ' '+(x0+dx*0.68+px*s2).toFixed(1)+' '+(y0+dy*0.68+py*s2).toFixed(1)+
+      ' '+x1.toFixed(1)+' '+y1.toFixed(1)};
   let side=-1;const usedY={};
   d.branches.slice(0,EX?100000:30).forEach((b,i)=>{
     let f=b.f;
@@ -16149,6 +16181,7 @@ function growTreeTime(W,Hh,opts){
     /* sage healed you, blue ran, steel rode, bark lifted — and the
        sage says WHICH PHASE, because that is the progression */
     b._j=(R()-0.5)*0.55;                  /* siblings, not copies */
+    b._s=(R()-0.5)*2;                     /* which way this limb sets off, and how hard */
     const bc=branchCol(b),bstroke=bc;
     /* THE CROWN IS MADE BY ONE RULE (13 Sep, owner reference: a bare
        wrought-iron tree). Low branches are LONG and near-horizontal;
@@ -16204,8 +16237,7 @@ function growTreeTime(W,Hh,opts){
     if(EX&&!follows&&WLAW==='thin')bwid=Math.min(bwid,Math.max(0.8*SWX,trunkHalf(f)*1.5));
     out+='<path data-tp="branch" data-tn="'+esc(b.n)+'" data-tk="'+esc(b.k)+
       (EX?'" data-a="txTap" data-v="'+esc(b.kind+':'+b.id)+'" id="'+txElId(b.kind,b.id)+'" pointer-events="all':'')+
-      '" d="M'+bx.toFixed(1)+' '+y0.toFixed(1)+' Q'+mx.toFixed(1)+' '+my.toFixed(1)+' '+
-      x1.toFixed(1)+' '+y1.toFixed(1)+'" stroke="'+bstroke+'" stroke-width="'+bwid.toFixed(2)+
+      '" d="'+limbPath(bx,y0,mx,my,x1,y1,b._s||0)+'" stroke="'+bstroke+'" stroke-width="'+bwid.toFixed(2)+
       '" fill="none" opacity="'+(EX?(b.walk?0.5:0.9):(0.9-i*0.02)).toFixed(2)+'" stroke-linecap="round"/>';
     /* A BRANCH FORKS. Time still fixes only where it MEETS the trunk;
        everything above that point is the same seeded recursion the
@@ -16235,7 +16267,7 @@ function growTreeTime(W,Hh,opts){
         const a2=base+spread*(n2===1?R()-0.5:1);
         const l2=ln*(0.56+R()*0.28);
         kids.push({a2:a2,l2:l2});lsum+=l2}
-      kids.forEach(kd=>{
+      kids.forEach((kd,k)=>{
         let a2=kd.a2;let l2=kd.l2;
         if(EX){
           /* STEERED BACK, NOT CUT. If this child would land outside the
@@ -16253,9 +16285,12 @@ function growTreeTime(W,Hh,opts){
         const w2=Math.max(WMIN,Math.min(wid,kidW(wid,n2,lsum?l2/lsum:1/n2)));
         const nx=px+Math.cos(a2)*l2,ny=py+Math.sin(a2)*l2;
         bd(nx,ny,3);
-        out+='<path data-tp="twig" d="M'+px.toFixed(1)+' '+py.toFixed(1)+' Q'+
-          (px+Math.cos(a2)*l2*0.5).toFixed(1)+' '+(py+Math.sin(a2)*l2*0.55).toFixed(1)+' '+
-          nx.toFixed(1)+' '+ny.toFixed(1)+'" stroke="'+woodCol(b,depth)+'" stroke-width="'+
+        out+='<path data-tp="twig" d="'+limbPath(px,py,
+            px+Math.cos(a2)*l2*0.5,py+Math.sin(a2)*l2*0.55,nx,ny,
+            /* alternating by child and depth, so one spray never all
+               bends the same way */
+            ((k%2?1:-1)*(0.45+((depth*7+k*3)%5)*0.16)))+
+          '" stroke="'+woodCol(b,depth)+'" stroke-width="'+
           w2.toFixed(2)+'" fill="none" opacity="'+(POSTER?0.92:0.85-depth*0.09).toFixed(2)+
           '" stroke-linecap="round"/>';
         if(segs)segs.push([px,py,px+Math.cos(a2)*l2*0.5,py+Math.sin(a2)*l2*0.55,nx,ny,w2,(hostD+depth+1)]);
