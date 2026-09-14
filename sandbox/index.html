@@ -862,7 +862,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='4c3383';  // stamped by tools/build.py with the content hash
+const BUILD_ID='c866ac';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -15769,7 +15769,19 @@ function growTreeTime(W,Hh,opts){
   const R=seedRand(d.seed);
   const RD=seedRand(String(d.seed)+':dots');   // see THE WOOD IS DRAWN FROM ITS OWN STREAM
   W=W||300;Hh=Hh||300;
-  const LS=EX?(W/z/300)*Math.pow(z,1.3):1;   // limb length: the card's numbers at this width, stretched more than the zoom
+  /* ═══ A ZOOM IS A SCALE (owner, 14 Sep 2026: "zoom shifts everything
+     every time you zoom, slightly — should be smooth") ═══════════════
+     Limb lengths grew z^0.3 while the canvas they sit in grew z, so the
+     drawing genuinely RE-LAID-OUT at every zoom step: the pinch showed a
+     uniform CSS scale, the redraw landed somewhere else, and everything
+     jumped. The idea behind it — spread the dots apart rather than fatten
+     them — does not need the geometry to move at all. Positions scale
+     with the zoom, so the gaps between dots already grow with it; what
+     must NOT grow with it is the ink: strokes at z^0.45 and dots at
+     z^0.35, which is what makes a zoomed-in tree read as zoomed in. The
+     shape is now the same shape at every zoom, exactly scaled, so a pinch
+     preview and its redraw agree to the pixel. */
+  const LS=EX?(W/300):1;                     // limb length scales with the canvas
   const SWX=EX?Math.pow(z,0.45):1;           // strokes grow slowly
   /* ═══ A CHILD IS NEVER THICKER THAN WHAT IT GROWS FROM (owner, 14 Sep
      2026: "a branch should not be thicker than the branch it is connected
@@ -16492,7 +16504,11 @@ function growTreeTime(W,Hh,opts){
       /* how much elbow room a find claims. opts.fan turns it up so a
          recent stretch with dozens of them spreads across the crown
          instead of matting into one blob. */
-      dots.push({x:bx,y:by,r:br9,pad:br9*(rk9>=2?1.1:0.7)*(+opts.fan||1),kind:'bloom',c:rarityOf(bl.rar)[1],bl:bl});
+      /* FANNED (owner, 14 Sep 2026, after the before/after board). A run of
+         finds in one recent stretch used to mat into a single blob; each
+         one asks for two and a half times its own halo in clear space now,
+         so they spread across the crown. Nothing moved in time. */
+      dots.push({x:bx,y:by,r:br9,pad:br9*(rk9>=2?1.1:0.7)*(+opts.fan||2.4),kind:'bloom',c:rarityOf(bl.rar)[1],bl:bl});
       return}
     out+=bloom(bx,by,bl.epic?3.8:2.7,rarCol(bl.epic))+
       '<circle data-tp="bloom" data-tk="'+esc(bl.k)+'" cx="'+bx.toFixed(1)+'" cy="'+by.toFixed(1)+
@@ -16532,7 +16548,15 @@ function growTreeTime(W,Hh,opts){
       else if(dd.kind==='pat'){const pt=dd.pt,c=dd.c,r=dd.r;
         out+='<path data-tp="pstem" d="M'+f1(dd.sx)+' '+f1(dd.sy)+' L'+f1(dd.x)+' '+f1(dd.y)+'" stroke="'+c+'" stroke-width="'+f1(0.7*SWX)+'" opacity=".45" stroke-linecap="round"/>'+
           ((pt.isNew&&nw9++<ANIM_MAX)?'<circle class="tx-new" cx="'+f1(dd.x)+'" cy="'+f1(dd.y)+'" r="'+f1(r+4*G)+'" fill="none" stroke="'+c+'" stroke-width="'+f1(1*SWX)+'"/>':'')+
-          '<path data-a="txTap" data-v="'+esc('pat:'+pt.t)+'" data-tp="pattern" pointer-events="all" stroke="'+c+'" stroke-width="'+f1(0.9*SWX)+'" d="M'+f1(dd.x)+' '+f1(dd.y-r)+' L'+f1(dd.x+r*0.62)+' '+f1(dd.y)+' L'+f1(dd.x)+' '+f1(dd.y+r)+' L'+f1(dd.x-r*0.62)+' '+f1(dd.y)+' Z" fill="'+c+'" fill-opacity=".35" opacity=".95"/>'}
+          /* A DIAMOND IS AS EASY TO HIT AS A LEAF (owner, 14 Sep 2026:
+             "very hard to click diamonds"). Every leaf and blossom carries
+             a transparent stroke several times its own width purely as a
+             tap target; the pattern seed was the one dot that did not, so
+             its hit area was the thin outline of a small lozenge. The
+             target is its own invisible circle now, and the shape it sits
+             under takes no taps at all. */
+          '<circle data-a="txTap" data-v="'+esc('pat:'+pt.t)+'" pointer-events="all" fill="transparent" cx="'+f1(dd.x)+'" cy="'+f1(dd.y)+'" r="'+f1(Math.max(r*2.2,TAP*1.2))+'"/>'+
+          '<path data-tp="pattern" pointer-events="none" stroke="'+c+'" stroke-width="'+f1(1.1*SWX)+'" d="M'+f1(dd.x)+' '+f1(dd.y-r)+' L'+f1(dd.x+r*0.62)+' '+f1(dd.y)+' L'+f1(dd.x)+' '+f1(dd.y+r)+' L'+f1(dd.x-r*0.62)+' '+f1(dd.y)+' Z" fill="'+c+'" fill-opacity=".55" opacity=".95"/>'}
       else{const bl=dd.bl,c=dd.c,r=dd.r,rk9=bl.rank|0,special=rk9>=2;
         const focus=S.treeFocus&&S.treeFocus===bl.id;
         /* THE HALO IS DRAWN AND THE MOVEMENT IS RATIONED (owner, 14 Sep:
@@ -16615,7 +16639,24 @@ function treeTimeLive(){try{return treeTimeOn()&&!!treeTimeData()}catch(e){retur
    code that looks like a feature: the same disease as the cardio
    ordering bug, one layer up.
    The share card still calls growTree on purpose (recorded deferral). */
-function treeSvg(W,Hh){return treeTimeOn()?growTreeTime(W,Hh):growTree(W,Hh)}
+/* ═══ THE CARD IS THE SAME TREE (owner, 14 Sep 2026: "tree is wildly
+   different from the preview for no reason, it should show the actual
+   current tree") ═══════════════════════════════════════════════════════
+   The Points card drew from treeTimeData's PERIOD model and the page drew
+   from the explorer's DAY model, so the two disagreed about what a branch
+   was, how many there were and what colour they came out — on the same
+   account, on the same day. A preview that is not a preview of anything is
+   worse than no preview. The card renders the explorer's own drawing now,
+   at the card's width: same limbs, same days, same finds, same colours,
+   just small. The old period model stays behind growTreeTime's default for
+   the poster tool and the comparison sheet. */
+function treeSvg(W,Hh){
+  if(!treeTimeOn())return growTree(W,Hh);
+  try{
+    const m=(typeof treeXModel==='function')?treeXModel():null;
+    if(m&&!m.empty&&m.H)return growTreeTime(W,Math.round(m.H*(W/((typeof TX_W!=='undefined')?TX_W:480))),{explore:true,zoom:1,card:true});}
+  catch(e){oops('treeSvg.card',e)}
+  return growTreeTime(W,Hh)}
 /* ══ THE EXPLORER — the whole tree, every set, every run, every find
    (owner ruling, 14 Sep 2026: "really, really, really detailed… every
    single finding, every single set, every single run… it needs to make
@@ -16939,7 +16980,11 @@ function treeXSvg(m,zIn){
     const key=m.stamp+'@'+z;
     if(S._txSvg&&S._txSvg.key===key)return S._txSvg.svg;
     S._txVbLast=null;
-    const svg=growTreeTime(TX_W*z,m.H*Math.pow(z,1.15),{explore:true,zoom:z});
+        /* the height scales with the zoom like everything else. It used to
+           grow z^1.15, which stretched the day axis away from the limbs and
+           was half of why a pinch jumped (see A ZOOM IS A SCALE in
+           14-tree.js) */
+    const svg=growTreeTime(TX_W*z,m.H*z,{explore:true,zoom:z});
     S._txSvg={key:key,svg:svg,vb:S._txVbLast||null};
     return svg}
   catch(e){oops('treeXSvg',e);return ''}}
@@ -17562,9 +17607,18 @@ function todayVerdict(){
       const gapD=(Date.now()-new Date(last9.date).getTime())/864e5;
       if(gapD<=1.5){
         const ws9=weekState(p,last9.week);
-        if(ws9&&ws9.total>0&&ws9.n>=ws9.total)
+        if(ws9&&ws9.total>0&&ws9.n>=ws9.total){
+          /* NAME THE WEEK YOU ARE IN, NOT ONLY THE ONE YOU FINISHED
+             (beta-caught by Angus, 14 Sep 2026: "thinks I'm on w2 when
+             it's w3"). Both surfaces were right — he had just finished
+             week 2's last session and the block had rolled to week 3 —
+             but a card headlined "Week 2" beside a Program page shouting
+             W3 reads as the app being confused, and a reader is entitled
+             to that reading. The next week is named here now, so the two
+             cannot look like they disagree. */
+          const nx9=(typeof weekFor==='function'?weekFor(p.id):0)||(last9.week+1);
           return{tone:'ok',wait:true,t:'Week '+last9.week+' done \u2014 all of it',
-            d:'Every session logged. Rest today \u2014 next week starts whenever you do.',cta:null}}}
+            d:'Every session logged. Rest today \u2014 week '+nx9+' starts whenever you do.',cta:null}}}}
   }catch(e){}
   /* when the calendar forces a merge, the closer IS the suggestion —
      every surface says the same thing (owner-caught, 6 Sep) */
