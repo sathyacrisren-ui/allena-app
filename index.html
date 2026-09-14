@@ -855,7 +855,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='70154b';  // stamped by tools/build.py with the content hash
+const BUILD_ID='e0a772';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -24147,6 +24147,8 @@ function viewData(){
   const left=Object.keys(byTitle).filter(k=>KNOWN.indexOf(k)<0);
   if(left.length)h+=setGroup('More',left.map(k=>setRow(I.prog,k,'',k)));
   h+='<p class="mono" style="color:var(--faint);font-size:10px;text-align:center;margin:22px 0 8px;letter-spacing:.08em">ALLENA · BUILD '+BUILD_ID+(SANDBOX?' · SANDBOX':'')+'</p>';
+  try{if(S._shX&&S._shX.length)h+='<p class="mono" style="color:var(--faint);font-size:9.5px;text-align:center;margin:0 0 6px;line-height:1.5">SHEETS · '+
+    esc(S._shX.slice().reverse().map(x=>x.t+' '+x.a+' '+x.f+'\u2192'+x.to).join('  \u00b7  '))+'</p>'}catch(e){oops('sheetXray',e)}
   try{if(S._ndgLast)h+='<p class="mono" style="color:var(--faint);font-size:9.5px;text-align:center;margin:0 0 6px">NUDGE PULL · '+esc(S._ndgLast.t||'')+' · '+esc(S._ndgLast.st||'')+(S._ndgLast.found!=null?' · found '+S._ndgLast.found:'')+(S._ndgLast.queued!=null?' · queued '+S._ndgLast.queued:'')+'</p>'}catch(e){}
     /* DIAGNOSTICS (audit, Phase D): the last failures this app hit, in
        memory only, never uploaded. Empty is the normal state. */
@@ -27360,13 +27362,20 @@ setInterval(function(){try{
     if(d>110){
       /* the panel and the dark leave together — the panel used to go
          first and the page sat under a full scrim with nothing on it */
+      /* A TRANSITION NEEDS A FRAME TO START FROM. The drag sets
+         transition:none; putting the duration back and the new transform
+         in the same style recalculation means the browser sees one change
+         and the panel JUMPS. Reading a layout property in between is what
+         commits the first value, so the second one animates. */
       s9.style.transition='transform .24s cubic-bezier(.4,0,.2,1)';
+      void s9.offsetWidth;
       s9.style.transform='translateY(105%)';
       if(b9){b9.classList.add('scrimout');b9.style.setProperty('--scrim','0')}
       try{vib(8)}catch(e2){}
       setTimeout(function(){runAction('closeSheet')},235)}
     else{
       s9.style.transition='transform .26s cubic-bezier(.34,1.4,.64,1)';
+      void s9.offsetWidth;
       s9.style.transform='';
       if(b9){b9.classList.add('scrimout');b9.style.setProperty('--scrim','1')}
       setTimeout(function(){try{s9.style.transition='';
@@ -27739,7 +27748,20 @@ document.addEventListener('click',e=>{
   pressOff();
   vib(8);
   const a=t.dataset.a,v=t.dataset.v;
-  if(a==='closeSheet'&&e.target.closest('[data-stop]')&&e.target.tagName!=='BUTTON')return;
+  /* ═══ A TAP INSIDE THE PANEL NEVER CLOSES IT (owner, 14 Sep 2026, with
+     a recording: a sheet that opened and vanished again inside a frame)
+     ═══════════════════════════════════════════════════════════════════
+     The scrim carries data-a="closeSheet", so a tap on sheet CONTENT that
+     has no action of its own walks up to the scrim and closes the sheet.
+     The old guard let it through whenever the tapped element was a
+     <button> — which was there to keep the sheet's own Close working, and
+     Close carries its own data-a, so it never needed the exception. What
+     the exception actually did was make EVERY plain button inside every
+     sheet a close button. The right test is about the ACTION's element,
+     not the tapped one: if the thing carrying closeSheet is the scrim and
+     the tap landed inside the panel, it was not a tap on the scrim. */
+  if(a==='closeSheet'&&t.classList&&t.classList.contains('sheet-bg')&&
+     e.target.closest('[data-stop]'))return;
   /* guarded (audit P3): a throwing case used to be indistinguishable
      from a dead button — silent, with only Diagnostics any the wiser */
   runActionSafe(a,v,t,e)});
@@ -27914,7 +27936,27 @@ function sheetScrollBack(){
    Every user tap goes through here now. The action still runs exactly as
    before; the only difference is that a failure is visible, survivable,
    and points at where the record of it lives. */
+/* ═══ THE SHEET X-RAY (owner, 14 Sep 2026, with a recording of a popup
+   that opened and vanished inside a frame) ═══════════════════════════
+   When a sheet closes itself there is nothing on screen to read and no
+   way to ask the phone what happened. Every action that changes which
+   sheet is up leaves a line here, and Settings prints the last eight
+   under the build stamp — the same shape as the nudge and wrist X-rays,
+   and for the same reason: a subsystem that goes quiet has to be able to
+   say why. Costs one array push per tap. */
+function sheetMark(a){
+  try{const was=(S.sheet&&S.sheet.t)||'-';
+    setTimeout(function(){
+      try{const now=(S.sheet&&S.sheet.t)||'-';
+        if(now===was)return;
+        S._shX=(S._shX||[]);
+        S._shX.push({a:String(a||'?').slice(0,18),f:was,to:now,
+          t:new Date().toTimeString().slice(0,8)});
+        if(S._shX.length>8)S._shX.shift()}
+      catch(e){oops('sheetMark.after',e)}},0)}
+  catch(e){oops('sheetMark',e)}}
 function runActionSafe(a,v,t,e){
+  sheetMark(a);
   try{runAction(a,v,t,e);return true}
   catch(err){
     oops('action:'+a,err);
