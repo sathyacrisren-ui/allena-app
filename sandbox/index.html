@@ -131,8 +131,8 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
 .find-glow{box-shadow:0 0 20px 0 rgba(48,209,88,.18),0 0 4px 0 rgba(48,209,88,.28)}
 .tx-new{animation:txPulse 1.6s ease-in-out infinite}@keyframes txPulse{0%,100%{opacity:.25}50%{opacity:.95}}
 .tx-guide{filter:drop-shadow(0 0 5px currentColor) drop-shadow(0 0 12px currentColor);animation:txPulse 1s ease-in-out 3}
-.tx-glow{filter:drop-shadow(0 0 2.5px currentColor) drop-shadow(0 0 7px currentColor)}
-.tx-glow-epic{filter:drop-shadow(0 0 3px currentColor) drop-shadow(0 0 10px currentColor) drop-shadow(0 0 18px currentColor)}
+.tx-glow{filter:drop-shadow(0 0 2px currentColor) drop-shadow(0 0 4.5px currentColor)}
+.tx-glow-epic{filter:drop-shadow(0 0 2.5px currentColor) drop-shadow(0 0 7px currentColor) drop-shadow(0 0 12px currentColor)}
 .tx-shim{transform-box:fill-box;transform-origin:center;animation:txShim 3.4s ease-in-out infinite}
 .tx-epic{animation-duration:2.3s}
 @keyframes txShim{0%,100%{transform:scale(1);opacity:.10}50%{transform:scale(1.4);opacity:.3}}
@@ -833,7 +833,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='18ae1b';  // stamped by tools/build.py with the content hash
+const BUILD_ID='b2f0a7';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -16040,8 +16040,11 @@ function growTreeTime(W,Hh,opts){
      rounded to something tidier than the data. */
   if(opts.dates!==false)(function(){
     const MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    /* a short tree ticks DAYS (owner's screenshot, 14 Sep: three "Sep
+       '26" in a row on a five-week window) */
     const lab=f=>{try{const t9=new Date(d.first+'T12:00');
       t9.setDate(t9.getDate()+Math.round(f*d.span));
+      if(d.span<150)return t9.getDate()+' '+MON[t9.getMonth()];
       return MON[t9.getMonth()]+' \u2019'+String(t9.getFullYear()).slice(2)}catch(e){return ''}};
     const dc=POSTER?'#8D8A84':'var(--faint)';
     const fs=POSTER?10:7.5, lx=mnX-7;
@@ -16233,11 +16236,17 @@ function treeXModel(){
       const twigs=order.map(b=>exs[b]);
       const nSets=twigs.reduce((a,t)=>a+t.sets.length,0);
       if(!nSets)return;
-      const bell=0.55+0.45*Math.sin(Math.PI*Math.pow(Math.max(0.02,Math.min(0.98,f)),1.25));
-      const len0=22+Math.min(96,nSets*3.6+twigs.length*4),len=len0*bell;
-      const ang=(14+f*22+R()*20)*Math.PI/180;
+      /* THE CARD'S OWN RULES (owner, 14 Sep: "I want it to look like the
+         left tree"): the crown is a bell — low limbs long and flat, high
+         limbs short and steep — with the card's numbers scaled from its
+         300px to this 480px, and the session's work stretching the limb
+         a little on top. */
+      const bell=Math.sin(Math.PI*Math.pow(Math.max(0.02,Math.min(0.98,f)),1.25));
+      const len0=(9+20*(0.18+0.82*bell))*1.6*(0.72+R()*0.62);
+      const work=0.85+Math.min(0.75,nSets/30),len=len0*work;
+      const ang=((26+f*30)+R()*18)*Math.PI/180;
       const ton=(h.log||[]).reduce((a,l)=>a+((l.w>0&&l.r>0)?l.w*l.r:0),0);
-      branches.push({kind:'sess',id:String(h.id),k:k,f:f,y:y0,x0:tx(f)+side*halfW(f)*0.9,side:side,ang:ang,len:len,len0:len0,bow:(R()-0.4)*0.6,dom:dom,sf:sfAt(f)+(R()-0.5)*0.4,
+      branches.push({kind:'sess',id:String(h.id),k:k,f:f,y:y0,x0:tx(f)+side*halfW(f)*0.9,side:side,ang:ang,len:len,len0:len0,work:work,bow:(R()-0.4)*0.6,dom:dom,sf:sfAt(f)+(R()-0.5)*0.4,
         title:h.dayTitle||(dom==='reh'?'Rehab':'Session'),sets:nSets,ton:ton,minutes:h.minutes||0,live:(typeof sessionLive==='function')?sessionLive(h):false,twigs:twigs})});
     /* runs, rides, walks → branches of kilometre leaves */
     R9.forEach(r=>{
@@ -16246,9 +16255,9 @@ function treeXModel(){
       const isRun=(typeof isRunType==='function')?isRunType(r.type):true;
       const dom=isRun?'run':(r.type==='ride'?'ride':'walk');
       const km=Math.max(0,+r.km||0);
-      const bell=0.55+0.45*Math.sin(Math.PI*Math.pow(Math.max(0.02,Math.min(0.98,f)),1.25));
-      const len=((dom==='walk'?16:22)+Math.min(110,km*(dom==='ride'?2.0:3.2)))*bell;
-      const ang=(12+f*22+R()*20)*Math.PI/180;
+      const bell=Math.sin(Math.PI*Math.pow(Math.max(0.02,Math.min(0.98,f)),1.25));
+      const len=(9+20*(0.18+0.82*bell))*1.6*(0.72+R()*0.62)*(dom==='walk'?0.6:(0.85+Math.min(0.9,km/24)));
+      const ang=((26+f*30)+R()*18)*Math.PI/180;
       branches.push({kind:'run',id:String(r.id||k+':'+km),k:k,f:f,y:y0,x0:tx(f)+side*halfW(f)*0.9,side:side,ang:ang,len:len,bow:(R()-0.4)*0.6,dom:dom,sf:sfAt(f)+(R()-0.5)*0.4,
         km:km,mins:+r.mins||0,hr:+r.hr||0,type:r.type||'',leaves:Math.min(45,Math.max(1,Math.round(km))),run:r})});
     /* finds → blossoms on stems off the trunk */
@@ -16319,11 +16328,24 @@ function treeXSvg(m,zIn){
     const SP=Math.pow(z,1.15);          // branch spread
     const SPT=Math.pow(z,1.25);         // twig spread
     const G=Math.pow(z,0.35);           // dot growth
+    /* EVERY DOT IS TAPPABLE AT FULL ZOOM (owner, 14 Sep, at 6×: "all dots
+       must be equivalent to the size you made the purple dots, the
+       smaller ones are too hard to click"). A dot's own size says its
+       work at 1×; as the zoom rises it converges on one common size,
+       the Rare blossom's, and reaches it at 6×. */
+    const TAP=3.0*G,tz=Math.max(0,Math.min(1,(z-1)/5));
+    const sz=r=>r*(1-tz)+TAP*tz;
     const SW=Math.pow(z,0.45);          // stroke growth
     const FS=Math.pow(z,0.25);          // text growth
     const X=x=>x*z,Y=y=>y*z;
     const W=m.W*z,Hh=m.H*z,groundY=Y(m.groundY),topY=Y(m.topY);
     const f1=v=>v.toFixed(1);
+    /* THE CANVAS GROWS TO ITS OWN BOUNDS (found at 3×: a big session near
+       today fanned its twigs above the top edge and those leaves could
+       not be scrolled to). The same rule the card uses: track every tip
+       and dot, and size the viewBox around them. */
+    let mnX=0,mxX=W,mnY=topY-40,mxY=Hh;
+    const bd=(x,y,r)=>{r=r||3;if(x-r<mnX)mnX=x-r;if(x+r>mxX)mxX=x+r;if(y-r<mnY)mnY=y-r;if(y+r>mxY)mxY=y+r};
     /* month ticks */
     (function(){const d=new Date(m.first+'T12:00');d.setDate(1);d.setMonth(d.getMonth()+1);
       const MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];let guard=0;
@@ -16373,46 +16395,68 @@ function treeXSvg(m,zIn){
     const leaf=(lx,ly,r,c,op,v,pr)=>dots.push({x:lx,y:ly,r:r,kind:'leaf',c:c,op:op,v:v,pr:pr});
     m.branches.forEach(b=>{
       const R=seedRand('branch:'+b.id);
-      const wood=txCol(m,b.dom,b.sf,0.2),twigC=txCol(m,b.dom,b.sf,0.9),leafC=txCol(m,b.dom,b.sf,1.9);
-      const bw=(b.kind==='sess'?(1.2+Math.min(1.8,b.sets*0.07)):(1.0+Math.min(1.6,b.km*0.05)))*SW;
+      const wood=txCol(m,b.dom,b.sf,0.2),leafC=txCol(m,b.dom,b.sf,1.9);
+      const woodAt=depth=>txCol(m,b.dom,b.sf,0.18+depth*0.24);
+      const budC=k=>txCol(m,b.dom,b.sf,1.25+k);
       const op=b.dom==='walk'?'.5':'.9';
       const L=b.len*SP,x0=X(b.x0),y0=Y(b.y);
       const x1=x0+b.side*Math.cos(b.ang)*L,y1=y0-Math.sin(b.ang)*L;
-      const mx=x0+b.side*Math.cos(b.ang)*L*(0.5+b.bow*0.4),my=y0-Math.sin(b.ang)*L*(0.3-b.bow*0.4);
+      const mx=x0+b.side*Math.cos(b.ang)*L*(0.5+b.bow*0.4),my=y0-Math.sin(b.ang)*L*(0.34-b.bow*0.5);
+      const bw=(2.4*(b.kind==='sess'?(0.8+Math.min(0.9,b.sets/24)):(0.7+Math.min(0.9,b.km/20))))*SW;
       o.push('<path data-a="txTap" data-v="'+esc(b.kind+':'+b.id)+'" data-tp="branch" id="'+txElId(b.kind,b.id)+'" pointer-events="all" d="'+txQ(x0,y0,mx,my,x1,y1)+'" stroke="'+wood+'" stroke-width="'+f1(bw)+'" fill="none" opacity="'+op+'" stroke-linecap="round"/>');
-      /* a twig that divides, and divides again — the card's lacy
-         recursion; returns its segments so leaves can sit on all of it */
-      const grow=(px,py,ang,ln,depth,wid,segs)=>{
-        const nx=px+b.side*Math.cos(ang)*ln,ny=py-Math.sin(ang)*ln;
-        const cx=px+b.side*Math.cos(ang)*ln*0.5,cy=py-Math.sin(ang)*ln*0.62;
-        o.push('<path data-tp="twig" d="'+txQ(px,py,cx,cy,nx,ny)+'" stroke="'+twigC+'" stroke-width="'+f1(wid)+'" fill="none" opacity="'+(0.85-depth*0.12).toFixed(2)+'" stroke-linecap="round"/>');
-        segs.push([px,py,cx,cy,nx,ny]);
-        if(depth<2&&ln>9*z){const kids=depth===0?2:(R()<0.6?2:1);
-          for(let k=0;k<kids;k++)grow(nx,ny,ang+((k?1:-1)*(12+R()*26))*Math.PI/180*(kids===1?(R()-0.5)*1.4:1),ln*(0.5+R()*0.25),depth+1,Math.max(0.3,wid*0.62),segs)}
-        return segs};
+      /* THE CARD'S FORK, VERBATIM IN SPIRIT: four levels, one to three
+         children, spread widening with depth, length 56-84% of the
+         parent, width x0.62, opacity fading. Every segment is kept so
+         the sets can sit on it; every tip is kept for a bud. */
+      const fork=(px,py,ax,ay,ln,depth,wid,segs,tips)=>{
+        if(depth>4||ln<2.4*z){tips.push([px,py]);return}
+        const n2=depth>=2?(R()<0.22?1:(R()<0.9?2:3)):(R()<0.1?1:2);
+        for(let k=0;k<n2;k++){
+          const spread=(k===0?-1:1)*(9+R()*30+depth*5)*Math.PI/180*(0.6+R()*0.9);
+          const base=Math.atan2(py-ay,px-ax);
+          const a2=base+spread*(n2===1?R()-0.5:1);
+          const l2=ln*(0.56+R()*0.28);
+          const nx=px+Math.cos(a2)*l2,ny=py+Math.sin(a2)*l2;
+          const cx=px+Math.cos(a2)*l2*0.5,cy=py+Math.sin(a2)*l2*0.55;
+          o.push('<path data-tp="twig" d="'+txQ(px,py,cx,cy,nx,ny)+'" stroke="'+woodAt(depth)+'" stroke-width="'+f1(Math.max(0.3,wid*0.62))+'" fill="none" opacity="'+(0.85-depth*0.09).toFixed(2)+'" stroke-linecap="round"/>');
+          segs.push([px,py,cx,cy,nx,ny]);bd(nx,ny,4);
+          fork(nx,ny,px,py,l2,depth+1,wid*0.62,segs,tips)}};
       const onSegs=(segs,u)=>{const segI=Math.min(segs.length-1,Math.floor(u*segs.length*0.999));
         const sg=segs[segI];const uu=(u*segs.length)-segI;
         return txOnQ(sg[0],sg[1],sg[2],sg[3],sg[4],sg[5],Math.min(1,uu))};
+      const bud=(tp,k)=>{if(R()<0.2)return;const rr=(0.8+R()*0.6)*G;
+        o.push('<circle data-tp="bud" cx="'+f1(tp[0])+'" cy="'+f1(tp[1])+'" r="'+f1(rr)+'" fill="'+budC((R()-0.5)*0.9)+'" opacity="'+(0.5+R()*0.25).toFixed(2)+'"/>')};
       if(b.kind==='sess'){
+        /* each exercise is one child leaving the limb's end — the card's
+           first fork — with its own subtree; extra exercises beyond four
+           leave the limb further down */
         const n=b.twigs.length;
         b.twigs.forEach((tw,j)=>{
-          const t=0.26+0.68*(j+1)/(n+1);const P=txOnQ(x0,y0,mx,my,x1,y1,t);
-          const flip=(j%2?1:-1);
-          const a2=b.ang+flip*(24+R()*26)*Math.PI/180;
-          const tl=(9+Math.min(30,tw.sets.length*3.6))*SPT;
-          const segs=grow(P[0],P[1],a2,tl,0,0.75*SW,[]);
+          let px=x1,py=y1,ax=mx,ay=my;
+          if(j>=4){const t=0.45+0.5*((j-4)+1)/((n-4)+1);const P=txOnQ(x0,y0,mx,my,x1,y1,t);px=P[0];py=P[1];ax=x0;ay=y0}
+          const base=Math.atan2(py-ay,px-ax);
+          const spread=((j%2)?1:-1)*(9+R()*30+Math.floor(j/2)*11)*Math.PI/180*(0.6+R()*0.9);
+          const a2=base+spread;
+          const l2=L*(0.56+R()*0.28)*(0.7+Math.min(0.6,tw.sets.length/8))*Math.pow(z,0.1);
+          const nx=px+Math.cos(a2)*l2,ny=py+Math.sin(a2)*l2;
+          const cx=px+Math.cos(a2)*l2*0.5,cy=py+Math.sin(a2)*l2*0.55;
+          const segs=[[px,py,cx,cy,nx,ny]],tips=[];
+          o.push('<path data-tp="twig" d="'+txQ(px,py,cx,cy,nx,ny)+'" stroke="'+woodAt(0)+'" stroke-width="'+f1(Math.max(0.3,bw*0.62))+'" fill="none" opacity=".85" stroke-linecap="round"/>');
+          bd(nx,ny,4);fork(nx,ny,px,py,l2,1,bw*0.62,segs,tips);
           const mS=tw.sets.length;
-          tw.sets.forEach((st,i)=>{const u=0.3+0.7*(i+1)/(mS+1);
+          tw.sets.forEach((st,i)=>{const u=0.2+0.8*(i+1)/(mS+1);
             const Q=onSegs(segs,u);
-            leaf(Q[0]+(R()-0.5)*2.4*G,Q[1]+(R()-0.5)*2.4*G,(0.95+1.9*st.rel)*G,leafC,0.6+0.35*st.rel,'set:'+b.id+':'+st.i,st.pr)})})}
+            leaf(Q[0]+(R()-0.5)*2.2*G,Q[1]+(R()-0.5)*2.2*G,sz((0.8+1.6*st.rel)*G),leafC,0.6+0.35*st.rel,'set:'+b.id+':'+st.i,st.pr)});
+          tips.forEach(tp=>bud(tp))})}
       else{
-        const segs=[[x0,y0,mx,my,x1,y1]];
-        if(b.len>40)grow(x1,y1,b.ang+(R()-0.5)*0.6,L*0.42,1,Math.max(0.4,bw*0.6),segs);
+        const segs=[[x0,y0,mx,my,x1,y1]],tips=[];
+        fork(x1,y1,mx,my,L*0.7,1,bw,segs,tips);
         const n=b.leaves;
         for(let i=0;i<n;i++){const u=(i+0.6)/(n+0.2);
           const Q=onSegs(segs,u);
-          const perp=(i%2?1:-1)*(2.2+R()*1.6)*G;
-          leaf(Q[0]-Math.sin(b.ang)*perp*b.side*0.3,Q[1]-Math.cos(b.ang)*perp,(b.dom==='walk'?1.0:(1.3+(b.hr>0?0.4:0)))*G,leafC,b.dom==='walk'?0.5:0.8,b.kind+':'+b.id,false)}}});
+          const perp=(i%2?1:-1)*(1.8+R()*1.4)*G;
+          leaf(Q[0]-Math.sin(b.ang)*perp*b.side*0.3,Q[1]-Math.cos(b.ang)*perp,sz((b.dom==='walk'?0.9:(1.1+(b.hr>0?0.35:0)))*G),leafC,b.dom==='walk'?0.5:0.8,b.kind+':'+b.id,false)}
+        tips.forEach(tp=>bud(tp))}});
     /* phases cleared */
     m.phases.slice(0,8).forEach(ph=>{const y=Y(m.yAt(ph.f)),x=X(m.tx(ph.f))+(ph.p%2?1:-1)*(m.halfW(ph.f)*SW+6*G);
       o.push('<circle data-tp="phase" cx="'+f1(x)+'" cy="'+f1(y)+'" r="'+f1(3.4*G)+'" fill="#C96442" opacity=".92"/>'+
@@ -16421,17 +16465,18 @@ function treeXSvg(m,zIn){
     (m.patterns||[]).forEach(pt=>{
       const c=pt.tone==='warn'?'var(--amber)':pt.tone==='good'?'var(--green)':'var(--dim)';
       const sx=X(pt.x0),sy=Y(pt.y0),stem=pt.stem*SP;
-      dots.push({x:sx+pt.side*Math.cos(pt.a)*stem,y:sy-Math.sin(pt.a)*stem,r:3.2*G,kind:'pat',c:c,sx:sx,sy:sy,pt:pt})});
+      dots.push({x:sx+pt.side*Math.cos(pt.a)*stem,y:sy-Math.sin(pt.a)*stem,r:sz(2.6*G),kind:'pat',c:c,sx:sx,sy:sy,pt:pt})});
     /* blossoms: the rarity ladder, the same constant every surface reads */
     m.blossoms.forEach(bl=>{
-      const c=rarityOf(bl.rar)[1],r=([2.6,3.2,3.9,4.8][bl.rank]||2.6)*G;
+      const c=rarityOf(bl.rar)[1],r=bl.rank>=2?([1.9,2.4,3.0,3.8][bl.rank])*G:sz(([1.9,2.4][bl.rank]||1.9)*G);
       const sx=X(bl.x0),sy=Y(bl.y0),stem=bl.stem*SP;
       dots.push({x:sx+bl.side*Math.cos(bl.a)*stem,y:sy-Math.sin(bl.a)*stem,r:r,kind:'bloom',c:c,sx:sx,sy:sy,bl:bl})});
     txSpread(dots,2.2*G);
+    dots.forEach(d=>bd(d.x,d.y,d.r*2.4+8));
     dots.forEach(d=>{
       if(d.kind==='leaf'){
         o.push('<circle data-a="txTap" data-v="'+esc(d.v)+'" data-tp="leaf" pointer-events="all" stroke="transparent" stroke-width="'+f1(7*G)+'" cx="'+f1(d.x)+'" cy="'+f1(d.y)+'" r="'+d.r.toFixed(2)+'" fill="'+d.c+'" opacity="'+d.op.toFixed(2)+'"/>'+
-          (d.pr?'<circle cx="'+f1(d.x)+'" cy="'+f1(d.y)+'" r="'+(d.r+1.4*G).toFixed(2)+'" fill="none" stroke="#F0EEE6" stroke-width="'+f1(0.6*SW)+'" opacity=".8"/>':''))}
+          (d.pr?'<circle cx="'+f1(d.x)+'" cy="'+f1(d.y)+'" r="'+(d.r+1.2*G).toFixed(2)+'" fill="none" stroke="#F0EEE6" stroke-width="'+f1(0.45*SW)+'" opacity=".55"/>':''))}
       else if(d.kind==='pat'){const pt=d.pt,c=d.c,r=d.r,bx=d.x,by=d.y;
         o.push('<path data-tp="pstem" d="M'+f1(d.sx)+' '+f1(d.sy)+' L'+f1(bx)+' '+f1(by)+'" stroke="'+c+'" stroke-width="'+f1(0.7*SW)+'" opacity=".45" stroke-linecap="round"/>'+
           (pt.isNew?'<circle class="tx-new" cx="'+f1(bx)+'" cy="'+f1(by)+'" r="'+f1(r+4*G)+'" fill="none" stroke="'+c+'" stroke-width="'+f1(1*SW)+'"/>':'')+
@@ -16440,16 +16485,20 @@ function treeXSvg(m,zIn){
         const focus=S.treeFocus&&S.treeFocus===bl.id;
         const special=bl.rank>=2;
         o.push('<path data-tp="stem" d="M'+f1(d.sx)+' '+f1(d.sy)+' L'+f1(bx)+' '+f1(by)+'" stroke="'+c+'" stroke-width="'+f1(0.8*SW)+'" opacity=".55" stroke-linecap="round"/>'+
-          (special?'<circle class="tx-shim'+(bl.rank===3?' tx-epic':'')+'" cx="'+f1(bx)+'" cy="'+f1(by)+'" r="'+f1(r*2.2)+'" fill="'+c+'" opacity=".12"/>':'')+
+          (special?'<circle class="tx-shim'+(bl.rank===3?' tx-epic':'')+'" cx="'+f1(bx)+'" cy="'+f1(by)+'" r="'+f1(r*1.8)+'" fill="'+c+'" opacity=".12"/>':'')+
           (bl.isNew?'<circle class="tx-new" cx="'+f1(bx)+'" cy="'+f1(by)+'" r="'+f1(r+4*G)+'" fill="none" stroke="'+c+'" stroke-width="'+f1(1*SW)+'"/>':'')+
           '<circle data-a="txTap" data-v="'+esc('find:'+bl.id)+'" data-tp="bloom"'+(special?' class="tx-glow'+(bl.rank===3?' tx-glow-epic':'')+'" style="color:'+c+'"':'')+' pointer-events="all" stroke="transparent" stroke-width="'+f1(8*G)+'" id="'+txElId('find',bl.id)+'" cx="'+f1(bx)+'" cy="'+f1(by)+'" r="'+f1(r)+'" fill="'+c+'" opacity="'+(special?'.97':'.85')+'"/>'+
           (bl.rank>=2?'<circle cx="'+f1(bx)+'" cy="'+f1(by)+'" r="'+f1(r+2.2*G)+'" fill="none" stroke="'+c+'" stroke-width="'+f1(0.6*SW)+'" opacity=".45"/>':'')+
           (focus?'<circle class="tx-new" cx="'+f1(bx)+'" cy="'+f1(by)+'" r="'+f1(r+9*G)+'" fill="none" stroke="'+c+'" stroke-width="'+f1(1.4*SW)+'"/>'+
             '<text x="'+f1(bx+bl.side*(r+12*G))+'" y="'+f1(by+3)+'" text-anchor="'+(bl.side>0?'start':'end')+'" font-size="'+f1(8*FS)+'" fill="'+c+'" font-family="-apple-system,system-ui,sans-serif" style="paint-order:stroke;stroke:#1F1E1D;stroke-width:3px">'+esc(String(bl.t).slice(0,34))+'</text>':''))}});
-    const svg='<svg viewBox="0 0 '+f1(W)+' '+f1(Hh)+'" style="width:100%;height:auto;display:block;overflow:visible">'+o.join('')+'</svg>';
-    S._txSvg={key:key,svg:svg};
+    const pad=8;
+    const vb={x:mnX-pad,y:mnY-pad,w:(mxX-mnX)+pad*2,h:(mxY-mnY)+pad*2};
+    const svg='<svg viewBox="'+f1(vb.x)+' '+f1(vb.y)+' '+f1(vb.w)+' '+f1(vb.h)+'" style="width:100%;height:auto;display:block;overflow:visible">'+o.join('')+'</svg>';
+    S._txSvg={key:key,svg:svg,vb:vb};
     return svg}
   catch(e){oops('treeXSvg',e);return ''}}
+function txVb(){try{const v=S._txSvg&&S._txSvg.vb;if(v)return v}catch(e){oops('txVb',e)}
+  const m=treeXModel(),z=txZ();return{x:0,y:0,w:(m.W||TX_W)*z,h:(m.H||TX_MINH)*z}}
 function txSpread(dots,gap){
   /* push any two dots apart until they clear each other by `gap`; a few
      passes over a spatial hash, so a canopy of thousands stays cheap.
@@ -16529,8 +16578,8 @@ function treeXAfterRender(){
       w.addEventListener('scroll',function(){S._txScroll={t:w.scrollTop,l:w.scrollLeft}},{passive:true})}
     if(S._txGoto){const id=S._txGoto;S._txGoto=null;
       const el=document.getElementById(String(id).indexOf('tx')===0?String(id):txElId('find',id));
-      if(el){const m=treeXModel();const P=txElPoint(el);const cy=P[1],cx=P[0];
-        const sc=(inner.clientWidth||TX_W)/((m.W||TX_W)*txZ());
+      if(el){const vb=txVb();const P=txElPoint(el);const cy=P[1]-vb.y,cx=P[0]-vb.x;
+        const sc=(inner.clientWidth||TX_W)/(vb.w||TX_W);
         w.scrollTop=Math.max(0,cy*sc-w.clientHeight*0.45);w.scrollLeft=Math.max(0,cx*sc-w.clientWidth*0.5);
         S._txScroll={t:w.scrollTop,l:w.scrollLeft};return}}
     if(S._txScroll){w.scrollTop=S._txScroll.t;w.scrollLeft=S._txScroll.l}}
@@ -16636,8 +16685,8 @@ function treeGuide(kind,id){
     setTimeout(function(){try{
       const w=document.getElementById('txwrap'),inner=document.getElementById('txinner'),el=document.getElementById(elId);
       if(!w||!inner||!el)return treeGuideTo(kind,id);
-      const m=treeXModel();const sc=(inner.clientWidth||TX_W)/((m.W||TX_W)*1);
-      const P=txElPoint(el);const px=P[0]*sc,py=P[1]*sc;
+      const vb=txVb();const sc=(inner.clientWidth||TX_W)/(vb.w||TX_W);
+      const P=txElPoint(el);const px=(P[0]-vb.x)*sc,py=(P[1]-vb.y)*sc;
       try{el.classList.add('tx-guide')}catch(e9){}
       const top=Math.max(0,py-w.clientHeight*0.45),left=Math.max(0,px-w.clientWidth*0.5);
       try{w.scrollTo({top:top,left:left,behavior:'smooth'})}catch(e9){w.scrollTop=top;w.scrollLeft=left}
