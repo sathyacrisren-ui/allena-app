@@ -912,7 +912,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='49608f';  // stamped by tools/build.py with the content hash
+const BUILD_ID='4d19ba';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -1386,7 +1386,35 @@ function applyAdj(exName,delta,why,silent){
   if(!prog)return false;
   prog.adj=prog.adj||{};
   const before=prog.adj[exName]||0;
-  prog.adj[exName]=Math.round((before+delta)*4)/4;
+  /* ═══ A LIFT CANNOT BE BURIED BELOW ZERO (audit pass C, 14 Sep 2026)
+     ═══════════════════════════════════════════════════════════════════
+     prog.adj was written as before+delta with no clamp anywhere, while the
+     SET's target was clamped at zero. Those two facts together make the
+     damage one-way. Simulated on a 100 kg lift: twenty cuts of 5 kg —
+     which is a month of a lift trained three times a week through an
+     illness, and cuts are "safety and always apply" so they have no weekly
+     limit — leave adj at MINUS 100. The prescription reads 0 kg. Then
+     thirty earned increases of 2.5, a season's honest work, only bring it
+     back to minus 25: the lifter is paying back weight they never lost,
+     and the screen shows nothing for weeks.
+     The floor is the authored weight itself, so the effective prescription
+     can reach zero and never pass it. Nothing else about regulation moves:
+     every cut inside the range still applies in full. */
+  let floor=-Infinity;
+  try{
+    let exDef=null;
+    ((prog&&prog.days)||[]).some(d9=>(d9.exercises||[]).some(x9=>{
+      if(x9.name===exName){exDef=x9;return true}return false}));
+    if(exDef){
+      const wk9=(typeof weekFor==='function')?weekFor(prog.id):(S.week||1);
+      const l9=setsForWeek(exDef,wk9)||setsForWeek(exDef,1);
+      const st9=(l9||[]).find(x9=>x9&&x9.w!=null);
+      if(st9&&+st9.w>0)floor=-(+st9.w)}}
+  catch(e9){oops('applyAdj.floor',e9)}
+  const want=Math.round((before+delta)*4)/4;
+  prog.adj[exName]=Math.max(floor,want);
+  if(want<floor&&!silent){try{flash('That lift is already down to nothing against what was written \u2014 this is a programming question now, not a load one.')}catch(_){}}
+  delta=prog.adj[exName]-before;          // what was ACTUALLY applied
   saveLib();
   if(S.sess){
     S.sess.sets.forEach(st=>{if(st.ex===exName&&st.targetW!=null){st.targetW=Math.max(0,Math.round((st.targetW+delta)*4)/4);st.adj=(st.adj||0)+delta}});
@@ -15526,7 +15554,39 @@ function treeTimeData(opts){
       if(!m||m.empty)return null;
       const t=treeData();
       const branches=m.branches.map(b=>Object.assign({},b,{n:b.title||b.kind,dom:b.dom==='walk'?'ride':b.dom,walk:b.dom==='walk',reh:b.dom==='reh'}));
-      const blossom=(m.blossoms||[]).map(x=>Object.assign({},x,{epic:x.rank===3}));
+      let blossom=(m.blossoms||[]).map(x=>Object.assign({},x,{epic:x.rank===3}));
+      /* ═══ THE CARD BUNDLES; THE PAGE DRAWS EVERYTHING (owner, 14 Sep
+         2026: "the condensed version doesn't look right, branch top left
+         floating — I know there's a lot of data to put in one small photo,
+         it can just bundle things together, average it, to make it fit")
+         ═══════════════════════════════════════════════════════════════
+         The page is a map you scroll into, so every day gets its own limb
+         and every find its own blossom. The card is a portrait seen whole
+         at 300px: twenty-eight limbs and ninety finds in that space is not
+         detail, it is noise — and a limb whose neighbours are all on top
+         of it reads as floating, because you cannot see what it joins.
+         So the card GROUPS. Days bundle into eight clusters, and the finds
+         it shows are the rarest and the newest rather than all of them.
+         Nothing is lost: the page still has all of it, one tap away. */
+      if(opts.card){
+        const days=[];branches.forEach(b=>{if(days.indexOf(b.k)<0)days.push(b.k)});
+        days.sort();
+        const grp=Math.max(1,Math.ceil(days.length/8));
+        const lead={};
+        branches.forEach(b=>{
+          const g='c'+Math.floor(days.indexOf(b.k)/grp);
+          b.lk=g;
+          if(!lead[g]){lead[g]=b;b.lead=true;b.follow=false}
+          else{b.lead=false;b.follow=true}});
+        Object.keys(lead).forEach(g=>{
+          const kids=branches.filter(b=>b.lk===g);
+          const ds=[];kids.forEach(b=>{if(ds.indexOf(b.k)<0)ds.push(b.k)});ds.sort();
+          kids.forEach(b=>{const di=ds.indexOf(b.k);
+            b.lu=ds.length<2?0.10:(0.10+0.62*(di/(ds.length-1)))})});
+        /* the rarest first, then the newest — a card should show the finds
+           worth seeing, not the ninety it happens to hold */
+        blossom=blossom.slice().sort((a,b)=>(b.rank-a.rank)||String(b.k||'').localeCompare(String(a.k||''))).slice(0,14);
+      }
       let scar=null,phases=[];
       try{const a=S.acl||{};
         if(a.on&&a.date&&a.date>=m.first)scar={f:m.frac(a.date),k:a.date};
@@ -15824,7 +15884,10 @@ function growTreeTime(W,Hh,opts){
      with opts.explore unset nothing here changes. */
   const EX=!!opts.explore;
   const z=EX?Math.max(1,Math.min(6,+opts.zoom||1)):1;
-  const d=treeTimeData(EX?{explore:true}:null);
+  /* the card flag has to reach the ADAPTER, not just the renderer — the
+     bundling that makes a 300px portrait readable happens where the model
+     is turned into branches, and passing {explore:true} alone dropped it */
+  const d=treeTimeData(EX?{explore:true,card:!!opts.card}:null);
   if(!d)return EX?'':growTree(W,Hh);    // under the floor, the old tree, unchanged
   const R=seedRand(d.seed);
   const RD=seedRand(String(d.seed)+':dots');   // see THE WOOD IS DRAWN FROM ITS OWN STREAM
@@ -16490,7 +16553,7 @@ function growTreeTime(W,Hh,opts){
          the leaf opens its exercise's top set with every other set of it
          that day listed underneath. `opts.leaf` still forces any of the
          three for a board or a future setting. */
-      const LEAF=String(opts.leaf||'ex');
+      const LEAF=String(opts.leaf||(opts.card?'sess':'ex'));
       /* THE WOOD IS DRAWN FROM ITS OWN STREAM (owner, 14 Sep 2026: "tree
          changes when you zoom"). Leaf jitter used to draw from the same
          seeded PRNG as the branches, and how MANY leaves there are depends
