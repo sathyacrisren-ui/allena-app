@@ -833,7 +833,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='e0af6a';  // stamped by tools/build.py with the content hash
+const BUILD_ID='58e6a4';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -9401,9 +9401,34 @@ function runAdd(r){
   try{const mt=rpMatchRun(r);
     if(mt&&mt.device)flash('Plan ticked — the '+(mt.kind||'run')+' ('+udNum(mt.km)+' '+udUnit()+'), witnessed by your watch.')}catch(e){}
 }
+/* DELETED STAYS DELETED (owner, 14 Sep: "I deleted my old runs… I closed
+   and reopened Allena and it resynced the Apple Health data. Shouldn't
+   do that."). The Health import only asked whether an id still existed,
+   so a run the user removed looked like a new one on the next sync and
+   came straight back. A deletion is remembered now — by id, and by its
+   day-and-distance signature so a clock-skewed twin cannot slip past —
+   on the run-seen store (an existing key; every other reader of it
+   only tests its own 'acwr…' entries). Every sync honours it. Bringing
+   deleted runs back is one deliberate button in Settings, never a
+   side effect of opening the app. */
+function runDelSig(r){try{return 'delsig:'+String(r.date).slice(0,10)+':'+Math.round((+r.km||0)*5)/5}catch(e){return ''}}   // auditcheck-allow: utc-day-key — a run row stores a local YYYY-MM-DD
 function runDel(id){
+  try{const r=runs().find(x=>x.id===id);
+    if(r){S.runSeen=S.runSeen||{};S.runSeen['del:'+id]=today();const sg=runDelSig(r);if(sg)S.runSeen[sg]=today();lset(K_RUNSEEN,S.runSeen)}}
+  catch(e){oops('runDel.tomb',e)}
   S.runs=runs().filter(r=>r.id!==id);runSave();
   S.history=S.history.filter(h=>h.id!=='run-'+id);saveHistory()}
+function runDeleted(w){
+  /* was this workout removed by the user? */
+  try{const d=S.runSeen||{};return !!(d['del:'+w.id]||d[runDelSig(w)])}catch(e){return false}}
+function runDelCount(){try{return Object.keys(S.runSeen||{}).filter(k=>k.indexOf('del:')===0).length}catch(e){return 0}}
+function runUndelete(){
+  /* the one door back: forget every deletion and ask Health again */
+  try{const d=S.runSeen||{};let n=0;
+    Object.keys(d).forEach(k=>{if(k.indexOf('del:')===0||k.indexOf('delsig:')===0){delete d[k];n++}});
+    S.runSeen=d;lset(K_RUNSEEN,d);
+    try{if(typeof inWrapper==='function'&&inWrapper())window.webkit.messageHandlers.allena.postMessage('sync')}catch(e9){oops('runUndelete.sync',e9)}
+    return n}catch(e){oops('runUndelete',e);return 0}}
 function paceStr(min,km){if(!min||!km)return '';const p=UNITS.d==='mi'?min/(km*MI_KM):min/km;
   const m=Math.floor(p),sec=Math.round((p-m)*60);
   return m+':'+String(sec).padStart(2,'0')+' /'+udUnit()}
@@ -10225,6 +10250,7 @@ function hkImport(parsed){
   let added=0;const byType={};
   parsed.workouts.forEach(w=>{
     if(have.has(w.id))return;
+    if(typeof runDeleted==='function'&&runDeleted(w))return;   // the user removed this one; it stays removed
     if(nearDup(w))return;
     have.add(w.id);
     runAdd(w);added++;byType[w.type]=(byType[w.type]||0)+1});
@@ -23682,7 +23708,9 @@ function viewData(){
     setRow(I.save,'Export a backup',backupDue()?'due':'','Export'),
     setRow(I.back,'Restore from backup','','Restore'),
     setRow(I.back,'Start fresh','','Start fresh'),
-    setRow(I.prog,'Logged RIR instead of RPE?','one-tap repair','__rirfix')]);
+    setRow(I.prog,'Logged RIR instead of RPE?','one-tap repair','__rirfix')].concat(
+    (typeof runDelCount==='function'&&runDelCount()>0)
+      ?[navRow(I.load,'Bring back runs you deleted',String(runDelCount()),'runUndelete',null,{sub:'Health won’t re-add a deleted run on its own. This does, on purpose.'})]:[]));
   h+=setGroup('Help',[
     setRow(I.bug,'Get help','sathya@allenaapp.com','__help')]);
   h+=setGroup('Beta testing',[
@@ -27719,6 +27747,8 @@ function runAction(a,v,t,e){
     case 'treeGuide':{const s9=String(v||'');const i9=s9.indexOf(':');if(i9<0)break;
       treeGuide(s9.slice(0,i9),s9.slice(i9+1));break}
     case 'treePopHide':{S._txPopHide=today();render();break}
+    case 'runUndelete':{const n=runUndelete();S.patCache=null;render();
+      flash(n?'Forgotten. Health syncs them back on the next open, or now if it can.':'Nothing was deleted.');break}
     case 'treeZoom':{const z=Math.max(1,Math.min(6,+S.txZoom||1));
       S.txZoom=Math.round((v==='in'?Math.min(6,z*1.5):Math.max(1,z/1.5))*10)/10;render();break}
     case 'treeLegendTog':{S.treeLegend=!S.treeLegend;render();break}
