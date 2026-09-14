@@ -131,8 +131,18 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
 .find-glow{box-shadow:0 0 20px 0 rgba(48,209,88,.18),0 0 4px 0 rgba(48,209,88,.28)}
 .tx-new{animation:txPulse 1.6s ease-in-out infinite}@keyframes txPulse{0%,100%{opacity:.25}50%{opacity:.95}}
 .tx-guide{filter:drop-shadow(0 0 5px currentColor) drop-shadow(0 0 12px currentColor);animation:txPulse 1s ease-in-out 3}
-.tx-glow{filter:drop-shadow(0 0 2px currentColor) drop-shadow(0 0 4.5px currentColor)}
-.tx-glow-epic{filter:drop-shadow(0 0 2.5px currentColor) drop-shadow(0 0 7px currentColor) drop-shadow(0 0 12px currentColor)}
+/* A GLOW IS DRAWN, NEVER FILTERED (owner-reported, 14 Sep 2026: "the
+   tree is extremely laggy"). These two rules put two and three stacked
+   drop-shadow blurs on EVERY rare and epic blossom — dozens of filtered
+   nodes inside one huge scrolling SVG, each re-blurred by the compositor
+   on every frame of every scroll and every pinch. That was the cost, not
+   the element count: generating the whole drawing takes 11-25 ms, and the
+   page still crawled. The halo is concentric circles in the drawing now —
+   same look, one paint, and it scales with the zoom like everything else.
+   The classes stay as markers (the renderer and the tests read them).
+   LAW: no CSS filter on anything the tree repeats. */
+.tx-glow{}
+.tx-glow-epic{}
 .tx-shim{transform-box:fill-box;transform-origin:center;animation:txShim 3.4s ease-in-out infinite}
 .tx-epic{animation-duration:2.3s}
 @keyframes txShim{0%,100%{transform:scale(1);opacity:.10}50%{transform:scale(1.4);opacity:.3}}
@@ -366,7 +376,19 @@ body.sesslive #hkPulse{top:calc(env(safe-area-inset-top) + 40px)}
 @keyframes bgFade{from{opacity:0}to{opacity:1}}
 .sheet-bg{position:fixed;inset:0;z-index:70;display:flex;align-items:flex-end;justify-content:center}
 .sheet-bg::before{content:'';position:absolute;inset:0;background:rgba(20,19,17,.74);
-  animation:bgFade .26s ease both}
+  opacity:var(--scrim,1);animation:bgFade .26s ease both}
+/* DRAGGING A SHEET DOWN MUST TAKE THE DARK WITH IT (owner-caught on
+   video, 14 Sep 2026: "pop ups still becoming transparent when touching
+   or dragging down, also background turns a different shade a few too
+   many times"). When the scrim moved to ::before, the drag handler was
+   left setting `background` on .sheet-bg ITSELF — a second, lower layer
+   that the real scrim sat on top of. So a pull-down darkened the screen
+   instead of lightening it, and on release the panel slid away and left
+   the page sitting under a full-strength scrim with nothing on it for a
+   fifth of a second. The scrim is a variable now, so the finger moves
+   the thing the eye is actually looking at. An animation with fill:both
+   outranks a specified value, which is why the drag adds .nofade first. */
+.sheet-bg.scrimout::before{transition:opacity .24s ease}
 /* over the SESSION the backdrop goes solid — the rest ring and the Skip
    rest button read straight through a 74% scrim and the two screens look
    printed on top of each other (owner-caught, 11 Sep) */
@@ -833,7 +855,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='41e5f6';  // stamped by tools/build.py with the content hash
+const BUILD_ID='f7eff3';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -2403,6 +2425,41 @@ function snWeeks(sn){
     else if(at===pv)prev=+sn.week_live||0;
     return{cur:cur,prev:prev,at:at}}
   catch(e){oops('snWeeks',e);return{cur:0,prev:null,at:null}}}
+/* ONE CROWN, ONE READER (owner-caught, Monday 14 Sep 2026: "crown
+   belongs to Angus, should not be on Dad"). Two boards resolved last
+   week's holder two ways. Social asked last week's FINALS and got it
+   right. Today set crown='them' and then drew the crown over `top` —
+   THIS WEEK'S leader — so on a Monday morning where every score is
+   still zero it landed on whoever happened to sort first. A crown is a
+   fact about a finished week; it can never be read off a live board.
+   Both podiums and the duel pill ask this function now, so they cannot
+   disagree, and the field is the same one duelVerdict judged: a rival
+   who was not racing last week cannot be wearing its crown. */
+function crownKeyNow(){
+  try{
+    const a9=acct()||{};
+    const pv=dayKey(new Date(new Date(questWeekKey()+'T12:00').getTime()-7*864e5));  // auditcheck-allow: utc-day-key
+    const r9=(a9.duelHist||{})[pv];
+    if(r9==='w')return 'me';
+    if(r9!=='l')return null;                       // a draw, or not judged yet
+    const wk0=questWeekKey(),el9={};let nEl=0;
+    (S.frRows||[]).forEach(x=>{if(x.linked_at&&String(x.linked_at).slice(0,10)<wk0){
+      const fid=x.owner_id===S.frMe?x.friend_id:x.owner_id;
+      if(fid&&!el9[fid]){el9[fid]=1;nEl++}}});
+    (S.crewRows||[]).forEach(m=>{const id=m&&m.user_id;
+      if(id&&id!==S.frMe&&m.joined_at&&String(m.joined_at).slice(0,10)<wk0&&!el9[id]){el9[id]=1;nEl++}});
+    const rows=(S.frSnaps||[]).filter(s9=>snWeeks(s9).prev!=null&&(!nEl||el9[s9.user_id]))
+      .sort((x,y)=>(snWeeks(y).prev||0)-(snWeeks(x).prev||0));
+    return rows[0]?rows[0].user_id:null}
+  catch(e){oops('crownKeyNow',e);return null}}
+/* how many weeks running the crown has been mine — only meaningful
+   while crownKeyNow() says 'me' */
+function crownReign(){
+  try{const h9=(acct()||{}).duelHist||{};
+    const ks=Object.keys(h9).filter(k=>/^\d{4}-/.test(k)).sort().reverse();
+    let n=0;for(const k of ks){if(h9[k]==='w')n++;else break}
+    return n}
+  catch(e){return 0}}
 function frLinked(){
   const me=S.frMe;
   return (S.frRows||[]).filter(x=>x.linked_at).map(x=>{
@@ -2762,15 +2819,9 @@ function friendsSection(){
             init:(f.named?String(f.name).slice(0,1).toUpperCase():'?'),week:f.week||0,stale:staleT(f.seen)})));
         R.sort((a,b)=>b.week-a.week||(a.me?-1:1));
         R.forEach((x,i)=>{x.rank=i+1});
-        /* last week's crown rides above its holder's avatar */
-        let crownKey=null;
-        try{const a9=acct()||{};
-          const pv=dayKey(new Date(new Date(questWeekKey()+'T12:00').getTime()-7*864e5));
-          const r9=(a9.duelHist||{})[pv];
-          if(r9==='w')crownKey='me';
-          else if(r9==='l'){const rows=(S.frSnaps||[]).filter(s9=>snWeeks(s9).prev!=null)
-            .sort((x,y)=>(snWeeks(y).prev||0)-(snWeeks(x).prev||0));
-            if(rows[0])crownKey=rows[0].user_id}}catch(e9){}
+        /* last week's crown rides above its holder's avatar — one reader,
+           shared with Today's podium (see crownKeyNow) */
+        const crownKey=crownKeyNow();
         const CROWN='<svg width="20" height="13" viewBox="0 0 20 13" style="position:absolute;top:-16px;left:50%;transform:translateX(-50%)" aria-hidden="true"><path d="M2.2 12 L1.4 3.6 L6 7.2 L10 1.2 L14 7.2 L18.6 3.6 L17.8 12 Z" fill="var(--gold)"/><circle cx="1.4" cy="3" r="1.2" fill="var(--gold)"/><circle cx="10" cy="1.2" r="1.3" fill="var(--gold)"/><circle cx="18.6" cy="3" r="1.2" fill="var(--gold)"/></svg>';
         const hasCrown=x=>crownKey&&((x.me&&crownKey==='me')||(!x.me&&x.id===crownKey));
         const pod=R.slice(0,3);
@@ -15395,8 +15446,29 @@ function growTree(W,Hh){
    thing. A lifting-only tree stays two-tone for ten years, and that
    is honest.
    ══════════════════════════════════════════════════════════════ */
-function treeTimeData(){
+function treeTimeData(opts){
   try{
+    /* ONE RENDERER, TWO SURFACES (owner, 14 Sep: "how come the tree still
+       looks very different from the sapling"). In explore mode the same
+       drawing function runs on the explorer's model: every session and
+       run is a branch, every set a leaf, every find a blossom. The
+       trunk, the ramps, the fork and the crown are the card's own code,
+       so the two cannot drift apart again. */
+    if(opts&&opts.explore){
+      const m=(typeof treeXModel==='function')?treeXModel():null;
+      if(!m||m.empty)return null;
+      const t=treeData();
+      const branches=m.branches.map(b=>Object.assign({},b,{n:b.title||b.kind,dom:b.dom==='walk'?'ride':b.dom,walk:b.dom==='walk',reh:b.dom==='reh'}));
+      const blossom=(m.blossoms||[]).map(x=>Object.assign({},x,{epic:x.rank===3}));
+      let scar=null,phases=[];
+      try{const a=S.acl||{};
+        if(a.on&&a.date&&a.date>=m.first)scar={f:m.frac(a.date),k:a.date};
+        (a.tests||[]).filter(t9=>t9.date&&t9.phase&&t9.date>=m.first).forEach(t9=>phases.push({f:m.frac(t9.date),p:t9.phase}))}
+      catch(e){oops('treeScarX',e)}
+      return{first:m.first,last:m.last,span:m.span,frac:m.frac,branches:branches,
+        load:m.load,peak:Math.max.apply(null,m.load.concat([1])),buck:7,blossom:blossom,patterns:m.patterns||[],
+        scar:scar,phases:phases,runs:m.runs,rehab:t.rehab,weeks:t.weeks,days:t.days,
+        tier:t.tier,seed:t.seed,pts:t.pts,x:m}}
     /* ONE WINDOW FOR BOTH TREES (owner, 14 Sep: "they look different" —
        the explorer was showing Since surgery and this card showed the
        whole record). The explorer's window applies here too; the
@@ -15677,13 +15749,85 @@ function treeTimeLegend(poster){
 function growTreeTime(W,Hh,opts){
   opts=opts||{};
   const POSTER=!!opts.poster;   /* the wrought-iron reference: pure structure, no buds */
-  const d=treeTimeData();
-  if(!d)return growTree(W,Hh);          // under the floor, the old tree, unchanged
+  /* EXPLORE MODE (14 Sep): the full-page tree is this same function.
+     z is the zoom; geometry scales with W (which the caller sets to
+     480·z), lengths get a little extra stretch, strokes grow slowly and
+     dots converge on one tappable size — the laws recorded in
+     CLAUDE.md under THE EXPLORER. Every EX branch below is additive:
+     with opts.explore unset nothing here changes. */
+  const EX=!!opts.explore;
+  const z=EX?Math.max(1,Math.min(6,+opts.zoom||1)):1;
+  const d=treeTimeData(EX?{explore:true}:null);
+  if(!d)return EX?'':growTree(W,Hh);    // under the floor, the old tree, unchanged
   const R=seedRand(d.seed);
   W=W||300;Hh=Hh||300;
+  const LS=EX?(W/z/300)*Math.pow(z,1.3):1;   // limb length: the card's numbers at this width, stretched more than the zoom
+  const SWX=EX?Math.pow(z,0.45):1;           // strokes grow slowly
+  /* ═══ A CHILD IS NEVER THICKER THAN WHAT IT GROWS FROM (owner, 14 Sep
+     2026: "a branch should not be thicker than the branch it is connected
+     to... branches more distant from the trunk should be thinner than
+     their predecessor") ═══════════════════════════════════════════════
+     The invariant is not optional under any law; the law only decides how
+     FAST a fork gives up its parent's thickness.
+       taper  — every fork keeps 62% of its parent, at every level
+       vinci  — da Vinci: the children's cross-sections add up to the
+                parent's, so each of n equal children keeps 1/sqrt(n)
+                (two keep 71%, three keep 58%)
+       vinciw — da Vinci, shared by how much wood each child carries, so
+                the longer sub-branch takes more of the parent
+       thin   — a steeper 52%, and no branch thicker than the trunk at its
+                own height: lacier, closest to the wrought-iron reference */
+  const WLAW=String(opts.widths||'taper');
+  /* the thinnest wood that still draws. It is a FLOOR on every stroke,
+     branch and twig alike — flooring only the twigs let a hairline twig
+     out-measure the hairline branch it grew from. */
+  const WMIN=EX?0.3*SWX:0.3;
+  const kidW=(wid,n,share)=>{
+    if(WLAW==='vinci')return wid/Math.sqrt(Math.max(1,n));
+    if(WLAW==='vinciw')return wid*Math.sqrt(Math.max(0.05,Math.min(1,share)));
+    if(WLAW==='thin')return wid*0.52;
+    return wid*0.62};
+  const G=EX?Math.pow(z,0.35):1;             // dots grow slowly
+  const TAP=4.6*G,tz=EX?Math.max(0,Math.min(1,(z-1)/5)):0;
+  const sz=r=>r*(1-tz)+TAP*tz;               // …and converge on one tappable size at 6x
+  /* FORK DEPTH EASES WITH THE ZOOM *AND* WITH THE TREE (owner, 14 Sep:
+     "extremely laggy"). Twigs were two thirds of every element in the
+     drawing — 83 sessions x 47 twigs. On a card the lace IS the tree;
+     on a page where every session is already its own branch, the mass
+     comes from the branches and a fourth level of subdivision buys
+     nothing anybody can see. */
+  /* depth eases with the ZOOM and with how many limbs reach the TRUNK —
+     not with the total branch count. A day's later sessions hang off a
+     limb rather than adding one, so counting them was cutting the lace
+     off a tree that had not actually got any busier at the trunk. */
+  const NLIMB=EX?((d.branches||[]).filter(b9=>!b9.follow).length||(d.branches||[]).length):0;
+  const MAXD=EX?Math.min(z<2?4:(z<4?3:2),(NLIMB>34?3:4)):4;
+  const BUDS=!EX||z<1.8;
+  /* BUDS ARE TEXTURE, AND TEXTURE HAS A BUDGET (owner, 14 Sep: "the tree
+     is extremely laggy"). One bud per free tip is right for a fifteen-
+     branch card; on a page where every session is a branch it was more
+     than half of every element in the drawing — thousands of circles
+     carrying no data, at the one zoom where nobody can tell them apart.
+     The chance thins as the tree fills, so the look holds and the count
+     does not run away. */
+  const BUDP=POSTER?0.38:(EX?Math.min(0.8,560/Math.max(1,(d.branches||[]).length*14)):0.80);
+  const dots=[];                             // explore: every tappable dot, spread apart before it is drawn
   const col=d.tier[2],leafCol=treeSeason().leaf;
   const groundY=Hh-26,topY=22,usable=groundY-topY;
   const yAt=f=>groundY-f*usable;         // LINEAR. f=0 first day, f=1 today.
+  const fAt=y=>Math.max(0,Math.min(1,(groundY-y)/(usable||1)));
+  /* ═══ THE CROWN HAS AN EDGE (owner, 14 Sep 2026: "there needs to be a
+     constraint in the distance of the branches from the trunk, if it gets
+     too far it makes the tree look unnatural and lop-sided") ═══════════
+     Nothing stopped a limb reaching, so a heavy week threw one arm right
+     across the canvas and the viewBox grew to fit it — which is exactly
+     how a tree ends up with one long arm and a short one. A real crown
+     has a silhouette: narrow at the ankle, widest about two thirds up,
+     drawing in again at the head. Wood that reaches it is STEERED BACK
+     toward the trunk rather than cut, because a clipped branch reads as
+     a mistake and a returning one reads as a tree. */
+  const reachAt=f=>{const u=Math.max(0,Math.min(1,f));
+    return W*(0.085+0.335*Math.sin(Math.PI*Math.pow(u,1.25)))*(opts.reach==null?1:+opts.reach)};
   const cx=W/2;
   /* THE TRUNK MEANDERS (owner call, 13 Sep). A dead-straight column
      reads as a mast. Three seeded sine components, damped to nothing at
@@ -15696,7 +15840,12 @@ function growTreeTime(W,Hh,opts){
      sweep over its whole height with smaller corrections riding on it
      — so the dominant term is now under two cycles top to bottom. */
   const MND=opts.meander==null?1:+opts.meander;
-  const ph1=R()*6.283,ph2=R()*6.283,ph3=R()*6.283,amp=(25+R()*14)*MND;
+  /* THE MEANDER IS A FRACTION OF THE WIDTH, NOT A NUMBER OF PIXELS
+     (owner, 14 Sep 2026: "the trunk needs to be thicker and meandering
+     like the sapling"). 25-39px is a visible wander across a 300px card
+     and a dead-straight line down a 480px page that is three times as
+     tall. The card is W=300, so this changes nothing there. */
+  const ph1=R()*6.283,ph2=R()*6.283,ph3=R()*6.283,amp=(25+R()*14)*MND*(W/300);
   const tx=f=>{const g=Math.max(0,Math.min(1,f));
     return cx+amp*g*(Math.sin(g*4.2+ph1)*0.70+Math.sin(g*7.3+ph2)*0.22+Math.sin(g*11.5+ph3)*0.08)};
   /* COLOUR PROGRESSES THROUGH THE TREE'S OWN STAGES (owner, 13 Sep:
@@ -15804,8 +15953,13 @@ function growTreeTime(W,Hh,opts){
      defaults it replaced are what the wrought-iron reference ruled out.
      These are the settled numbers; the opts stay so another board can
      be rendered without touching the renderer. */
-  const wMax=+opts.trunkMax||11.0, wMin=+opts.trunkMin||1.8;
-  const TPR=opts.taper==null?0.50:+opts.taper;
+  /* the sapling's numbers are for a 300px card. On the explorer's wider,
+     much taller canvas the same absolute width draws a hairline and the
+     same taper has vanished to nothing by halfway up — so the explorer
+     keeps the sapling's PROPORTIONS rather than its pixels, and tapers
+     less because it has four times as much height to taper over. */
+  const wMax=+opts.trunkMax||(EX?20.0:11.0), wMin=+opts.trunkMin||(EX?4.2:1.8);
+  const TPR=opts.taper==null?(EX?0.34:0.50):+opts.taper;
   const FLR=opts.flare==null?0.55:+opts.flare;
   const N=d.load.length;
   const halfAt=i=>{
@@ -15817,6 +15971,7 @@ function growTreeTime(W,Hh,opts){
      work, and a quiet stretch still narrows visibly. */
   const taper=i=>1-TPR*Math.pow(N<2?0:i/(N-1),0.7);
   const smooth=i=>((halfAt(i-1)+halfAt(i)*2+halfAt(i+1))/4)*taper(i);
+  const trunkHalf=f=>{try{return smooth(Math.min(N-1,Math.round(Math.max(0,Math.min(1,f))*(N-1))))}catch(e){return 4}};
   const L=[],Rt=[];
   /* BOTH ENDS OF THE TRUNK ARE GROWN, NOT CUT (owner, 13 Sep: "a more
      natural start and ending to the trunk — right now they look
@@ -15931,15 +16086,37 @@ function growTreeTime(W,Hh,opts){
       '" stroke="var(--faint)" stroke-width="1.2" opacity=".55" stroke-linecap="round"/>'}
 
   /* branches. Time fixes y and NOTHING else. */
+  /* EXPLORE: where a week's later sessions attach. The first session of a
+     week-and-domain leaves the trunk and keeps its whole subtree here;
+     the rest of that week hang off it (see THE WEEK IS THE LIMB in
+     14c-tree-explorer.js) instead of adding another trunk attachment. */
+  const limbSeg={},limbSide={};let lastLimbSide=1;
+  const alongSegs=(sg,u)=>{if(!sg||!sg.length)return null;
+    const i=Math.min(sg.length-1,Math.floor(Math.max(0,Math.min(1,u))*sg.length*0.999));
+    const q=sg[i],t=Math.min(1,Math.max(0,(u*sg.length)-i)),v=1-t;
+    /* [2] is the width of the wood there — a session joining a limb can
+       never be drawn thicker than the piece it joins */
+    return[v*v*q[0]+2*v*t*q[2]+t*t*q[4],v*v*q[1]+2*v*t*q[3]+t*t*q[5],q[6]||0,q[7]==null?0:q[7]]};
   let side=-1;const usedY={};
-  d.branches.slice(0,30).forEach((b,i)=>{
+  d.branches.slice(0,EX?100000:30).forEach((b,i)=>{
     let f=b.f;
-    const CF=opts.crownFrom==null?0.10:+opts.crownFrom;
+    const CF=opts.crownFrom==null?(EX?0.02:0.10):+opts.crownFrom;
     if(f<CF)f=CF+f*0.5;                          // nothing sprouts off the ankle
     const key=Math.round(f*48);
     if(usedY[key]){f=Math.min(1,f+(usedY[key]*0.006));side=-side}else side=(R()<0.5?-1:1);
+    /* EXPLORE: limbs strictly alternate and a week's sessions all stay on
+       their limb's side. A random side per limb ran two and three the same
+       way — a lop-sided tree — and a follower given its own side aimed
+       back across the trunk it had just grown out of. */
+    if(EX&&b.lk){
+      if(b.follow&&limbSide[b.lk])side=limbSide[b.lk];
+      else{side=-lastLimbSide;lastLimbSide=side;limbSide[b.lk]=side}}
     usedY[key]=(usedY[key]||0)+1;
-    const y0=yAt(f),bx=tx(f);
+    let y0=yAt(f),bx=tx(f),follows=false;
+    let hostW=0,hostD=0;
+    if(EX&&b.follow&&limbSeg[b.lk]){
+      const P=alongSegs(limbSeg[b.lk],b.lu);
+      if(P){bx=P[0];y0=P[1];hostW=P[2]||0;hostD=P[3]||0;follows=true}}
     /* sage healed you, blue ran, steel rode, bark lifted — and the
        sage says WHICH PHASE, because that is the progression */
     b._j=(R()-0.5)*0.55;                  /* siblings, not copies */
@@ -15960,55 +16137,159 @@ function growTreeTime(W,Hh,opts){
        the same way read as a fern frond. A tree's mass comes from
        subdividing early and often, not from the length of the first
        stroke. */
-    const len=(9+20*(0.18+0.82*bell))*(0.72+R()*0.62);
-    const x1=bx+side*Math.cos(ang)*len,y1=y0-Math.sin(ang)*len;
+    /* A LIMB REACHES (owner, 14 Sep, from the sapling he approved): its
+       limbs span most of the width and the trunk between them is bare.
+       Spacing them out without lengthening them drew a thin spike. The
+       crown envelope is what stops this running away. */
+    const len=(9+20*(0.18+0.82*bell))*(0.72+R()*0.62)*LS*(EX?1.32*(b.work||(b.kind==='run'?(0.85+Math.min(0.9,(b.km||0)/24)):1))*(b.walk?0.6:1)*(follows?0.7:1):1);
+    let x1=bx+side*Math.cos(ang)*len,y1=y0-Math.sin(ang)*len;
+    if(EX){ /* pull the limb in until its tip sits inside the crown */
+      const lim=reachAt(fAt(y1)),off=Math.abs(x1-tx(fAt(y1)));
+      if(off>lim&&off>0.01){const sc=Math.max(0.3,lim/off);
+        x1=bx+(x1-bx)*sc;y1=y0+(y1-y0)*sc}}
     /* a real limb leaves the trunk almost flat and SWEEPS up */
     /* and the sweep varies per limb, in BOTH directions, so no two
        branches share a silhouette */
     const bow=(R()-0.35)*0.7;
-    const mx=bx+side*Math.cos(ang)*len*(0.5+bow*0.5),
-          my=y0-Math.sin(ang)*len*(0.34-bow*0.5);
+    /* the control point rides the tip, so a limb pulled in by the crown
+       keeps its sweep instead of kinking (algebraically identical to the
+       old form whenever nothing is pulled in) */
+    const mx=bx+(x1-bx)*(0.5+bow*0.5),
+          my=y0+(y1-y0)*(0.34-bow*0.5);
     bd(x1,y1,3);
+    /* THE CARD'S OWN WEIGHT (owner, 14 Sep: "it still doesn't look like the
+       sapling in any of those options"). Measured side by side, the
+       silhouettes already matched — what did not was the WOOD. The card
+       thins every branch as the tree fills (2.4 down to 0.6 across thirty)
+       so its crown is fine lace; the explorer scaled every branch UP by
+       how much work was in it and never thinned, so eighty limbs all came
+       out heavy and the drawing read as a fern frond. Work still shows,
+       in the LENGTH of the limb and the size of its leaves — it does not
+       also get to fatten the wood. */
+    let bwid=EX?((2.4-Math.min(1.75,i*0.022))*SWX):((POSTER?4.0:2.4)-i*0.06);
+    /* a session hanging off a week's limb starts at the wood it joined,
+       never at its own full weight — that was the visible inversion */
+    if(follows&&hostW>0)bwid=Math.min(bwid,hostW*0.86);
+    bwid=Math.max(WMIN,bwid);
+    /* and under `thin`, nothing off the trunk outgrows the trunk */
+    if(EX&&!follows&&WLAW==='thin')bwid=Math.min(bwid,Math.max(0.8*SWX,trunkHalf(f)*1.5));
     out+='<path data-tp="branch" data-tn="'+esc(b.n)+'" data-tk="'+esc(b.k)+
+      (EX?'" data-a="txTap" data-v="'+esc(b.kind+':'+b.id)+'" id="'+txElId(b.kind,b.id)+'" pointer-events="all':'')+
       '" d="M'+bx.toFixed(1)+' '+y0.toFixed(1)+' Q'+mx.toFixed(1)+' '+my.toFixed(1)+' '+
-      x1.toFixed(1)+' '+y1.toFixed(1)+'" stroke="'+bstroke+'" stroke-width="'+((POSTER?4.0:2.4)-i*0.06).toFixed(2)+
-      '" fill="none" opacity="'+(0.9-i*0.02).toFixed(2)+'" stroke-linecap="round"/>';
+      x1.toFixed(1)+' '+y1.toFixed(1)+'" stroke="'+bstroke+'" stroke-width="'+bwid.toFixed(2)+
+      '" fill="none" opacity="'+(EX?(b.walk?0.5:0.9):(0.9-i*0.02)).toFixed(2)+'" stroke-linecap="round"/>';
     /* A BRANCH FORKS. Time still fixes only where it MEETS the trunk;
        everything above that point is the same seeded recursion the
        original tree used, which is the thing that makes it read as
        drawn rather than as a chart with bark on it. */
-    const tips=[];
+    /* ═══ NO CHAIN RUNS AWAY FROM THE TRUNK (owner, 14 Sep 2026: "some
+       growth outward is ok, it is parts that are about over 5 forks")
+       ═══ The week limb put a session's own recursion ON TOP of the wood
+       it joined, so a chain from the trunk could be seven forks long and
+       marched straight out of the crown. The budget is counted from the
+       TRUNK, not from the branch: a session joining thin wood two forks
+       out gets that much less of its own. */
+    const dCap=(EX&&follows)?Math.max(1,MAXD-(hostD+1)):MAXD;
+    const tips=[],segs=EX?[[bx,y0,mx,my,x1,y1,bwid,hostD]]:null;
     (function fork(px,py,ax,ay,ln,depth,wid){
       /* FOUR LEVELS, not two. The lacy quality of a bare tree is
          entirely in the terminal twigs — stop at two and it reads as a
          pole with spurs, which is what it did (owner, 13 Sep). */
-      if(depth>(POSTER?5:4)||ln<(POSTER?1.8:2.4)){tips.push([px,py]);return}
+      if(depth>(POSTER?5:dCap)||ln<(POSTER?1.8:2.4)*(EX?z:1)){tips.push([px,py]);return}
       const n2=depth>=2?(R()<0.22?1:(R()<0.9?2:3)):(R()<0.1?1:2);
+      /* every child's geometry is settled BEFORE any of them is drawn, so
+         a law that shares the parent between them has something to share */
+      const kids=[];let lsum=0;
       for(let k=0;k<n2;k++){
         const spread=(k===0?-1:1)*(9+R()*30+depth*5)*Math.PI/180*(0.6+R()*0.9);
         const base=Math.atan2(py-ay,px-ax);
         const a2=base+spread*(n2===1?R()-0.5:1);
         const l2=ln*(0.56+R()*0.28);
+        kids.push({a2:a2,l2:l2});lsum+=l2}
+      kids.forEach(kd=>{
+        let a2=kd.a2;let l2=kd.l2;
+        if(EX){
+          /* STEERED BACK, NOT CUT. If this child would land outside the
+             crown, mirror its horizontal run so it grows toward the trunk
+             instead; if it is still outside, shorten it onto the edge. */
+          let ex9=px+Math.cos(a2)*l2,ey9=py+Math.sin(a2)*l2;
+          const lim1=reachAt(fAt(ey9)),tx1=tx(fAt(ey9));
+          if(Math.abs(ex9-tx1)>lim1){
+            a2=Math.PI-a2;
+            ex9=px+Math.cos(a2)*l2;ey9=py+Math.sin(a2)*l2;
+            const lim2=reachAt(fAt(ey9)),off2=Math.abs(ex9-tx(fAt(ey9)));
+            if(off2>lim2&&off2>0.01)l2*=Math.max(0.35,lim2/off2)}}
+        /* THE INVARIANT: whatever the law works out, a child is capped at
+           its parent. Nothing downstream of a branch is ever thicker. */
+        const w2=Math.max(WMIN,Math.min(wid,kidW(wid,n2,lsum?l2/lsum:1/n2)));
         const nx=px+Math.cos(a2)*l2,ny=py+Math.sin(a2)*l2;
         bd(nx,ny,3);
         out+='<path data-tp="twig" d="M'+px.toFixed(1)+' '+py.toFixed(1)+' Q'+
           (px+Math.cos(a2)*l2*0.5).toFixed(1)+' '+(py+Math.sin(a2)*l2*0.55).toFixed(1)+' '+
           nx.toFixed(1)+' '+ny.toFixed(1)+'" stroke="'+woodCol(b,depth)+'" stroke-width="'+
-          Math.max(0.3,wid*0.62).toFixed(2)+'" fill="none" opacity="'+(POSTER?0.92:0.85-depth*0.09).toFixed(2)+
+          w2.toFixed(2)+'" fill="none" opacity="'+(POSTER?0.92:0.85-depth*0.09).toFixed(2)+
           '" stroke-linecap="round"/>';
-        fork(nx,ny,px,py,l2,depth+1,wid*0.62)}})(x1,y1,bx,y0,len,0,(POSTER?4.2:2.6)-Math.min(1.4,i*0.045));
+        if(segs)segs.push([px,py,px+Math.cos(a2)*l2*0.5,py+Math.sin(a2)*l2*0.55,nx,ny,w2,(hostD+depth+1)]);
+        fork(nx,ny,px,py,l2,depth+1,w2)})})(x1,y1,bx,y0,len,0,
+      /* THE FORK STARTS AT THE BRANCH, NOT ABOVE IT. It was seeded at 2.6
+         against a branch drawn at 2.4, so the first twig off every branch
+         was computed from a parent thicker than the branch existed. */
+      EX?bwid:Math.min((POSTER?4.0:2.4)-i*0.06,(POSTER?4.2:2.6)-Math.min(1.4,i*0.045)));
+    if(EX&&segs&&segs.length&&b.lk&&!b.follow)limbSeg[b.lk]=segs;
+    /* EXPLORE: the sets sit along the branch's own wood, in set order,
+       later sets further out; a run's kilometres the same */
+    if(EX&&segs&&segs.length){
+      const onSegs=u=>{const segI=Math.min(segs.length-1,Math.floor(u*segs.length*0.999));
+        const sg=segs[segI];const uu=Math.min(1,(u*segs.length)-segI),v=1-uu;
+        return[v*v*sg[0]+2*v*uu*sg[2]+uu*uu*sg[4],v*v*sg[1]+2*v*uu*sg[3]+uu*uu*sg[5]]};
+      /* ═══ WHAT A LEAF IS (owner, 14 Sep 2026: "should we instead just
+         make it every workout instead of every set? or every exercise
+         not every set") ═══════════════════════════════════════════════
+           'set'  — one leaf per logged set, one per kilometre run
+           'ex'   — one leaf per exercise, sized by its best set that day,
+                    one per run; the sets live in the sheet behind it
+           'sess' — one leaf per workout and one per run
+         The wood is identical under all three: only how many dots hang
+         on it changes, and a leaf always opens something real. */
+      /* THE DEFAULT IS SEMANTIC: an exercise when you are looking at the
+         whole tree, every set once you have zoomed into a day. Five
+         hundred set-dots at 1x is a green haze you cannot read or tap;
+         forty workout-dots is a bare tree with nothing to find. The map
+         answer is to show the level you can actually use at the scale you
+         are at — and zooming a cluster then genuinely reveals the day. */
+      const LEAF=String(opts.leaf||(z>=3?'set':'ex'));
+      const put=(u,r9,c9,op9,v9,pr9)=>{const P=onSegs(u);
+        dots.push({x:P[0]+(R()-0.5)*2*G,y:P[1]+(R()-0.5)*2*G,r:sz(r9*G),kind:'leaf',c:c9,op:op9,v:v9,pr:pr9})};
+      if(b.kind==='sess'){
+        if(LEAF==='sess'){
+          let top=0,ns=0;(b.twigs||[]).forEach(tw=>tw.sets.forEach(st=>{ns++;if(st.rel>top)top=st.rel}));
+          if(ns)put(0.62,0.9+1.7*top,leafColOf(b,(top-0.5)*0.8),0.6+0.35*top,'sess:'+b.id,false)}
+        else if(LEAF==='ex'){
+          const tw9=(b.twigs||[]).filter(tw=>tw.sets&&tw.sets.length);
+          tw9.forEach((tw,i)=>{let bs=tw.sets[0];tw.sets.forEach(st=>{if(st.rel>bs.rel)bs=st});
+            const u=0.14+0.84*(i+1)/(tw9.length+1);
+            put(u,0.85+1.65*bs.rel,leafColOf(b,(bs.rel-0.5)*0.8),0.6+0.35*bs.rel,'set:'+b.id+':'+bs.i,
+              tw.sets.some(st=>st.pr))})}
+        else{const all=[];(b.twigs||[]).forEach(tw=>tw.sets.forEach(st=>all.push(st)));
+          all.forEach((st,i)=>put(0.12+0.88*(i+1)/(all.length+1),0.8+1.6*st.rel,
+            leafColOf(b,(st.rel-0.5)*0.8),0.6+0.35*st.rel,'set:'+b.id+':'+st.i,st.pr))}}
+      else{const n=(LEAF==='set')?(b.leaves||1):1;
+        for(let i=0;i<n;i++)put((i+0.6)/(n+0.2),
+          (LEAF==='set'?1:1.5)*(b.walk?0.9:(1.1+(b.hr>0?0.35:0))),
+          leafColOf(b,0.2),b.walk?0.5:0.8,b.kind+':'+b.id,false)}}
     /* leaves cluster at the tips, the way they actually do */
     /* BUDS, NOT FOLIAGE. The reference is a bare winter tree and the
        beauty is all structure; fat leaf blobs buried it. One small bud
        per tip keeps the seasonal colour meaningful without hiding the
        twigs that took the work to draw. */
     tips.forEach(tp=>{
-      if(R()<(POSTER?0.62:0.20))return;
-      const rr=(POSTER?0.62:0.8)+R()*(POSTER?0.5:0.6);
+      if(!BUDS)return;
+      if(R()>BUDP)return;
+      const rr=((POSTER?0.62:0.8)+R()*(POSTER?0.5:0.6))*G;
       const lc=leafColOf(b,(R()-0.5)*0.9);   /* no two leaves the same */
       bd(tp[0],tp[1],POSTER?3.4:1.8);
       out+=bloom(tp[0],tp[1],rr,lc)+
-        '<circle data-tp="leaf" cx="'+tp[0].toFixed(1)+'" cy="'+tp[1].toFixed(1)+'" r="'+rr.toFixed(1)+
+        '<circle data-tp="'+(EX?'bud':'leaf')+'" cx="'+tp[0].toFixed(1)+'" cy="'+tp[1].toFixed(1)+'" r="'+rr.toFixed(1)+
         '" fill="'+lc+'" opacity="'+((POSTER?0.8:0.55)+R()*0.2).toFixed(2)+'"/>'});
     /* keep EVERY tip, not just the first. Two moments a fortnight apart
        used to resolve to the same nearest branch and then to that
@@ -16031,7 +16312,7 @@ function growTreeTime(W,Hh,opts){
      The date still decides the height — only the exact tip moves, and
      only far enough to stop two labels pointing at one dot. */
   const takenTip={},takenPt={};
-  const BRS=d.branches.slice(0,30);
+  const BRS=d.branches.slice(0,EX?100000:30);
   /* THE TREE READS THE SAME RARITY LADDER AS EVERY OTHER SURFACE (owner,
      13 Sep: "once you have those colours implement them into the tree as
      well"). rarityOf is the one constant; a find is gold and the rarest
@@ -16043,12 +16324,19 @@ function growTreeTime(W,Hh,opts){
      300px card and mean on an A2 sheet, where the finds are half the
      reason to look (owner, 13 Sep: "where have all the epic finds and
      the rare finds gone"). */
-  d.blossom.slice(0,POSTER?44:14).slice().sort((a,b)=>a.f-b.f).forEach(bl=>{
+  d.blossom.slice(0,EX?100000:(POSTER?44:14)).slice().sort((a,b)=>a.f-b.f).forEach(bl=>{
     /* a find is amber, always. On the poster it glows; it never turns
        into another colour, because amber means one thing. */
     let bx=null,by=null;
-    const order=BRS.map((b,ix)=>({b:b,ix:ix,dd:Math.abs(b.f-bl.f)}))
-      .filter(o=>o.b._tips&&o.b._tips.length).sort((a,b)=>a.dd-b.dd);
+    /* A FIND BLOOMS IN ITS OWN DAY'S CLUSTER (owner, 14 Sep 2026:
+       "zoom into a cluster and it would all be relevant for that day of
+       workouts, findings etc"). Nearest-by-date was close but not the
+       same thing — a find could land on the session either side of the
+       one it came out of. A branch from the find's OWN day wins outright;
+       nearest-by-date is only the fallback for a find with no session
+       under it (a scan, a rest-day health find). */
+    const order=BRS.map((b,ix)=>({b:b,ix:ix,same:(b.k&&bl.k&&b.k===bl.k)?0:1,dd:Math.abs(b.f-bl.f)}))
+      .filter(o=>o.b._tips&&o.b._tips.length).sort((a,b)=>a.same-b.same||a.dd-b.dd);
     for(let oi=0;oi<order.length&&bx===null;oi++){
       const o=order[oi],tps=o.b._tips;
       for(let ti=0;ti<tps.length;ti++){
@@ -16057,8 +16345,12 @@ function growTreeTime(W,Hh,opts){
         const pk=tps[ti][0].toFixed(0)+','+tps[ti][1].toFixed(0);
         if(takenPt[pk])continue;
         takenTip[key]=1;takenPt[pk]=1;bx=tps[ti][0];by=tps[ti][1];break}}
-    if(bx===null){bx=tx(bl.f)+(R()-0.5)*22;by=yAt(bl.f)}
+    if(bx===null){bx=tx(bl.f)+(R()-0.5)*22*(EX?z:1);by=yAt(bl.f)}
     bd(bx,by,3.5);
+    if(EX){const rk9=bl.rank|0;
+      const br9=rk9>=2?([1.9,2.4,3.0,3.8][rk9])*G:sz(([1.9,2.4][rk9]||1.9)*G);
+      dots.push({x:bx,y:by,r:br9,pad:br9*(rk9>=2?1.1:0.7),kind:'bloom',c:rarityOf(bl.rar)[1],bl:bl});
+      return}
     out+=bloom(bx,by,bl.epic?3.8:2.7,rarCol(bl.epic))+
       '<circle data-tp="bloom" data-tk="'+esc(bl.k)+'" cx="'+bx.toFixed(1)+'" cy="'+by.toFixed(1)+
       '" r="'+(bl.epic?(POSTER?3.8:3.2):(POSTER?2.7:2.2))+'" fill="'+rarCol(bl.epic)+
@@ -16077,12 +16369,64 @@ function growTreeTime(W,Hh,opts){
     out+=bloom(x,y,2.9,pc)+'<circle data-tp="phase" cx="'+x.toFixed(1)+'" cy="'+y.toFixed(1)+
       '" r="'+(POSTER?2.9:2.6)+'" fill="'+pc+'" opacity=".92"/>'});
 
+  /* EXPLORE: pattern seeds on stems off the trunk, then every dot is
+     spread apart and drawn on top of the wood */
+  if(EX){
+    const f1=v=>(+v).toFixed(1);
+    /* how many things may animate at once. Beyond a handful the movement
+       stops reading as a highlight and starts reading as a page that
+       cannot keep up. */
+    const ANIM_MAX=8;let anim9=0,nw9=0;
+    (d.patterns||[]).forEach(pt=>{
+      const c=pt.tone==='warn'?'var(--amber)':pt.tone==='good'?'var(--green)':'var(--dim)';
+      const sx=tx(pt.f)+pt.side*(trunkHalf(pt.f)+2),sy=yAt(pt.f),stem=pt.stem*LS*0.6;
+      dots.push({x:sx+pt.side*Math.cos(pt.a)*stem,y:sy-Math.sin(pt.a)*stem,r:sz(2.6*G),kind:'pat',c:c,sx:sx,sy:sy,pt:pt})});
+    try{txSpread(dots,2.2*G+TAP*0.9*tz)}catch(e){oops('treeX.spread',e)}
+    dots.forEach(dd=>{bd(dd.x,dd.y,dd.r*2.4+8);
+      if(dd.kind==='leaf'){
+        out+='<circle data-a="txTap" data-v="'+esc(dd.v)+'" data-tp="leaf" pointer-events="all" stroke="transparent" stroke-width="'+f1(7*G)+'" cx="'+f1(dd.x)+'" cy="'+f1(dd.y)+'" r="'+dd.r.toFixed(2)+'" fill="'+dd.c+'" opacity="'+dd.op.toFixed(2)+'"/>'+
+          (dd.pr?'<circle cx="'+f1(dd.x)+'" cy="'+f1(dd.y)+'" r="'+(dd.r+1.2*G).toFixed(2)+'" fill="none" stroke="#F0EEE6" stroke-width="'+f1(0.45*SWX)+'" opacity=".55"/>':'')}
+      else if(dd.kind==='pat'){const pt=dd.pt,c=dd.c,r=dd.r;
+        out+='<path data-tp="pstem" d="M'+f1(dd.sx)+' '+f1(dd.sy)+' L'+f1(dd.x)+' '+f1(dd.y)+'" stroke="'+c+'" stroke-width="'+f1(0.7*SWX)+'" opacity=".45" stroke-linecap="round"/>'+
+          ((pt.isNew&&nw9++<ANIM_MAX)?'<circle class="tx-new" cx="'+f1(dd.x)+'" cy="'+f1(dd.y)+'" r="'+f1(r+4*G)+'" fill="none" stroke="'+c+'" stroke-width="'+f1(1*SWX)+'"/>':'')+
+          '<path data-a="txTap" data-v="'+esc('pat:'+pt.t)+'" data-tp="pattern" pointer-events="all" stroke="'+c+'" stroke-width="'+f1(0.9*SWX)+'" d="M'+f1(dd.x)+' '+f1(dd.y-r)+' L'+f1(dd.x+r*0.62)+' '+f1(dd.y)+' L'+f1(dd.x)+' '+f1(dd.y+r)+' L'+f1(dd.x-r*0.62)+' '+f1(dd.y)+' Z" fill="'+c+'" fill-opacity=".35" opacity=".95"/>'}
+      else{const bl=dd.bl,c=dd.c,r=dd.r,rk9=bl.rank|0,special=rk9>=2;
+        const focus=S.treeFocus&&S.treeFocus===bl.id;
+        /* THE HALO IS DRAWN AND THE MOVEMENT IS RATIONED (owner, 14 Sep:
+           "extremely laggy"). Two static rings give the glow the CSS
+           filter used to; only the first few special finds breathe, so a
+           collection of eighty-five is not eighty-five nodes animating
+           forever behind a finger that is trying to scroll. The focused
+           find always moves — it is the one the user was sent to. */
+        const mov=focus||(special&&anim9++<ANIM_MAX);
+        out+=(special?'<circle cx="'+f1(dd.x)+'" cy="'+f1(dd.y)+'" r="'+f1(r*1.95)+'" fill="'+c+'" opacity=".055"/>'+
+            '<circle'+(mov?' class="tx-shim'+(rk9===3?' tx-epic':'')+'"':'')+' cx="'+f1(dd.x)+'" cy="'+f1(dd.y)+'" r="'+f1(r*1.42)+'" fill="'+c+'" opacity=".13"/>':'')+
+          ((bl.isNew&&(focus||nw9++<ANIM_MAX))?'<circle class="tx-new" cx="'+f1(dd.x)+'" cy="'+f1(dd.y)+'" r="'+f1(r+4*G)+'" fill="none" stroke="'+c+'" stroke-width="'+f1(1*SWX)+'"/>':'')+
+          '<circle data-a="txTap" data-v="'+esc('find:'+bl.id)+'" data-tp="bloom" data-tk="'+esc(bl.k||'')+'"'+(special?' class="tx-glow'+(rk9===3?' tx-glow-epic':'')+'" style="color:'+c+'"':'')+' pointer-events="all" stroke="transparent" stroke-width="'+f1(8*G)+'" id="'+txElId('find',bl.id)+'" cx="'+f1(dd.x)+'" cy="'+f1(dd.y)+'" r="'+f1(r)+'" fill="'+c+'" opacity="'+(special?'.97':'.85')+'"/>'+
+          (special?'<circle cx="'+f1(dd.x)+'" cy="'+f1(dd.y)+'" r="'+f1(r+2.2*G)+'" fill="none" stroke="'+c+'" stroke-width="'+f1(0.6*SWX)+'" opacity=".45"/>':'')+
+          (focus?'<circle class="tx-new" cx="'+f1(dd.x)+'" cy="'+f1(dd.y)+'" r="'+f1(r+9*G)+'" fill="none" stroke="'+c+'" stroke-width="'+f1(1.4*SWX)+'"/>'+
+            '<text x="'+f1(dd.x+(bl.side||1)*(r+12*G))+'" y="'+f1(dd.y+3)+'" text-anchor="'+((bl.side||1)>0?'start':'end')+'" font-size="'+f1(8*Math.pow(z,0.25))+'" fill="'+c+'" font-family="-apple-system,system-ui,sans-serif" style="paint-order:stroke;stroke:#1F1E1D;stroke-width:3px">'+esc(String(bl.t||'').slice(0,34))+'</text>':'')}});
+    /* the axis: months down the left, the two ends named */
+    (function(){const MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+      const FS=Math.pow(z,0.25);
+      const d9=new Date(d.first+'T12:00');d9.setDate(1);d9.setMonth(d9.getMonth()+1);let guard=0;
+      while(guard++<400){const k=dayKey(d9);if(k>d.last)break;
+        const y=yAt(d.frac(k)),jan=d9.getMonth()===0;
+        out+='<line x1="10" y1="'+f1(y)+'" x2="'+(jan?26:18)+'" y2="'+f1(y)+'" stroke="var(--faint)" stroke-width="'+(jan?1.2:0.7)+'" opacity="'+(jan?.7:.4)+'"/>'+
+          '<text x="30" y="'+f1(y+3)+'" font-size="'+f1((jan?9:7.5)*FS)+'" fill="var(--faint)" opacity="'+(jan?.9:.6)+'" font-family="-apple-system,system-ui,sans-serif">'+MON[d9.getMonth()]+(jan?' '+d9.getFullYear():'')+'</text>';
+        bd(10,y,2);d9.setMonth(d9.getMonth()+1)}
+      const m9=d.x||{};
+      const groundLabel=m9.folded?esc(fmtDate(d.first+'T12:00'))+' · '+m9.folded+' EARLIER '+(m9.folded===1?'ENTRY':'ENTRIES')+' FOLDED INTO THE GROUND':esc(fmtDate(d.first+'T12:00'))+' · THE FIRST LOGGED DAY';
+      out+='<text x="'+f1(W/2)+'" y="'+f1(groundY+18)+'" text-anchor="middle" font-size="'+f1(8*FS)+'" fill="var(--faint)" opacity=".8" font-family="-apple-system,system-ui,sans-serif">'+groundLabel+'</text>'+
+        '<text x="'+f1(W/2)+'" y="'+f1(topY-12)+'" text-anchor="middle" font-size="'+f1(8*FS)+'" fill="var(--faint)" opacity=".8" font-family="-apple-system,system-ui,sans-serif">TODAY</text>';
+      bd(W/2,groundY+22,4);bd(W/2,topY-18,4)})()}
+
   /* FOUR DATES UP THE TREE (owner, 13 Sep). Height is time and nothing
      in the drawing said so, so a stranger could not read the axis at
      all. Evenly spaced, drawn outside the crown so they never sit on
      the wood, and they are REAL dates off the first logged day — never
      rounded to something tidier than the data. */
-  if(opts.dates!==false)(function(){
+  if(opts.dates!==false&&!EX)(function(){
     const MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
     /* a short tree ticks DAYS (owner's screenshot, 14 Sep: three "Sep
        '26" in a row on a five-week window) */
@@ -16104,6 +16448,7 @@ function growTreeTime(W,Hh,opts){
   const pad=8;
   const vb=[(mnX-pad).toFixed(1),(mnY-pad).toFixed(1),
     (mxX-mnX+pad*2).toFixed(1),(mxY-mnY+pad*2).toFixed(1)].join(' ');
+  if(EX)S._txVbLast={x:mnX-pad,y:mnY-pad,w:(mxX-mnX)+pad*2,h:(mxY-mnY)+pad*2};
   return '<svg viewBox="'+vb+'" style="width:100%;height:auto;display:block;overflow:visible">'+out+'</svg>'}
 
 /* THE CHRONOLOGICAL TREE IS THE TREE (owner ruling, 13 Sep 2026: "it's
@@ -16170,6 +16515,17 @@ function treeSvg(W,Hh){return treeTimeOn()?growTreeTime(W,Hh):growTree(W,Hh)}
 const TX_W=480;               // base width; zoom 1 fits the phone
 const TX_PPD=5;               // pixels per day at zoom 1 (a year ≈ 1,800px)
 const TX_MINH=720;
+const TX_LIMBGAP=104;         // clear trunk between one limb and the next
+/* HOW MANY LIMBS A TRUNK WEARS (owner, 14 Sep 2026, holding up the sapling
+   he approved: "does not look like this sapling... you don't need to have
+   such a small gap between branches from the trunk"). His reference carries
+   NINE limbs over its whole height with long bare stretches between them.
+   Thirty-four of them on a 480-wide canvas cannot be spaced like that and
+   stay tree-shaped — the arithmetic is width x 2.4 for the height, and the
+   height is limbs x the gap. Twelve is what those two numbers agree on. A
+   day is still the cluster: once there are more active days than limbs, a
+   limb carries two or three days, spread along it in day order. */
+const TX_LIMBS=12;
 function txSeenIds(){try{return (lget('training-collseen-v1',{})||{}).ids||{}}catch(e){return {}}}
 function treeXNewN(){
   /* the icon's badge: finds nobody has looked at yet, and patterns too */
@@ -16227,7 +16583,21 @@ function treeXModel(){
     const d0=new Date(first+'T12:00'),d1=new Date(last+'T12:00');
     const span=Math.max(14,Math.round((d1-d0)/864e5));
     const frac=k=>{try{const d=new Date(String(k).slice(0,10)+'T12:00');return Math.max(0,Math.min(1,(d-d0)/864e5/span))}catch(e){return 0}};
-    const Hh=Math.max(TX_MINH,span*TX_PPD+120);
+    /* ═══ THE TRUNK IS LONG AND THE BRANCHES ARE FAR APART (owner, 14 Sep
+       2026, with the sapling he approved in front of him: "does not look
+       like this sapling — if you're saying you're running out of room just
+       extend and go up, you don't need to have such a small gap between
+       branches from the trunk") ═════════════════════════════════════════
+       The reference has eight or nine limbs over its whole height with
+       long bare stretches of trunk between them. Every version of this
+       page so far crammed its limbs into whatever height the time axis
+       happened to give, and close-packed limbs draw a herringbone however
+       well each one is drawn. Height is free — the page scrolls — so the
+       tree is as tall as it needs to be for its limbs to stand apart. */
+    const nLimbDays=(function(){const dd={};
+      H.forEach(h=>dd[hKey(h)]=1);R9.forEach(r=>dd[String(r.date).slice(0,10)]=1);   // auditcheck-allow: utc-day-key — a run row stores a local YYYY-MM-DD
+      const n=Object.keys(dd).length;return Math.min(TX_LIMBS,Math.max(1,n))})();
+    const Hh=Math.max(TX_MINH,span*TX_PPD+120,nLimbDays*TX_LIMBGAP+160);
     const groundY=Hh-40,topY=50,usable=groundY-topY;
     const yAt=f=>groundY-f*usable;
     const td=(typeof treeData==='function')?treeData():{seed:'x',pts:0};
@@ -16304,6 +16674,63 @@ function treeXModel(){
       const ang=((26+f*30)+R()*18)*Math.PI/180;
       branches.push({kind:'run',id:String(r.id||k+':'+km),k:k,f:f,y:y0,x0:tx(f)+side*halfW(f)*0.9,side:side,ang:ang,len:len,bow:(R()-0.4)*0.6,dom:dom,sf:sfAt(f)+(R()-0.5)*0.4,
         km:km,mins:+r.mins||0,hr:+r.hr||0,type:r.type||'',leaves:Math.min(45,Math.max(1,Math.round(km))),run:r})});
+    /* ═══ THE WEEK IS THE LIMB (owner, 14 Sep 2026, asked four times:
+       "I want the tree to look like the sapling") ═══════════════════
+       The card grows a branch per PERIOD and forks it; the explorer grew
+       one per SESSION, straight off the trunk. On a real account that is
+       a branch every eight pixels of trunk all the way up — a bottlebrush
+       with a pointed top, which is the exact failure the chronological
+       tree was built to avoid, arriving by a different door. Side by side
+       with the card the difference was the density and nothing else: 83
+       attachments against 12.
+       A session is still its own branch with its own tap and its own
+       height. It just does not all leave the TRUNK any more: the first
+       session of a week-and-domain leaves the trunk, and the rest of that
+       week hang off it, further out for later in the week. The silhouette
+       becomes the card's, and every set is still a leaf you can reach. */
+    (function(){
+      /* ═══ THE CLUSTER IS THE DAY (owner, 14 Sep 2026: "why is there only
+         running on the left and lifting on the right? I was thinking
+         visualising days as clusters close in proximity, so a user can
+         zoom into a cluster and it would all be relevant for that day —
+         workouts, findings etc") ═══════════════════════════════════════
+         Keying the limb on week-AND-DOMAIN split the tree down the middle:
+         a week's lifting limb and its running limb were consecutive, the
+         strict alternation put one on each side, and every week repeated
+         it. The week is the limb, full stop — and INSIDE it the unit is
+         the DAY. Everything that happened on a day attaches at the same
+         point on its week's limb: the lift, the run, the rehab, and (in
+         the renderer) the findings whose event day that is. Zoom into a
+         cluster and you are looking at one day of your life. */
+      const lim={};
+      branches.sort((a,b)=>a.f-b.f||String(a.id).localeCompare(String(b.id)));
+      /* THE LIMB IS A DAY — until there are too many days to draw. The
+         card carries about eighteen limbs whatever you feed it; a trunk
+         with five hundred on it is a bottlebrush again, and a trunk with
+         eight is a pole with pom-poms. So one limb per day, and once the
+         window holds more active days than the trunk can wear, a limb
+         takes a short run of consecutive days instead. Height is still
+         time: the limb leaves the trunk at its first day. */
+      const allDays=[];branches.forEach(b=>{if(allDays.indexOf(b.k)<0)allDays.push(b.k)});
+      allDays.sort();
+      const grp=Math.max(1,Math.ceil(allDays.length/TX_LIMBS));
+      branches.forEach(b=>{
+        const lk='d'+Math.floor(allDays.indexOf(b.k)/grp);
+        b.lk=lk;
+        if(!lim[lk]){lim[lk]=[];b.lead=true}
+        lim[lk].push(b)});
+      Object.keys(lim).forEach(k=>{const g=lim[k];
+        const days=[];g.forEach(b=>{if(days.indexOf(b.k)<0)days.push(b.k)});
+        days.sort();
+        g.forEach(b=>{
+          const di=days.indexOf(b.k);
+          /* one attachment point per DAY, later days further out; a day's
+             lift and its run share it, which is what makes it a cluster */
+          b.lu=days.length<2?0.10:(0.10+0.62*(di/(days.length-1)));
+          b.dayi=di;
+          b.follow=b!==g[0]});
+        g[0].lkn=g.length});
+    })();
     /* finds → blossoms on stems off the trunk */
     const ORDR={common:0,uncommon:1,rare:2,epic:3};
     const byDay={};
@@ -16355,15 +16782,12 @@ function treeXModel(){
 function txCol(m,dom,sf,k){return treeRampCol(m.domRamp(dom),Math.min(6,Math.max(0,sf+(k||0))))}
 function txQ(x0,y0,mx,my,x1,y1){return 'M'+x0.toFixed(1)+' '+y0.toFixed(1)+' Q'+mx.toFixed(1)+' '+my.toFixed(1)+' '+x1.toFixed(1)+' '+y1.toFixed(1)}
 function txOnQ(x0,y0,mx,my,x1,y1,t){const u=1-t;return[u*u*x0+2*u*t*mx+t*t*x1,u*u*y0+2*u*t*my+t*t*y1]}
-/* ZOOM SPREADS, IT DOES NOT FATTEN (owner, 14 Sep: "dots shouldn't be
-   enlarging at the same rate as the zoom, all it has to do is be
-   separated from other dots and branches enough to click easily").
-   Zooming re-lays the tree out: every position scales with the zoom
-   and branches and twigs stretch a little MORE than that, so the gaps
-   between things grow; a leaf's radius grows only as the cube-ish root
-   of the zoom, so at 6× a leaf is under twice its size while the space
-   around it is six times. During a pinch the canvas is scaled by CSS
-   (fast); the moment the fingers lift it is redrawn at the new zoom. */
+/* THE EXPLORER DRAWS WITH THE CARD'S RENDERER (owner, 14 Sep: "how come
+   the tree still looks very different from the sapling"). Because it was
+   a second renderer copying the first's rules, and copies drift. There
+   is one now: growTreeTime in explore mode, fed by this model. The zoom
+   laws (spread harder than scale, dots grow slowly and converge on one
+   tappable size, no buds when zoomed) live inside it. */
 function txZ(){return Math.max(1,Math.min(6,+S.txZoom||1))}
 function treeXSvg(m,zIn){
   try{
@@ -16371,194 +16795,9 @@ function treeXSvg(m,zIn){
     const z=Math.max(1,Math.min(6,+zIn||txZ()));
     const key=m.stamp+'@'+z;
     if(S._txSvg&&S._txSvg.key===key)return S._txSvg.svg;
-    const o=[];
-    const climb=TREE_RAMP.m.climb;
-    /* ZOOM SPREADS HARDER THAN IT SCALES (owner, at 6× on a dense life:
-       "still very cluttered and close to each other"). Branches and
-       twigs stretch more than the zoom, the days pull apart vertically
-       more than the zoom, and the spread pass demands a full dot's
-       width of clear space between dots at full zoom. */
-    const SP=Math.pow(z,1.3);           // branch spread
-    const SPT=Math.pow(z,1.4);          // twig spread
-    const ZY=Math.pow(z,1.15);          // days pull apart faster than the zoom
-    const G=Math.pow(z,0.35);           // dot growth
-    /* EVERY DOT IS TAPPABLE AT FULL ZOOM (owner, 14 Sep, at 6×: "all dots
-       must be equivalent to the size you made the purple dots, the
-       smaller ones are too hard to click"). A dot's own size says its
-       work at 1×; as the zoom rises it converges on one common size,
-       the Rare blossom's, and reaches it at 6×. */
-    /* the Rare blossom READS as its core plus its halo — that is the
-       size the owner pointed at ("the purple dots"), so the common size
-       everything converges on is that, not the core */
-    const TAP=4.6*G,tz=Math.max(0,Math.min(1,(z-1)/5));
-    const sz=r=>r*(1-tz)+TAP*tz;
-    /* the card's recursion is for the card's zoom. Zoomed in, four
-       levels of twigs tangle across the screen and the buds on their
-       tips read as data that cannot be tapped (owner, at 6×: "the
-       overlap and smallness of the dots is worse"). Depth eases and the
-       buds go as the zoom rises. */
-    const MAXD=z<2?4:(z<4?3:2);
-    const BUDS=z<1.8;
-    const SW=Math.pow(z,0.45);          // stroke growth
-    const FS=Math.pow(z,0.25);          // text growth
-    const X=x=>x*z,Y=y=>y*ZY;
-    const W=m.W*z,Hh=m.H*ZY,groundY=Y(m.groundY),topY=Y(m.topY);
-    const f1=v=>v.toFixed(1);
-    /* THE CANVAS GROWS TO ITS OWN BOUNDS (found at 3×: a big session near
-       today fanned its twigs above the top edge and those leaves could
-       not be scrolled to). The same rule the card uses: track every tip
-       and dot, and size the viewBox around them. */
-    let mnX=0,mxX=W,mnY=topY-40,mxY=Hh;
-    const bd=(x,y,r)=>{r=r||3;if(x-r<mnX)mnX=x-r;if(x+r>mxX)mxX=x+r;if(y-r<mnY)mnY=y-r;if(y+r>mxY)mxY=y+r};
-    /* month ticks */
-    (function(){const d=new Date(m.first+'T12:00');d.setDate(1);d.setMonth(d.getMonth()+1);
-      const MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];let guard=0;
-      while(guard++<400){const k=dayKey(d);if(k>m.last)break;
-        const y=Y(m.yAt(m.frac(k))),jan=d.getMonth()===0;
-        o.push('<line x1="10" y1="'+f1(y)+'" x2="'+(jan?26:18)+'" y2="'+f1(y)+'" stroke="var(--faint)" stroke-width="'+(jan?1.2:0.7)+'" opacity="'+(jan?.7:.4)+'"/>'+
-          '<text x="30" y="'+f1(y+3)+'" font-size="'+f1((jan?9:7.5)*FS)+'" fill="var(--faint)" opacity="'+(jan?.9:.6)+'" font-family="-apple-system,system-ui,sans-serif">'+MON[d.getMonth()]+(jan?' '+d.getFullYear():'')+'</text>');
-        d.setMonth(d.getMonth()+1)}})();
-    const groundLabel=m.folded?esc(fmtDate(m.first+'T12:00'))+' · '+m.folded+' EARLIER '+(m.folded===1?'ENTRY':'ENTRIES')+' FOLDED INTO THE GROUND':esc(fmtDate(m.first+'T12:00'))+' · THE FIRST LOGGED DAY';
-    o.push('<line x1="40" y1="'+f1(groundY)+'" x2="'+f1(W-40)+'" y2="'+f1(groundY)+'" stroke="var(--line)" stroke-width="1" opacity=".6"/>'+
-      '<text x="'+f1(W/2)+'" y="'+f1(groundY+18)+'" text-anchor="middle" font-size="'+f1(8*FS)+'" fill="var(--faint)" opacity=".8" font-family="-apple-system,system-ui,sans-serif">'+groundLabel+'</text>'+
-      '<text x="'+f1(W/2)+'" y="'+f1(topY-30)+'" text-anchor="middle" font-size="'+f1(8*FS)+'" fill="var(--faint)" opacity=".8" font-family="-apple-system,system-ui,sans-serif">TODAY</text>');
-    /* roots, for the weeks that held */
-    (function(){const R=seedRand('explorer-roots:'+m.first);
-      const n=Math.min(9,3+Math.floor(((typeof treeData==='function'?treeData().weeks:0)||0)/2));
-      for(let i=0;i<n;i++){const dir=(i%2?1:-1)*(0.6+R()*0.7),a0=(6+R()*26)*Math.PI/180,l0=(18+R()*22)*z;
-        (function dig(px,py,ang,ln,depth,wid,op){if(depth>2||ln<4)return;
-          const nx=px+dir*Math.cos(ang)*ln,ny=Math.min(Hh-2,py+Math.sin(ang)*ln);
-          o.push('<path d="'+txQ(px,py,px+dir*Math.cos(ang)*ln*0.5,py+Math.sin(ang)*ln*0.22,nx,ny)+'" stroke="'+climb[2]+'" stroke-width="'+f1(wid*SW)+'" fill="none" opacity="'+op.toFixed(2)+'" stroke-linecap="round"/>');
-          const kids=depth===0?2:(R()<0.45?1:2);
-          for(let k=0;k<kids;k++)dig(nx,ny,ang+((k?1:-1)*(9+R()*22))*Math.PI/180,ln*(0.55+R()*0.2),depth+1,Math.max(0.4,wid*0.6),op*0.68)
-        })(X(m.tx(0))+dir*3,groundY+1,a0,l0,0,2+R()*0.6,0.34)}})();
-    /* the trunk: width is work, colour climbs the stage ladder */
-    (function(){const NT=Math.max(40,m.nb*4),L=[],Rt=[];
-      L.push([X(m.tx(0))-m.halfW(0)*SW,groundY+5]);Rt.push([X(m.tx(0))+m.halfW(0)*SW,groundY+5]);
-      for(let i=0;i<NT;i++){const u=i/(NT-1),f=u*0.985,y=Y(m.yAt(f)),xc=X(m.tx(f)),h=m.halfW(f)*SW;L.push([xc-h,y]);Rt.push([xc+h,y])}
-      const NS=20;let sv='';for(let i=0;i<=NS;i++){const f=i/NS;sv+='<stop offset="'+f.toFixed(3)+'" stop-color="'+treeRampCol(climb,m.sfAt(f))+'"/>'}
-      o.push('<defs><linearGradient id="txtr" gradientUnits="userSpaceOnUse" x1="0" y1="'+f1(groundY)+'" x2="0" y2="'+f1(topY)+'">'+sv+'</linearGradient></defs>');
-      o.push('<path data-tp="trunk" d="M'+L.map(p=>f1(p[0])+' '+f1(p[1])).join(' L')+' L'+Rt.slice().reverse().map(p=>f1(p[0])+' '+f1(p[1])).join(' L')+' Z" fill="url(#txtr)" opacity=".55"/>');
-      const cut=Math.round(L.length*0.8);
-      o.push('<path d="M'+L.slice(0,cut).map(p=>f1(p[0])+' '+f1(p[1])).join(' L')+'" fill="none" stroke="url(#txtr)" stroke-width="'+f1(1.2*SW)+'" opacity=".6" stroke-linecap="round"/>'+
-        '<path d="M'+Rt.slice(0,cut).map(p=>f1(p[0])+' '+f1(p[1])).join(' L')+'" fill="none" stroke="url(#txtr)" stroke-width="'+f1(1.2*SW)+'" opacity=".45" stroke-linecap="round"/>')})();
-    if(m.scar){const y=Y(m.yAt(m.scar.f)),sx=X(m.tx(m.scar.f));
-      o.push('<line data-tp="scar" x1="'+f1(sx-30*z)+'" y1="'+f1(y)+'" x2="'+f1(sx+30*z)+'" y2="'+f1(y)+'" stroke="var(--faint)" stroke-width="1.4" opacity=".6" stroke-linecap="round"/>'+
-        '<text x="'+f1(sx+34*z)+'" y="'+f1(y+3)+'" font-size="'+f1(7.5*FS)+'" fill="var(--faint)" opacity=".8" font-family="-apple-system,system-ui,sans-serif">'+esc(fmtDate(m.scar.k+'T12:00'))+' · surgery / injury</text>')}
-    /* branches: the same forking recursion the card uses — a short limb
-       that divides, twigs that divide again, leaves clustering toward the
-       tips — so the page reads as the tree the owner chose, not a chart */
-    /* EVERY DOT IS COLLECTED FIRST, SPREAD APART, THEN DRAWN (owner, 14
-       Sep, from his phone: "some dots still overlap so you can't click
-       them because they're hiding behind another leaf"). A leaf, a
-       blossom or a seed that lands on another is nudged along the line
-       between them until they clear, a few passes over a spatial grid,
-       so nothing is ever buried. Stems and rings are drawn to the final
-       spot. */
-    const dots=[];   // {x,y,r,kind,...}
-    const leaf=(lx,ly,r,c,op,v,pr)=>dots.push({x:lx,y:ly,r:r,kind:'leaf',c:c,op:op,v:v,pr:pr});
-    m.branches.forEach(b=>{
-      const R=seedRand('branch:'+b.id);
-      const wood=txCol(m,b.dom,b.sf,0.2),leafC=txCol(m,b.dom,b.sf,1.9);
-      const woodAt=depth=>txCol(m,b.dom,b.sf,0.18+depth*0.24);
-      const budC=k=>txCol(m,b.dom,b.sf,1.25+k);
-      const op=b.dom==='walk'?'.5':'.9';
-      const L=b.len*SP,x0=X(b.x0),y0=Y(b.y);
-      const x1=x0+b.side*Math.cos(b.ang)*L,y1=y0-Math.sin(b.ang)*L;
-      const mx=x0+b.side*Math.cos(b.ang)*L*(0.5+b.bow*0.4),my=y0-Math.sin(b.ang)*L*(0.34-b.bow*0.5);
-      const bw=(2.4*(b.kind==='sess'?(0.8+Math.min(0.9,b.sets/24)):(0.7+Math.min(0.9,b.km/20))))*SW;
-      o.push('<path data-a="txTap" data-v="'+esc(b.kind+':'+b.id)+'" data-tp="branch" id="'+txElId(b.kind,b.id)+'" pointer-events="all" d="'+txQ(x0,y0,mx,my,x1,y1)+'" stroke="'+wood+'" stroke-width="'+f1(bw)+'" fill="none" opacity="'+op+'" stroke-linecap="round"/>');
-      /* THE CARD'S FORK, VERBATIM IN SPIRIT: four levels, one to three
-         children, spread widening with depth, length 56-84% of the
-         parent, width x0.62, opacity fading. Every segment is kept so
-         the sets can sit on it; every tip is kept for a bud. */
-      const fork=(px,py,ax,ay,ln,depth,wid,segs,tips)=>{
-        if(depth>MAXD||ln<2.4*z){tips.push([px,py]);return}
-        const n2=depth>=2?(R()<0.22?1:(R()<0.9?2:3)):(R()<0.1?1:2);
-        for(let k=0;k<n2;k++){
-          const spread=(k===0?-1:1)*(9+R()*30+depth*5)*Math.PI/180*(0.6+R()*0.9);
-          const base=Math.atan2(py-ay,px-ax);
-          const a2=base+spread*(n2===1?R()-0.5:1);
-          const l2=ln*(0.56+R()*0.28);
-          const nx=px+Math.cos(a2)*l2,ny=py+Math.sin(a2)*l2;
-          const cx=px+Math.cos(a2)*l2*0.5,cy=py+Math.sin(a2)*l2*0.55;
-          o.push('<path data-tp="twig" d="'+txQ(px,py,cx,cy,nx,ny)+'" stroke="'+woodAt(depth)+'" stroke-width="'+f1(Math.max(0.3,wid*0.62))+'" fill="none" opacity="'+(0.85-depth*0.09).toFixed(2)+'" stroke-linecap="round"/>');
-          segs.push([px,py,cx,cy,nx,ny]);bd(nx,ny,4);
-          fork(nx,ny,px,py,l2,depth+1,wid*0.62,segs,tips)}};
-      const onSegs=(segs,u)=>{const segI=Math.min(segs.length-1,Math.floor(u*segs.length*0.999));
-        const sg=segs[segI];const uu=(u*segs.length)-segI;
-        return txOnQ(sg[0],sg[1],sg[2],sg[3],sg[4],sg[5],Math.min(1,uu))};
-      const bud=(tp,k)=>{if(!BUDS||R()<0.2)return;const rr=(0.8+R()*0.6)*G;
-        o.push('<circle data-tp="bud" cx="'+f1(tp[0])+'" cy="'+f1(tp[1])+'" r="'+f1(rr)+'" fill="'+budC((R()-0.5)*0.9)+'" opacity="'+(0.5+R()*0.25).toFixed(2)+'"/>')};
-      if(b.kind==='sess'){
-        /* each exercise is one child leaving the limb's end — the card's
-           first fork — with its own subtree; extra exercises beyond four
-           leave the limb further down */
-        const n=b.twigs.length;
-        b.twigs.forEach((tw,j)=>{
-          let px=x1,py=y1,ax=mx,ay=my;
-          if(j>=4){const t=0.45+0.5*((j-4)+1)/((n-4)+1);const P=txOnQ(x0,y0,mx,my,x1,y1,t);px=P[0];py=P[1];ax=x0;ay=y0}
-          const base=Math.atan2(py-ay,px-ax);
-          const spread=((j%2)?1:-1)*(9+R()*30+Math.floor(j/2)*11)*Math.PI/180*(0.6+R()*0.9);
-          const a2=base+spread;
-          const l2=L*(0.56+R()*0.28)*(0.7+Math.min(0.6,tw.sets.length/8))*Math.pow(z,0.1);
-          const nx=px+Math.cos(a2)*l2,ny=py+Math.sin(a2)*l2;
-          const cx=px+Math.cos(a2)*l2*0.5,cy=py+Math.sin(a2)*l2*0.55;
-          const segs=[[px,py,cx,cy,nx,ny]],tips=[];
-          o.push('<path data-tp="twig" d="'+txQ(px,py,cx,cy,nx,ny)+'" stroke="'+woodAt(0)+'" stroke-width="'+f1(Math.max(0.3,bw*0.62))+'" fill="none" opacity=".85" stroke-linecap="round"/>');
-          bd(nx,ny,4);fork(nx,ny,px,py,l2,1,bw*0.62,segs,tips);
-          const mS=tw.sets.length;
-          tw.sets.forEach((st,i)=>{const u=0.2+0.8*(i+1)/(mS+1);
-            const Q=onSegs(segs,u);
-            leaf(Q[0]+(R()-0.5)*2.2*G,Q[1]+(R()-0.5)*2.2*G,sz((0.8+1.6*st.rel)*G),leafC,0.6+0.35*st.rel,'set:'+b.id+':'+st.i,st.pr)});
-          tips.forEach(tp=>bud(tp))})}
-      else{
-        const segs=[[x0,y0,mx,my,x1,y1]],tips=[];
-        fork(x1,y1,mx,my,L*0.7,1,bw,segs,tips);
-        const n=b.leaves;
-        for(let i=0;i<n;i++){const u=(i+0.6)/(n+0.2);
-          const Q=onSegs(segs,u);
-          const perp=(i%2?1:-1)*(1.8+R()*1.4)*G;
-          leaf(Q[0]-Math.sin(b.ang)*perp*b.side*0.3,Q[1]-Math.cos(b.ang)*perp,sz((b.dom==='walk'?0.9:(1.1+(b.hr>0?0.35:0)))*G),leafC,b.dom==='walk'?0.5:0.8,b.kind+':'+b.id,false)}
-        tips.forEach(tp=>bud(tp))}});
-    /* phases cleared */
-    m.phases.slice(0,8).forEach(ph=>{const y=Y(m.yAt(ph.f)),x=X(m.tx(ph.f))+(ph.p%2?1:-1)*(m.halfW(ph.f)*SW+6*G);
-      o.push('<circle data-tp="phase" cx="'+f1(x)+'" cy="'+f1(y)+'" r="'+f1(3.4*G)+'" fill="#C96442" opacity=".92"/>'+
-        '<text x="'+f1(x+(ph.p%2?7:-7)*G)+'" y="'+f1(y+3)+'" text-anchor="'+(ph.p%2?'start':'end')+'" font-size="'+f1(7*FS)+'" fill="#C96442" opacity=".9" font-family="-apple-system,system-ui,sans-serif">phase '+ph.p+'</text>')});
-    /* patterns: seeds on short stems */
-    (m.patterns||[]).forEach(pt=>{
-      const c=pt.tone==='warn'?'var(--amber)':pt.tone==='good'?'var(--green)':'var(--dim)';
-      const sx=X(pt.x0),sy=Y(pt.y0),stem=pt.stem*SP;
-      dots.push({x:sx+pt.side*Math.cos(pt.a)*stem,y:sy-Math.sin(pt.a)*stem,r:sz(2.6*G),kind:'pat',c:c,sx:sx,sy:sy,pt:pt})});
-    /* blossoms: the rarity ladder, the same constant every surface reads */
-    m.blossoms.forEach(bl=>{
-      const c=rarityOf(bl.rar)[1],r=bl.rank>=2?([1.9,2.4,3.0,3.8][bl.rank])*G:sz(([1.9,2.4][bl.rank]||1.9)*G);
-      const sx=X(bl.x0),sy=Y(bl.y0),stem=bl.stem*SP;
-      dots.push({x:sx+bl.side*Math.cos(bl.a)*stem,y:sy-Math.sin(bl.a)*stem,r:r,kind:'bloom',c:c,sx:sx,sy:sy,bl:bl})});
-    txSpread(dots,2.2*G+TAP*0.9*tz);
-    dots.forEach(d=>bd(d.x,d.y,d.r*2.4+8));
-    dots.forEach(d=>{
-      if(d.kind==='leaf'){
-        o.push('<circle data-a="txTap" data-v="'+esc(d.v)+'" data-tp="leaf" pointer-events="all" stroke="transparent" stroke-width="'+f1(7*G)+'" cx="'+f1(d.x)+'" cy="'+f1(d.y)+'" r="'+d.r.toFixed(2)+'" fill="'+d.c+'" opacity="'+d.op.toFixed(2)+'"/>'+
-          (d.pr?'<circle cx="'+f1(d.x)+'" cy="'+f1(d.y)+'" r="'+(d.r+1.2*G).toFixed(2)+'" fill="none" stroke="#F0EEE6" stroke-width="'+f1(0.45*SW)+'" opacity=".55"/>':''))}
-      else if(d.kind==='pat'){const pt=d.pt,c=d.c,r=d.r,bx=d.x,by=d.y;
-        o.push('<path data-tp="pstem" d="M'+f1(d.sx)+' '+f1(d.sy)+' L'+f1(bx)+' '+f1(by)+'" stroke="'+c+'" stroke-width="'+f1(0.7*SW)+'" opacity=".45" stroke-linecap="round"/>'+
-          (pt.isNew?'<circle class="tx-new" cx="'+f1(bx)+'" cy="'+f1(by)+'" r="'+f1(r+4*G)+'" fill="none" stroke="'+c+'" stroke-width="'+f1(1*SW)+'"/>':'')+
-          '<path data-a="txTap" data-v="'+esc('pat:'+pt.t)+'" data-tp="pattern" pointer-events="all" stroke="'+c+'" stroke-width="'+f1(0.9*SW)+'" d="M'+f1(bx)+' '+f1(by-r)+' L'+f1(bx+r*0.62)+' '+f1(by)+' L'+f1(bx)+' '+f1(by+r)+' L'+f1(bx-r*0.62)+' '+f1(by)+' Z" fill="'+c+'" fill-opacity=".35" opacity=".95"/>')}
-      else{const bl=d.bl,c=d.c,r=d.r,bx=d.x,by=d.y;
-        const focus=S.treeFocus&&S.treeFocus===bl.id;
-        const special=bl.rank>=2;
-        o.push('<path data-tp="stem" d="M'+f1(d.sx)+' '+f1(d.sy)+' L'+f1(bx)+' '+f1(by)+'" stroke="'+c+'" stroke-width="'+f1(0.8*SW)+'" opacity=".55" stroke-linecap="round"/>'+
-          (special?'<circle class="tx-shim'+(bl.rank===3?' tx-epic':'')+'" cx="'+f1(bx)+'" cy="'+f1(by)+'" r="'+f1(r*1.8)+'" fill="'+c+'" opacity=".12"/>':'')+
-          (bl.isNew?'<circle class="tx-new" cx="'+f1(bx)+'" cy="'+f1(by)+'" r="'+f1(r+4*G)+'" fill="none" stroke="'+c+'" stroke-width="'+f1(1*SW)+'"/>':'')+
-          '<circle data-a="txTap" data-v="'+esc('find:'+bl.id)+'" data-tp="bloom"'+(special?' class="tx-glow'+(bl.rank===3?' tx-glow-epic':'')+'" style="color:'+c+'"':'')+' pointer-events="all" stroke="transparent" stroke-width="'+f1(8*G)+'" id="'+txElId('find',bl.id)+'" cx="'+f1(bx)+'" cy="'+f1(by)+'" r="'+f1(r)+'" fill="'+c+'" opacity="'+(special?'.97':'.85')+'"/>'+
-          (bl.rank>=2?'<circle cx="'+f1(bx)+'" cy="'+f1(by)+'" r="'+f1(r+2.2*G)+'" fill="none" stroke="'+c+'" stroke-width="'+f1(0.6*SW)+'" opacity=".45"/>':'')+
-          (focus?'<circle class="tx-new" cx="'+f1(bx)+'" cy="'+f1(by)+'" r="'+f1(r+9*G)+'" fill="none" stroke="'+c+'" stroke-width="'+f1(1.4*SW)+'"/>'+
-            '<text x="'+f1(bx+bl.side*(r+12*G))+'" y="'+f1(by+3)+'" text-anchor="'+(bl.side>0?'start':'end')+'" font-size="'+f1(8*FS)+'" fill="'+c+'" font-family="-apple-system,system-ui,sans-serif" style="paint-order:stroke;stroke:#1F1E1D;stroke-width:3px">'+esc(String(bl.t).slice(0,34))+'</text>':''))}});
-    const pad=8;
-    const vb={x:mnX-pad,y:mnY-pad,w:(mxX-mnX)+pad*2,h:(mxY-mnY)+pad*2};
-    const svg='<svg viewBox="'+f1(vb.x)+' '+f1(vb.y)+' '+f1(vb.w)+' '+f1(vb.h)+'" style="width:100%;height:auto;display:block;overflow:visible">'+o.join('')+'</svg>';
-    S._txSvg={key:key,svg:svg,vb:vb};
+    S._txVbLast=null;
+    const svg=growTreeTime(TX_W*z,m.H*Math.pow(z,1.15),{explore:true,zoom:z});
+    S._txSvg={key:key,svg:svg,vb:S._txVbLast||null};
     return svg}
   catch(e){oops('treeXSvg',e);return ''}}
 function txVb(){try{const v=S._txSvg&&S._txSvg.vb;if(v)return v}catch(e){oops('txVb',e)}
@@ -16577,7 +16816,11 @@ function txSpread(dots,gap){
         for(let dx=-1;dx<=1;dx++)for(let dy=-1;dy<=1;dy++){
           const cellList=grid[(gx+dx)+':'+(gy+dy)];if(!cellList)continue;
           for(let q=0;q<cellList.length;q++){const j=cellList[q];if(j<=i)continue;
-            const b=dots[j];const need=a.r+b.r+gap;
+            /* a blossom carries a drawn halo and a find the eye is meant
+               to land on, so it asks for more clear space than a set does
+               (owner, 14 Sep: "can you unclutter this" — ninety-three
+               finds in one recent band matted into a single sheet) */
+            const b=dots[j];const need=a.r+b.r+gap+(a.pad||0)+(b.pad||0);
             let vx=b.x-a.x,vy=b.y-a.y;let d=Math.hypot(vx,vy);
             if(d>=need)continue;
             if(d<0.01){vx=((i*7)%3)-1||1;vy=((j*5)%3)-1||-1;d=Math.hypot(vx,vy)}
@@ -16800,13 +17043,28 @@ function treeXSheet(){
           if(e9>best){best=e9;bestK=k}
           if(k<hKey(h)&&(prevK===''||k>prevK)){prevK=k;prevE=e9}})});
       const rel=(e&&best)?Math.round(e/best*100):null;
-      return wrapSheet('A leaf · one set',
+      /* AT A GLANCE THE LEAF IS THE EXERCISE, so the sheet has to show the
+         exercise (owner, 14 Sep: "every exercise not every set"). The tap
+         lands on that day's TOP set of the lift; the rest of the day's
+         sets of it are listed under, so nothing is hidden behind the one
+         number the leaf was sized by. */
+      const sameEx=(h.log||[]).map((q,ix)=>({q:q,ix:ix}))
+        .filter(o=>gBase(o.q.ex)===b&&(o.q.w||o.q.r||o.q.secs));
+      const others=sameEx.length>1?('<div class="mt" style="border-top:1px solid var(--line);padding-top:9px">'+
+        '<p class="mono" style="font-size:9px;letter-spacing:.12em;color:var(--faint)">EVERY SET OF IT THAT DAY</p>'+
+        sameEx.map(o=>'<div style="display:flex;justify-content:space-between;gap:10px;margin-top:5px;font-size:12.5px'+
+          (o.ix===+S.sheet.i?';font-weight:650':';color:var(--dim)')+'">'+
+          '<span>Set '+(o.q.setNo||(o.ix+1))+(o.q.pr?' <span style="color:var(--green)">PR</span>':'')+'</span>'+
+          '<span class="mono">'+(o.q.secs>0?o.q.secs+'s':uwNum(o.q.w)+' × '+o.q.r)+(o.q.rpe!=null?' @'+o.q.rpe:'')+'</span></div>').join('')+
+        '</div>'):'';
+      return wrapSheet(sameEx.length>1?('A leaf · '+sameEx.length+' sets'):'A leaf · one set',
         '<p class="disp" style="font-size:19px;font-weight:650;line-height:1.2">'+esc(b)+'</p>'+
         '<p class="mono" style="color:var(--faint);font-size:10px;margin-top:4px">'+esc(fmtDate(hKey(h)+'T12:00'))+' · SET '+(l.setNo||(+S.sheet.i+1))+(l.pr?' · <span style="color:var(--green)">PR</span>':'')+'</p>'+
         '<p class="disp" style="font-size:28px;font-weight:700;margin-top:10px">'+(l.secs>0?l.secs+'s hold':uwNum(l.w)+' '+uwUnit()+' × '+l.r)+(l.rpe!=null?' <span style="font-size:14px;color:var(--dim)">@ RPE '+l.rpe+'</span>':'')+'</p>'+
         (e?'<p style="color:var(--dim);font-size:12.5px;line-height:1.6;margin-top:8px">About '+uwNum(e)+' '+uwUnit()+' estimated max'+(rel!=null?' — '+rel+'% of your best ever on this lift'+(bestK?' ('+esc(fmtDate(bestK+'T12:00'))+')':''):'')+'.'+
           (prevE!=null?' The time before, on '+esc(fmtDate(prevK+'T12:00'))+', worked out to '+uwNum(Math.round(prevE))+'.':'')+'</p>':'')+
-        '<p style="color:var(--faint);font-size:11px;line-height:1.5;margin-top:10px">The leaf’s size is that percentage. A ring around it is a PR.</p>'+
+        others+
+        '<p style="color:var(--faint);font-size:11px;line-height:1.5;margin-top:10px">The leaf’s size is that percentage. A ring around it is a PR. Zoom in past 3× and every set becomes a leaf of its own.</p>'+
         '<button data-a="txOpenLog" data-v="'+esc(String(h.id))+'" class="btn mt2" style="color:var(--amber)">Open the session in the log</button>')}
     if(t==='txrun'){
       const m=treeXModel();const b=(m.branches||[]).find(x=>x.kind==='run'&&x.id===String(S.sheet.id));
@@ -22024,13 +22282,15 @@ function viewToday(){
       const myN=myFirst||'You';
       const myInit=(myFirst||myMail||'Y').slice(0,1).toUpperCase();
       const frKnown=!!top.named;
-      let crown='';
-      try{const pv=dayKey(new Date(new Date(questWeekKey()+'T12:00').getTime()-7*864e5));
-        const r9=((acct()||{}).duelHist||{})[pv];
-        if(r9==='w')crown='me';else if(r9==='l')crown='them';
-        if(crown==='me'){const hist9=(acct()||{}).duelHist||{};
-          const ks9=Object.keys(hist9).filter(k9=>/^\d{4}-/.test(k9)).sort().reverse();
-          S._reign=0;for(const k9 of ks9){if(hist9[k9]==='w')S._reign++;else break}}}catch(e9){}
+      /* THE CROWN IS A FACT ABOUT A FINISHED WEEK (owner-caught, 14 Sep
+         2026: "crown belongs to Angus should not be on Dad"). This used
+         to say crown='them' and then paint it over `top` — the leader of
+         the LIVE board — so on a Monday of zeros it sat on whoever sorted
+         first. crownKeyNow() names the actual holder; Social's podium
+         reads the same function. */
+      const crownKey=(typeof crownKeyNow==='function')?crownKeyNow():null;
+      const crown=crownKey==='me'?'me':crownKey?'them':'';
+      if(crown==='me')S._reign=(typeof crownReign==='function')?crownReign():0;
       const frInit=frKnown?top.name.slice(0,1).toUpperCase():'?';
       /* last week's winner wears a small drawn crown above the ring —
          vector, epic-gold, on-identity (owner ruled the emoji out) */
@@ -22056,7 +22316,7 @@ function viewToday(){
         const R9=[{me:1,name:myN,init:myInit,week:mine,id:'me',av:(acct()||{}).av||''}]
           .concat(Ls.map(f=>({name:f.named?f.name:'?',init:(f.named?String(f.name).slice(0,1):'?').toUpperCase(),week:f.week,id:f.id,av:f.av||''})));
         R9.sort((x,y)=>y.week-x.week);R9.forEach((x,i)=>x.rank=i+1);
-        const crowned=x=>(crown==='me'&&x.id==='me')||(crown==='them'&&x.id===top.id);
+        const crowned=x=>crownKey&&(crownKey==='me'?x.id==='me':x.id===crownKey);
         const stepH9={1:32,2:19,3:13};
         const col9=x=>{const first=x.rank===1;const size=first?54:40;
           const fire9=(first&&x.week>0&&typeof flameF==='function')?flameF(x.av,size):'';
@@ -22093,7 +22353,7 @@ function viewToday(){
         '<div style="flex:none;display:flex;flex-direction:column;align-items:center;gap:2px;padding:0 4px">'+
         '<span class="mono disp grad" style="font-size:17px;font-weight:800;letter-spacing:.06em">VS</span>'+
         '<span class="mono" style="font-size:15px;font-weight:700">'+mine+'\u2009\u2013\u2009'+top.week+'</span></div>'+
-        ava(top.name,frInit,lead<=0&&top.week>0?'var(--green)':'var(--line)',lead<0,crown==='them')+
+        ava(top.name,frInit,lead<=0&&top.week>0?'var(--green)':'var(--line)',lead<0,!!crownKey&&crownKey===top.id)+
         '</div>'+
         ((crown==='me'&&S._reign>=2)?'<p class="mono" style="font-size:8.5px;letter-spacing:.1em;color:var(--gold);margin-top:6px">CROWN HELD '+S._reign+' WEEKS</p>':'')+
         '<div style="height:6px;border-radius:6px;background:var(--line);overflow:hidden;margin-top:12px;display:flex">'+
@@ -26628,6 +26888,18 @@ function render(){
     if(pgAnim)try{const ap=document.getElementById('app');
       if(ap){ap.classList.remove('pgnav','back');void ap.offsetWidth;
         ap.classList.add('pgnav');if(navBack)ap.classList.add('back');
+        /* THE PAGE ARRIVES ONCE (owner-caught on video, 14 Sep 2026:
+           "clicking diamond nodes on tree give a glitchy reveal page
+           twice"). The stagger was stood down by `#app.pgnav .stg>*
+           {animation:none}` — a rule that only holds WHILE the class is
+           on. Three hundred and forty milliseconds later the class comes
+           off, the override stops applying, and allenaRise starts THEN,
+           from opacity 0: a page that was already fully drawn dissolved
+           and rose in a second time. Every navigation in the app did
+           this. Suppressing an animation with a class you are about to
+           remove only delays it — so the class goes off the markup
+           instead, and the page that moves has nothing left to replay. */
+        try{ap.querySelectorAll('.stg').forEach(el=>el.classList.remove('stg'))}catch(e9){}
         clearTimeout(render.__pgT);
         render.__pgT=setTimeout(()=>{try{ap.classList.remove('pgnav','back')}catch(e9){oops('pgnav.clear',e9)}},340)}}
       catch(e){oops('pgnav',e)}
@@ -26939,10 +27211,13 @@ setInterval(function(){try{
     if(y0==null||!sh)return;
     const dy=e.touches[0].clientY-y0;
     if(dy<=0){if(!dragging){y0=null;sh=null}return}
-    if(!dragging){if(dy<12)return;dragging=true;sh.style.transition='none';if(bg)bg.style.transition='none'}
+    if(!dragging){if(dy<12)return;dragging=true;sh.style.transition='none';
+      /* the scrim's fade animation has fill:both and would outrank an
+         inline value, so stand it down before the finger takes over */
+      if(bg){bg.classList.add('nofade');bg.classList.remove('scrimout')}}
     const d=Math.min(dy,620);
     sh.style.transform='translateY('+d+'px)';
-    if(bg)bg.style.background='rgba(0,0,0,'+Math.max(0,0.55-d/900).toFixed(3)+')';
+    if(bg)bg.style.setProperty('--scrim',Math.max(0,1-d/460).toFixed(3));
     if(e.cancelable)e.preventDefault()},{passive:false});
   document.addEventListener('touchend',()=>{
     if(!dragging||!sh){y0=null;sh=null;dragging=false;return}
@@ -26950,15 +27225,19 @@ setInterval(function(){try{
     const d=m9?+m9[1]:0;
     const s9=sh,b9=bg;sh=null;bg=null;y0=null;dragging=false;
     if(d>110){
+      /* the panel and the dark leave together — the panel used to go
+         first and the page sat under a full scrim with nothing on it */
       s9.style.transition='transform .24s cubic-bezier(.4,0,.2,1)';
       s9.style.transform='translateY(105%)';
-      if(b9){b9.style.transition='background .2s ease';b9.style.background='rgba(0,0,0,0)'}
+      if(b9){b9.classList.add('scrimout');b9.style.setProperty('--scrim','0')}
       try{vib(8)}catch(e2){}
-      setTimeout(function(){runAction('closeSheet')},200)}
+      setTimeout(function(){runAction('closeSheet')},235)}
     else{
       s9.style.transition='transform .26s cubic-bezier(.34,1.4,.64,1)';
       s9.style.transform='';
-      setTimeout(function(){try{s9.style.transition=''}catch(e2){}},280)}},{passive:true});
+      if(b9){b9.classList.add('scrimout');b9.style.setProperty('--scrim','1')}
+      setTimeout(function(){try{s9.style.transition='';
+        if(b9){b9.classList.remove('scrimout');b9.style.removeProperty('--scrim')}}catch(e2){}},280)}},{passive:true});
 })();
 
 /* the page behind an open sheet never scrolls (owner-caught, 10 Sep:
