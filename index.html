@@ -912,7 +912,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='ece229';  // stamped by tools/build.py with the content hash
+const BUILD_ID='49608f';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -16153,7 +16153,20 @@ function growTreeTime(W,Hh,opts){
      the canopy; stopping at a height left a flat sawn cut. Neither is
      how a trunk ends. It holds most of its width up the climb and then
      goes in a hurry, inside its own crown, and the branches take over. */
-  const TTOP=opts.trunkTop==null?0.88:+opts.trunkTop;
+  /* ═══ THE TRUNK REACHES THE TOP OF ITS OWN TREE (owner, 14 Sep 2026:
+     "the branches are bigger than the trunk at the top" — measured, and
+     he was right in a way I had not looked for) ══════════════════════
+     The polygon stopped at 88% of the height. On a 300px card that is the
+     settled design: the trunk gives out inside its own crown and the
+     branches take over, which is what a real tree does. On the explorer
+     the top of the drawing is TODAY, and branches are placed right up to
+     it — so the top twelve percent carried ten limbs with NO TRUNK BESIDE
+     THEM AT ALL. Nothing was too thick; there was simply nothing to be
+     thicker than, and the cap could not see it because the cap reads
+     trunkDrawn, which clamps f to TTOP and happily reports a width for
+     wood the polygon never paints. Measured after: zero branches above
+     the trunk, zero wider than it. */
+  const TTOP=opts.trunkTop==null?(EX?1:0.88):+opts.trunkTop;
   const NT=Math.max(28,N*4);
   const flare=u=>FLR<=0?1:(u<0.11?1+FLR*Math.pow(1-u/0.11,2.0):1);
   /* ON A PAGE YOU SCROLL INTO, THE TRUNK NEVER GIVES UP ALL ITS WIDTH.
@@ -26877,7 +26890,22 @@ function onSessionScreen(){try{return !!(S.sess&&S.view==='session')}catch(e){re
 /* the sheet, or an honest panel saying it could not draw — never a
    frozen app and never a trap (audit P4). Named so it can be tested. */
 function sheetSafe(){
-  try{return sheetHtml()}
+  try{
+    const h=sheetHtml();
+    /* ═══ A SHEET THAT DRAWS NOTHING IS A DEAD TAP (audit pass C, 14 Sep
+       2026) ═══════════════════════════════════════════════════════════
+       sheetHtml returns '' for a type it does not know, and for fifteen
+       types whose data is missing — so S.sheet is set, the user's tap is
+       recorded, and NOTHING APPEARS. That is precisely the failure this
+       repo bans: "a feature that silently does nothing looks exactly like
+       a feature with no data yet." A throwing sheet has offered a way out
+       since Phase D; an empty one offered nothing at all. */
+    if(h&&h.trim())return h;
+    if(S.sheet)oops('sheet:empty:'+((S.sheet&&S.sheet.t)||'?'),'drew nothing');
+    return S.sheet?('<div class="sheet-bg" data-a="closeSheet"><div class="sheet" data-stop="1">'+
+      '<p class="eyebrow" style="color:var(--red)">Nothing to show here</p>'+
+      '<p style="font-size:14px;line-height:1.6;margin-top:8px">This panel had no content to draw. Nothing was lost — Allena wrote down why, under Settings \u2192 Diagnostics.</p>'+
+      '<button data-a="closeSheet" class="big disp mt2" style="background:var(--amber);color:var(--bg);font-size:15px">Close</button></div></div>'):''}
   catch(e){
     oops('sheetHtml:'+((S.sheet&&S.sheet.t)||'?'),e);
     return '<div class="sheet-bg" data-a="closeSheet"><div class="sheet" data-stop="1">'+
@@ -26934,6 +26962,14 @@ function render(){
   /* never a blank dead page: an unknown or renamed view id falls back
      to Today instead of rendering nothing (owner-caught) */
   else{S.view='today';body=viewToday()}
+  /* A VIEW THAT DRAWS NOTHING IS A BLANK SCREEN WITH NO WAY BACK (audit
+     pass C, 14 Sep 2026). The dispatch already catches a view that THROWS
+     and a view id it does not know; five views can simply return '' when
+     their state is missing, and an empty body is painted as an empty
+     body — no header, no Back, nothing to tap. Same law, same answer. */
+  if(!body||!String(body).trim()){
+    oops('view:empty:'+S.view,'drew nothing');
+    S.view='today';body=viewToday()}
   }catch(e9){
     /* A THROWING VIEW MUST NOT FREEZE THE APP (audit, Phase D). The
        dispatch had no try/catch, so one null access anywhere in a view
@@ -28282,7 +28318,6 @@ function runAction(a,v,t,e){
       S.history.sort((a,b)=>a.date.localeCompare(b.date));saveHistory();
       S.hform=null;S.sheet=null;S.patCache=null;render();flash('Session updated.');break}
     case 'delHistYes':S.history=S.history.filter(h=>h.id!==v);saveHistory();S.sheet=null;S.open=null;render();break;
-    case 'markDone':{const h=S.history.find(x=>x.id===v);if(h){h.complete=true;saveHistory()}render();break}
     case 'closeSheet':{
       /* the cut-plan popup sits on top of the preview flow — closing
          it returns to the preview where you were, never to the view
@@ -28688,7 +28723,6 @@ function runAction(a,v,t,e){
       if(dr){dr.classList.remove('open');setTimeout(function(){S.drawerOpen=false;render()},240)}
       else{S.drawerOpen=false;render()}break}
     case 'drawerNav':{const _f=S.view;S.drawerOpen=false;S._navQuiet=1;runAction('nav',v);S.backTo=_f;S.backDrawer=true;break}
-    case 'hubNav':{S._navQuiet=1;runAction('nav',v);S.backTo='progress';S.backDrawer=false;break}
     case 'back':{const _t=S.backTo||'today';const _d=!!S.backDrawer;
       S.backTo=null;S.backDrawer=false;S.view=_t;
       if(_t==='you')S.backTo='data'; // You is only reached from Settings — a second back lands there, never loops
@@ -28914,18 +28948,6 @@ function runAction(a,v,t,e){
     case 'impCancel':{const b=S.impBack;S.imp=null;S.impBack=null;S.view=(b==='own'&&S.own)?'own':'home';render();break}
     case 'impKind':{if(S.imp)S.imp.kindHint=v;render();break}
     case 'impParse':impParse();break;
-    case 'impDelEx':{const [di,ei]=v.split(':').map(Number);S.imp.draft.days[di].exercises.splice(ei,1);
-      S.imp.assess=assessProgram(S.imp.draft);render();break}
-    case 'impAddEx':{const di=+v;S.imp.draft.days[di].exercises.push({name:'New exercise',rest:90,sets:{'default':[{reps:'8-12',rpe:8}]}});
-      S.imp.assess=assessProgram(S.imp.draft);render();break}
-    case 'impSave':{const p=S.imp.draft;if(!p||!p.days||!p.days.length){flash('Nothing to save.');break}
-      let ch=[];
-      if(v==='fix')ch=impApplyFix(p);
-      S.lib.programs.push(p);S.lib.activeId=p.id;saveLib();setWeek(1,p.id);
-      S.imp=null;S.view='home';render();
-      if(v==='ask'){S.coach.thread=[];S.coach.sent=false;S.coach.input='Review the program I just loaded — anything you would change?';S.coachBack='home';S.view='coach';render()}
-      else flash(ch.length?'Saved with '+ch.length+' adjustment'+(ch.length===1?'':'s')+'.':'Program saved.');
-      break}
     case 'scanNew':S.sform={date:today(),w:'',bf:'',smm:'',vf:'',bmr:'',tee:'',legL:'',legR:'',img:null,busy:false};S.sheet={t:'scan'};render();break;
     case 'scanRead':readScanWithAllena();break;
     case 'scanSave':{const f=S.sform;if(!(+f.w>0)){flash('Weight is needed at minimum.');break}
@@ -29155,8 +29177,6 @@ function runAction(a,v,t,e){
       flash(n?(n+' put back'+(stuck.length?', '+stuck.length+' left where '+(stuck.length===1?'it was':'they were')+' logged':'')+'.'):'Nothing to put back — all of it has been logged.');
       render();break}
     case 'offloadCancel':S.moveq=null;S.sheet={t:'preview'};render();break;
-    case 'offloadClear':{const p=activeProgSafe(),k=offloadKey(p);
-      S.offload[k]=[];lset(K_OFF,S.offload);flash('Moved work cleared.');render();break}
     case 'prevCut':{const pv=S.prev;
       const p5=S.lib.programs.find(x=>x.id===pv.pid)||activeProgSafe();
       const ck=offloadKey(p5);
@@ -29327,7 +29347,6 @@ function runAction(a,v,t,e){
     case 'crewLeave':{try{crewLeave()}catch(e){}break}
     case 'evidenceOpen':{S.backTo=S.view;S.backDrawer=false;S.sheet=null;
       S.evidenceId=v;S.view='evidence';render();break}
-    case 'recentFindsOpen':{S.sheet={t:'recentfinds'};render();break}
     case 'romOpen':{S.sheet={t:'rom'};render();break}
     case 'romStart':{
       try{webkit.messageHandlers.allena.postMessage(JSON.stringify({type:'rom'}))}catch(e){flash('The camera needs the Allena app.')}
@@ -29361,7 +29380,6 @@ function runAction(a,v,t,e){
         (typeof notifEchoes==='function'?notifEchoes():[]).forEach(x=>P.echoSeen[x.id]=1);
         lset(K_NOTIF,P)}catch(e){}
       render();break}
-    case 'signalOpen':{const sg=signalDue();if(sg){S.signalReveal=sg;render()}break}
     case 'signalKeep':{const sg=S.signalReveal;
       /* only scenes with a real id touch storage — an echo replay has
          none, and used to bank a junk 'undefined' entry (caught 7 Sep) */
@@ -29421,9 +29439,6 @@ function runAction(a,v,t,e){
       if(navigator.share){navigator.share({title:'Allena',text:txt9}).catch(function(){})}
       else{try{navigator.clipboard.writeText(txt9);flash('Copied — send it to them.')}catch(e){flash('Could not copy.')}}
       break}
-    case 'fghostCopy':{try{const c9=fghostCode();
-      navigator.clipboard.writeText('Race me on Allena — my best week vs yours.\nIn Allena: The ghost \u2192 Race a mate \u2192 paste this code:\n'+c9);
-      flash('Copied — send it to them.')}catch(e){flash('Could not copy.')}break}
     case 'fghostCopyRaw':{try{navigator.clipboard.writeText(fghostCode()||'');
       flash('Code copied \u2014 paste it anywhere.')}catch(e){flash('Could not copy.')}break}
     case 'fghostPaste':{(navigator.clipboard&&navigator.clipboard.readText?navigator.clipboard.readText():Promise.reject()).then(function(tx){
@@ -29556,8 +29571,6 @@ function runAction(a,v,t,e){
       S.coachBack=S.view;S.sheet=null;chatNew();
       S.coach.input='About the deep-read finding \u201c'+it.t+'\u201d \u2014 '+(it.plain||it.d).slice(0,180)+' \u2026 what should I actually do with this?';
       render();break}
-    case 'deepScroll':{S.scrollTo='deepcard';render();
-      try{setTimeout(function(){var el=document.getElementById('deepcard');if(el)el.scrollIntoView({behavior:'smooth',block:'start'})},80)}catch(e){}break}
     case 'deepItemOpen':S.sheet={t:'deepitem',i:+v};render();break;
     case 'pvSubOpen':S.sheet={t:'pvsub',i:+v};render();break;
     case 'pvSubBack':S.sheet={t:'preview'};render();break;
@@ -29827,14 +29840,14 @@ function runAction(a,v,t,e){
     case 'dailyToggle':S.daily.on=!S.daily.on;lset(K_DAILY,S.daily);render();break;
     case 'creaToggle':S.supp.on=!S.supp.on;lset(K_SUPP,S.supp);render();break;
     case 'goalsOpen':S.sheet={t:'goals'};render();break;
-    case 'gEx':S.gform=S.gform||{ex:null,w:60,r:8};S.gform.ex=t.dataset.v;render();break;
+
     case 'gAdd':{const f=S.gform;if(!f||!f.ex||S.goals.length>=3)break;
       if(!(+f.w>0)||!(+f.r>0)){flash('Set a weight and reps.');break}
       if(S.goals.some(g=>g.ex===f.ex)){flash('One goal per lift — remove the existing one first.');break}
       S.goals.push({id:'g'+Date.now().toString(36),ex:f.ex,w:+f.w,r:+f.r,created:Date.now(),done:null});
       lset(K_GOALS,S.goals);f.ex=null;render();break}
     case 'gDel':S.goals=S.goals.filter(g=>g.id!==v);lset(K_GOALS,S.goals);render();break;
-    case 'progNoteToggle':S.progNoteOpen=!S.progNoteOpen;render();break;
+
     case 'unitW':unitsSet('w',v);render();flash(v==='lb'?'Weights now read in pounds — stored metric underneath.':'Weights back to kilograms.');break;
     case 'unitD':unitsSet('d',v);render();flash(v==='mi'?'Distances now read in miles — stored metric underneath.':'Distances back to kilometres.');break;
     case 'progNoteOpen':S.sheet={t:'prognote'};render();break;
@@ -29860,22 +29873,12 @@ function runAction(a,v,t,e){
     case 'adjOpen':S.sheet={t:'adjledger'};render();break;
     case '__help':S.sheet={t:'help'};render();break;
     case 'helpCopy':{try{navigator.clipboard.writeText('sathya@allenaapp.com');flash('Address copied.')}catch(e){flash('sathya@allenaapp.com')}break}
-    case 'drawerReport':S.drawerOpen=false;runAction('dsetOpen','__report');break;
+
     case 'progDataGo':{const o9=S.impDataOffer;if(!o9)break;
       S.impDataOffer=null;S.sheet=null;
       impNew();S.imp.grid=o9.grid;S.imp.fileName=o9.fileName;S.imp.kindHint='hist';
       S.view='import';render();impParse();break}
     case 'progDataSkip':S.impDataOffer=null;S.sheet=null;render();break;
-    case 'aliasSweep':{const r=historyAliasScan();
-      const map={};r.autos.forEach(a=>{map[a.from]=a.to});
-      if(r.asks.length){
-        S.halias={r:r,map:map,picks:{},
-          apply:function(m,c){const n=historyAliasApplyMap(m,c);
-            flash(n?n+' logged sets renamed — duplicates merged.':'Names already consistent.')},
-          next:function(){S.sheet=null;render()}};
-        S.sheet={t:'histalias'};render();break}
-      const n=historyAliasApplyMap(map,r.canon);
-      flash(n?n+' logged sets renamed — duplicates merged.':'Nothing to merge — names already consistent.');render();break}
     case 'haPick':{const ha=S.halias;if(!ha)break;
       const ix=String(v).indexOf(':');
       ha.picks[+String(v).slice(0,ix)]=String(v).slice(ix+1);render();break}
@@ -29893,6 +29896,11 @@ function runAction(a,v,t,e){
     case 'frJoinGo':{const c9=String(S.frIn||'').trim().toUpperCase();
       if(/^G[A-Z0-9]{4,7}$/.test(c9)&&S.crewCap===true){crewJoin(c9);break}}
     // falls through: a G-code joins a crew, anything else is a friend code
+    /* REACHED BY FALL-THROUGH, NEVER BY NAME — and that is exactly why the
+       dead-case sweep of 14 Sep 2026 nearly deleted it. Its label appears
+       once in the whole source, which is the signature of an unreachable
+       case AND the signature of a fall-through target. The linter caught it.
+       Any future sweep must exclude a case its predecessor falls into. */
     // eslint-disable-next-line no-fallthrough
     case '__frJoinGoPair':frJoin(S.frIn||'');break;
     case 'frRemove':frRemove(v);break;
@@ -29906,7 +29914,7 @@ function runAction(a,v,t,e){
       render();break}
     case 'tourSkip':S.tour=null;lset('training-tour-v1',{seen:today()});render();break;
     case 'tourOpen':S.tour={i:0};S.sheet=null;S.view='today';render();break;
-    case 'ledgerOpen':S.sheet={t:'ledger'};render();break;
+
     case 'weekClockOpen':S.sheet={t:'wkclock'};render();break;
     case 'clkSetDay':{const p=activeProgSafe();if(!p)break;
       const d9=Math.max(1,Math.min(7,+v||1));
@@ -30035,7 +30043,7 @@ function runAction(a,v,t,e){
     case 'axOpen':S.sheet=null;S.axf={cat:'pushH',name:'',sets:3,reps:'8-12',w:'',hold:false,secs:30,perSide:false,perm:false};S.sheet={t:'addex',mode:v||'live'};render();break;
     case 'axCat':S.axf.cat=v;S.axf.name='';render();break;
     case 'axPick':S.axf.name=t.dataset.v;render();break;
-    case 'axReps':S.axf.reps=v;render();break;
+
     case 'axHold':S.axf.hold=v==='1';render();break;
     case 'axPerSide':S.axf.perSide=!S.axf.perSide;render();break;
     case 'axPerm':S.axf.perm=!S.axf.perm;render();break;
@@ -30255,8 +30263,8 @@ function runAction(a,v,t,e){
     case 'acctDelGo':{S.sheet=null;render();acctDelete();break}
     case 'acctOut':lset(K_ACCT,null);S.acctPending=false;render();
       flash('Signed out. Your training data never left this phone anyway.');break;
-    case 'loadPasted':if(S.paste.trim())doImport(S.paste);break;
-    case 'pickProgramFile':pick(doImport);break;
+
+
     case 'pickBackup':pick(doRestore);break;
   }}
 function pick(cb){
