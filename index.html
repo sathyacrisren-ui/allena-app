@@ -912,7 +912,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='99d9a9';  // stamped by tools/build.py with the content hash
+const BUILD_ID='6bb846';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -4766,6 +4766,28 @@ function muscleHits(ex){
   try{SECONDARY.forEach(r=>{if(!r[0].test(ex))return;
     r[1].forEach(m=>{if(!out[m])out[m]=0.5})})}catch(e){}
   return out}
+function protDayLogged(dd,k){
+  /* evidence the day's intake was measured, not just started.
+     A calorie figure beside the protein is the strong one — it is the
+     same bar the energy-deficit term already demands, and the Health
+     sync carries kcal whenever it carries protein.
+     Without one (somebody typing protein into the daily card, which has
+     no calorie field) the only check available is the shape of the
+     number: a single logged meal is roughly a quarter to a third of a
+     day, so anything under a third of what this person usually logs is
+     far more likely a log that stopped than a day that did. A genuine
+     low day — half the usual, say — still counts, because it is real.
+     No baseline yet means no outlier test, so the term behaves as it
+     always did rather than going quiet on new trackers. */
+  try{
+    if(!dd||!dd[k])return false;
+    if(dd[k].kcal>600)return true;
+    const cut=dayKey(new Date(Date.now()-28*864e5));
+    const past=Object.keys(dd).filter(x=>x<k&&x>=cut&&dd[x].pr>0).map(x=>+dd[x].pr).sort((a,b)=>a-b);
+    if(past.length<5)return true;
+    const med=past[Math.floor(past.length/2)];
+    return !(med>0)||dd[k].pr>=med*0.35}
+  catch(e){oops('protDayLogged',e);return true}}
 function recoveryMod(){
  /* recovery is not only time. Research-weighted rebuild (10 Sep 2026,
     owner-ordered literature pass): FOUR terms, each vs YOUR OWN
@@ -4813,7 +4835,19 @@ function recoveryMod(){
   const dd=(S.daily&&S.daily.days)||{};
   const yk=dayKey(new Date(Date.now()-864e5));
   const tgt=(typeof proteinDayTarget==='function')?proteinDayTarget():null;
-  if(tgt&&dd[yk]&&dd[yk].pr>0){const r=dd[yk].pr/tgt;
+  /* ═══ AN ABANDONED LOG IS NOT A BAD DAY (15 Sep 2026) ════════════════
+     The energy term below refuses any day under 600 kcal, because a
+     part-logged day is not a measured day. The protein term had no such
+     guard, so somebody who logged breakfast and then got on with their
+     life was billed for it: 25 g against a 128 g target reads as the
+     full -8%, identical to a genuine 60 g day. Measured both — 0.920
+     each. Anything under about half the target hits the floor, so EVERY
+     abandoned log lands there.
+     A day counts as logged through if it carries a plausible calorie
+     figure (the same bar the energy term uses) or if its protein is at
+     least half of what this person usually logs. Under five tracked days
+     there is no "usually" yet, so the term says nothing. */
+  if(tgt&&dd[yk]&&dd[yk].pr>0&&protDayLogged(dd,yk)){const r=dd[yk].pr/tgt;
    m*=r<1?Math.max(0.92,1-0.16*(1-r)):Math.min(1.05,1+0.1*(r-1))}
   try{const led=(typeof tdeeLedger==='function')?tdeeLedger():null;
    if(led&&led.tdee){let n=0,sum=0;
