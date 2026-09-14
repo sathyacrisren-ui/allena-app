@@ -833,7 +833,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='b2f0a7';  // stamped by tools/build.py with the content hash
+const BUILD_ID='e0af6a';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -16325,16 +16325,26 @@ function treeXSvg(m,zIn){
     if(S._txSvg&&S._txSvg.key===key)return S._txSvg.svg;
     const o=[];
     const climb=TREE_RAMP.m.climb;
-    const SP=Math.pow(z,1.15);          // branch spread
-    const SPT=Math.pow(z,1.25);         // twig spread
+    const SP=Math.pow(z,1.05);          // branch spread (the spread pass does the separating)
+    const SPT=Math.pow(z,1.1);          // twig spread
     const G=Math.pow(z,0.35);           // dot growth
     /* EVERY DOT IS TAPPABLE AT FULL ZOOM (owner, 14 Sep, at 6×: "all dots
        must be equivalent to the size you made the purple dots, the
        smaller ones are too hard to click"). A dot's own size says its
        work at 1×; as the zoom rises it converges on one common size,
        the Rare blossom's, and reaches it at 6×. */
-    const TAP=3.0*G,tz=Math.max(0,Math.min(1,(z-1)/5));
+    /* the Rare blossom READS as its core plus its halo — that is the
+       size the owner pointed at ("the purple dots"), so the common size
+       everything converges on is that, not the core */
+    const TAP=4.6*G,tz=Math.max(0,Math.min(1,(z-1)/5));
     const sz=r=>r*(1-tz)+TAP*tz;
+    /* the card's recursion is for the card's zoom. Zoomed in, four
+       levels of twigs tangle across the screen and the buds on their
+       tips read as data that cannot be tapped (owner, at 6×: "the
+       overlap and smallness of the dots is worse"). Depth eases and the
+       buds go as the zoom rises. */
+    const MAXD=z<2?4:(z<4?3:2);
+    const BUDS=z<1.8;
     const SW=Math.pow(z,0.45);          // stroke growth
     const FS=Math.pow(z,0.25);          // text growth
     const X=x=>x*z,Y=y=>y*z;
@@ -16409,7 +16419,7 @@ function treeXSvg(m,zIn){
          parent, width x0.62, opacity fading. Every segment is kept so
          the sets can sit on it; every tip is kept for a bud. */
       const fork=(px,py,ax,ay,ln,depth,wid,segs,tips)=>{
-        if(depth>4||ln<2.4*z){tips.push([px,py]);return}
+        if(depth>MAXD||ln<2.4*z){tips.push([px,py]);return}
         const n2=depth>=2?(R()<0.22?1:(R()<0.9?2:3)):(R()<0.1?1:2);
         for(let k=0;k<n2;k++){
           const spread=(k===0?-1:1)*(9+R()*30+depth*5)*Math.PI/180*(0.6+R()*0.9);
@@ -16424,7 +16434,7 @@ function treeXSvg(m,zIn){
       const onSegs=(segs,u)=>{const segI=Math.min(segs.length-1,Math.floor(u*segs.length*0.999));
         const sg=segs[segI];const uu=(u*segs.length)-segI;
         return txOnQ(sg[0],sg[1],sg[2],sg[3],sg[4],sg[5],Math.min(1,uu))};
-      const bud=(tp,k)=>{if(R()<0.2)return;const rr=(0.8+R()*0.6)*G;
+      const bud=(tp,k)=>{if(!BUDS||R()<0.2)return;const rr=(0.8+R()*0.6)*G;
         o.push('<circle data-tp="bud" cx="'+f1(tp[0])+'" cy="'+f1(tp[1])+'" r="'+f1(rr)+'" fill="'+budC((R()-0.5)*0.9)+'" opacity="'+(0.5+R()*0.25).toFixed(2)+'"/>')};
       if(b.kind==='sess'){
         /* each exercise is one child leaving the limb's end — the card's
