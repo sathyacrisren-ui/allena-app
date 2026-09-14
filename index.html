@@ -855,7 +855,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='b19e82';  // stamped by tools/build.py with the content hash
+const BUILD_ID='642c34';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -15760,6 +15760,7 @@ function growTreeTime(W,Hh,opts){
   const d=treeTimeData(EX?{explore:true}:null);
   if(!d)return EX?'':growTree(W,Hh);    // under the floor, the old tree, unchanged
   const R=seedRand(d.seed);
+  const RD=seedRand(String(d.seed)+':dots');   // see THE WOOD IS DRAWN FROM ITS OWN STREAM
   W=W||300;Hh=Hh||300;
   const LS=EX?(W/z/300)*Math.pow(z,1.3):1;   // limb length: the card's numbers at this width, stretched more than the zoom
   const SWX=EX?Math.pow(z,0.45):1;           // strokes grow slowly
@@ -15806,8 +15807,18 @@ function growTreeTime(W,Hh,opts){
      only more SUBDIVISION can fill — filling them with more limbs is what
      drew the bottlebrush. Zoomed in it still eases, because that is where
      a fifth level starts looking like data it is not. */
-  const MAXD=EX?Math.min(z<2?5:(z<4?3:2),(NLIMB>34?3:5)):4;
-  const BUDS=!EX||z<1.8;
+  /* ═══ ZOOMING DOES NOT REDRAW THE TREE (owner, 14 Sep 2026: "tree
+     changes when you zoom") ═══════════════════════════════════════════
+     Fork depth used to ease as you zoomed in, which meant the BRANCHES
+     THEMSELVES moved: zoom in on a limb and the limb you were looking at
+     had gone. That is not a zoom, it is a second drawing. A map may add
+     detail as you go in; it may never rearrange the roads. Depth is a
+     property of the tree now, not of how close you are standing. */
+  const MAXD=EX?(NLIMB>34?3:5):4;
+  /* buds are structure too, so they stay at every zoom — they simply
+     stop growing, so they shrink away from the data leaves instead of
+     vanishing between one pinch and the next */
+  const BUDS=true;
   /* BUDS ARE TEXTURE, AND TEXTURE HAS A BUDGET (owner, 14 Sep: "the tree
      is extremely laggy"). One bud per free tip is right for a fifteen-
      branch card; on a page where every session is a branch it was more
@@ -15831,8 +15842,15 @@ function growTreeTime(W,Hh,opts){
      drawing in again at the head. Wood that reaches it is STEERED BACK
      toward the trunk rather than cut, because a clipped branch reads as
      a mistake and a returning one reads as a tree. */
+  /* THE ENVELOPE IS MEASURED IN LIMB UNITS, NOT CANVAS UNITS (owner,
+     14 Sep 2026: "tree changes when you zoom"). Sized against W it grew
+     linearly with the zoom while limbs grow z^0.3, so at 1x it clipped
+     wood that it left alone at 6x — and a clipped twig terminates a
+     level early, which is how pinching gained and lost whole branches.
+     Scaled by LS it bites identically at every zoom, which is the only
+     way the drawing can be the same drawing. */
   const reachAt=f=>{const u=Math.max(0,Math.min(1,f));
-    return W*(0.085+0.335*Math.sin(Math.PI*Math.pow(u,1.25)))*(opts.reach==null?1:+opts.reach)};
+    return (EX?300*LS:W)*(0.085+0.335*Math.sin(Math.PI*Math.pow(u,1.25)))*(opts.reach==null?1:+opts.reach)};
   const cx=W/2;
   /* THE TRUNK MEANDERS (owner call, 13 Sep). A dead-straight column
      reads as a mast. Three seeded sine components, damped to nothing at
@@ -16152,8 +16170,13 @@ function growTreeTime(W,Hh,opts){
     if(!(EX||POSTER))return 'M'+x0.toFixed(1)+' '+y0.toFixed(1)+' Q'+mx.toFixed(1)+' '+my.toFixed(1)+' '+x1.toFixed(1)+' '+y1.toFixed(1);
     const dx=x1-x0,dy=y1-y0,L=Math.hypot(dx,dy)||1;
     const px=-dy/L,py=dx/L;                      // perpendicular to the run
-    const s1=(0.16+0.16*Math.abs(k))*L*(k<0?-1:1);
-    const s2=-s1*0.62;
+    /* THE SWAY IS SMALL (owner, 14 Sep: "the meandering is way too
+       random"). At a sixth of the limb's own length per handle, the two
+       opposing pulls stop reading as a lean and start reading as a hook:
+       the line leaves the trunk, turns back past its own start and comes
+       down. Real wood deviates a few percent. */
+    const s1=(0.045+0.035*Math.abs(k))*L*(k<0?-1:1);
+    const s2=-s1*0.55;
     return 'M'+x0.toFixed(1)+' '+y0.toFixed(1)+
       ' C'+(x0+dx*0.30+px*s1).toFixed(1)+' '+(y0+dy*0.30+py*s1+(my-(y0+dy*0.30))*0.55).toFixed(1)+
       ' '+(x0+dx*0.68+px*s2).toFixed(1)+' '+(y0+dy*0.68+py*s2).toFixed(1)+
@@ -16205,8 +16228,12 @@ function growTreeTime(W,Hh,opts){
        crown envelope is what stops this running away. */
     const len=(9+20*(0.18+0.82*bell))*(0.72+R()*0.62)*LS*(EX?1.32*(b.work||(b.kind==='run'?(0.85+Math.min(0.9,(b.km||0)/24)):1))*(b.walk?0.6:1)*(follows?0.7:1):1);
     let x1=bx+side*Math.cos(ang)*len,y1=y0-Math.sin(ang)*len;
+    /* the envelope is read at the branch's OWN height, which is fixed by
+       its date — reading it at the tip made it a function of how tall the
+       canvas happened to be, and the canvas grows with the zoom */
+    const lim0=reachAt(f),cx0=tx(f);
     if(EX){ /* pull the limb in until its tip sits inside the crown */
-      const lim=reachAt(fAt(y1)),off=Math.abs(x1-tx(fAt(y1)));
+      const lim=lim0,off=Math.abs(x1-cx0);
       if(off>lim&&off>0.01){const sc=Math.max(0.3,lim/off);
         x1=bx+(x1-bx)*sc;y1=y0+(y1-y0)*sc}}
     /* a real limb leaves the trunk almost flat and SWEEPS up */
@@ -16233,8 +16260,13 @@ function growTreeTime(W,Hh,opts){
        never at its own full weight — that was the visible inversion */
     if(follows&&hostW>0)bwid=Math.min(bwid,hostW*0.86);
     bwid=Math.max(WMIN,bwid);
-    /* and under `thin`, nothing off the trunk outgrows the trunk */
-    if(EX&&!follows&&WLAW==='thin')bwid=Math.min(bwid,Math.max(0.8*SWX,trunkHalf(f)*1.5));
+    /* THE TRUNK IS ALWAYS THICKER THAN WHAT COMES OUT OF IT (owner,
+       14 Sep 2026: "the branches on the screenshot are thicker than the
+       trunk — trunk should be thicker than the branches that come from
+       it"). It is the fork's own law one level up, and it was only being
+       applied under one of the four width options. A limb is capped at
+       four fifths of the trunk's full width where it joins it. */
+    if(EX&&!follows)bwid=Math.min(bwid,Math.max(0.6*SWX,trunkHalf(f)*2*0.8));
     out+='<path data-tp="branch" data-tn="'+esc(b.n)+'" data-tk="'+esc(b.k)+
       (EX?'" data-a="txTap" data-v="'+esc(b.kind+':'+b.id)+'" id="'+txElId(b.kind,b.id)+'" pointer-events="all':'')+
       '" d="'+limbPath(bx,y0,mx,my,x1,y1,b._s||0)+'" stroke="'+bstroke+'" stroke-width="'+bwid.toFixed(2)+
@@ -16256,7 +16288,11 @@ function growTreeTime(W,Hh,opts){
       /* FOUR LEVELS, not two. The lacy quality of a bare tree is
          entirely in the terminal twigs — stop at two and it reads as a
          pole with spurs, which is what it did (owner, 13 Sep). */
-      if(depth>(POSTER?5:dCap)||ln<(POSTER?1.8:2.4)*(EX?z:1)){tips.push([px,py]);return}
+      /* the stop is measured in the SAME units the limbs are drawn in.
+         It used to scale with the zoom while the lengths scaled with LS,
+         so a twig that terminated at 1x survived at 4x and the tree grew
+         extra wood as you pinched (owner: "tree changes when you zoom"). */
+      if(depth>(POSTER?5:dCap)||ln<(POSTER?1.8:2.4)*(EX?LS:1)){tips.push([px,py]);return}
       const n2=depth>=2?(R()<0.22?1:(R()<0.9?2:3)):(R()<0.1?1:2);
       /* every child's geometry is settled BEFORE any of them is drawn, so
          a law that shares the parent between them has something to share */
@@ -16270,16 +16306,16 @@ function growTreeTime(W,Hh,opts){
       kids.forEach((kd,k)=>{
         let a2=kd.a2;let l2=kd.l2;
         if(EX){
-          /* STEERED BACK, NOT CUT. If this child would land outside the
-             crown, mirror its horizontal run so it grows toward the trunk
-             instead; if it is still outside, shorten it onto the edge. */
-          let ex9=px+Math.cos(a2)*l2,ey9=py+Math.sin(a2)*l2;
-          const lim1=reachAt(fAt(ey9)),tx1=tx(fAt(ey9));
-          if(Math.abs(ex9-tx1)>lim1){
-            a2=Math.PI-a2;
-            ex9=px+Math.cos(a2)*l2;ey9=py+Math.sin(a2)*l2;
-            const lim2=reachAt(fAt(ey9)),off2=Math.abs(ex9-tx(fAt(ey9)));
-            if(off2>lim2&&off2>0.01)l2*=Math.max(0.35,lim2/off2)}}
+          /* THE CROWN'S EDGE SHORTENS WOOD, IT NEVER TURNS IT ROUND
+             (owner, 14 Sep: "the meandering is way too random, it's making
+             forks go backwards and down and all over the place"). Mirroring
+             the horizontal run was the cause: a child that reached the edge
+             was sent back the way it came, so limbs crossed their own
+             parents and headed for the ground. Wood grows outward. A branch
+             that runs out of room stops short. */
+          const ex9=px+Math.cos(a2)*l2;
+          const off1=Math.abs(ex9-cx0);
+          if(off1>lim0&&off1>0.01)l2*=Math.max(0.30,lim0/off1)}
         /* THE INVARIANT: whatever the law works out, a child is capped at
            its parent. Nothing downstream of a branch is ever thicker. */
         const w2=Math.max(WMIN,Math.min(wid,kidW(wid,n2,lsum?l2/lsum:1/n2)));
@@ -16289,7 +16325,7 @@ function growTreeTime(W,Hh,opts){
             px+Math.cos(a2)*l2*0.5,py+Math.sin(a2)*l2*0.55,nx,ny,
             /* alternating by child and depth, so one spray never all
                bends the same way */
-            ((k%2?1:-1)*(0.45+((depth*7+k*3)%5)*0.16)))+
+            ((k%2?1:-1)*(0.30+((depth*7+k*3)%5)*0.09)))+
           '" stroke="'+woodCol(b,depth)+'" stroke-width="'+
           w2.toFixed(2)+'" fill="none" opacity="'+(POSTER?0.92:0.85-depth*0.09).toFixed(2)+
           '" stroke-linecap="round"/>';
@@ -16322,8 +16358,16 @@ function growTreeTime(W,Hh,opts){
          answer is to show the level you can actually use at the scale you
          are at — and zooming a cluster then genuinely reveals the day. */
       const LEAF=String(opts.leaf||(z>=3?'set':'ex'));
+      /* THE WOOD IS DRAWN FROM ITS OWN STREAM (owner, 14 Sep 2026: "tree
+         changes when you zoom"). Leaf jitter used to draw from the same
+         seeded PRNG as the branches, and how MANY leaves there are depends
+         on the zoom — so switching from a leaf-per-exercise to a leaf-per-
+         set pulled a different number of values out of the sequence, every
+         branch after it got different numbers, and the whole tree reshaped
+         itself mid-pinch. Dots have their own stream now: the wood cannot
+         be moved by anything hanging off it. */
       const put=(u,r9,c9,op9,v9,pr9)=>{const P=onSegs(u);
-        dots.push({x:P[0]+(R()-0.5)*2*G,y:P[1]+(R()-0.5)*2*G,r:sz(r9*G),kind:'leaf',c:c9,op:op9,v:v9,pr:pr9})};
+        dots.push({x:P[0]+(RD()-0.5)*2*G,y:P[1]+(RD()-0.5)*2*G,r:sz(r9*G),kind:'leaf',c:c9,op:op9,v:v9,pr:pr9})};
       if(b.kind==='sess'){
         if(LEAF==='sess'){
           let top=0,ns=0;(b.twigs||[]).forEach(tw=>tw.sets.forEach(st=>{ns++;if(st.rel>top)top=st.rel}));
