@@ -671,6 +671,21 @@ function sessAdv(s){
   for(let i=s.idx+1;i<s.sets.length;i++)if(!logged(i))return i;
   for(let i=0;i<s.sets.length;i++)if(!logged(i))return i;
   return -1}catch(e){return Math.min((+s.idx||0)+1,(s.sets||[]).length-1)}}
+/* ═══ THE SET IN PLAY, NOT THE SET JUST FINISHED (owner, 14 Sep 2026:
+   "should be able to modify during rest") ══════════════════════════════
+   s.idx does not advance until the rest clock ends — that is deliberate,
+   because the rest belongs to the set you just did. But every Modify
+   surface read s.sets[s.idx] directly, so during rest Tune load, Swap
+   exercise, Skip this set and Skip the whole exercise all pointed at work
+   that was already in the log. The sheet opened, it looked right, and it
+   changed the wrong thing. sessNow is the set the athlete is about to do:
+   the next unlogged one while resting, the current one otherwise. Every
+   surface that offers a change asks this. */
+function sessNow(s){
+  try{if(!s||!s.sets||!s.sets.length)return 0;
+    if(s.phase==='resting'){const n=sessAdv(s);if(n>=0)return n}
+    return Math.min(s.idx,s.sets.length-1)}
+  catch(e){oops('sessNow',e);return Math.min((s&&s.idx)||0,((s&&s.sets)||[]).length-1)}}
 /* heldBest was removed 9 Sep (owner ruling): the written hold time is
    the prescription, always — a long hold is logged in full but never
    becomes the next set's target. */
@@ -878,7 +893,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='3c84ee';  // stamped by tools/build.py with the content hash
+const BUILD_ID='203548';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -1336,7 +1351,7 @@ function subWeight(sub,W){
   const q=/per DB|one DB|per side/.test(sub.u)?(raw<10?1:2.5):(raw<20?1:2.5);
   return Math.round(raw/q)*q}
 function applySub(sub){
-  const s=S.sess,cur=s.sets[s.idx],no=cur.exNo;
+  const s=S.sess,cur=s.sets[sessNow(s)],no=cur.exNo;
   s.subs=s.subs||{};
   s.sets.forEach(st=>{if(st.exNo!==no)return;
     st.origEx=st.origEx||st.ex;st.ex=sub.n;
@@ -3576,9 +3591,15 @@ A.commit=(confirmed)=>{const s=S.sess,c=s.sets[s.idx],timed=!!c.secs;
   if(ni9<0){s.phase='done';S.restEnd=null;audioCancel();
     try{S.sessReveal=sessionReveal()}catch(e){S.sessReveal=null}
     try{if(typeof reviewMoment==='function')setTimeout(reviewMoment,2500)}catch(e){}}
-  else{const r=c.rest||0;
+  else{
+    /* A SUPERSET HAS ONE REST, AT THE END OF THE ROUND (owner, 14 Sep
+       2026: "superset exercises don't need rest"). Mid-round you walk
+       straight to the next exercise; the clock runs after the round
+       closes. See the weaver in 30-action-router. */
+    const mid=(c.ssNo!=null&&c.ssEnd===false);
+    const r=mid?0:(c.rest||0);
     if(r>5){audioCancel();S.restBeep=audioIn(r);S.restEnd=Date.now()+r*1000;S.restTotal=r;s.phase='resting'}
-    else{s.idx=ni9;s.phase='ready'}}
+    else{s.idx=ni9;s.phase='ready';if(mid){S.restEnd=null;audioCancel()}}}
   const gHit=checkGoals(e);
   const auto=autoProgress(e,c);
   persistActive();render();
@@ -3594,7 +3615,7 @@ A.exPlan=()=>{const s=S.sess,seen=[],by={};
     by[st.exNo].sets.push({i:i,st:st});
     if(s.log.some(l=>l.ex===st.ex&&l.setNo===st.setNo))by[st.exNo].done++});
   return seen};
-A.deferEx=()=>{const s=S.sess,cur=s.sets[s.idx],no=cur.exNo;
+A.deferEx=()=>{const s=S.sess,cur=s.sets[sessNow(s)],no=cur.exNo;
   const logged=i=>s.log.some(l=>l.ex===s.sets[i].ex&&l.setNo===s.sets[i].setNo);
   const move=[],keep=[];
   s.sets.forEach((st,i)=>{(st.exNo===no&&!logged(i)?move:keep).push(st)});
@@ -3623,9 +3644,13 @@ A.jumpTo=i=>{audioCancel();const s=S.sess;const t=Math.max(0,Math.min(+i,s.sets.
   s.idx=t;
   s.phase='ready';S.restEnd=null;S.holdEnd=null;S.holdWait=false;S.sheet=null;
   audioCancel();persistActive();render()};
-A.skipSet=()=>A.adv(S.sess.idx+1);
-A.skipEx=()=>{S.sess.skipped=(S.sess.skipped||[]);if(S.sess.skipped.indexOf(S.sess.sets[S.sess.idx].exNo)<0)S.sess.skipped.push(S.sess.sets[S.sess.idx].exNo);const s=S.sess,no=s.sets[s.idx].exNo;let i=s.idx;
-  while(i<s.sets.length&&s.sets[i].exNo===no)i++;A.adv(i)};
+/* skipping SKIPS THE SET IN PLAY — during rest that is the next one, not
+   the one already in the log (owner, 14 Sep 2026: "should be able to
+   modify during rest"). See sessNow in 00-core. */
+A.skipSet=()=>A.adv(sessNow(S.sess)+1);
+A.skipEx=()=>{const s=S.sess,i0=sessNow(s),no=s.sets[i0].exNo;
+  s.skipped=(s.skipped||[]);if(s.skipped.indexOf(no)<0)s.skipped.push(no);
+  let i=i0;while(i<s.sets.length&&s.sets[i].exNo===no)i++;A.adv(i)};
 A.skipRest=()=>{audioCancel();S.restEnd=null;const n9=sessAdv(S.sess);
   if(n9<0){S.sess.phase='done';try{S.sessReveal=sessionReveal()}catch(e){}}
   else{S.sess.idx=n9;S.sess.phase='ready'}persistActive();render()};
@@ -26495,7 +26520,7 @@ function sheetHtml(){
       :'<p style="color:var(--faint);font-size:12px;text-align:center;margin-top:14px">Pick at least two exercises.</p>';
     return wrapSheet('Superset',inner)}
   if(S.sheet.t==='modify'){
-    const s2=S.sess,cur=s2.sets[Math.min(s2.idx,s2.sets.length-1)];
+    const s2=S.sess,cur=s2.sets[sessNow(s2)];   // the set in play, not the one just finished
     const row=(a,t2,sub,col)=>'<button data-a="'+a+'" class="card" style="width:100%;text-align:left;padding:13px 15px;display:flex;align-items:center;gap:12px">'+
       '<span style="flex:1;min-width:0"><span style="display:block;font-size:14px;font-weight:600;color:'+(col||'var(--text)')+'">'+t2+'</span>'+
       '<span style="color:var(--faint);font-size:11.5px">'+sub+'</span></span>'+
@@ -26514,7 +26539,7 @@ function sheetHtml(){
       '</div>';
     return wrapSheet('Modify',inner)}
   if(S.sheet.t==='tune'){
-    const s2=S.sess,cur=s2.sets[Math.min(s2.idx,s2.sets.length-1)];
+    const s2=S.sess,cur=s2.sets[sessNow(s2)];
     const prog=S.lib.programs.find(p=>p.id===s2.progId),cur_adj=adjOf(prog,cur.ex);
     let inner='<p style="color:var(--dim);font-size:13px;line-height:1.55">Change the load for <b style="color:var(--text)">'+esc(cur.ex)+'</b>. This updates the remaining sets today and the programmed weight from now on.</p>'+
       '<div class="card mt" style="padding:16px;text-align:center">'+
@@ -29656,9 +29681,21 @@ function runAction(a,v,t,e){
       s.sets.forEach(st=>{if(lg(st))done.push(st);
         else if(ord.indexOf(st.exNo)>=0)(by[st.exNo]=by[st.exNo]||[]).push(st);
         else rest.push(st)});
-      const weave=[];let more=true;
-      while(more){more=false;
-        ord.forEach(n=>{const a=by[n];if(a&&a.length){weave.push(a.shift());more=true}})}
+      /* ═══ A SUPERSET HAS ONE REST, AT THE END OF THE ROUND (owner,
+         14 Sep 2026: "superset exercises don't need rest") ══════════
+         The weave reordered the sets and nothing else, so the app kept
+         resting between every one of them — which is the opposite of
+         what a superset is. Each set carries its round number and the
+         last set of each round is marked; the rest clock only runs
+         after a marked one. A round that ends because its partner ran
+         out of sets still closes the round, so the rest is never lost,
+         only moved to where it belongs. */
+      const weave=[];let more=true,rnd=0;
+      while(more){more=false;let lastOfRound=null;
+        ord.forEach(n=>{const a=by[n];if(a&&a.length){
+          const st=a.shift();st.ssNo=rnd;st.ssEnd=false;weave.push(st);lastOfRound=st;more=true}});
+        if(lastOfRound)lastOfRound.ssEnd=true;
+        rnd++}
       if(!weave.length)break;
       s.sets=done.concat(weave,rest);
       s.idx=done.length;
@@ -29666,8 +29703,8 @@ function runAction(a,v,t,e){
       S.ssOrd=null;S.sheet=null;persistActive();
       flash('Superset on — '+weave.length+' sets woven.');render();break}
     case 'tuneOpen':S.sheet={t:'tune'};render();break;
-    case 'tuneBy':{const cur=S.sess.sets[S.sess.idx];applyAdj(cur.ex,+v,'manual');render();break}
-    case 'tuneReset':{const cur=S.sess.sets[Math.min(S.sess.idx,S.sess.sets.length-1)],prog=S.lib.programs.find(p=>p.id===S.sess.progId);
+    case 'tuneBy':{const cur=S.sess.sets[sessNow(S.sess)];applyAdj(cur.ex,+v,'manual');render();break}
+    case 'tuneReset':{const cur=S.sess.sets[sessNow(S.sess)],prog=S.lib.programs.find(p=>p.id===S.sess.progId);
       applyAdj(cur.ex,-adjOf(prog,cur.ex),'back to the written program');render();break}
     case 'undoAdj':undoAdj();break;
     case 'planOpen':S.sheet={t:'plan'};render();break;
@@ -29972,7 +30009,7 @@ function runAction(a,v,t,e){
       S.sheet=null;persistActive();render();flash('Swapped to '+nm+'.');break}
     case 'subPick':{const cur=S.sess.sets[S.sess.idx],f=subsFor(cur.origEx||cur.ex);
       if(f)applySub(f.list[+v]);break}
-    case 'subRevert':{const s2=S.sess,no=s2.sets[s2.idx].exNo;
+    case 'subRevert':{const s2=S.sess,no=s2.sets[sessNow(s2)].exNo;
       s2.sets.forEach(st=>{if(st.exNo!==no||!st.origEx)return;
         st.ex=st.origEx;st.targetW=st.origW;delete st.origEx;delete st.origW;delete st.subUnit;
         st.bar=/bench|rdl|barbell|speed/i.test(st.ex)});
