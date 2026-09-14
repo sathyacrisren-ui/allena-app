@@ -912,7 +912,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='18a8fc';  // stamped by tools/build.py with the content hash
+const BUILD_ID='a217a1';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -1033,6 +1033,28 @@ function entrySanity(e,c){
    forever, but TARGETS decay — anything that sets today's bar only
    trusts the last ~6 months. The 2024 you is history, not evidence. */
 function recentCutKey(){return dayKey(new Date(Date.now()-182*864e5))}
+/* ═══ A TIMER THAT SLEEPS WHEN THE SCREEN DOES (audit A3, 15 Sep 2026)
+   ═══════════════════════════════════════════════════════════════════
+   Two intervals started at load and never stopped: the minimised-session
+   pill at 2 Hz and the session ticker at 1 Hz. Both bail immediately on
+   screens they do not touch, so neither was a bug — but it is a wake-up
+   twice a second, all day, on a phone.
+   This is not a behaviour change. iOS suspends the WebContent process
+   the moment the app is backgrounded, so a hidden tick was already not
+   running (it is why the wrist's begin action needed `watchAct` to
+   normalise an expired rest); this just stops asking. On return the body
+   fires once immediately so nothing shows a stale second, and `dayCheck`
+   re-renders on the same event as it always has. */
+function tickEvery(fn,ms){
+  let id=null;
+  const run=()=>{try{fn()}catch(e){oops('tick',e)}};
+  const on=()=>{if(id==null)id=setInterval(run,ms)};
+  const off=()=>{if(id!=null){clearInterval(id);id=null}};
+  on();
+  try{document.addEventListener('visibilitychange',()=>{
+    if(document.visibilityState==='hidden')off();else{on();run()}})}
+  catch(e){oops('tickEvery',e)}
+  return{stop:off}}
 
 /* the (i) pattern (beta ask, 6 Sep — "overwhelming in terms of text"):
    numbers and headlines first; the explanatory paragraph waits behind
@@ -1228,16 +1250,39 @@ function autoReg(e,c){
       :{level:'ok',msg:e.secs+'s logged — build back toward '+c.secs+'s next time.'}}
   const low=repLow(c.targetReps),high=repHigh(c.targetReps),rpe=parseFloat(e.rpe);
   const tLo=rpeLow(c.targetRpe),tHi=rpeHigh(c.targetRpe),tR=tLo,tTxt=rpeStr(c.targetRpe);
-  if(!e.r||low==null||!e.w)return null;
+  /* a set with no weight is not a set with no information (audit A8,
+     15 Sep 2026): the `!e.w` bail meant every pull-up, dip and band set
+     logged in silence. A load-free exercise is one the PROGRAM wrote
+     without a weight; a weighted lift logged at 0 is still a miss. */
+  const FREE=c.targetW==null;
+  if(!e.r||low==null||(!FREE&&!e.w))return null;
   const isTop=/top set/i.test(e.ex);
   const last=c.setNo===c.of;
   // on the final set of an exercise, show the engine's verdict for the whole exercise
   if(last&&S.sess){
-    const rows=S.sess.log.filter(l=>l.ex===c.ex&&l.w).concat(S.sess.log.some(l=>l.ex===c.ex&&l.setNo===c.setNo&&l.r===e.r)?[]:[e]);
+    const rows=S.sess.log.filter(l=>l.ex===c.ex&&(FREE?l.r>0:l.w)).concat(S.sess.log.some(l=>l.ex===c.ex&&l.setNo===c.setNo&&l.r===e.r)?[]:[e]);
     if(rows.length>=c.of){
       const prog=S.lib.programs.find(p=>p.id===S.sess.progId);
       const r=regulate(rows,c,{prog:prog,eased:!!S.sess.readinessAdj});
       if(r)return{level:r.level,msg:r.msg}}}
+  /* mid-exercise on a load-free lift: every line below this quotes a
+     weight to add or take off, and there is none. Reps and rest are the
+     only levers, so those are the only things it offers. */
+  if(FREE){
+    if(e.r<low){
+      if(!isNaN(rpe)&&!isNaN(tLo)&&rpe<=tLo-1.5)
+        return{level:'ok',msg:'Short of the target at RPE '+e.rpe+' \u2014 that is stopping early, not too hard. Take the next set nearer RPE '+tR+'.'};
+      return{level:'ok',msg:'Missed the reps at RPE '+(isNaN(rpe)?'high effort':e.rpe)+'. Nothing to unload here \u2014 rest a little longer before the next set and keep the reps honest.'}}
+    if(!isNaN(rpe)&&!isNaN(tHi)&&rpe>=tHi+1)
+      return{level:'warn',msg:(rpe>=10?'That set went to failure against a target of RPE '+tTxt+'. ':'RPE '+e.rpe+' against a target of '+tTxt+'. ')+
+        'Stop a rep or two earlier on the rest, or rest longer \u2014 you want to finish this exercise, not survive it.'};
+    if(!isNaN(rpe)&&!isNaN(tHi)&&rpe>=tHi+0.5)
+      return{level:'ok',msg:'Slightly hot at RPE '+e.rpe+' against a target of '+tTxt+'. Hold the same reps for the rest of the exercise.'};
+    if(e.r>=high&&!isNaN(rpe)&&!isNaN(tLo)&&rpe<=tLo-1)
+      return{level:'good',msg:'Top of the range with room to spare. If the rest match, add a rep per set next time.'};
+    if(!isNaN(rpe)&&!isNaN(tLo)&&!isNaN(tHi)&&tHi>tLo&&rpe>=tLo&&rpe<=tHi&&e.r>=low)
+      return{level:'good',msg:'RPE '+e.rpe+' against a target of '+tTxt+' \u2014 right where it should be. Same again.'};
+    return{level:'ok',msg:'On target \u2014 same again.'}}
   // mid-exercise: react to the set just logged so the next one is right
   const step=exInc(S.lib.programs.find(p=>p.id===(S.sess&&S.sess.progId)),e.ex,e.w);
   if(e.r<low){
@@ -1381,6 +1426,53 @@ function applySub(sub){
     st.subUnit=sub.u});
   s.subs[no]=sub.n;S.sheet=null;persistActive();render();
   flash('Swapped to '+sub.n+'.')}
+/* ═══ THE AUTHORED WEIGHT, ONE READER ════════════════════════════════
+   Both the floor (below) and the ceiling (in autoProgress) measure
+   against the weight the BLOCK writes for this lift this week. It was
+   worked out twice, two slightly different ways; now it is one. */
+function authoredW(prog,exName){
+  try{
+    let exDef=null;
+    ((prog&&prog.days)||[]).some(d9=>(d9.exercises||[]).some(x9=>{
+      if(x9.name===exName){exDef=x9;return true}return false}));
+    if(!exDef)return null;
+    const wk9=(typeof weekFor==='function'&&prog)?weekFor(prog.id):(S.week||1);
+    const l9=setsForWeek(exDef,wk9)||setsForWeek(exDef,1);
+    const st9=(l9||[]).find(x9=>x9&&x9.w!=null);
+    return (st9&&+st9.w>0)?+st9.w:null}
+  catch(e9){oops('authoredW',e9);return null}}
+/* ═══ HOW FAR REGULATION MAY MOVE A LIFT ON ITS OWN (audit A7, 15 Sep
+   2026 — the owner's call was "fix them") ═══════════════════════════
+   The floor stopped a lift being buried; nothing stopped the other
+   direction. One step a week is a RATE limit, not a ceiling: sixteen
+   clean weeks is +40 kg on top of what the block wrote, arrived at
+   silently, and at that distance the written programme is the thing
+   that is wrong — not the load.
+   The cap is the larger of a fifth of the authored weight and 10 kg,
+   because a flat percentage punishes light lifts (20% of a 40 kg squat
+   is three clean weeks) while a flat number is meaningless on a leg
+   press. Either way it binds around half a block of uninterrupted
+   earned progress.
+   IT COUNTS REGULATION'S OWN WORK ONLY. `adjBase` is the part of the
+   adjustment a PERSON put there — catching the plan up to the logs, a
+   manual tune, a reset — and those are decisions, not drift. Without
+   that split, a user whose imported sheet was 40 kg stale would run the
+   catch-up tool and then never earn another increase, which punishes
+   exactly the person the catch-up tool was built for. */
+function adjCeiling(prog,exName){
+  const w=authoredW(prog,exName);
+  if(w==null)return Infinity;
+  return Math.max(w*0.2,10)}
+function adjEarned(prog,exName){
+  try{const a=(prog&&prog.adj&&prog.adj[exName])||0;
+    const b=(prog&&prog.adjBase&&prog.adjBase[exName])||0;
+    return a-b}catch(e9){return 0}}
+/* a deliberate change is the new baseline — call this right after any
+   applyAdj a PERSON asked for */
+function adjRebase(prog,exName){
+  try{if(!prog)return;prog.adjBase=prog.adjBase||{};
+    prog.adjBase[exName]=(prog.adj&&prog.adj[exName])||0;saveLib()}
+  catch(e9){oops('adjRebase',e9)}}
 function applyAdj(exName,delta,why,silent){
   const prog=S.lib.programs.find(p=>p.id===(S.sess?S.sess.progId:activeProg().id));
   if(!prog)return false;
@@ -1401,16 +1493,7 @@ function applyAdj(exName,delta,why,silent){
      can reach zero and never pass it. Nothing else about regulation moves:
      every cut inside the range still applies in full. */
   let floor=-Infinity;
-  try{
-    let exDef=null;
-    ((prog&&prog.days)||[]).some(d9=>(d9.exercises||[]).some(x9=>{
-      if(x9.name===exName){exDef=x9;return true}return false}));
-    if(exDef){
-      const wk9=(typeof weekFor==='function')?weekFor(prog.id):(S.week||1);
-      const l9=setsForWeek(exDef,wk9)||setsForWeek(exDef,1);
-      const st9=(l9||[]).find(x9=>x9&&x9.w!=null);
-      if(st9&&+st9.w>0)floor=-(+st9.w)}}
-  catch(e9){oops('applyAdj.floor',e9)}
+  {const aw=authoredW(prog,exName);if(aw!=null)floor=-aw}
   const want=Math.round((before+delta)*4)/4;
   prog.adj[exName]=Math.max(floor,want);
   if(want<floor&&!silent){try{flash('That lift is already down to nothing against what was written \u2014 this is a programming question now, not a load one.')}catch(_){}}
@@ -1469,6 +1552,81 @@ function learnStep(prog,ex,outcome){          // outcome: 'overshot' | 'held' | 
   else if(outcome==='easy')r.mult=Math.min(2,r.mult*1.25);
   else r.mult=r.mult*0.9+0.1;                 // drift back toward 1
   r.n=(r.n||0)+1;saveLib()}
+/* ═══ A LOAD-FREE LIFT IS STILL A LIFT (audit A8, 15 Sep 2026) ═══════
+   `autoReg` returned null on `!e.w` and `regulate` bailed on a null
+   target weight, so a pull-up, a dip, a band row and most bodyweight
+   work got NO verdict, NO effort feedback and no line of any kind. The
+   reps were logged, the RPE was logged, and nothing read them — which
+   looks exactly like a feature with no data yet.
+   The currency here is REPS, not kilos, so this branch never returns a
+   delta: nothing about a written plan can move silently off the back of
+   it. It reads the same two things the loaded engine reads — where the
+   reps landed in the range, and where the effort landed against target
+   — and says the true thing in the language that fits a lift with no
+   weight on it.
+   Rehab is untouched: `autoProgress` still refuses a rehab session
+   before it gets here, because a physio's prescription is not Allena's
+   to nudge (owner ruling, 6 Sep). */
+function regFree(rows,c,opts){
+  opts=opts||{};
+  const low=repLow(c.targetReps),high=repHigh(c.targetReps);
+  const tLo=rpeLow(c.targetRpe),tHi=rpeHigh(c.targetRpe),tTxt=rpeStr(c.targetRpe);
+  const rpes=rows.map(x=>parseFloat(x.rpe)).filter(x=>!isNaN(x));
+  const reps=rows.map(x=>x.r).filter(x=>x!=null);
+  if(!reps.length||low==null)return null;
+  const avg=rpes.length?rpes.reduce((a,b)=>a+b,0)/rpes.length:null;
+  const mx=rpes.length?Math.max.apply(null,rpes):null;
+  const d=(avg==null||isNaN(tLo))?null:(avg>tHi?avg-tHi:(avg<tLo?avg-tLo:0));
+  const belowLow=reps.filter(r=>r<low).length;
+  const allTop=high>0&&reps.every(r=>r>=high);
+  const decay=reps.length>1?reps[0]-reps[reps.length-1]:0;
+  const tot=reps.reduce((a,b)=>a+b,0);
+  /* ═══ AND A PHYSIO'S DOSE IS NOT ALLENA'S TO RESHAPE ════════════════
+     autoProgress refuses a rehab session before it reaches the engine,
+     but autoReg's last-set branch calls regulate() straight, so without
+     this a rehab user who missed reps on heel slides would be offered
+     "a band or an easier version" — an exercise substitution on a
+     physio's prescription, which this repo forbids outright. In a rehab
+     session the lines report and route to the physio; they never
+     prescribe. */
+  const REH=(function(){try{return (typeof isRehabSession==='function')&&isRehabSession()}catch(e9){return false}})();
+  const out={level:'ok',msg:'',delta:0,why:'',outcome:'held',free:true};
+  if(belowLow>=2&&d!=null&&d<=-1){
+    out.msg='Short of the range on '+belowLow+' sets at RPE '+(Math.round(avg*10)/10)+' against '+tTxt+'. There is no weight to take off here \u2014 that is stopping early. Same sets, taken closer to '+tLo+'.';
+    out.why='under-effort miss, bodyweight'}
+  else if(belowLow>=2){
+    out.level='warn';out.outcome='overshot';
+    out.msg='Missed the bottom of the range on '+belowLow+' sets'+(avg!=null?' at RPE '+(Math.round(avg*10)/10):'')+'. '+
+      (REH?'That is logged and it goes in the report \u2014 the dose is your physio\u2019s to set, so tell them rather than changing it yourself.'
+         :'With no load to drop, the lever is the exercise: take a band or an easier version, or keep the reps and add a set.');
+    out.why='reps under target, no load to cut'}
+  else if(d!=null&&d>=0.75){
+    out.level='warn';out.outcome='overshot';
+    out.msg=(mx>=10?'Sets taken to failure against a target of RPE '+tTxt+'. ':'Effort ran '+(Math.round(d*10)/10)+' above target. ')+
+      (REH?'That is above what your plan asks for. Come back to what is written and mention it to your physio.'
+         :'Nothing to unload, so stop a rep or two earlier next time or rest longer between sets. Reps at maximum effort buy fatigue you did not need.');
+    out.why='avg RPE '+(Math.round(avg*10)/10)+' vs target '+tTxt}
+  else if(allTop&&d!=null&&d<=-0.75){
+    out.level='good';out.outcome='easy';
+    out.msg='Top of the range and '+Math.abs(Math.round(d*10)/10)+' under target effort, '+tot+' reps in total. '+
+      (REH?'Worth saying at your next appointment \u2014 this one has room in it.'
+         :'This one has outgrown bodyweight \u2014 add load if you can hang it, or move to a harder version.');
+    out.why='top of range, well inside target effort'}
+  else if(allTop&&(d==null||d<=0.25)){
+    out.level='good';
+    out.msg='Every set at the top of the range on target effort, '+tot+' reps. '+
+      (REH?'All of it done as written.':'Add a rep per set next time \u2014 that is how this one progresses.');
+    out.why='double progression met, bodyweight'}
+  else if(d!=null&&d<=-1.5&&!allTop){
+    out.msg='Well inside the target effort at RPE '+(Math.round(avg*10)/10)+' but not at the top of the range. The reps are there \u2014 take the next ones nearer '+tLo+'.';
+    out.why='under-effort, bodyweight'}
+  else{
+    out.msg='On target'+(avg!=null?' (RPE '+(Math.round(avg*10)/10)+' vs '+tTxt+')':'')+', '+tot+' reps'+
+      (REH?', as your physio wrote it.':'. Aim for one more next time.');
+    out.why='in range at target effort'}
+  if(decay>=3&&out.level!=='warn'&&out.why.indexOf('under-effort')<0)
+    out.msg+=' Reps fell '+decay+' across the sets \u2014 longer rest would keep the quality up.';
+  return out}
 function regulate(rows,c,opts){
   // rows: [{w,r,rpe}] for this exercise this session (in order)
   opts=opts||{};
@@ -1487,7 +1645,9 @@ function regulate(rows,c,opts){
   const reps=wrk.map(x=>x.r).filter(x=>x!=null);
   const W=c.targetW;
   const out={level:'ok',msg:'',delta:0,why:'',outcome:'held'};
-  if(!rows.length||W==null||low==null)return null;
+  if(!rows.length||low==null)return null;
+  /* no weight written = the reps are the prescription (audit A8) */
+  if(W==null)return regFree(rows,c,opts);
   const avg=rpes.length?rpes.reduce((a,b)=>a+b,0)/rpes.length:null;
   const mx=rpes.length?Math.max.apply(null,rpes):null;
   // effort error measured against the whole range: inside it is no error at all
@@ -1545,12 +1705,15 @@ function regulate(rows,c,opts){
   return out}
 
 function autoProgress(e,c){
-  if(!S.sess||c.secs!=null||c.setNo!==c.of||c.targetW==null)return null;
+  if(!S.sess||c.secs!=null||c.setNo!==c.of)return null;
+  /* a load-free exercise still earns its verdict — it just can never
+     earn a load change, because there is no load (audit A8) */
+  const FREE=c.targetW==null;
   /* rehab work is a physio's prescription, not Allena's to nudge —
      barbell-increment logic on band work produced the "+2.5" that
      baffled a rehab user (owner ruling, 6 Sep) */
   try{if(isRehabSession())return null}catch(e9){}
-  const rows=S.sess.log.filter(l=>l.ex===c.ex&&l.w);
+  const rows=S.sess.log.filter(l=>l.ex===c.ex&&(FREE?l.r>0:l.w));
   if(rows.length<c.of)return null;
   const prog=S.lib.programs.find(p=>p.id===S.sess.progId);
   const r=regulate(rows,c,{prog:prog,eased:!!S.sess.readinessAdj});
@@ -1586,7 +1749,17 @@ function autoProgress(e,c){
         S.exVerdict=Object.assign({},r,{delta:0,outcome:'held',
           msg:'Every set at the top of the range on target effort \u2014 and the written program already steps this up next week. One increase, never two.',
           why:'the program steps itself; regulation stands down'});
-        return null}}}catch(e9){}}
+        return null}}
+    /* AND REGULATION HAS A CEILING (audit A7). Past it the gap is a
+       programming question, so the verdict says so and points at the
+       door that fixes it rather than quietly adding another step. */
+    const cap=adjCeiling(prog,c.ex),earned=adjEarned(prog,c.ex);
+    if(isFinite(cap)&&earned+r.delta>cap+0.001){
+      S.exVerdict=Object.assign({},r,{delta:0,outcome:'held',
+        msg:'Another clean session \u2014 but this lift is already '+uwNum(Math.round(earned*4)/4)+' '+uwUnit()+
+            ' above what your block writes for it. That far out, the programme is what needs changing, not the load. Program \u203a catch it up to your logs, or start the next block.',
+        why:'at the ceiling on the written program'});
+      return null}}catch(e9){oops('autoProgress.cap',e9)}}
   if(r.delta){applyAdj(c.ex,r.delta,r.why);
     if(r.delta>0){try{prog.adjWkBy=prog.adjWkBy||{};
       prog.adjWkBy[c.ex]=(typeof questWeekKey==='function')?questWeekKey():'';saveLib()}catch(e9){}}
@@ -27565,12 +27738,12 @@ function setPath(p,v){const k=p.split('.');let o=S;for(let i=0;i<k.length-1;i++)
 
 
 /* the minimized-session clock: ticks the pill without a render */
-setInterval(function(){try{
+tickEvery(function(){try{
   const el=document.getElementById('spTime');if(!el)return;
   const end=+el.dataset.end;if(!end)return;
   const left=Math.ceil((end-Date.now())/1000);
   if(left>0)el.textContent=mmss(left);
-  else{el.textContent='GO';el.style.color='var(--green)'}}catch(e){}},500);
+  else{el.textContent='GO';el.style.color='var(--green)'}}catch(e){oops('pillTick',e)}},500);
 /* ══ chart scrubbing ════════════════════════════════════════
    Touch a chart, read the value. Horizontal drags scrub; a
    vertical drag scrolls the page as usual. Direct DOM — no
@@ -29293,7 +29466,11 @@ function runAction(a,v,t,e){
     case 'catchOpen':{S.sheet={t:'catchup'};render();break}
     case 'catchApply':{
       const p9=activeProgSafe();const cu=(typeof catchUpPlan==='function')?catchUpPlan(p9):[];
-      cu.forEach(x=>{try{applyAdj(x.ex,Math.round((x.to-x.from)*4)/4,'caught up to your logs',true)}catch(e9){}});
+      /* a catch-up is a DECISION, not drift — it rebases the ceiling
+         regulation is measured against (audit A7), so the person whose
+         imported sheet was stale is not the person it punishes */
+      cu.forEach(x=>{try{applyAdj(x.ex,Math.round((x.to-x.from)*4)/4,'caught up to your logs',true);
+        if(typeof adjRebase==='function')adjRebase(p9,x.ex)}catch(e9){oops('catchApply',e9)}});
       S.sheet=null;flash(cu.length+' lift'+(cu.length===1?'':'s')+' caught up to what you actually lift. The ledger shows each one.');render();break}
     case 'avOpen':{S.avSel=avParse((acct()||{}).av)||{c:1,g:0};S.sheet={t:'avatar'};render();break}
     case 'avSetC':{S.avSel=Object.assign({},S.avSel||{c:0,g:0},{c:+v});render();break}
@@ -29316,7 +29493,7 @@ function runAction(a,v,t,e){
     case 'adjResetAll':{
       const p9=activeProgSafe();if(!p9||!p9.adj){break}
       const n9=Object.keys(p9.adj).filter(k=>p9.adj[k]).length;
-      p9.adj={};p9.adjWkBy={};saveLib();
+      p9.adj={};p9.adjWkBy={};p9.adjBase={};saveLib();
       /* the live session's targets follow immediately — no stale set screens */
       try{if(S.sess&&S.sess.progId===p9.id){const w9=S.week;
         S.sess.sets.forEach(st=>{if(st.adj&&st.targetW!=null){st.targetW=Math.max(0,Math.round((st.targetW-st.adj)*4)/4);st.adj=0}});
@@ -30078,9 +30255,15 @@ function runAction(a,v,t,e){
       S.ssOrd=null;S.sheet=null;persistActive();
       flash('Superset on — '+weave.length+' sets woven.');render();break}
     case 'tuneOpen':S.sheet={t:'tune'};render();break;
-    case 'tuneBy':{const cur=S.sess.sets[sessNow(S.sess)];applyAdj(cur.ex,+v,'manual');render();break}
+    case 'tuneBy':{const cur=S.sess.sets[sessNow(S.sess)];applyAdj(cur.ex,+v,'manual');
+      /* a manual tune is the user's call and never counts against
+         regulation's own ceiling (audit A7) */
+      try{if(typeof adjRebase==='function')adjRebase(S.lib.programs.find(p=>p.id===S.sess.progId),cur.ex)}catch(e9){oops('tuneBy.rebase',e9)}
+      render();break}
     case 'tuneReset':{const cur=S.sess.sets[sessNow(S.sess)],prog=S.lib.programs.find(p=>p.id===S.sess.progId);
-      applyAdj(cur.ex,-adjOf(prog,cur.ex),'back to the written program');render();break}
+      applyAdj(cur.ex,-adjOf(prog,cur.ex),'back to the written program');
+      try{if(typeof adjRebase==='function')adjRebase(prog,cur.ex)}catch(e9){oops('tuneReset.rebase',e9)}
+      render();break}
     case 'undoAdj':undoAdj();break;
     case 'planOpen':S.sheet={t:'plan'};render();break;
     case 'planJump':A.jumpTo(v);break;
@@ -30102,7 +30285,9 @@ function runAction(a,v,t,e){
       const all=[];prog.days.forEach(d=>d.exercises.forEach(e=>all.push(e.name)));
       if(all.indexOf(name)<0){const hit=all.find(n=>n.toLowerCase().indexOf(name.toLowerCase())>=0||name.toLowerCase().indexOf(n.toLowerCase())>=0);if(hit)name=hit}
       if(all.indexOf(name)<0){flash("Couldn't find that exercise in your program.");break}
-      applyAdj(name,m.act.kg,'Allena');m.act.applied=true;render();break}
+      applyAdj(name,m.act.kg,'Allena');
+      try{if(typeof adjRebase==='function')adjRebase(prog,name)}catch(e9){oops('coachApply.rebase',e9)}
+      m.act.applied=true;render();break}
     case 'coachFocus':S.coach.focus=v||null;S.coach.sent=false;render();break;
     case 'coachClear':S.coach.thread=[];S.coach.input='';S.coach.sent=false;render();break;
     case 'coachChip':{const q=t.dataset.v;
@@ -30574,7 +30759,7 @@ function pick(cb){
   i.click()}
 
 /* ══ ticker ═════════════════════════════════════════════ */
-setInterval(()=>{
+tickEvery(()=>{
   const s=S.sess;if(!s||S.view!=='session')return;
   if(s.phase==='working'){const el=document.getElementById('elapsed');
     if(el)el.textContent=mmss((Date.now()-(S.setStart||Date.now()))/1000);return}
