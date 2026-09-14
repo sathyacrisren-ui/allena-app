@@ -163,7 +163,7 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
 .tx-epic{animation-duration:2.3s}
 @keyframes txShim{0%,100%{transform:scale(1);opacity:.10}50%{transform:scale(1.4);opacity:.3}}
 @media (prefers-reduced-motion:reduce){.tx-shim{animation:none;opacity:.14}}
-.txpop{position:fixed;top:calc(env(safe-area-inset-top, 10px) + 54px);left:0;right:0;display:flex;justify-content:center;z-index:94;pointer-events:none}
+.txpop{position:fixed;top:calc(env(safe-area-inset-top, 10px) + 54px);left:0;right:0;display:flex;justify-content:center;z-index:94;pointer-events:none;transform:translateZ(0)}
 .txpop>div{pointer-events:auto;display:flex;align-items:center;gap:6px;background:color-mix(in srgb, var(--raised) 94%, #000);border:1px solid color-mix(in srgb, var(--text) 30%, transparent);border-radius:16px;box-shadow:0 12px 34px rgba(0,0,0,.5);padding:10px 12px 10px 14px;max-width:400px;width:calc(100% - 28px);margin:0 14px;animation:capDrop .42s cubic-bezier(.32,1.3,.5,1)}
 @media (prefers-reduced-motion:reduce){.txpop>div{animation:none}.tx-guide{animation:none}}
 @media (prefers-reduced-motion:reduce){.tx-new{animation:none;opacity:.8}}
@@ -363,7 +363,7 @@ body.sesslive #hkPulse{top:calc(env(safe-area-inset-top) + 40px)}
 @keyframes modalrise{from{transform:translateY(5.5%);opacity:0}to{transform:none;opacity:1}}
 .modalrise{animation:modalrise .32s cubic-bezier(.22,1,.36,1) both}
 @keyframes pillpop{0%{transform:translateX(-50%) scale(.45);opacity:0}60%{transform:translateX(-50%) scale(1.06)}100%{transform:translateX(-50%) scale(1);opacity:1}}
-#drawer{position:fixed;inset:0;z-index:60;pointer-events:none}
+#drawer{position:fixed;inset:0;z-index:60;pointer-events:none;transform:translateZ(0)}
 #drawer .scrim{position:absolute;inset:0;background:rgba(0,0,0,.55);opacity:0;transition:opacity .22s ease}
 #drawer .panel{overscroll-behavior:contain;position:absolute;top:0;left:0;bottom:0;width:84%;max-width:330px;background:var(--bg);
   border-right:1px solid var(--line);transform:translateX(-103%);transition:transform .26s cubic-bezier(.32,.9,.35,1);
@@ -397,7 +397,26 @@ body.sesslive #hkPulse{top:calc(env(safe-area-inset-top) + 40px)}
    order, so it can fade without taking the panel with it.
    Law: never animate opacity on an element that contains the sheet. */
 @keyframes bgFade{from{opacity:0}to{opacity:1}}
-.sheet-bg{position:fixed;inset:0;z-index:70;display:flex;align-items:flex-end;justify-content:center}
+/* ═══ THE OVERLAY IS ITS OWN LAYER (owner, 14 Sep 2026, sixth report,
+   with the frame that proves it: the tree's branches painted over the
+   sheet while the header behind was at FULL brightness — so the scrim was
+   not even down yet, and the page was compositing above the popup)
+   ═════════════════════════════════════════════════════════════════════
+   Raising #extra to z-index 60 was necessary and not sufficient. z-index
+   orders things WebKit is painting together; it does not settle an
+   argument between a composited layer and something that is not a layer
+   at all. #txwrap is a scrolling overflow container, which iOS always
+   gives its own scrolling layer, and the sheet was ordinary painted
+   content — so on the frames where the sheet had not finished arriving
+   the scroller's layer went over the top of it.
+   translateZ(0) makes the scrim a layer too, and two layers sort by the
+   rules. Safe on this element specifically: it is already position:fixed
+   and inset:0, so becoming a containing block changes nothing about its
+   own geometry, and its children are relative and absolute inside it.
+   LAW: anything that must cover the app gets its own layer, explicitly —
+   never assume the thing underneath is not one. */
+.sheet-bg{position:fixed;inset:0;z-index:70;display:flex;align-items:flex-end;justify-content:center;
+  transform:translateZ(0)}
 .sheet-bg::before{content:'';position:absolute;inset:0;background:rgba(20,19,17,.74);
   opacity:var(--scrim,1);animation:bgFade .26s ease both}
 /* DRAGGING A SHEET DOWN MUST TAKE THE DARK WITH IT (owner-caught on
@@ -446,7 +465,7 @@ body.sessview .sheet-bg::before{background:var(--bg)}
 .sig-fly{animation:sigfly .62s cubic-bezier(.4,0,.2,1) forwards!important;pointer-events:none;transform-origin:top right}
 @keyframes sigfly{0%{transform:translate(0,0) scale(1);opacity:1;border-radius:0}60%{opacity:.9}100%{transform:translate(calc(50vw - 46px),calc(-50vh + 46px)) scale(.08);opacity:0;border-radius:40px}}
 @media (prefers-reduced-motion:reduce){.sig-fly{animation:none!important;opacity:0}}
-.toast{position:fixed;top:calc(env(safe-area-inset-top, 10px) + 6px);left:0;right:0;display:flex;justify-content:center;z-index:95;pointer-events:none}
+.toast{position:fixed;top:calc(env(safe-area-inset-top, 10px) + 6px);left:0;right:0;display:flex;justify-content:center;z-index:95;pointer-events:none;transform:translateZ(0)}
 .toast div{display:flex;align-items:center;gap:8px;background:color-mix(in srgb, var(--raised) 94%, #000);border:1px solid var(--line);border-radius:999px;box-shadow:0 12px 34px rgba(0,0,0,.5);
   padding:10px 18px;font-size:13px;font-weight:600;max-width:400px;margin:0 16px;animation:capDrop .38s cubic-bezier(.32,1.3,.5,1)}
 .toast div::before{content:'';width:7px;height:7px;border-radius:7px;background:var(--green);flex:none}
@@ -893,7 +912,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='a9fdb2';  // stamped by tools/build.py with the content hash
+const BUILD_ID='8f5388';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -16108,6 +16127,16 @@ function growTreeTime(W,Hh,opts){
      their relationship holds at every zoom rather than only at one. */
   const smooth=i=>((halfAt(i-1)+halfAt(i)*2+halfAt(i+1))/4)*taper(i)*(EX?SWX:1);
   const trunkHalf=f=>{try{return smooth(Math.min(N-1,Math.round(Math.max(0,Math.min(1,f))*(N-1))))}catch(e){return 4}};
+  /* ═══ MEASURE THE TRUNK THAT IS DRAWN (owner, 14 Sep 2026: "the branches
+     are bigger than the trunk at the top") ══════════════════════════════
+     trunkHalf is the trunk's width BEFORE the polygon applies its own
+     top-vanish and its base flare — the shape that actually gets painted.
+     Capping branches against the unfaded number meant that up where the
+     trunk gives its width away, the cap was measuring wood that is not
+     there, and limbs came out heavier than the thing they grow from. This
+     is the drawn half-width at any height, and it is what the cap asks.
+     It is declared below the polygon's own constants, so it reads exactly
+     what the polygon does rather than a second copy of the same sum. */
   const L=[],Rt=[];
   /* BOTH ENDS OF THE TRUNK ARE GROWN, NOT CUT (owner, 13 Sep: "a more
      natural start and ending to the trunk — right now they look
@@ -16127,6 +16156,13 @@ function growTreeTime(W,Hh,opts){
   const TTOP=opts.trunkTop==null?0.88:+opts.trunkTop;
   const NT=Math.max(28,N*4);
   const flare=u=>FLR<=0?1:(u<0.11?1+FLR*Math.pow(1-u/0.11,2.0):1);
+  /* ON A PAGE YOU SCROLL INTO, THE TRUNK NEVER GIVES UP ALL ITS WIDTH.
+     A card is seen whole, so a trunk vanishing inside its own crown reads
+     as a tree. Scrolled into at the top, the same taper is a hairline
+     holding up limbs. It keeps a third of itself all the way up. */
+  const topFade=u=>EX?Math.max(0.34,1-Math.pow(u,5.5)):Math.max(0,1-Math.pow(u,2.6));
+  const trunkDrawn=f=>{const u=Math.max(0,Math.min(1,f))/ (TTOP||1);
+    return trunkHalf(f)*topFade(Math.min(1,u))*flare(Math.min(1,u))};
   (function(){const h0=smooth(0)*flare(0);
     L.push([tx(0)-h0,groundY+4]);Rt.push([tx(0)+h0,groundY+4])})();
   for(let i=0;i<NT;i++){
@@ -16136,8 +16172,7 @@ function growTreeTime(W,Hh,opts){
        you are looking is usually two thirds up, and a trunk that has
        already given up its width by then is the thing that reads as
        "barely visible". It holds longer and goes at the very top. */
-    const h=smooth(Math.min(N-1,Math.round(u*(N-1))))*
-      Math.max(0,1-Math.pow(u,EX?5.5:2.6))*flare(u);
+    const h=smooth(Math.min(N-1,Math.round(u*(N-1))))*topFade(u)*flare(u);
     L.push([xc-h,y]);Rt.push([xc+h,y]);bd(xc-h,y,1.5);bd(xc+h,y,1.5)}
   /* THE TRUNK CARRIES THE TRANSITION. It is the one part that spans
      every stage, so its gradient's STOPS SIT AT THE REAL CROSSINGS —
@@ -16348,7 +16383,7 @@ function growTreeTime(W,Hh,opts){
        it"). It is the fork's own law one level up, and it was only being
        applied under one of the four width options. A limb is capped at
        four fifths of the trunk's full width where it joins it. */
-    if(EX&&!follows)bwid=Math.min(bwid,Math.max(0.6*SWX,trunkHalf(f)*2*0.8));
+    if(EX&&!follows)bwid=Math.min(bwid,Math.max(WMIN,trunkDrawn(f)*2*0.78));
     out+='<path data-tp="branch" data-tn="'+esc(b.n)+'" data-tk="'+esc(b.k)+
       (EX?'" data-a="txTap" data-v="'+esc(b.kind+':'+b.id)+'" id="'+txElId(b.kind,b.id)+'" pointer-events="all':'')+
       '" d="'+limbPath(bx,y0,mx,my,x1,y1,b._s||0)+'" stroke="'+bstroke+'" stroke-width="'+bwid.toFixed(2)+
@@ -16695,7 +16730,15 @@ function treeSvg(W,Hh){
   if(!treeTimeOn())return growTree(W,Hh);
   try{
     const m=(typeof treeXModel==='function')?treeXModel():null;
-    if(m&&!m.empty&&m.H)return growTreeTime(W,Math.round(m.H*(W/((typeof TX_W!=='undefined')?TX_W:480))),{explore:true,zoom:1,card:true});}
+    /* THE CARD KEEPS THE CARD'S SHAPE (owner, 14 Sep 2026: "make this a
+       really zoomed out tree so it fits in the pill nicely like the old
+       tree"). The page's height comes from limb SPACING — twelve limbs,
+       a hundred pixels of clear trunk each — because it is a map you
+       scroll into. Carrying that height onto a 300px card made a ribbon
+       three screens long inside a box. The card passes its own box and
+       the same drawing compresses into it: same limbs, same days, same
+       finds, one glance. */
+    if(m&&!m.empty)return growTreeTime(W,Hh,{explore:true,zoom:1,card:true});}
   catch(e){oops('treeSvg.card',e)}
   return growTreeTime(W,Hh)}
 /* ══ THE EXPLORER — the whole tree, every set, every run, every find
@@ -17035,7 +17078,23 @@ function txSpread(dots,gap){
   /* push any two dots apart until they clear each other by `gap`; a few
      passes over a spatial hash, so a canopy of thousands stays cheap.
      Dots move along the line between them, both by half. */
+  /* ═══ A LEAF NEVER LEAVES ITS BRANCH (owner, 14 Sep 2026: "floating dots
+     and branches") ═════════════════════════════════════════════════════
+     Five passes of shoving, each one unbounded, and a dot in a crowded
+     cluster gets handed along until it is sitting in open space with no
+     wood under it — which reads as a rendering fault, because it is one.
+     The point of the pass is to stop dots hiding behind each other, and
+     that is a LOCAL job: a couple of dot-widths is the whole budget. Every
+     dot remembers where its wood put it and can never travel further than
+     its own allowance from that spot. A find may wander further than a set
+     because the fan is deliberate, but it is still tied to its own tip. */
   try{
+    dots.forEach(d=>{d._ox=d.x;d._oy=d.y;
+      d._mv=(d.kind==='bloom')?Math.max(d.r*4.5,gap*2.2)
+           :(d.kind==='pat')?Math.max(d.r*3,gap*1.6)
+           :Math.max(d.r*2.6,gap*1.4)});
+    const rein=d=>{const dx=d.x-d._ox,dy=d.y-d._oy,m=Math.hypot(dx,dy);
+      if(m>d._mv&&m>0.001){const k=d._mv/m;d.x=d._ox+dx*k;d.y=d._oy+dy*k}};
     const cell=Math.max(4,gap*4);
     for(let pass=0;pass<5;pass++){
       const grid={};let moved=0;
@@ -17055,7 +17114,9 @@ function txSpread(dots,gap){
             if(d<0.01){vx=((i*7)%3)-1||1;vy=((j*5)%3)-1||-1;d=Math.hypot(vx,vy)}
             const push=(need-d)/2/d;
             a.x-=vx*push;a.y-=vy*push;b.x+=vx*push;b.y+=vy*push;moved++}}});
-      if(!moved)break}}
+      dots.forEach(rein);
+      if(!moved)break}
+    dots.forEach(rein)}
   catch(e){oops('txSpread',e)}}
 function treeXLegend(){
   const dot=c=>'<span style="display:inline-block;width:9px;height:9px;border-radius:9px;background:'+c+';vertical-align:-1px;margin-right:6px"></span>';
