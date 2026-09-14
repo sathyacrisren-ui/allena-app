@@ -96,7 +96,23 @@ h1.disp:not(.brand),.gradhead{font-family:'Clash Grotesk',-apple-system,system-u
   font-weight:500!important;letter-spacing:0!important;color:var(--text)}
 body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
   background:radial-gradient(640px 500px at 50% -100px,var(--halo),transparent 72%)}
-#app,#extra{position:relative;z-index:1}
+/* ═══ THE SHEET IS ABOVE THE PAGE BY NUMBER, NOT BY LUCK (owner, 14 Sep
+   2026, fifth report: "you still haven't fixed the transparency issue on
+   the pop ups") ══════════════════════════════════════════════════════
+   It was never opacity. Measured in the browser, the panel is opaque and
+   every ancestor sits at opacity 1 the whole time — and the frame the
+   owner recorded shows the TREE'S OWN BRANCHES painted OVER the sheet's
+   text, which opacity cannot do. #app and #extra both sat at z-index 1,
+   so which one won was decided by DOM order alone: the weakest guarantee
+   there is, and the page under it holds a very large SVG that the pinch
+   handler promotes to its own compositing layer. A promoted layer inside
+   #app has no business beating #extra, but it only ever had one rank to
+   beat, and on iOS that tie is not reliably broken the way the spec says.
+   So the tie is gone. The page is 1, the overlay layer is 60, and nothing
+   the page does to itself can climb over a sheet again.
+   LAW: two siblings whose paint order matters must differ by NUMBER. */
+#app{position:relative;z-index:1}
+#extra{position:relative;z-index:60}
 .grad{color:var(--text)}
 .mono{font-family:-apple-system,system-ui,'Segoe UI',sans-serif;font-variant-numeric:tabular-nums}
 .brand,h1.brand,.disp.brand{font-family:'Clash Grotesk',-apple-system,system-ui,sans-serif!important;font-weight:500!important;letter-spacing:.05em;color:var(--text)}
@@ -862,7 +878,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='8b26bc';  // stamped by tools/build.py with the content hash
+const BUILD_ID='3b2a71';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
