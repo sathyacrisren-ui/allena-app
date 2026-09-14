@@ -855,7 +855,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='1dbc5d';  // stamped by tools/build.py with the content hash
+const BUILD_ID='085907';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -16017,8 +16017,8 @@ function growTreeTime(W,Hh,opts){
      same taper has vanished to nothing by halfway up — so the explorer
      keeps the sapling's PROPORTIONS rather than its pixels, and tapers
      less because it has four times as much height to taper over. */
-  const wMax=+opts.trunkMax||(EX?20.0:11.0), wMin=+opts.trunkMin||(EX?4.2:1.8);
-  const TPR=opts.taper==null?(EX?0.34:0.50):+opts.taper;
+  const wMax=+opts.trunkMax||(EX?22.0:11.0), wMin=+opts.trunkMin||(EX?8.0:1.8);
+  const TPR=opts.taper==null?(EX?0.30:0.50):+opts.taper;
   const FLR=opts.flare==null?0.55:+opts.flare;
   const N=d.load.length;
   const halfAt=i=>{
@@ -16029,7 +16029,17 @@ function growTreeTime(W,Hh,opts){
      looking at it, 13 Sep). Taper is shape; the wobble in it is the
      work, and a quiet stretch still narrows visibly. */
   const taper=i=>1-TPR*Math.pow(N<2?0:i/(N-1),0.7);
-  const smooth=i=>((halfAt(i-1)+halfAt(i)*2+halfAt(i+1))/4)*taper(i);
+  /* ═══ THE TRUNK SCALES WITH ITS BRANCHES (owner, 14 Sep 2026, at 2.7x:
+     "trunk should be thicker than the branches that come off it, the trunk
+     is barely visible") ════════════════════════════════════════════════
+     Every stroke here is drawn into a canvas that grows with the zoom and
+     is then squeezed back into the phone's width, so a line of fixed canvas
+     width gets THINNER on screen the further you zoom in. Branches are given
+     SWX to slow that down. The trunk was not, so it thinned a full z^0.45
+     faster than the limbs coming out of it, and by three times in it was a
+     hairline holding up thick wood. It gets the same treatment now, so
+     their relationship holds at every zoom rather than only at one. */
+  const smooth=i=>((halfAt(i-1)+halfAt(i)*2+halfAt(i+1))/4)*taper(i)*(EX?SWX:1);
   const trunkHalf=f=>{try{return smooth(Math.min(N-1,Math.round(Math.max(0,Math.min(1,f))*(N-1))))}catch(e){return 4}};
   const L=[],Rt=[];
   /* BOTH ENDS OF THE TRUNK ARE GROWN, NOT CUT (owner, 13 Sep: "a more
@@ -16054,8 +16064,13 @@ function growTreeTime(W,Hh,opts){
     L.push([tx(0)-h0,groundY+4]);Rt.push([tx(0)+h0,groundY+4])})();
   for(let i=0;i<NT;i++){
     const u=i/(NT-1),f=u*TTOP,y=yAt(f),xc=tx(f);
+    /* on a card the trunk disappears inside its own crown, which is right
+       for a 300px drawing seen whole. On a page you scroll INTO, the place
+       you are looking is usually two thirds up, and a trunk that has
+       already given up its width by then is the thing that reads as
+       "barely visible". It holds longer and goes at the very top. */
     const h=smooth(Math.min(N-1,Math.round(u*(N-1))))*
-      Math.max(0,1-Math.pow(u,2.6))*flare(u);
+      Math.max(0,1-Math.pow(u,EX?5.5:2.6))*flare(u);
     L.push([xc-h,y]);Rt.push([xc+h,y]);bd(xc-h,y,1.5);bd(xc+h,y,1.5)}
   /* THE TRUNK CARRIES THE TRANSITION. It is the one part that spans
      every stage, so its gradient's STOPS SIT AT THE REAL CROSSINGS —
@@ -16351,13 +16366,16 @@ function growTreeTime(W,Hh,opts){
            'sess' — one leaf per workout and one per run
          The wood is identical under all three: only how many dots hang
          on it changes, and a leaf always opens something real. */
-      /* THE DEFAULT IS SEMANTIC: an exercise when you are looking at the
-         whole tree, every set once you have zoomed into a day. Five
-         hundred set-dots at 1x is a green haze you cannot read or tap;
-         forty workout-dots is a bare tree with nothing to find. The map
-         answer is to show the level you can actually use at the scale you
-         are at — and zooming a cluster then genuinely reveals the day. */
-      const LEAF=String(opts.leaf||(z>=3?'set':'ex'));
+      /* A LEAF IS AN EXERCISE, AT EVERY ZOOM (owner, 14 Sep 2026: "can you
+         make it just exercises instead of every set"). It was semantic —
+         an exercise at a glance, a set once you had zoomed in — and on
+         paper that is how a map behaves. On the phone it is one more way
+         the tree changes under your fingers, which is the complaint this
+         whole afternoon has been about. Every set is still one tap away:
+         the leaf opens its exercise's top set with every other set of it
+         that day listed underneath. `opts.leaf` still forces any of the
+         three for a board or a future setting. */
+      const LEAF=String(opts.leaf||'ex');
       /* THE WOOD IS DRAWN FROM ITS OWN STREAM (owner, 14 Sep 2026: "tree
          changes when you zoom"). Leaf jitter used to draw from the same
          seeded PRNG as the branches, and how MANY leaves there are depends
