@@ -912,7 +912,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='b2babb';  // stamped by tools/build.py with the content hash
+const BUILD_ID='76ee1d';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -14037,6 +14037,44 @@ const CORR_BOUNDS={sleep:[60,960],sldeep:[0,600],slrem:[0,600],hrv:[5,250],rhr:[
   bw:[25,300],protein:[0,500],carb:[0,1200],fat:[0,500],kcal:[200,8000],ready:[0,100],
   msteps:[0,1],eprot:[0,1],ecarb:[0,1],pain:[0,10],stiff:[0,10],conf:[0,10],swell:[0,10]};
 const CORR_CUMUL={steps:1,kcal:1,protein:1,carb:1,fat:1,msteps:1,eprot:1,ecarb:1,walkkm:1};
+/* ═══ TWELVE READINGS ARE NOT TWELVE OBSERVATIONS (15 Sep 2026) ══════
+   The gate's t-test assumes each day is an independent draw. Almost none
+   of these signals are: sleep tonight looks like sleep last night, and a
+   3-DAY WINDOW signal shares two of its three inputs with the day beside
+   it. Measured against pure noise, 20,000 runs per cell:
+
+     independent series,  n=12  ->  1.9% of pairs clear the whole gate
+     mildly correlated,   n=12  ->  2.7%
+     3-day windows,       n=12  ->  7.1%
+     3-day windows,       n=90  ->  1.0%
+
+   Across a full-width grid (4,200 tested pairings) that last-but-one row
+   is roughly THREE HUNDRED findings built on nothing. FINDINGS-LIBRARY
+   track 5 measured the same 7% and named effective n as one of the four
+   honest levers; this is that lever.
+
+   Bartlett's correction, as used for autocorrelated series since 1935:
+   n_eff = n * (1 - p1*p2) / (1 + p1*p2), where p1 and p2 are each
+   series' own lag-1 autocorrelation. The t-test then runs on n_eff.
+   It is computed FROM THE DATA, so it needs no list of which signals are
+   windowed and it covers any signal added later.
+   Measured after: 3-day windows at n=12 fall from 7.1% to 0.17%, and an
+   independent daily signal at n>=30 is untouched — it costs nothing
+   where there was nothing wrong. */
+function corrAc1(v){
+  try{const n=v.length;if(n<4)return 0;
+    const m=v.reduce((a,b)=>a+b,0)/n;
+    let num=0,den=0;
+    for(let i=0;i<n;i++){const d=v[i]-m;den+=d*d;if(i<n-1)num+=d*(v[i+1]-m)}
+    return den>0?Math.max(-0.99,Math.min(0.99,num/den)):0}
+  catch(e){oops('corrAc1',e);return 0}}
+function corrEffN(pairs){
+  try{
+    const n=pairs.length;
+    const p1=corrAc1(pairs.map(p=>p[0])),p2=corrAc1(pairs.map(p=>p[1]));
+    const f=(1-p1*p2)/(1+p1*p2);
+    return Math.max(3,Math.min(n,n*f))}
+  catch(e){oops('corrEffN',e);return pairs.length}}
 function corrSettled(f,k){
   /* is this field, on this day, a finished number? One authority:
      the nutrition cumulatives are decided here, the Health fields by
@@ -14334,7 +14372,14 @@ function correlations(){
           if(!r)return;
           /* the strict gate — big effect, real sample, past the t-cut;
              conservative on purpose because we test many pairs */
-          if(Math.abs(r.rho)<0.5||r.n<12||r.t<2.8)return;
+          if(Math.abs(r.rho)<0.5||r.n<12)return;
+          /* and the t-cut runs on the EFFECTIVE sample size, because a
+             3-day window's twelve readings are nearer four observations
+             (see corrEffN) */
+          const ne=corrEffN(pairs);
+          if(ne<12)return;
+          const te=Math.abs(r.rho)*Math.sqrt((ne-2)/Math.max(1e-9,1-r.rho*r.rho));
+          if(te<2.8)return;
           /* split-half stability: a mass grid must never buy ghosts —
              the effect has to hold in BOTH halves of the data */
           {const half=Math.floor(pairs.length/2);
