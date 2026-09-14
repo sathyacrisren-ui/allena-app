@@ -912,7 +912,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='8bded5';  // stamped by tools/build.py with the content hash
+const BUILD_ID='3dcf85';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -4590,9 +4590,20 @@ function recoveryMod(){
   let m=1;
   const hk=hkDailyStore().days||{};
   const ks=Object.keys(hk).filter(k=>hk[k].sleep>0).sort();
-  if(ks.length>=7){
-   const last=hk[ks[ks.length-1]].sleep;
-   const pool=ks.slice(-28).map(k=>hk[k].sleep).sort((a,b)=>a-b);
+  /* ═══ "LAST NIGHT" HAS TO BE LAST NIGHT (engine audit, 14 Sep 2026) ═══
+     ks is the days that HAVE a sleep figure, so ks[last] was simply the
+     most recent one — a fortnight ago if the watch came off, and it was
+     still billed as last night and told to the user in those words
+     ("sleep last night against your own month of nights"). slice(-28)
+     had the same fault on the baseline: twenty-eight readings, not
+     twenty-eight nights. The term is silent unless there is a night from
+     last night or this morning, and the median is the last 28 days. */
+  const dAgo=n=>dayKey(new Date(Date.now()-n*864e5));
+  const recentK=ks.length?ks[ks.length-1]:null;
+  const month=ks.filter(k=>k>=dAgo(27));
+  if(month.length>=7&&recentK&&recentK>=dAgo(1)){
+   const last=hk[recentK].sleep;
+   const pool=month.map(k=>hk[k].sleep).sort((a,b)=>a-b);
    const med=pool[Math.floor(pool.length/2)];
    /* Health stores sleep in MINUTES; the -2%/hr rule needs hours
       (caught 10 Sep before it bit: a 90-minute-short night was read
@@ -25347,7 +25358,13 @@ function sheetHtml(){
       (function(){
         const knows=[],unknown=['stress','alcohol','illness'];
         try{const hk=hkDailyStore().days||{};
-          if(Object.keys(hk).filter(k=>hk[k].sleep>0).length>=7)knows.push('last night’s sleep against your own month of nights');
+          /* the same window the clock actually uses — a line claiming last
+             night when the watch has been off for a fortnight is a lie
+             about what Allena knows (engine audit, 14 Sep 2026) */
+          const dA=n=>dayKey(new Date(Date.now()-n*864e5));
+          const sk=Object.keys(hk).filter(k=>hk[k].sleep>0).sort();
+          if(sk.filter(k=>k>=dA(27)).length>=7&&sk[sk.length-1]>=dA(1))
+            knows.push('last night’s sleep against your own month of nights');
           else unknown.unshift('sleep')}catch(e){unknown.unshift('sleep')}
         try{const tgt=(typeof proteinDayTarget==='function')?proteinDayTarget():null;
           const dd=(S.daily&&S.daily.days)||{};const yk=dayKey(new Date(Date.now()-864e5));
