@@ -129,6 +129,8 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
 @media (prefers-reduced-motion:reduce){.irev{animation:none}}
 @keyframes findDust{0%{opacity:0;transform:translateY(3px)}30%{opacity:.85}100%{opacity:0;transform:translateY(-15px)}}
 .find-glow{box-shadow:0 0 20px 0 rgba(48,209,88,.18),0 0 4px 0 rgba(48,209,88,.28)}
+.tx-new{animation:txPulse 1.6s ease-in-out infinite}@keyframes txPulse{0%,100%{opacity:.25}50%{opacity:.95}}
+@media (prefers-reduced-motion:reduce){.tx-new{animation:none;opacity:.8}}
 /* the points pill (owner ask, 13 Sep): the one number that is all real,
    so it gets to glow. Slow on purpose \u2014 3.4s reads as alive, anything
    faster reads as a notification demanding something. */
@@ -821,7 +823,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='b01555';  // stamped by tools/build.py with the content hash
+const BUILD_ID='a4ac7b';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -8824,7 +8826,7 @@ function viewPoints(){
       13 Sep: "pill at top hitting tree"). mt spaces the cards; the inner
       padding gives the canopy its own headroom inside this one. */
    '<div class="card an-hero mt" style="padding:22px 18px 22px;border-radius:22px;text-align:center;border-color:'+t[2]+'">'+
-   '<div class="an-rise" data-treetap="1" style="margin:6px auto 0;max-width:300px">'+treeSvg(300,270)+'</div>'+
+   '<div class="an-rise" data-treetap="1" data-a="treeOpen" style="margin:6px auto 0;max-width:300px;cursor:pointer">'+treeSvg(300,270)+'</div>'+
    '<p class="disp" style="font-size:17px;font-weight:600;margin-top:6px">'+esc(stg[0])+'</p>'+
    '<p style="color:var(--dim);font-size:12.5px;line-height:1.55;margin-top:4px">'+esc(stg[1])+'</p>'+
    '<div style="height:1px;background:var(--line);margin:16px 0"></div>'+
@@ -16064,6 +16066,419 @@ function treeTimeLive(){try{return treeTimeOn()&&!!treeTimeData()}catch(e){retur
    ordering bug, one layer up.
    The share card still calls growTree on purpose (recorded deferral). */
 function treeSvg(W,Hh){return treeTimeOn()?growTreeTime(W,Hh):growTree(W,Hh)}
+/* ══ THE EXPLORER — the whole tree, every set, every run, every find
+   (owner ruling, 14 Sep 2026: "really, really, really detailed… every
+   single finding, every single set, every single run… it needs to make
+   logical sense… replace the findings page") ═══════════════════════
+
+   THIS REVERSES TWO STANDING RULES, on the owner's call, for THIS
+   surface only. "A data point is not a leaf" (13 Sep) held for a 300px
+   card, where a thousand dated leaves are a dense band. On a page you
+   can scroll and zoom, a thousand leaves are a thousand things you can
+   tap. And "the renderer is settled" still holds for growTreeTime: the
+   card on the Points page is untouched. This is a second renderer for
+   a full page, sharing the same trunk law, the same ramps and the same
+   rarity ladder, so the two never disagree about what a colour means.
+
+   THE LOGIC, which is the whole point:
+   - HEIGHT IS TIME. Linear, first logged day at the ground, today at
+     the top, never compressed. Months are ticked on the left.
+   - THE TRUNK IS WORK. Width at any height is that week's work (sets,
+     or half-kilometres), tapering as it climbs; its colour climbs the
+     stage ladder at the real crossings.
+   - A BRANCH IS A SESSION. One branch per lifting session, per run, per
+     ride, per rehab session, leaving the trunk at the day it happened,
+     alternating sides, longer when there was more work in it. Colour
+     by domain (green lifting, rose rehab, blue running, slate riding),
+     shade by the stage the tree had reached.
+   - A TWIG IS AN EXERCISE, in the order it was done, off its session.
+   - A LEAF IS A SET. On its exercise's twig, in set order. Its SIZE is
+     how heavy that set was against your best ever on that lift (a
+     timed hold: against your longest). A PR leaf wears a thin ring.
+     A run's leaves are its kilometres, one each; a ride's the same.
+   - A BLOSSOM IS A FINDING, at the day it was found, on a short stem
+     off the trunk, coloured by the rarity ladder every other surface
+     uses (blue Noticed, periwinkle Worth knowing, purple Rare find,
+     gold Big one) and sized by rank. A new one pulses until looked at.
+   - A TERRACOTTA MARK is a rehab phase cleared; the flat grey line is
+     the surgery or injury date. Same as the card.
+   Tap anything: a set opens its numbers and how it compared, a session
+   its totals and the log, a run its distance and pace, a find its
+   sheet. Nothing is drawn that is not in the data. */
+const TX_W=480;               // base width; zoom 1 fits the phone
+const TX_PPD=5;               // pixels per day at zoom 1 (a year ≈ 1,800px)
+const TX_MINH=720;
+function txSeenIds(){try{return (lget('training-collseen-v1',{})||{}).ids||{}}catch(e){return {}}}
+function treeXNewN(){
+  /* the icon's badge: finds nobody has looked at yet */
+  try{const seen=txSeenIds();return bankList().filter(x=>x.t&&!seen[x.id]).length}catch(e){oops('treeXNewN',e);return 0}}
+function treeXFocusId(){
+  try{const seen=txSeenIds();
+    const L=bankList().filter(x=>x.t&&!seen[x.id]);
+    if(!L.length)return null;
+    const ORD={epic:0,rare:1,uncommon:2,common:3};
+    L.sort((a,b)=>String(b.found||'').localeCompare(String(a.found||''))||(ORD[a.rar]??3)-(ORD[b.rar]??3));
+    return L[0].id}catch(e){oops('treeXFocusId',e);return null}}
+function treeXMarkSeen(){
+  /* seen by being seen (the standing rule): the visit clears the badge;
+     the focused leaf keeps its glow for the visit */
+  try{
+    const st=lget('training-collseen-v1',{})||{};st.ids=st.ids||{};
+    let n=0;bankList().forEach(x=>{if(x.t&&!st.ids[x.id]){st.ids[x.id]=today();n++}});
+    if(n)lset('training-collseen-v1',st);
+    try{if(typeof markDiscoveries==='function')markDiscoveries()}catch(e){oops('treeXMark.disc',e)}
+    try{if(typeof notifSync==='function')notifSync()}catch(e){oops('treeXMark.notif',e)}
+    return n}catch(e){oops('treeXMarkSeen',e);return 0}}
+function treeXModel(){
+  try{
+    const H=(S.history||[]).filter(h=>h.complete&&!h.run&&hKey(h)).sort((a,b)=>String(a.date).localeCompare(String(b.date)));
+    const R9=(S.runs||[]).filter(r=>r&&r.date).slice().sort((a,b)=>String(a.date).localeCompare(String(b.date)));
+    const bank=bankList().filter(x=>x.t);
+    const seen=txSeenIds();
+    const newN=bank.filter(x=>!seen[x.id]).length;
+    const stamp=today()+':'+H.length+':'+R9.length+':'+bank.length+':'+newN+':'+String(S.treeFocus||'');
+    if(S._txModel&&S._txModel.stamp===stamp)return S._txModel;
+    if(!H.length&&!R9.length)return{stamp:stamp,empty:true,sessions:0,runs:0,finds:bank.length};
+    const days=H.map(hKey).concat(R9.map(r=>String(r.date).slice(0,10))).filter(Boolean).sort();
+    const first=days[0],last=today();
+    const d0=new Date(first+'T12:00'),d1=new Date(last+'T12:00');
+    const span=Math.max(14,Math.round((d1-d0)/864e5));
+    const frac=k=>{try{const d=new Date(String(k).slice(0,10)+'T12:00');return Math.max(0,Math.min(1,(d-d0)/864e5/span))}catch(e){return 0}};
+    const Hh=Math.max(TX_MINH,span*TX_PPD+120);
+    const groundY=Hh-40,topY=50,usable=groundY-topY;
+    const yAt=f=>groundY-f*usable;
+    const td=(typeof treeData==='function')?treeData():{seed:'x',pts:0};
+    const R=seedRand(String(td.seed||'x')+':explorer');
+    const cx=TX_W/2;
+    const ph1=R()*6.283,ph2=R()*6.283,amp=30+R()*14;
+    const tx=f=>{const g=Math.max(0,Math.min(1,f));
+      return cx+amp*g*(Math.sin(g*4.2+ph1)*0.72+Math.sin(g*7.3+ph2)*0.28)};
+    /* work per week: the trunk's width and the stage ladder */
+    const BUCK=7,nb=Math.ceil(span/BUCK)+1;
+    const load=new Array(nb).fill(0);
+    const put=(k,w)=>{const i=Math.min(nb-1,Math.max(0,Math.floor(frac(k)*span/BUCK)));load[i]+=w};
+    H.forEach(h=>put(hKey(h),(h.log||[]).length||1));
+    R9.forEach(r=>put(String(r.date).slice(0,10),Math.max(1,(+r.km||0)/2)));
+    const peak=Math.max.apply(null,load.concat([1]));
+    const CUM=[];let t9=0;load.forEach(v=>{t9+=v;CUM.push(t9)});
+    const CUMT=CUM[CUM.length-1]||0;
+    const ptsAt=f=>{if(!CUMT)return 0;const x=Math.max(0,Math.min(1,f))*(CUM.length-1);
+      const i=Math.floor(x),t=x-i;const a=CUM[i],b=CUM[Math.min(CUM.length-1,i+1)];
+      return (td.pts||0)*((a+(b-a)*t)/CUMT)};
+    const sfAt=f=>{try{return treeStageFrac(ptsAt(f))}catch(e){return 0}};
+    const wMax=26,wMin=4;
+    const halfAt=i=>{const v=load[Math.max(0,Math.min(nb-1,i))]/peak;return (wMin+(wMax-wMin)*Math.pow(v,0.75))/2};
+    const smooth=i=>(halfAt(i-1)+halfAt(i)*2+halfAt(i+1))/4;
+    const halfW=f=>{const u=Math.max(0,Math.min(1,f));
+      return smooth(Math.round(u*(nb-1)))*(1-0.45*Math.pow(u,0.7))*(u<0.06?1+0.55*Math.pow(1-u/0.06,2):1)*Math.max(0.12,1-Math.pow(u,3))};
+    /* bests, for leaf size: the heaviest estimated max ever on each lift,
+       the longest hold ever on each timed exercise */
+    const best={},bestS={};
+    H.forEach(h=>(h.log||[]).forEach(l=>{const b=gBase(l.ex);
+      if(l.w>0&&l.r>0){const e=e1rm(l.w,l.r,l.rpe);if(e>(best[b]||0))best[b]=e}
+      if(l.secs>0&&l.secs>(bestS[b]||0))bestS[b]=l.secs}));
+    const isReh=h=>{try{const p9=(S.lib&&S.lib.programs||[]).find(x=>x.id===h.progId);return !!(p9&&(p9.acl||p9.rehabProto))}catch(e){return false}};
+    const RAMP=TREE_RAMP.m;
+    const domRamp=dom=>RAMP[dom==='reh'?'reh':dom==='run'?'run':(dom==='ride'||dom==='walk')?'ride':'lift'];
+    let side=1;
+    const branches=[];
+    /* sessions → branches; exercises → twigs; sets → leaves */
+    H.forEach(h=>{
+      const k=hKey(h),f=frac(k),y0=yAt(f);
+      side=(R()<0.82)?-side:side;
+      const dom=isReh(h)?'reh':'lift';
+      const exs=[];const order=[];
+      (h.log||[]).forEach((l,i)=>{if(!(l.w||l.r||l.secs))return;const b=gBase(l.ex);
+        if(!exs[b]){exs[b]={ex:b,sets:[]};order.push(b)}
+        const rel=l.secs>0?(bestS[b]?Math.min(1,l.secs/bestS[b]):0.5):(l.w>0&&l.r>0&&best[b]?Math.min(1,e1rm(l.w,l.r,l.rpe)/best[b]):0.4);
+        exs[b].sets.push({i:i,w:l.w,r:l.r,rpe:l.rpe,secs:l.secs,pr:!!l.pr,rel:rel,e:(l.w>0&&l.r>0)?Math.round(e1rm(l.w,l.r,l.rpe)):null})});
+      const twigs=order.map(b=>exs[b]);
+      const nSets=twigs.reduce((a,t)=>a+t.sets.length,0);
+      if(!nSets)return;
+      const len=26+Math.min(96,nSets*4.2);
+      const ang=(16+R()*26)*Math.PI/180;
+      const x0=tx(f)+side*halfW(f)*0.9;
+      const x1=x0+side*Math.cos(ang)*len,y1=y0-Math.sin(ang)*len;
+      const bow=(R()-0.4)*0.6;
+      const mx=x0+side*Math.cos(ang)*len*(0.5+bow*0.4),my=y0-Math.sin(ang)*len*(0.3-bow*0.4);
+      const sf=sfAt(f)+(R()-0.5)*0.4;
+      const ton=(h.log||[]).reduce((a,l)=>a+((l.w>0&&l.r>0)?l.w*l.r:0),0);
+      branches.push({kind:'sess',id:String(h.id),k:k,f:f,y:y0,x0:x0,x1:x1,y1:y1,mx:mx,my:my,side:side,ang:ang,len:len,dom:dom,sf:sf,
+        title:h.dayTitle||(dom==='reh'?'Rehab':'Session'),sets:nSets,ton:ton,minutes:h.minutes||0,live:(typeof sessionLive==='function')?sessionLive(h):false,twigs:twigs})});
+    /* runs, rides, walks → branches of kilometre leaves */
+    R9.forEach(r=>{
+      const k=String(r.date).slice(0,10),f=frac(k),y0=yAt(f);
+      side=(R()<0.82)?-side:side;
+      const isRun=(typeof isRunType==='function')?isRunType(r.type):true;
+      const dom=isRun?'run':(r.type==='ride'?'ride':'walk');
+      const km=Math.max(0,+r.km||0);
+      const len=(dom==='walk'?16:26)+Math.min(120,km*(dom==='ride'?2.2:3.4));
+      const ang=(14+R()*24)*Math.PI/180;
+      const x0=tx(f)+side*halfW(f)*0.9;
+      const x1=x0+side*Math.cos(ang)*len,y1=y0-Math.sin(ang)*len;
+      const bow=(R()-0.4)*0.6;
+      const mx=x0+side*Math.cos(ang)*len*(0.5+bow*0.4),my=y0-Math.sin(ang)*len*(0.3-bow*0.4);
+      branches.push({kind:'run',id:String(r.id||k+':'+km),k:k,f:f,y:y0,x0:x0,x1:x1,y1:y1,mx:mx,my:my,side:side,ang:ang,len:len,dom:dom,sf:sfAt(f)+(R()-0.5)*0.4,
+        km:km,mins:+r.mins||0,hr:+r.hr||0,type:r.type||'',leaves:Math.min(45,Math.max(1,Math.round(km))),run:r})});
+    /* finds → blossoms on stems off the trunk */
+    const ORDR={common:0,uncommon:1,rare:2,epic:3};
+    const byDay={};
+    const blossoms=bank.slice().sort((a,b)=>String(a.found||'').localeCompare(String(b.found||''))).map(x=>{
+      const k=String(x.found||first).slice(0,10);const f=k<first?0:frac(k);
+      const n=byDay[k]=(byDay[k]||0)+1;
+      const rank=ORDR[x.rar]??0;
+      /* MANY FINDS ON ONE DAY FAN INTO A CROWN (seen in the browser: an
+         install day banks dozens at once and they piled into one clump).
+         Alternate sides, walk the angle across the quarter, and let the
+         stems grow with the count so the day reads as a spray. */
+      const sd=(n%2?1:-1);
+      const a=(12+((n-1)*23)%66)*Math.PI/180;
+      const stem=16+rank*4+Math.min(120,(n-1)*2.4);
+      const x0=tx(f)+sd*halfW(f)*0.8,y0=yAt(f);
+      return{id:x.id,k:k,f:f,rank:rank,rar:x.rar,t:x.t,tag:x.tag||'',isNew:!seen[x.id],
+        x0:x0,y0:y0,x1:x0+sd*Math.cos(a)*stem,y1:y0-Math.sin(a)*stem,side:sd}});
+    let scar=null,phases=[];
+    try{const a=S.acl||{};
+      if(a.on&&a.date&&a.date>=first)scar={f:frac(a.date),k:a.date};
+      (a.tests||[]).filter(t=>t.date&&t.phase&&t.date>=first).forEach(t=>phases.push({f:frac(t.date),p:t.phase,k:t.date}))}
+    catch(e){oops('treeX.scar',e)}
+    const sessions=branches.filter(b=>b.kind==='sess').length,runs=branches.filter(b=>b.kind==='run').length;
+    const setsN=branches.reduce((a,b)=>a+(b.sets||0),0);
+    const m={stamp:stamp,empty:false,first:first,last:last,span:span,W:TX_W,H:Hh,groundY:groundY,topY:topY,
+      yAt:yAt,tx:tx,halfW:halfW,sfAt:sfAt,frac:frac,load:load,nb:nb,branches:branches,blossoms:blossoms,scar:scar,phases:phases,
+      sessions:sessions,runs:runs,sets:setsN,finds:bank.length,newN:newN,domRamp:domRamp};
+    S._txModel=m;return m}
+  catch(e){oops('treeXModel',e);return{stamp:'err',empty:true,sessions:0,runs:0,finds:0}}}
+function txCol(m,dom,sf,k){return treeRampCol(m.domRamp(dom),Math.min(6,Math.max(0,sf+(k||0))))}
+function txQ(x0,y0,mx,my,x1,y1){return 'M'+x0.toFixed(1)+' '+y0.toFixed(1)+' Q'+mx.toFixed(1)+' '+my.toFixed(1)+' '+x1.toFixed(1)+' '+y1.toFixed(1)}
+function txOnQ(x0,y0,mx,my,x1,y1,t){const u=1-t;return[u*u*x0+2*u*t*mx+t*t*x1,u*u*y0+2*u*t*my+t*t*y1]}
+function treeXSvg(m){
+  try{
+    if(!m||m.empty)return '';
+    if(S._txSvg&&S._txSvg.stamp===m.stamp)return S._txSvg.svg;
+    const o=[];
+    const R=seedRand('explorer-draw:'+m.first+':'+m.branches.length);
+    const climb=TREE_RAMP.m.climb;
+    /* month ticks, every month, years heavier */
+    (function(){const d=new Date(m.first+'T12:00');d.setDate(1);d.setMonth(d.getMonth()+1);
+      const MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];let guard=0;
+      while(guard++<400){const k=dayKey(d);if(k>m.last)break;
+        const y=m.yAt(m.frac(k)),jan=d.getMonth()===0;
+        o.push('<line x1="10" y1="'+y.toFixed(1)+'" x2="'+(jan?26:18)+'" y2="'+y.toFixed(1)+'" stroke="var(--faint)" stroke-width="'+(jan?1.2:0.7)+'" opacity="'+(jan?.7:.4)+'"/>'+
+          '<text x="30" y="'+(y+3).toFixed(1)+'" font-size="'+(jan?9:7.5)+'" fill="var(--faint)" opacity="'+(jan?.9:.6)+'" font-family="-apple-system,system-ui,sans-serif">'+MON[d.getMonth()]+(jan?' '+d.getFullYear():'')+'</text>');
+        d.setMonth(d.getMonth()+1)}})();
+    o.push('<line x1="40" y1="'+m.groundY+'" x2="'+(m.W-40)+'" y2="'+m.groundY+'" stroke="var(--line)" stroke-width="1" opacity=".6"/>'+
+      '<text x="'+(m.W/2)+'" y="'+(m.groundY+18)+'" text-anchor="middle" font-size="8" fill="var(--faint)" opacity=".8" font-family="-apple-system,system-ui,sans-serif">'+esc(fmtDate(m.first+'T12:00'))+' · THE FIRST LOGGED DAY</text>'+
+      '<text x="'+(m.W/2)+'" y="'+(m.topY-30)+'" text-anchor="middle" font-size="8" fill="var(--faint)" opacity=".8" font-family="-apple-system,system-ui,sans-serif">TODAY</text>');
+    /* roots, for the weeks that held */
+    (function(){const n=Math.min(9,3+Math.floor(((typeof treeData==='function'?treeData().weeks:0)||0)/2));
+      for(let i=0;i<n;i++){const dir=(i%2?1:-1)*(0.6+R()*0.7),a0=(6+R()*26)*Math.PI/180,l0=18+R()*22;
+        (function dig(px,py,ang,ln,depth,wid,op){if(depth>2||ln<4)return;
+          const nx=px+dir*Math.cos(ang)*ln,ny=Math.min(m.H-2,py+Math.sin(ang)*ln);
+          o.push('<path d="'+txQ(px,py,px+dir*Math.cos(ang)*ln*0.5,py+Math.sin(ang)*ln*0.22,nx,ny)+'" stroke="'+climb[2]+'" stroke-width="'+wid.toFixed(2)+'" fill="none" opacity="'+op.toFixed(2)+'" stroke-linecap="round"/>');
+          const kids=depth===0?2:(R()<0.45?1:2);
+          for(let k=0;k<kids;k++)dig(nx,ny,ang+((k?1:-1)*(9+R()*22))*Math.PI/180,ln*(0.55+R()*0.2),depth+1,Math.max(0.4,wid*0.6),op*0.68)
+        })(m.tx(0)+dir*3,m.groundY+1,a0,l0,0,2+R()*0.6,0.34)}})();
+    /* the trunk: width is work, colour climbs the stage ladder */
+    (function(){const NT=Math.max(40,m.nb*4),L=[],Rt=[];
+      L.push([m.tx(0)-m.halfW(0),m.groundY+5]);Rt.push([m.tx(0)+m.halfW(0),m.groundY+5]);
+      for(let i=0;i<NT;i++){const u=i/(NT-1),f=u*0.985,y=m.yAt(f),xc=m.tx(f),h=m.halfW(f);L.push([xc-h,y]);Rt.push([xc+h,y])}
+      const NS=20;let sv='';for(let i=0;i<=NS;i++){const f=i/NS;sv+='<stop offset="'+f.toFixed(3)+'" stop-color="'+treeRampCol(climb,m.sfAt(f))+'"/>'}
+      o.push('<defs><linearGradient id="txtr" gradientUnits="userSpaceOnUse" x1="0" y1="'+m.groundY+'" x2="0" y2="'+m.topY+'">'+sv+'</linearGradient></defs>');
+      o.push('<path data-tp="trunk" d="M'+L.map(p=>p[0].toFixed(1)+' '+p[1].toFixed(1)).join(' L')+' L'+Rt.slice().reverse().map(p=>p[0].toFixed(1)+' '+p[1].toFixed(1)).join(' L')+' Z" fill="url(#txtr)" opacity=".55"/>');
+      const cut=Math.round(L.length*0.8);
+      o.push('<path d="M'+L.slice(0,cut).map(p=>p[0].toFixed(1)+' '+p[1].toFixed(1)).join(' L')+'" fill="none" stroke="url(#txtr)" stroke-width="1.2" opacity=".6" stroke-linecap="round"/>'+
+        '<path d="M'+Rt.slice(0,cut).map(p=>p[0].toFixed(1)+' '+p[1].toFixed(1)).join(' L')+'" fill="none" stroke="url(#txtr)" stroke-width="1.2" opacity=".45" stroke-linecap="round"/>')})();
+    if(m.scar){const y=m.yAt(m.scar.f),sx=m.tx(m.scar.f);
+      o.push('<line data-tp="scar" x1="'+(sx-30).toFixed(1)+'" y1="'+y.toFixed(1)+'" x2="'+(sx+30).toFixed(1)+'" y2="'+y.toFixed(1)+'" stroke="var(--faint)" stroke-width="1.4" opacity=".6" stroke-linecap="round"/>'+
+        '<text x="'+(sx+34).toFixed(1)+'" y="'+(y+3).toFixed(1)+'" font-size="7.5" fill="var(--faint)" opacity=".8" font-family="-apple-system,system-ui,sans-serif">'+esc(fmtDate(m.scar.k+'T12:00'))+' · surgery / injury</text>')}
+    /* branches */
+    m.branches.forEach(b=>{
+      const wood=txCol(m,b.dom,b.sf,0.2),twigC=txCol(m,b.dom,b.sf,0.9),leafC=txCol(m,b.dom,b.sf,1.9);
+      const bw=b.kind==='sess'?(1.4+Math.min(2.2,b.sets*0.09)):(1.2+Math.min(2.0,b.km*0.06));
+      const op=b.dom==='walk'?'.5':'.9';
+      o.push('<path data-a="txTap" data-v="'+esc(b.kind+':'+b.id)+'" data-tp="branch" pointer-events="all" d="'+txQ(b.x0,b.y,b.mx,b.my,b.x1,b.y1)+'" stroke="'+wood+'" stroke-width="'+bw.toFixed(2)+'" fill="none" opacity="'+op+'" stroke-linecap="round"/>');
+      if(b.kind==='sess'){
+        const n=b.twigs.length;
+        b.twigs.forEach((tw,j)=>{
+          const t=(j+1)/(n+1);const P=txOnQ(b.x0,b.y,b.mx,b.my,b.x1,b.y1,t);
+          const flip=(j%2?1:-1);
+          const a2=b.ang+flip*(30+R()*22)*Math.PI/180;
+          const tl=10+Math.min(34,tw.sets.length*4.5);
+          const ex=P[0]+b.side*Math.cos(a2)*tl,ey=P[1]-Math.sin(a2)*tl;
+          o.push('<path data-tp="twig" d="M'+P[0].toFixed(1)+' '+P[1].toFixed(1)+' L'+ex.toFixed(1)+' '+ey.toFixed(1)+'" stroke="'+twigC+'" stroke-width=".9" fill="none" opacity=".8" stroke-linecap="round"/>');
+          const mS=tw.sets.length;
+          tw.sets.forEach((st,i)=>{const u=(i+1)/(mS+1);
+            const lx=P[0]+(ex-P[0])*u+(R()-0.5)*2.4,ly=P[1]+(ey-P[1])*u+(R()-0.5)*2.4;
+            const r=1.5+2.6*st.rel;
+            o.push('<circle data-a="txTap" data-v="'+esc('set:'+b.id+':'+st.i)+'" data-tp="leaf" pointer-events="all" stroke="transparent" stroke-width="7" cx="'+lx.toFixed(1)+'" cy="'+ly.toFixed(1)+'" r="'+r.toFixed(2)+'" fill="'+leafC+'" opacity="'+(0.6+0.35*st.rel).toFixed(2)+'"/>'+
+              (st.pr?'<circle cx="'+lx.toFixed(1)+'" cy="'+ly.toFixed(1)+'" r="'+(r+1.4).toFixed(2)+'" fill="none" stroke="#F0EEE6" stroke-width=".6" opacity=".8"/>':''))})})}
+      else{
+        const n=b.leaves;
+        for(let i=0;i<n;i++){const u=(i+0.6)/(n+0.2);const P=txOnQ(b.x0,b.y,b.mx,b.my,b.x1,b.y1,u);
+          const perp=(i%2?1:-1)*(2.2+R()*1.6);
+          const lx=P[0]-Math.sin(b.ang)*perp*b.side*0.3+(R()-0.5)*1.2,ly=P[1]-Math.cos(b.ang)*perp;
+          const r=b.dom==='walk'?1.3:(1.9+(b.hr>0?0.5:0));
+          o.push('<circle data-a="txTap" data-v="'+esc(b.kind+':'+b.id)+'" data-tp="leaf" pointer-events="all" stroke="transparent" stroke-width="7" cx="'+lx.toFixed(1)+'" cy="'+ly.toFixed(1)+'" r="'+r.toFixed(2)+'" fill="'+leafC+'" opacity="'+(b.dom==='walk'?'.5':'.8')+'"/>')}}});
+    /* phases cleared */
+    m.phases.slice(0,8).forEach(ph=>{const y=m.yAt(ph.f),x=m.tx(ph.f)+(ph.p%2?1:-1)*(m.halfW(ph.f)+6);
+      o.push('<circle data-tp="phase" cx="'+x.toFixed(1)+'" cy="'+y.toFixed(1)+'" r="3.4" fill="#C96442" opacity=".92"/>'+
+        '<text x="'+(x+(ph.p%2?7:-7)).toFixed(1)+'" y="'+(y+3).toFixed(1)+'" text-anchor="'+(ph.p%2?'start':'end')+'" font-size="7" fill="#C96442" opacity=".9" font-family="-apple-system,system-ui,sans-serif">phase '+ph.p+'</text>')});
+    /* blossoms: the rarity ladder, the same constant every surface reads */
+    m.blossoms.forEach(bl=>{
+      const c=rarityOf(bl.rar)[1],r=[2.6,3.2,3.9,4.8][bl.rank]||2.6;
+      const focus=S.treeFocus&&S.treeFocus===bl.id;
+      o.push('<path data-tp="stem" d="M'+bl.x0.toFixed(1)+' '+bl.y0.toFixed(1)+' L'+bl.x1.toFixed(1)+' '+bl.y1.toFixed(1)+'" stroke="'+c+'" stroke-width=".8" opacity=".55" stroke-linecap="round"/>'+
+        (bl.rank>=2?'<circle cx="'+bl.x1.toFixed(1)+'" cy="'+bl.y1.toFixed(1)+'" r="'+(r*2.2).toFixed(1)+'" fill="'+c+'" opacity=".12"/>':'')+
+        (bl.isNew?'<circle class="tx-new" cx="'+bl.x1.toFixed(1)+'" cy="'+bl.y1.toFixed(1)+'" r="'+(r+4).toFixed(1)+'" fill="none" stroke="'+c+'" stroke-width="1"/>':'')+
+        '<circle data-a="txTap" data-v="'+esc('find:'+bl.id)+'" data-tp="bloom" pointer-events="all" stroke="transparent" stroke-width="8" id="'+esc('tx-'+bl.id.replace(/[^A-Za-z0-9_-]/g,'_'))+'" cx="'+bl.x1.toFixed(1)+'" cy="'+bl.y1.toFixed(1)+'" r="'+r.toFixed(1)+'" fill="'+c+'" opacity="'+(bl.rank>=2?'.97':'.85')+'"/>'+
+        (bl.rank>=2?'<circle cx="'+bl.x1.toFixed(1)+'" cy="'+bl.y1.toFixed(1)+'" r="'+(r+2.2).toFixed(1)+'" fill="none" stroke="'+c+'" stroke-width=".6" opacity=".45"/>':'')+
+        (focus?'<circle class="tx-new" cx="'+bl.x1.toFixed(1)+'" cy="'+bl.y1.toFixed(1)+'" r="'+(r+9).toFixed(1)+'" fill="none" stroke="'+c+'" stroke-width="1.4"/>'+
+          '<text x="'+(bl.x1+bl.side*(r+12)).toFixed(1)+'" y="'+(bl.y1+3).toFixed(1)+'" text-anchor="'+(bl.side>0?'start':'end')+'" font-size="8" fill="'+c+'" font-family="-apple-system,system-ui,sans-serif" style="paint-order:stroke;stroke:#1F1E1D;stroke-width:3px">'+esc(String(bl.t).slice(0,34))+'</text>':''))});
+    const svg='<svg viewBox="0 0 '+m.W+' '+m.H+'" style="width:100%;height:auto;display:block;overflow:visible">'+o.join('')+'</svg>';
+    S._txSvg={stamp:m.stamp,svg:svg};
+    return svg}
+  catch(e){oops('treeXSvg',e);return ''}}
+function treeXLegend(){
+  const dot=c=>'<span style="display:inline-block;width:9px;height:9px;border-radius:9px;background:'+c+';vertical-align:-1px;margin-right:6px"></span>';
+  const rows=[
+    ['<span style="display:inline-block;width:9px;height:14px;border-radius:2px;background:'+TREE_RAMP.m.climb[3]+';vertical-align:-3px;margin-right:6px"></span>','The trunk','Height is time, the ground is your first logged day, the top is today. Width is that week’s work. The colour climbs your own stage ladder.'],
+    [dot(TREE_RAMP.m.lift[4]),'A branch is a session','One per lifting session (green), rehab session (rose), run (blue) or ride (slate), at the day it happened. Longer when there was more in it.'],
+    [dot(TREE_RAMP.m.lift[5]),'A twig is an exercise','In the order you did them, off the session it belongs to.'],
+    [dot(TREE_RAMP.m.lift[6]),'A leaf is a set','On its exercise’s twig, in set order. Bigger when it was heavier against your best ever on that lift. A thin ring means a PR. On a run, a leaf is a kilometre.'],
+    [dot(rarityOf('common')[1])+dot(rarityOf('uncommon')[1])+dot(rarityOf('rare')[1])+dot(rarityOf('epic')[1]),'A blossom is a finding','At the day it was found, coloured by the same ladder as everywhere else: Noticed, Worth knowing, Rare find, Big one. A new one pulses until you look.'],
+    [dot('#C96442'),'A rehab phase cleared','The flat grey line is the surgery or injury date.']];
+  return rows.map(r=>'<div style="display:flex;gap:10px;align-items:flex-start;margin-top:9px"><span style="flex:none;padding-top:2px">'+r[0]+'</span><span style="flex:1;min-width:0"><b style="font-size:12.5px">'+r[1]+'</b><span style="display:block;color:var(--dim);font-size:11.5px;line-height:1.5;margin-top:2px">'+r[2]+'</span></span></div>').join('')}
+function viewTree(){
+  try{
+    const m=treeXModel();
+    const z=Math.max(1,Math.min(6,+S.txZoom||1));
+    let h='<div class="view" style="padding:16px 0 0;overflow:hidden">'+
+      '<div style="display:flex;align-items:center;gap:10px;padding:0 14px">'+
+      '<button data-a="back" class="btn" style="width:auto;padding:8px 14px;color:var(--dim);font-size:12.5px">‹ Back</button>'+
+      '<h1 class="disp" style="font-size:22px;font-weight:600;flex:1;min-width:0">Your tree</h1>'+
+      '<button data-a="treeLegendTog" aria-label="What the tree means" style="width:36px;height:36px;border-radius:36px;background:var(--raised);border:1.5px solid var(--line);color:var(--dim);font-size:13px;flex:none">i</button></div>';
+    if(!m||m.empty){
+      return h+'<div class="card" style="margin:16px 14px;padding:16px"><p style="font-size:14px;font-weight:600">Nothing to draw yet</p>'+
+        '<p style="color:var(--dim);font-size:12.5px;line-height:1.6;margin-top:6px">The tree draws itself from what you log: every session is a branch, every set a leaf, every finding a blossom. Log a session and come back.</p></div></div>'}
+    h+='<p class="mono" style="padding:6px 14px 0;font-size:9.5px;letter-spacing:.06em;color:var(--faint)">'+
+      m.sessions+' SESSION'+(m.sessions===1?'':'S')+' · '+m.sets+' SET'+(m.sets===1?'':'S')+' · '+m.runs+' RUN'+(m.runs===1?'':'S')+' · '+m.finds+' FIND'+(m.finds===1?'':'S')+
+      (m.newN?' · <span style="color:var(--green)">'+m.newN+' NEW</span>':'')+'</p>';
+    if(S.treeLegend)h+='<div class="card" style="margin:10px 14px 0;padding:12px 14px">'+treeXLegend()+'</div>';
+    h+='<div style="display:flex;align-items:center;gap:8px;padding:8px 14px 0">'+
+      '<button data-a="treeZoom" data-v="out" class="btn" style="width:auto;padding:7px 13px;font-size:14px;color:var(--dim)">−</button>'+
+      '<span class="mono" style="font-size:10px;color:var(--faint);min-width:30px;text-align:center">'+(Math.round(z*10)/10)+'×</span>'+
+      '<button data-a="treeZoom" data-v="in" class="btn" style="width:auto;padding:7px 13px;font-size:14px;color:var(--dim)">+</button>'+
+      '<span style="flex:1"></span>'+
+      (m.newN?'<button data-a="treeNewest" class="mono" style="font-size:9.5px;letter-spacing:.06em;color:var(--green);border:1px solid var(--green);border-radius:9px;padding:6px 9px">NEWEST FIND</button>':'')+
+      '<button data-a="findingsOpen" class="mono" style="font-size:9.5px;letter-spacing:.06em;color:var(--faint);border:1px solid var(--line);border-radius:9px;padding:6px 9px">AS A LIST</button></div>'+
+      '<p style="color:var(--faint);font-size:10.5px;padding:5px 14px 0">Pinch to zoom, scroll up and down the years, tap any leaf.</p>'+
+      '<div id="txwrap" style="margin-top:8px;height:calc(100dvh - 205px);overflow:auto;-webkit-overflow-scrolling:touch;touch-action:pan-x pan-y;position:relative">'+
+      '<div id="txinner" style="width:'+(100*z)+'%;margin:0 auto">'+treeXSvg(m)+'</div></div>';
+    try{if(typeof deepReadyInfo==='function'&&deepReadyInfo())h+='<button data-a="deepGo" style="display:flex;align-items:center;gap:9px;margin:8px 14px 0;padding:10px 12px;width:calc(100% - 28px);text-align:left;background:var(--raised);border-radius:12px">'+
+      '<span class="mono" style="color:var(--amber);font-size:9px;letter-spacing:.08em;flex:none">THIS WEEK’S READ</span><span style="flex:1;font-size:12px;color:var(--dim)">Ready. It becomes leaves too.</span><span class="mono" style="color:var(--amber);font-size:11px">›</span></button>'}catch(e){oops('treeX.read',e)}
+    return h+'</div>'}
+  catch(e){oops('viewTree',e);return '<div class="view pad"><p>The tree could not draw. Tap back and try again.</p></div>'}}
+function treeXAfterRender(){
+  /* scroll survives a re-render (a sheet opening rebuilds the page),
+     and a focused find is brought into view once */
+  try{
+    if(S.view!=='tree')return;
+    const w=document.getElementById('txwrap'),inner=document.getElementById('txinner');if(!w||!inner)return;
+    if(!w.__txBound){w.__txBound=1;
+      w.addEventListener('scroll',function(){S._txScroll={t:w.scrollTop,l:w.scrollLeft}},{passive:true})}
+    if(S._txGoto){const id=S._txGoto;S._txGoto=null;
+      const el=document.getElementById('tx-'+String(id).replace(/[^A-Za-z0-9_-]/g,'_'));
+      if(el){const m=treeXModel();const cy=+el.getAttribute('cy')||0,cx=+el.getAttribute('cx')||0;
+        const sc=(inner.clientWidth||TX_W)/(m.W||TX_W);
+        w.scrollTop=Math.max(0,cy*sc-w.clientHeight*0.45);w.scrollLeft=Math.max(0,cx*sc-w.clientWidth*0.5);
+        S._txScroll={t:w.scrollTop,l:w.scrollLeft};return}}
+    if(S._txScroll){w.scrollTop=S._txScroll.t;w.scrollLeft=S._txScroll.l}}
+  catch(e){oops('treeXAfterRender',e)}}
+/* pinch to zoom — decided on touchstart, applied through rAF, no layout
+   reads inside touchmove beyond the two touch points */
+(function(){
+  try{
+    let z0=1,d0=0,pinch=false,raf=0,zNext=1,fx=0,fy=0,sl0=0,st0=0,wrap=null,inner=null;
+    document.addEventListener('touchstart',function(e){
+      if(e.touches.length!==2){pinch=false;return}
+      const w=e.target.closest&&e.target.closest('#txwrap');if(!w)return;
+      wrap=w;inner=document.getElementById('txinner');if(!inner)return;
+      const a=e.touches[0],b=e.touches[1];
+      d0=Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY)||1;
+      z0=Math.max(1,Math.min(6,+S.txZoom||1));zNext=z0;
+      const rc=w.getBoundingClientRect();
+      fx=(a.clientX+b.clientX)/2-rc.left;fy=(a.clientY+b.clientY)/2-rc.top;
+      sl0=w.scrollLeft;st0=w.scrollTop;pinch=true},{passive:true});
+    document.addEventListener('touchmove',function(e){
+      if(!pinch||e.touches.length!==2)return;
+      const a=e.touches[0],b=e.touches[1];
+      const d=Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY)||1;
+      zNext=Math.max(1,Math.min(6,z0*d/d0));
+      if(e.cancelable)e.preventDefault();
+      if(!raf)raf=requestAnimationFrame(function(){raf=0;
+        if(!inner||!wrap)return;
+        inner.style.width=(100*zNext)+'%';
+        const k=zNext/z0;
+        wrap.scrollLeft=(sl0+fx)*k-fx;wrap.scrollTop=(st0+fy)*k-fy})},{passive:false});
+    const end=function(){if(!pinch)return;pinch=false;S.txZoom=Math.round(zNext*10)/10;
+      try{if(wrap)S._txScroll={t:wrap.scrollTop,l:wrap.scrollLeft}}catch(e){oops('txPinchEnd',e)}};
+    document.addEventListener('touchend',end,{passive:true});
+    document.addEventListener('touchcancel',end,{passive:true})}
+  catch(e){oops('txPinch',e)}})();
+function treeXSheet(){
+  try{
+    const t=S.sheet&&S.sheet.t;
+    if(t==='txsess'){
+      const h=(S.history||[]).find(x=>String(x.id)===String(S.sheet.id));
+      if(!h)return wrapSheet('A session','<p style="color:var(--dim);font-size:13px;margin-top:6px">This session is no longer in the log.</p>');
+      const sets=(h.log||[]).filter(l=>l.w||l.r||l.secs);
+      const ton=sets.reduce((a,l)=>a+((l.w>0&&l.r>0)?l.w*l.r:0),0);
+      const rp=sets.map(l=>+l.rpe).filter(x=>isFinite(x));
+      const ex={};sets.forEach(l=>{const b=gBase(l.ex);ex[b]=(ex[b]||0)+1});
+      const prs=sets.filter(l=>l.pr).length;
+      const live=(typeof sessionLive==='function')?sessionLive(h):false;
+      const stat=(v,l)=>'<div style="flex:1;text-align:center"><p class="disp" style="font-size:18px;font-weight:700">'+v+'</p><p class="mono" style="font-size:8px;color:var(--faint);letter-spacing:.06em;margin-top:2px">'+l+'</p></div>';
+      return wrapSheet('A branch · one session',
+        '<p class="disp" style="font-size:19px;font-weight:650;line-height:1.2">'+esc(h.dayTitle||'Session')+'</p>'+
+        '<p class="mono" style="color:var(--faint);font-size:10px;margin-top:4px">'+esc(fmtDate(hKey(h)+'T12:00'))+(h.minutes?' · '+h.minutes+' MIN':'')+(live?' · WITNESSED':'')+'</p>'+
+        '<div class="card mt" style="padding:12px 8px;display:flex">'+stat(sets.length,'SETS')+stat(Object.keys(ex).length,'EXERCISES')+stat(ton>0?tonStr(ton):'—','LIFTED')+stat(rp.length?(Math.round(rp.reduce((a,b)=>a+b,0)/rp.length*10)/10):'—','AVG RPE')+'</div>'+
+        '<div style="margin-top:10px">'+Object.keys(ex).map(b=>'<p style="font-size:12.5px;color:var(--dim);margin-top:4px">'+esc(b)+' <span class="mono" style="color:var(--faint);font-size:10px">'+ex[b]+' set'+(ex[b]===1?'':'s')+'</span></p>').join('')+'</div>'+
+        (prs?'<p style="color:var(--green);font-size:12px;margin-top:8px">'+prs+' PR'+(prs===1?'':'s')+' in this session.</p>':'')+
+        '<p style="color:var(--faint);font-size:11px;line-height:1.5;margin-top:10px">Each twig off this branch is one exercise; each leaf on a twig is one set, sized against your best on that lift.</p>'+
+        '<button data-a="txOpenLog" data-v="'+esc(String(h.id))+'" class="btn mt2" style="color:var(--amber)">Open it in the workout log</button>')}
+    if(t==='txset'){
+      const h=(S.history||[]).find(x=>String(x.id)===String(S.sheet.id));
+      const l=h&&(h.log||[])[+S.sheet.i];
+      if(!h||!l)return wrapSheet('A set','<p style="color:var(--dim);font-size:13px;margin-top:6px">This set is no longer in the log.</p>');
+      const b=gBase(l.ex);
+      const e=(l.w>0&&l.r>0)?Math.round(e1rm(l.w,l.r,l.rpe)):null;
+      let best=0,bestK='',prevE=null,prevK='';
+      (S.history||[]).forEach(x=>{if(!x.complete||x.run)return;const k=hKey(x);
+        (x.log||[]).forEach(q=>{if(gBase(q.ex)!==b||!(q.w>0&&q.r>0))return;const e9=e1rm(q.w,q.r,q.rpe);
+          if(e9>best){best=e9;bestK=k}
+          if(k<hKey(h)&&(prevK===''||k>prevK)){prevK=k;prevE=e9}})});
+      const rel=(e&&best)?Math.round(e/best*100):null;
+      return wrapSheet('A leaf · one set',
+        '<p class="disp" style="font-size:19px;font-weight:650;line-height:1.2">'+esc(b)+'</p>'+
+        '<p class="mono" style="color:var(--faint);font-size:10px;margin-top:4px">'+esc(fmtDate(hKey(h)+'T12:00'))+' · SET '+(l.setNo||(+S.sheet.i+1))+(l.pr?' · <span style="color:var(--green)">PR</span>':'')+'</p>'+
+        '<p class="disp" style="font-size:28px;font-weight:700;margin-top:10px">'+(l.secs>0?l.secs+'s hold':uwNum(l.w)+' '+uwUnit()+' × '+l.r)+(l.rpe!=null?' <span style="font-size:14px;color:var(--dim)">@ RPE '+l.rpe+'</span>':'')+'</p>'+
+        (e?'<p style="color:var(--dim);font-size:12.5px;line-height:1.6;margin-top:8px">About '+uwNum(e)+' '+uwUnit()+' estimated max'+(rel!=null?' — '+rel+'% of your best ever on this lift'+(bestK?' ('+esc(fmtDate(bestK+'T12:00'))+')':''):'')+'.'+
+          (prevE!=null?' The time before, on '+esc(fmtDate(prevK+'T12:00'))+', worked out to '+uwNum(Math.round(prevE))+'.':'')+'</p>':'')+
+        '<p style="color:var(--faint);font-size:11px;line-height:1.5;margin-top:10px">The leaf’s size is that percentage. A ring around it is a PR.</p>'+
+        '<button data-a="txOpenLog" data-v="'+esc(String(h.id))+'" class="btn mt2" style="color:var(--amber)">Open the session in the log</button>')}
+    if(t==='txrun'){
+      const m=treeXModel();const b=(m.branches||[]).find(x=>x.kind==='run'&&x.id===String(S.sheet.id));
+      if(!b)return wrapSheet('A run','<p style="color:var(--dim);font-size:13px;margin-top:6px">This one is no longer in the log.</p>');
+      const r=b.run;
+      const pace=(r.mins>0&&r.km>0)?paceStr(r.mins,r.km):'';
+      return wrapSheet('A branch · one '+(b.dom==='ride'?'ride':b.dom==='walk'?'walk':'run'),
+        '<p class="disp" style="font-size:26px;font-weight:700;line-height:1.1">'+(Math.round(b.km*10)/10)+' km</p>'+
+        '<p class="mono" style="color:var(--faint);font-size:10px;margin-top:4px">'+esc(fmtDate(b.k+'T12:00'))+(r.mins?' · '+Math.round(r.mins)+' MIN':'')+(pace?' · '+esc(pace)+(b.dom==='ride'?'':'/KM'):'')+(r.hr?' · HR '+Math.round(r.hr):'')+(r.type?' · '+esc(String(r.type).toUpperCase()):'')+'</p>'+
+        '<p style="color:var(--faint);font-size:11px;line-height:1.5;margin-top:10px">Each leaf on this branch is one kilometre. '+(r.hr?'Heart rate was recorded, so it can race.':'No heart rate on it.')+'</p>'+
+        (r.id?'<button data-a="txOpenRun" data-v="'+esc(String(r.id))+'" class="btn mt2" style="color:var(--amber)">Open it on the running page</button>':''))}
+    return null}
+  catch(e){oops('treeXSheet',e);return null}}
 /* ══ rest-day content (prompt 2) ════════════════════════════
    Rest days were dead air: "week complete", nothing else. Now
    the verdict card serves one rotating piece of the user's own
@@ -19807,9 +20222,23 @@ function aiLockHtml(what){
     '<span style="flex:1;font-size:12.5px;color:var(--dim)">'+esc(what)+' needs an API key or the Allena cloud link</span>'+
     '<span class="mono" style="color:var(--amber);font-size:11px;flex:none">Set up \u203a</span></button>'}
 function findingsBtn(){
-  /* the brain, worn on the header (owner call, Sep 2026): same
-     neural glyph as the deep read, fully lit, on a heavier chip —
-     the door to Findings should look like the mind behind them. */
+  /* THE TREE ICON (owner, 14 Sep 2026: "a new finding is made, the tree
+     icon lights up, the user clicks it and is taken to the tree with the
+     new leaf"). The brain glyph and the Findings list are one tap
+     further in, from the tree page's AS A LIST button. The badge counts
+     banked finds nobody has looked at. */
+  const n=(typeof treeXNewN==='function')?treeXNewN():unseenFindings();
+  const lit=n>0;
+  const gold=(typeof rarityOf==='function')?rarityOf('epic')[1]:'#F5C542';
+  return '<button data-a="treeOpen" aria-label="Your tree" style="position:relative;width:44px;height:44px;border-radius:13px;background:var(--raised);border:1.5px solid '+(lit?'color-mix(in srgb, var(--text) 75%, transparent)':'color-mix(in srgb, var(--text) 28%, transparent)')+';box-shadow:0 0 13px 0 '+(lit?'rgba(245,197,66,.45)':'rgba(30,155,255,.25)')+';display:flex;align-items:center;justify-content:center;flex:none">'+
+    '<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">'+
+    '<path d="M12 21V11" stroke="var(--text)" stroke-width="1.6" stroke-linecap="round" fill="none"/>'+
+    '<path d="M12 15l-4-3M12 12l4-3M12 17l3-2" stroke="var(--text)" stroke-width="1.2" stroke-linecap="round" fill="none" opacity=".8"/>'+
+    '<circle cx="8" cy="12" r="1.7" fill="'+(lit?gold:'var(--text)')+'"/><circle cx="16" cy="9" r="1.7" fill="'+(lit?gold:'var(--text)')+'" opacity=".9"/><circle cx="15" cy="15" r="1.4" fill="var(--text)" opacity=".7"/><circle cx="12" cy="7" r="1.5" fill="'+(lit?gold:'var(--text)')+'" opacity=".85"/>'+
+    '</svg>'+
+    (n?'<span class="mono" style="position:absolute;top:-5px;right:-2px;min-width:17px;height:17px;padding:0 4px;border-radius:10px;background:var(--red);color:#fff;font-size:9.5px;font-weight:700;display:flex;align-items:center;justify-content:center">'+(n>9?'9+':n)+'</span>':'')+
+    '</button>'}
+function findingsBtnOld(){
   const n=unseenFindings();
   /* the count badge is iOS badge-red (owner call, Sep 2026) — the
      native unread convention; in-app red still means stop */
@@ -23235,6 +23664,7 @@ function availEquipHtml(){
 function sheetHtml(){
   if(!S.sheet)return '';
   if(S.sheet.t==='pod'&&typeof podSheet==='function')return podSheet();
+  if((S.sheet.t==='txsess'||S.sheet.t==='txset'||S.sheet.t==='txrun')&&typeof treeXSheet==='function'){const tx9=treeXSheet();if(tx9)return tx9}
   if(S.sheet.t==='discard')return wrapSheet('Discard session',
     '<p style="color:var(--dim);font-size:14px;line-height:1.55">Throws away everything from this session, including the '+
     (S.sess?S.sess.log.length:0)+' sets already logged. Use Save &amp; exit instead if you want to keep them.</p>'+
@@ -25533,6 +25963,7 @@ function render(){
   if(S.view==='today'&&typeof arrivalDue==='function'&&arrivalDue()&&typeof viewArrival==='function')body=viewArrival();   // was below, unreachable (audit)
   else if(S.view==='today')body=viewToday();
   else if(S.view==='findings')body=viewFindings();
+  else if(S.view==='tree')body=viewTree();
   else if(S.view==='territory')body=viewTerritory();
   else if(S.view==='plans')body=viewPlans();
   else if(S.view==='sub')body=viewSub();
@@ -25636,7 +26067,7 @@ function render(){
       drow('social','Social','<circle cx="8" cy="9" r="3.4"/><circle cx="16" cy="9" r="3.4"/><path d="M3.5 19c.6-3 2.3-4.6 4.5-4.6S12 16 12.5 19"/><path d="M11.5 19c.6-3 2.3-4.6 4.5-4.6s3.9 1.6 4.5 4.6"/>')+
       drow('progress','Progress',ICONS.progress)+
       ((hasFinds||hasColl||hasStand||hasHealth)?'<div style="display:flex;align-items:center;gap:8px;margin:12px 13px 4px"><span style="flex:1;height:1px;background:var(--line)"></span><span class="mono" style="color:var(--faint);font-size:9px;letter-spacing:.12em">YOUR DATA</span><span style="flex:1;height:1px;background:var(--line)"></span></div>':'')+
-      (hasFinds?drow('findings','Patterns in your data',I2.spark):'')+
+      (hasFinds?drow('tree','Your tree \u2014 every set, every find',I2.spark,'treeOpen'):'')+
       /* a tree, not a line chart (owner, 13 Sep: "it's the same as the
          data icon"). I2.trend is a rising-line glyph, which is exactly
          what every other data row wears — two rows with one icon read
@@ -25859,6 +26290,7 @@ function render(){
       if(lo){const r9=lo.querySelector('.swrow');
         const c9=r9&&r9.children[Math.max(0,Math.min(3,S.lensIdx||0))];
         if(c9)lo.style.height=c9.offsetHeight+'px'}}catch(e){}
+    try{if(typeof treeXAfterRender==='function')treeXAfterRender()}catch(e){oops('treeXAfterRender',e)}
     if(S.scrollTo)setTimeout(doScroll,30);
     try{const dr=document.getElementById('drawer');
       /* slide in only on a FRESH open — a re-render while the drawer is
@@ -26979,6 +27411,31 @@ function runAction(a,v,t,e){
                :{tier:'premium',since:today(),trialEnds:null,plan:'yr',source:'preview'});
       render();flash(on?'Back to Free.':'Previewing Premium. Nothing was charged.');break}
     case 'findingsOpen':S._navQuiet=1;{if(S.view!=='findings'){S.backTo=S.view;S.backDrawer=false}S.sheet=null;S.view='findings';render();break}
+    /* THE TREE IS THE DOOR (owner, 14 Sep): the header icon lands on the
+       explorer with the newest unseen find in view; looking clears the
+       badge after the same 2.5s grace every reveal uses */
+    case 'treeOpen':{S._navQuiet=1;if(S.view!=='tree'){S.backTo=S.view;S.backDrawer=false}
+      S.sheet=null;S.drawerOpen=false;S.view='tree';
+      const fid=(typeof treeXFocusId==='function')?treeXFocusId():null;
+      S.treeFocus=fid;S._txGoto=fid;if(!fid)S._txScroll=null;
+      setTimeout(function(){try{treeXMarkSeen()}catch(e9){oops('treeXMarkSeen',e9)}},2500);
+      render();break}
+    case 'treeNewest':{const fid=S.treeFocus||((typeof treeXFocusId==='function')?treeXFocusId():null);
+      if(fid){S.treeFocus=fid;S._txGoto=fid}render();break}
+    case 'treeZoom':{const z=Math.max(1,Math.min(6,+S.txZoom||1));
+      S.txZoom=Math.round((v==='in'?Math.min(6,z*1.5):Math.max(1,z/1.5))*10)/10;render();break}
+    case 'treeLegendTog':{S.treeLegend=!S.treeLegend;render();break}
+    case 'txTap':{const s9=String(v||'');
+      if(s9.indexOf('find:')===0){const id=s9.slice(5);
+        try{const st=lget('training-collseen-v1',{})||{};st.ids=st.ids||{};if(!st.ids[id]){st.ids[id]=today();lset('training-collseen-v1',st)}}catch(e9){oops('txTap.seen',e9)}
+        S.sheet={t:'find',id:id}}
+      else if(s9.indexOf('set:')===0){const q=s9.slice(4).split(':');S.sheet={t:'txset',id:q[0],i:+q[1]||0}}
+      else if(s9.indexOf('sess:')===0)S.sheet={t:'txsess',id:s9.slice(5)};
+      else if(s9.indexOf('run:')===0)S.sheet={t:'txrun',id:s9.slice(4)};
+      else break;
+      render();break}
+    case 'txOpenLog':{S.sheet=null;S.backTo='tree';S.backDrawer=false;S.view='history';S.open=v;S.scrollTo='h'+v;render();break}
+    case 'txOpenRun':{S.sheet=null;S.backTo='tree';S.backDrawer=false;runAction('runDetail',v);break}
     case 'findingsGo':S._navQuiet=1;{if(S.view!=='findings'){S.backTo=S.view;S.backDrawer=false}S.sheet=null;S.view='findings';runAction('anRun');break}
     case 'prioSet':{S.prof=Object.assign({},S.prof||{},{prio:v});lset(K_PROF,S.prof);render();
       flash(v==='run'?'Running leads — leg days ease around hard runs.':v==='lift'?'Lifting leads — one quality run goes easy.':'Balanced — hard days alternate weekly.');break}
