@@ -823,7 +823,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='927139';  // stamped by tools/build.py with the content hash
+const BUILD_ID='37034d';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -16129,18 +16129,35 @@ function treeXMarkSeen(){
     try{if(typeof markDiscoveries==='function')markDiscoveries()}catch(e){oops('treeXMark.disc',e)}
     try{if(typeof notifSync==='function')notifSync()}catch(e){oops('treeXMark.notif',e)}
     return n}catch(e){oops('treeXMarkSeen',e);return 0}}
+/* THE WINDOW (owner, 14 Sep: "should be able to discard old data like my
+   2024-25 logs that really elongates the tree"). Nothing is deleted — the
+   tree simply starts where you say, and everything before that is folded
+   into the ground and counted there. Lives on the profile blob, no new
+   storage key. */
+function txFromKey(){
+  try{const v=(S.prof&&S.prof.treeFrom)||'all';
+    if(v==='year'){const d=new Date();d.setFullYear(d.getFullYear()-1);return dayKey(d)}
+    if(v==='this')return String(new Date().getFullYear())+'-01-01';
+    if(v==='scar')return (S.acl&&S.acl.date)?String(S.acl.date).slice(0,10):null;   // auditcheck-allow: utc-day-key — the ACL date is a local YYYY-MM-DD
+    if(/^\d{4}-\d{2}-\d{2}$/.test(String(v)))return String(v);
+    return null}catch(e){oops('txFromKey',e);return null}}
 function treeXModel(){
   try{
-    const H=(S.history||[]).filter(h=>h.complete&&!h.run&&hKey(h)).sort((a,b)=>String(a.date).localeCompare(String(b.date)));
-    const R9=(S.runs||[]).filter(r=>r&&r.date).slice().sort((a,b)=>String(a.date).localeCompare(String(b.date)));
-    const bank=bankList().filter(x=>x.t);
+    const from=txFromKey();
+    const Hall=(S.history||[]).filter(h=>h.complete&&!h.run&&hKey(h)).sort((a,b)=>String(a.date).localeCompare(String(b.date)));
+    const Rall=(S.runs||[]).filter(r=>r&&r.date).slice().sort((a,b)=>String(a.date).localeCompare(String(b.date)));
+    const H=from?Hall.filter(h=>hKey(h)>=from):Hall;
+    const R9=from?Rall.filter(r=>String(r.date).slice(0,10)>=from):Rall;   // auditcheck-allow: utc-day-key — a run row stores a local YYYY-MM-DD
+    const folded=(Hall.length-H.length)+(Rall.length-R9.length);
+    const bankAll=bankList().filter(x=>x.t);
+    const bank=from?bankAll.filter(x=>String(x.found||'')>=from):bankAll;
     const seen=txSeenIds();
-    const newN=bank.filter(x=>!seen[x.id]).length;
-    const stamp=today()+':'+H.length+':'+R9.length+':'+bank.length+':'+newN+':'+String(S.treeFocus||'');
+    const newN=bankAll.filter(x=>!seen[x.id]).length;
+    const stamp=today()+':'+H.length+':'+R9.length+':'+bank.length+':'+newN+':'+String(S.treeFocus||'')+':'+String(from||'');
     if(S._txModel&&S._txModel.stamp===stamp)return S._txModel;
-    if(!H.length&&!R9.length)return{stamp:stamp,empty:true,sessions:0,runs:0,finds:bank.length};
+    if(!H.length&&!R9.length)return{stamp:stamp,empty:true,sessions:0,runs:0,finds:bank.length,folded:folded,from:from};
     const days=H.map(hKey).concat(R9.map(r=>String(r.date).slice(0,10))).filter(Boolean).sort();
-    const first=days[0],last=today();
+    const first=from&&from<days[0]?from:days[0],last=today();
     const d0=new Date(first+'T12:00'),d1=new Date(last+'T12:00');
     const span=Math.max(14,Math.round((d1-d0)/864e5));
     const frac=k=>{try{const d=new Date(String(k).slice(0,10)+'T12:00');return Math.max(0,Math.min(1,(d-d0)/864e5/span))}catch(e){return 0}};
@@ -16166,7 +16183,7 @@ function treeXModel(){
       const i=Math.floor(x),t=x-i;const a=CUM[i],b=CUM[Math.min(CUM.length-1,i+1)];
       return (td.pts||0)*((a+(b-a)*t)/CUMT)};
     const sfAt=f=>{try{return treeStageFrac(ptsAt(f))}catch(e){return 0}};
-    const wMax=26,wMin=4;
+    const wMax=17,wMin=3;      // the sapling (owner's pick, 13 Sep), scaled to this width
     const halfAt=i=>{const v=load[Math.max(0,Math.min(nb-1,i))]/peak;return (wMin+(wMax-wMin)*Math.pow(v,0.75))/2};
     const smooth=i=>(halfAt(i-1)+halfAt(i)*2+halfAt(i+1))/4;
     const halfW=f=>{const u=Math.max(0,Math.min(1,f));
@@ -16182,12 +16199,14 @@ function treeXModel(){
     const domRamp=dom=>RAMP[dom==='reh'?'reh':dom==='run'?'run':(dom==='ride'||dom==='walk')?'ride':'lift'];
     let side=1;
     const branches=[];
-    /* sessions → branches; exercises → twigs; sets → leaves */
+    /* sessions → branches; exercises → twigs; sets → leaves. The model
+       keeps BASE parameters (where it leaves the trunk, its angle, its
+       base length); the drawing lays them out at the current zoom. */
     H.forEach(h=>{
       const k=hKey(h),f=frac(k),y0=yAt(f);
       side=(R()<0.82)?-side:side;
       const dom=isReh(h)?'reh':'lift';
-      const exs=[];const order=[];
+      const exs={};const order=[];
       (h.log||[]).forEach((l,i)=>{if(!(l.w||l.r||l.secs))return;const b=gBase(l.ex);
         if(!exs[b]){exs[b]={ex:b,sets:[]};order.push(b)}
         const rel=l.secs>0?(bestS[b]?Math.min(1,l.secs/bestS[b]):0.5):(l.w>0&&l.r>0&&best[b]?Math.min(1,e1rm(l.w,l.r,l.rpe)/best[b]):0.4);
@@ -16195,15 +16214,10 @@ function treeXModel(){
       const twigs=order.map(b=>exs[b]);
       const nSets=twigs.reduce((a,t)=>a+t.sets.length,0);
       if(!nSets)return;
-      const len=26+Math.min(96,nSets*4.2);
+      const len=24+Math.min(90,nSets*3.6+twigs.length*4);
       const ang=(16+R()*26)*Math.PI/180;
-      const x0=tx(f)+side*halfW(f)*0.9;
-      const x1=x0+side*Math.cos(ang)*len,y1=y0-Math.sin(ang)*len;
-      const bow=(R()-0.4)*0.6;
-      const mx=x0+side*Math.cos(ang)*len*(0.5+bow*0.4),my=y0-Math.sin(ang)*len*(0.3-bow*0.4);
-      const sf=sfAt(f)+(R()-0.5)*0.4;
       const ton=(h.log||[]).reduce((a,l)=>a+((l.w>0&&l.r>0)?l.w*l.r:0),0);
-      branches.push({kind:'sess',id:String(h.id),k:k,f:f,y:y0,x0:x0,x1:x1,y1:y1,mx:mx,my:my,side:side,ang:ang,len:len,dom:dom,sf:sf,
+      branches.push({kind:'sess',id:String(h.id),k:k,f:f,y:y0,x0:tx(f)+side*halfW(f)*0.9,side:side,ang:ang,len:len,bow:(R()-0.4)*0.6,dom:dom,sf:sfAt(f)+(R()-0.5)*0.4,
         title:h.dayTitle||(dom==='reh'?'Rehab':'Session'),sets:nSets,ton:ton,minutes:h.minutes||0,live:(typeof sessionLive==='function')?sessionLive(h):false,twigs:twigs})});
     /* runs, rides, walks → branches of kilometre leaves */
     R9.forEach(r=>{
@@ -16212,13 +16226,9 @@ function treeXModel(){
       const isRun=(typeof isRunType==='function')?isRunType(r.type):true;
       const dom=isRun?'run':(r.type==='ride'?'ride':'walk');
       const km=Math.max(0,+r.km||0);
-      const len=(dom==='walk'?16:26)+Math.min(120,km*(dom==='ride'?2.2:3.4));
+      const len=(dom==='walk'?16:24)+Math.min(110,km*(dom==='ride'?2.0:3.2));
       const ang=(14+R()*24)*Math.PI/180;
-      const x0=tx(f)+side*halfW(f)*0.9;
-      const x1=x0+side*Math.cos(ang)*len,y1=y0-Math.sin(ang)*len;
-      const bow=(R()-0.4)*0.6;
-      const mx=x0+side*Math.cos(ang)*len*(0.5+bow*0.4),my=y0-Math.sin(ang)*len*(0.3-bow*0.4);
-      branches.push({kind:'run',id:String(r.id||k+':'+km),k:k,f:f,y:y0,x0:x0,x1:x1,y1:y1,mx:mx,my:my,side:side,ang:ang,len:len,dom:dom,sf:sfAt(f)+(R()-0.5)*0.4,
+      branches.push({kind:'run',id:String(r.id||k+':'+km),k:k,f:f,y:y0,x0:tx(f)+side*halfW(f)*0.9,side:side,ang:ang,len:len,bow:(R()-0.4)*0.6,dom:dom,sf:sfAt(f)+(R()-0.5)*0.4,
         km:km,mins:+r.mins||0,hr:+r.hr||0,type:r.type||'',leaves:Math.min(45,Math.max(1,Math.round(km))),run:r})});
     /* finds → blossoms on stems off the trunk */
     const ORDR={common:0,uncommon:1,rare:2,epic:3};
@@ -16236,7 +16246,7 @@ function treeXModel(){
       const stem=16+rank*4+Math.min(120,(n-1)*2.4);
       const x0=tx(f)+sd*halfW(f)*0.8,y0=yAt(f);
       return{id:x.id,k:k,f:f,rank:rank,rar:x.rar,t:x.t,tag:x.tag||'',isNew:!seen[x.id],
-        x0:x0,y0:y0,x1:x0+sd*Math.cos(a)*stem,y1:y0-Math.sin(a)*stem,side:sd}});
+        x0:x0,y0:y0,a:a,stem:stem,x1:x0+sd*Math.cos(a)*stem,y1:y0-Math.sin(a)*stem,side:sd}});
     let scar=null,phases=[];
     try{const a=S.acl||{};
       if(a.on&&a.date&&a.date>=first)scar={f:frac(a.date),k:a.date};
@@ -16246,97 +16256,144 @@ function treeXModel(){
     const setsN=branches.reduce((a,b)=>a+(b.sets||0),0);
     const m={stamp:stamp,empty:false,first:first,last:last,span:span,W:TX_W,H:Hh,groundY:groundY,topY:topY,
       yAt:yAt,tx:tx,halfW:halfW,sfAt:sfAt,frac:frac,load:load,nb:nb,branches:branches,blossoms:blossoms,scar:scar,phases:phases,
-      sessions:sessions,runs:runs,sets:setsN,finds:bank.length,newN:newN,domRamp:domRamp};
+      sessions:sessions,runs:runs,sets:setsN,finds:bank.length,newN:newN,domRamp:domRamp,folded:folded,from:from,firstEver:days[0]};
     S._txModel=m;return m}
   catch(e){oops('treeXModel',e);return{stamp:'err',empty:true,sessions:0,runs:0,finds:0}}}
 function txCol(m,dom,sf,k){return treeRampCol(m.domRamp(dom),Math.min(6,Math.max(0,sf+(k||0))))}
 function txQ(x0,y0,mx,my,x1,y1){return 'M'+x0.toFixed(1)+' '+y0.toFixed(1)+' Q'+mx.toFixed(1)+' '+my.toFixed(1)+' '+x1.toFixed(1)+' '+y1.toFixed(1)}
 function txOnQ(x0,y0,mx,my,x1,y1,t){const u=1-t;return[u*u*x0+2*u*t*mx+t*t*x1,u*u*y0+2*u*t*my+t*t*y1]}
-function treeXSvg(m){
+/* ZOOM SPREADS, IT DOES NOT FATTEN (owner, 14 Sep: "dots shouldn't be
+   enlarging at the same rate as the zoom, all it has to do is be
+   separated from other dots and branches enough to click easily").
+   Zooming re-lays the tree out: every position scales with the zoom
+   and branches and twigs stretch a little MORE than that, so the gaps
+   between things grow; a leaf's radius grows only as the cube-ish root
+   of the zoom, so at 6× a leaf is under twice its size while the space
+   around it is six times. During a pinch the canvas is scaled by CSS
+   (fast); the moment the fingers lift it is redrawn at the new zoom. */
+function txZ(){return Math.max(1,Math.min(6,+S.txZoom||1))}
+function treeXSvg(m,zIn){
   try{
     if(!m||m.empty)return '';
-    if(S._txSvg&&S._txSvg.stamp===m.stamp)return S._txSvg.svg;
+    const z=Math.max(1,Math.min(6,+zIn||txZ()));
+    const key=m.stamp+'@'+z;
+    if(S._txSvg&&S._txSvg.key===key)return S._txSvg.svg;
     const o=[];
-    const R=seedRand('explorer-draw:'+m.first+':'+m.branches.length);
     const climb=TREE_RAMP.m.climb;
-    /* month ticks, every month, years heavier */
+    const SP=Math.pow(z,1.15);          // branch spread
+    const SPT=Math.pow(z,1.25);         // twig spread
+    const G=Math.pow(z,0.35);           // dot growth
+    const SW=Math.pow(z,0.45);          // stroke growth
+    const FS=Math.pow(z,0.25);          // text growth
+    const X=x=>x*z,Y=y=>y*z;
+    const W=m.W*z,Hh=m.H*z,groundY=Y(m.groundY),topY=Y(m.topY);
+    const f1=v=>v.toFixed(1);
+    /* month ticks */
     (function(){const d=new Date(m.first+'T12:00');d.setDate(1);d.setMonth(d.getMonth()+1);
       const MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];let guard=0;
       while(guard++<400){const k=dayKey(d);if(k>m.last)break;
-        const y=m.yAt(m.frac(k)),jan=d.getMonth()===0;
-        o.push('<line x1="10" y1="'+y.toFixed(1)+'" x2="'+(jan?26:18)+'" y2="'+y.toFixed(1)+'" stroke="var(--faint)" stroke-width="'+(jan?1.2:0.7)+'" opacity="'+(jan?.7:.4)+'"/>'+
-          '<text x="30" y="'+(y+3).toFixed(1)+'" font-size="'+(jan?9:7.5)+'" fill="var(--faint)" opacity="'+(jan?.9:.6)+'" font-family="-apple-system,system-ui,sans-serif">'+MON[d.getMonth()]+(jan?' '+d.getFullYear():'')+'</text>');
+        const y=Y(m.yAt(m.frac(k))),jan=d.getMonth()===0;
+        o.push('<line x1="10" y1="'+f1(y)+'" x2="'+(jan?26:18)+'" y2="'+f1(y)+'" stroke="var(--faint)" stroke-width="'+(jan?1.2:0.7)+'" opacity="'+(jan?.7:.4)+'"/>'+
+          '<text x="30" y="'+f1(y+3)+'" font-size="'+f1((jan?9:7.5)*FS)+'" fill="var(--faint)" opacity="'+(jan?.9:.6)+'" font-family="-apple-system,system-ui,sans-serif">'+MON[d.getMonth()]+(jan?' '+d.getFullYear():'')+'</text>');
         d.setMonth(d.getMonth()+1)}})();
-    o.push('<line x1="40" y1="'+m.groundY+'" x2="'+(m.W-40)+'" y2="'+m.groundY+'" stroke="var(--line)" stroke-width="1" opacity=".6"/>'+
-      '<text x="'+(m.W/2)+'" y="'+(m.groundY+18)+'" text-anchor="middle" font-size="8" fill="var(--faint)" opacity=".8" font-family="-apple-system,system-ui,sans-serif">'+esc(fmtDate(m.first+'T12:00'))+' · THE FIRST LOGGED DAY</text>'+
-      '<text x="'+(m.W/2)+'" y="'+(m.topY-30)+'" text-anchor="middle" font-size="8" fill="var(--faint)" opacity=".8" font-family="-apple-system,system-ui,sans-serif">TODAY</text>');
+    const groundLabel=m.folded?esc(fmtDate(m.first+'T12:00'))+' · '+m.folded+' EARLIER '+(m.folded===1?'ENTRY':'ENTRIES')+' FOLDED INTO THE GROUND':esc(fmtDate(m.first+'T12:00'))+' · THE FIRST LOGGED DAY';
+    o.push('<line x1="40" y1="'+f1(groundY)+'" x2="'+f1(W-40)+'" y2="'+f1(groundY)+'" stroke="var(--line)" stroke-width="1" opacity=".6"/>'+
+      '<text x="'+f1(W/2)+'" y="'+f1(groundY+18)+'" text-anchor="middle" font-size="'+f1(8*FS)+'" fill="var(--faint)" opacity=".8" font-family="-apple-system,system-ui,sans-serif">'+groundLabel+'</text>'+
+      '<text x="'+f1(W/2)+'" y="'+f1(topY-30)+'" text-anchor="middle" font-size="'+f1(8*FS)+'" fill="var(--faint)" opacity=".8" font-family="-apple-system,system-ui,sans-serif">TODAY</text>');
     /* roots, for the weeks that held */
-    (function(){const n=Math.min(9,3+Math.floor(((typeof treeData==='function'?treeData().weeks:0)||0)/2));
-      for(let i=0;i<n;i++){const dir=(i%2?1:-1)*(0.6+R()*0.7),a0=(6+R()*26)*Math.PI/180,l0=18+R()*22;
+    (function(){const R=seedRand('explorer-roots:'+m.first);
+      const n=Math.min(9,3+Math.floor(((typeof treeData==='function'?treeData().weeks:0)||0)/2));
+      for(let i=0;i<n;i++){const dir=(i%2?1:-1)*(0.6+R()*0.7),a0=(6+R()*26)*Math.PI/180,l0=(18+R()*22)*z;
         (function dig(px,py,ang,ln,depth,wid,op){if(depth>2||ln<4)return;
-          const nx=px+dir*Math.cos(ang)*ln,ny=Math.min(m.H-2,py+Math.sin(ang)*ln);
-          o.push('<path d="'+txQ(px,py,px+dir*Math.cos(ang)*ln*0.5,py+Math.sin(ang)*ln*0.22,nx,ny)+'" stroke="'+climb[2]+'" stroke-width="'+wid.toFixed(2)+'" fill="none" opacity="'+op.toFixed(2)+'" stroke-linecap="round"/>');
+          const nx=px+dir*Math.cos(ang)*ln,ny=Math.min(Hh-2,py+Math.sin(ang)*ln);
+          o.push('<path d="'+txQ(px,py,px+dir*Math.cos(ang)*ln*0.5,py+Math.sin(ang)*ln*0.22,nx,ny)+'" stroke="'+climb[2]+'" stroke-width="'+f1(wid*SW)+'" fill="none" opacity="'+op.toFixed(2)+'" stroke-linecap="round"/>');
           const kids=depth===0?2:(R()<0.45?1:2);
           for(let k=0;k<kids;k++)dig(nx,ny,ang+((k?1:-1)*(9+R()*22))*Math.PI/180,ln*(0.55+R()*0.2),depth+1,Math.max(0.4,wid*0.6),op*0.68)
-        })(m.tx(0)+dir*3,m.groundY+1,a0,l0,0,2+R()*0.6,0.34)}})();
+        })(X(m.tx(0))+dir*3,groundY+1,a0,l0,0,2+R()*0.6,0.34)}})();
     /* the trunk: width is work, colour climbs the stage ladder */
     (function(){const NT=Math.max(40,m.nb*4),L=[],Rt=[];
-      L.push([m.tx(0)-m.halfW(0),m.groundY+5]);Rt.push([m.tx(0)+m.halfW(0),m.groundY+5]);
-      for(let i=0;i<NT;i++){const u=i/(NT-1),f=u*0.985,y=m.yAt(f),xc=m.tx(f),h=m.halfW(f);L.push([xc-h,y]);Rt.push([xc+h,y])}
+      L.push([X(m.tx(0))-m.halfW(0)*SW,groundY+5]);Rt.push([X(m.tx(0))+m.halfW(0)*SW,groundY+5]);
+      for(let i=0;i<NT;i++){const u=i/(NT-1),f=u*0.985,y=Y(m.yAt(f)),xc=X(m.tx(f)),h=m.halfW(f)*SW;L.push([xc-h,y]);Rt.push([xc+h,y])}
       const NS=20;let sv='';for(let i=0;i<=NS;i++){const f=i/NS;sv+='<stop offset="'+f.toFixed(3)+'" stop-color="'+treeRampCol(climb,m.sfAt(f))+'"/>'}
-      o.push('<defs><linearGradient id="txtr" gradientUnits="userSpaceOnUse" x1="0" y1="'+m.groundY+'" x2="0" y2="'+m.topY+'">'+sv+'</linearGradient></defs>');
-      o.push('<path data-tp="trunk" d="M'+L.map(p=>p[0].toFixed(1)+' '+p[1].toFixed(1)).join(' L')+' L'+Rt.slice().reverse().map(p=>p[0].toFixed(1)+' '+p[1].toFixed(1)).join(' L')+' Z" fill="url(#txtr)" opacity=".55"/>');
+      o.push('<defs><linearGradient id="txtr" gradientUnits="userSpaceOnUse" x1="0" y1="'+f1(groundY)+'" x2="0" y2="'+f1(topY)+'">'+sv+'</linearGradient></defs>');
+      o.push('<path data-tp="trunk" d="M'+L.map(p=>f1(p[0])+' '+f1(p[1])).join(' L')+' L'+Rt.slice().reverse().map(p=>f1(p[0])+' '+f1(p[1])).join(' L')+' Z" fill="url(#txtr)" opacity=".55"/>');
       const cut=Math.round(L.length*0.8);
-      o.push('<path d="M'+L.slice(0,cut).map(p=>p[0].toFixed(1)+' '+p[1].toFixed(1)).join(' L')+'" fill="none" stroke="url(#txtr)" stroke-width="1.2" opacity=".6" stroke-linecap="round"/>'+
-        '<path d="M'+Rt.slice(0,cut).map(p=>p[0].toFixed(1)+' '+p[1].toFixed(1)).join(' L')+'" fill="none" stroke="url(#txtr)" stroke-width="1.2" opacity=".45" stroke-linecap="round"/>')})();
-    if(m.scar){const y=m.yAt(m.scar.f),sx=m.tx(m.scar.f);
-      o.push('<line data-tp="scar" x1="'+(sx-30).toFixed(1)+'" y1="'+y.toFixed(1)+'" x2="'+(sx+30).toFixed(1)+'" y2="'+y.toFixed(1)+'" stroke="var(--faint)" stroke-width="1.4" opacity=".6" stroke-linecap="round"/>'+
-        '<text x="'+(sx+34).toFixed(1)+'" y="'+(y+3).toFixed(1)+'" font-size="7.5" fill="var(--faint)" opacity=".8" font-family="-apple-system,system-ui,sans-serif">'+esc(fmtDate(m.scar.k+'T12:00'))+' · surgery / injury</text>')}
-    /* branches */
+      o.push('<path d="M'+L.slice(0,cut).map(p=>f1(p[0])+' '+f1(p[1])).join(' L')+'" fill="none" stroke="url(#txtr)" stroke-width="'+f1(1.2*SW)+'" opacity=".6" stroke-linecap="round"/>'+
+        '<path d="M'+Rt.slice(0,cut).map(p=>f1(p[0])+' '+f1(p[1])).join(' L')+'" fill="none" stroke="url(#txtr)" stroke-width="'+f1(1.2*SW)+'" opacity=".45" stroke-linecap="round"/>')})();
+    if(m.scar){const y=Y(m.yAt(m.scar.f)),sx=X(m.tx(m.scar.f));
+      o.push('<line data-tp="scar" x1="'+f1(sx-30*z)+'" y1="'+f1(y)+'" x2="'+f1(sx+30*z)+'" y2="'+f1(y)+'" stroke="var(--faint)" stroke-width="1.4" opacity=".6" stroke-linecap="round"/>'+
+        '<text x="'+f1(sx+34*z)+'" y="'+f1(y+3)+'" font-size="'+f1(7.5*FS)+'" fill="var(--faint)" opacity=".8" font-family="-apple-system,system-ui,sans-serif">'+esc(fmtDate(m.scar.k+'T12:00'))+' · surgery / injury</text>')}
+    /* branches: the same forking recursion the card uses — a short limb
+       that divides, twigs that divide again, leaves clustering toward the
+       tips — so the page reads as the tree the owner chose, not a chart */
+    const leafEl=(lx,ly,r,c,op,v,pr)=>'<circle data-a="txTap" data-v="'+esc(v)+'" data-tp="leaf" pointer-events="all" stroke="transparent" stroke-width="'+f1(7*G)+'" cx="'+f1(lx)+'" cy="'+f1(ly)+'" r="'+r.toFixed(2)+'" fill="'+c+'" opacity="'+op.toFixed(2)+'"/>'+
+      (pr?'<circle cx="'+f1(lx)+'" cy="'+f1(ly)+'" r="'+(r+1.4*G).toFixed(2)+'" fill="none" stroke="#F0EEE6" stroke-width="'+f1(0.6*SW)+'" opacity=".8"/>':'');
     m.branches.forEach(b=>{
+      const R=seedRand('branch:'+b.id);
       const wood=txCol(m,b.dom,b.sf,0.2),twigC=txCol(m,b.dom,b.sf,0.9),leafC=txCol(m,b.dom,b.sf,1.9);
-      const bw=b.kind==='sess'?(1.4+Math.min(2.2,b.sets*0.09)):(1.2+Math.min(2.0,b.km*0.06));
+      const bw=(b.kind==='sess'?(1.4+Math.min(2.2,b.sets*0.09)):(1.2+Math.min(2.0,b.km*0.06)))*SW;
       const op=b.dom==='walk'?'.5':'.9';
-      o.push('<path data-a="txTap" data-v="'+esc(b.kind+':'+b.id)+'" data-tp="branch" pointer-events="all" d="'+txQ(b.x0,b.y,b.mx,b.my,b.x1,b.y1)+'" stroke="'+wood+'" stroke-width="'+bw.toFixed(2)+'" fill="none" opacity="'+op+'" stroke-linecap="round"/>');
+      const L=b.len*SP,x0=X(b.x0),y0=Y(b.y);
+      const x1=x0+b.side*Math.cos(b.ang)*L,y1=y0-Math.sin(b.ang)*L;
+      const mx=x0+b.side*Math.cos(b.ang)*L*(0.5+b.bow*0.4),my=y0-Math.sin(b.ang)*L*(0.3-b.bow*0.4);
+      o.push('<path data-a="txTap" data-v="'+esc(b.kind+':'+b.id)+'" data-tp="branch" pointer-events="all" d="'+txQ(x0,y0,mx,my,x1,y1)+'" stroke="'+wood+'" stroke-width="'+f1(bw)+'" fill="none" opacity="'+op+'" stroke-linecap="round"/>');
+      /* a twig that divides: returns the segments so leaves can sit on
+         every part of it, clustering toward the tips */
+      const grow=(px,py,ang,ln,depth,wid,segs)=>{
+        const nx=px+b.side*Math.cos(ang)*ln,ny=py-Math.sin(ang)*ln;
+        const cx=px+b.side*Math.cos(ang)*ln*0.5,cy=py-Math.sin(ang)*ln*0.62;
+        o.push('<path data-tp="twig" d="'+txQ(px,py,cx,cy,nx,ny)+'" stroke="'+twigC+'" stroke-width="'+f1(wid)+'" fill="none" opacity="'+(0.85-depth*0.12).toFixed(2)+'" stroke-linecap="round"/>');
+        segs.push([px,py,cx,cy,nx,ny]);
+        if(depth<1&&ln>14*z){const kids=R()<0.7?2:1;
+          for(let k=0;k<kids;k++)grow(nx,ny,ang+((k?1:-1)*(14+R()*24))*Math.PI/180*(kids===1?(R()-0.5):1),ln*(0.5+R()*0.25),depth+1,Math.max(0.35,wid*0.62),segs)}
+        return segs};
       if(b.kind==='sess'){
         const n=b.twigs.length;
         b.twigs.forEach((tw,j)=>{
-          const t=(j+1)/(n+1);const P=txOnQ(b.x0,b.y,b.mx,b.my,b.x1,b.y1,t);
+          const t=0.28+0.66*(j+1)/(n+1);const P=txOnQ(x0,y0,mx,my,x1,y1,t);
           const flip=(j%2?1:-1);
-          const a2=b.ang+flip*(30+R()*22)*Math.PI/180;
-          const tl=10+Math.min(34,tw.sets.length*4.5);
-          const ex=P[0]+b.side*Math.cos(a2)*tl,ey=P[1]-Math.sin(a2)*tl;
-          o.push('<path data-tp="twig" d="M'+P[0].toFixed(1)+' '+P[1].toFixed(1)+' L'+ex.toFixed(1)+' '+ey.toFixed(1)+'" stroke="'+twigC+'" stroke-width=".9" fill="none" opacity=".8" stroke-linecap="round"/>');
+          const a2=b.ang+flip*(26+R()*24)*Math.PI/180;
+          const tl=(9+Math.min(30,tw.sets.length*3.8))*SPT;
+          const segs=grow(P[0],P[1],a2,tl,0,0.95*SW,[]);
           const mS=tw.sets.length;
-          tw.sets.forEach((st,i)=>{const u=(i+1)/(mS+1);
-            const lx=P[0]+(ex-P[0])*u+(R()-0.5)*2.4,ly=P[1]+(ey-P[1])*u+(R()-0.5)*2.4;
-            const r=1.5+2.6*st.rel;
-            o.push('<circle data-a="txTap" data-v="'+esc('set:'+b.id+':'+st.i)+'" data-tp="leaf" pointer-events="all" stroke="transparent" stroke-width="7" cx="'+lx.toFixed(1)+'" cy="'+ly.toFixed(1)+'" r="'+r.toFixed(2)+'" fill="'+leafC+'" opacity="'+(0.6+0.35*st.rel).toFixed(2)+'"/>'+
-              (st.pr?'<circle cx="'+lx.toFixed(1)+'" cy="'+ly.toFixed(1)+'" r="'+(r+1.4).toFixed(2)+'" fill="none" stroke="#F0EEE6" stroke-width=".6" opacity=".8"/>':''))})})}
+          /* leaves along the whole twig, later sets further out */
+          tw.sets.forEach((st,i)=>{const u=0.22+0.78*(i+1)/(mS+1);
+            const segI=Math.min(segs.length-1,Math.floor(u*segs.length*0.999));
+            const sg=segs[segI];const uu=(u*segs.length)-segI;
+            const Q=txOnQ(sg[0],sg[1],sg[2],sg[3],sg[4],sg[5],Math.min(1,uu));
+            const lx=Q[0]+(R()-0.5)*2.4*G,ly=Q[1]+(R()-0.5)*2.4*G;
+            o.push(leafEl(lx,ly,(1.5+2.6*st.rel)*G,leafC,0.6+0.35*st.rel,'set:'+b.id+':'+st.i,st.pr))})})}
       else{
+        const segs=[[x0,y0,mx,my,x1,y1]];
+        if(b.len>40)grow(x1,y1,b.ang+(R()-0.5)*0.6,L*0.42,1,Math.max(0.5,bw*0.6),segs);
         const n=b.leaves;
-        for(let i=0;i<n;i++){const u=(i+0.6)/(n+0.2);const P=txOnQ(b.x0,b.y,b.mx,b.my,b.x1,b.y1,u);
-          const perp=(i%2?1:-1)*(2.2+R()*1.6);
-          const lx=P[0]-Math.sin(b.ang)*perp*b.side*0.3+(R()-0.5)*1.2,ly=P[1]-Math.cos(b.ang)*perp;
-          const r=b.dom==='walk'?1.3:(1.9+(b.hr>0?0.5:0));
-          o.push('<circle data-a="txTap" data-v="'+esc(b.kind+':'+b.id)+'" data-tp="leaf" pointer-events="all" stroke="transparent" stroke-width="7" cx="'+lx.toFixed(1)+'" cy="'+ly.toFixed(1)+'" r="'+r.toFixed(2)+'" fill="'+leafC+'" opacity="'+(b.dom==='walk'?'.5':'.8')+'"/>')}}});
+        for(let i=0;i<n;i++){const u=(i+0.6)/(n+0.2);
+          const segI=Math.min(segs.length-1,Math.floor(u*segs.length*0.999));
+          const sg=segs[segI];const uu=(u*segs.length)-segI;
+          const Q=txOnQ(sg[0],sg[1],sg[2],sg[3],sg[4],sg[5],Math.min(1,uu));
+          const perp=(i%2?1:-1)*(2.2+R()*1.6)*G;
+          const lx=Q[0]-Math.sin(b.ang)*perp*b.side*0.3,ly=Q[1]-Math.cos(b.ang)*perp;
+          const r=(b.dom==='walk'?1.3:(1.9+(b.hr>0?0.5:0)))*G;
+          o.push(leafEl(lx,ly,r,leafC,b.dom==='walk'?0.5:0.8,b.kind+':'+b.id,false))}}});
     /* phases cleared */
-    m.phases.slice(0,8).forEach(ph=>{const y=m.yAt(ph.f),x=m.tx(ph.f)+(ph.p%2?1:-1)*(m.halfW(ph.f)+6);
-      o.push('<circle data-tp="phase" cx="'+x.toFixed(1)+'" cy="'+y.toFixed(1)+'" r="3.4" fill="#C96442" opacity=".92"/>'+
-        '<text x="'+(x+(ph.p%2?7:-7)).toFixed(1)+'" y="'+(y+3).toFixed(1)+'" text-anchor="'+(ph.p%2?'start':'end')+'" font-size="7" fill="#C96442" opacity=".9" font-family="-apple-system,system-ui,sans-serif">phase '+ph.p+'</text>')});
+    m.phases.slice(0,8).forEach(ph=>{const y=Y(m.yAt(ph.f)),x=X(m.tx(ph.f))+(ph.p%2?1:-1)*(m.halfW(ph.f)*SW+6*G);
+      o.push('<circle data-tp="phase" cx="'+f1(x)+'" cy="'+f1(y)+'" r="'+f1(3.4*G)+'" fill="#C96442" opacity=".92"/>'+
+        '<text x="'+f1(x+(ph.p%2?7:-7)*G)+'" y="'+f1(y+3)+'" text-anchor="'+(ph.p%2?'start':'end')+'" font-size="'+f1(7*FS)+'" fill="#C96442" opacity=".9" font-family="-apple-system,system-ui,sans-serif">phase '+ph.p+'</text>')});
     /* blossoms: the rarity ladder, the same constant every surface reads */
     m.blossoms.forEach(bl=>{
-      const c=rarityOf(bl.rar)[1],r=[2.6,3.2,3.9,4.8][bl.rank]||2.6;
+      const c=rarityOf(bl.rar)[1],r=([2.6,3.2,3.9,4.8][bl.rank]||2.6)*G;
       const focus=S.treeFocus&&S.treeFocus===bl.id;
-      o.push('<path data-tp="stem" d="M'+bl.x0.toFixed(1)+' '+bl.y0.toFixed(1)+' L'+bl.x1.toFixed(1)+' '+bl.y1.toFixed(1)+'" stroke="'+c+'" stroke-width=".8" opacity=".55" stroke-linecap="round"/>'+
-        (bl.rank>=2?'<circle cx="'+bl.x1.toFixed(1)+'" cy="'+bl.y1.toFixed(1)+'" r="'+(r*2.2).toFixed(1)+'" fill="'+c+'" opacity=".12"/>':'')+
-        (bl.isNew?'<circle class="tx-new" cx="'+bl.x1.toFixed(1)+'" cy="'+bl.y1.toFixed(1)+'" r="'+(r+4).toFixed(1)+'" fill="none" stroke="'+c+'" stroke-width="1"/>':'')+
-        '<circle data-a="txTap" data-v="'+esc('find:'+bl.id)+'" data-tp="bloom" pointer-events="all" stroke="transparent" stroke-width="8" id="'+esc('tx-'+bl.id.replace(/[^A-Za-z0-9_-]/g,'_'))+'" cx="'+bl.x1.toFixed(1)+'" cy="'+bl.y1.toFixed(1)+'" r="'+r.toFixed(1)+'" fill="'+c+'" opacity="'+(bl.rank>=2?'.97':'.85')+'"/>'+
-        (bl.rank>=2?'<circle cx="'+bl.x1.toFixed(1)+'" cy="'+bl.y1.toFixed(1)+'" r="'+(r+2.2).toFixed(1)+'" fill="none" stroke="'+c+'" stroke-width=".6" opacity=".45"/>':'')+
-        (focus?'<circle class="tx-new" cx="'+bl.x1.toFixed(1)+'" cy="'+bl.y1.toFixed(1)+'" r="'+(r+9).toFixed(1)+'" fill="none" stroke="'+c+'" stroke-width="1.4"/>'+
-          '<text x="'+(bl.x1+bl.side*(r+12)).toFixed(1)+'" y="'+(bl.y1+3).toFixed(1)+'" text-anchor="'+(bl.side>0?'start':'end')+'" font-size="8" fill="'+c+'" font-family="-apple-system,system-ui,sans-serif" style="paint-order:stroke;stroke:#1F1E1D;stroke-width:3px">'+esc(String(bl.t).slice(0,34))+'</text>':''))});
-    const svg='<svg viewBox="0 0 '+m.W+' '+m.H+'" style="width:100%;height:auto;display:block;overflow:visible">'+o.join('')+'</svg>';
-    S._txSvg={stamp:m.stamp,svg:svg};
+      const sx=X(bl.x0),sy=Y(bl.y0),stem=bl.stem*SP;
+      const bx=sx+bl.side*Math.cos(bl.a)*stem,by=sy-Math.sin(bl.a)*stem;
+      o.push('<path data-tp="stem" d="M'+f1(sx)+' '+f1(sy)+' L'+f1(bx)+' '+f1(by)+'" stroke="'+c+'" stroke-width="'+f1(0.8*SW)+'" opacity=".55" stroke-linecap="round"/>'+
+        (bl.rank>=2?'<circle cx="'+f1(bx)+'" cy="'+f1(by)+'" r="'+f1(r*2.2)+'" fill="'+c+'" opacity=".12"/>':'')+
+        (bl.isNew?'<circle class="tx-new" cx="'+f1(bx)+'" cy="'+f1(by)+'" r="'+f1(r+4*G)+'" fill="none" stroke="'+c+'" stroke-width="'+f1(1*SW)+'"/>':'')+
+        '<circle data-a="txTap" data-v="'+esc('find:'+bl.id)+'" data-tp="bloom" pointer-events="all" stroke="transparent" stroke-width="'+f1(8*G)+'" id="'+esc('tx-'+bl.id.replace(/[^A-Za-z0-9_-]/g,'_'))+'" cx="'+f1(bx)+'" cy="'+f1(by)+'" r="'+f1(r)+'" fill="'+c+'" opacity="'+(bl.rank>=2?'.97':'.85')+'"/>'+
+        (bl.rank>=2?'<circle cx="'+f1(bx)+'" cy="'+f1(by)+'" r="'+f1(r+2.2*G)+'" fill="none" stroke="'+c+'" stroke-width="'+f1(0.6*SW)+'" opacity=".45"/>':'')+
+        (focus?'<circle class="tx-new" cx="'+f1(bx)+'" cy="'+f1(by)+'" r="'+f1(r+9*G)+'" fill="none" stroke="'+c+'" stroke-width="'+f1(1.4*SW)+'"/>'+
+          '<text x="'+f1(bx+bl.side*(r+12*G))+'" y="'+f1(by+3)+'" text-anchor="'+(bl.side>0?'start':'end')+'" font-size="'+f1(8*FS)+'" fill="'+c+'" font-family="-apple-system,system-ui,sans-serif" style="paint-order:stroke;stroke:#1F1E1D;stroke-width:3px">'+esc(String(bl.t).slice(0,34))+'</text>':''))});
+    const svg='<svg viewBox="0 0 '+f1(W)+' '+f1(Hh)+'" style="width:100%;height:auto;display:block;overflow:visible">'+o.join('')+'</svg>';
+    S._txSvg={key:key,svg:svg};
     return svg}
   catch(e){oops('treeXSvg',e);return ''}}
 function treeXLegend(){
@@ -16363,7 +16420,12 @@ function viewTree(){
         '<p style="color:var(--dim);font-size:12.5px;line-height:1.6;margin-top:6px">The tree draws itself from what you log: every session is a branch, every set a leaf, every finding a blossom. Log a session and come back.</p></div></div>'}
     h+='<p class="mono" style="padding:6px 14px 0;font-size:9.5px;letter-spacing:.06em;color:var(--faint)">'+
       m.sessions+' SESSION'+(m.sessions===1?'':'S')+' · '+m.sets+' SET'+(m.sets===1?'':'S')+' · '+m.runs+' RUN'+(m.runs===1?'':'S')+' · '+m.finds+' FIND'+(m.finds===1?'':'S')+
-      (m.newN?' · <span style="color:var(--green)">'+m.newN+' NEW</span>':'')+'</p>';
+      (m.newN?' · <span style="color:var(--green)">'+m.newN+' NEW</span>':'')+
+      (m.folded?' · '+m.folded+' FOLDED':'')+'</p>';
+    /* the window: fold the old years into the ground, nothing deleted */
+    {const cur=(S.prof&&S.prof.treeFrom)||'all';
+     const opts=[['all','All'],['this','This year'],['year','12 months']].concat((S.acl&&S.acl.date)?[['scar','Since surgery']]:[]);
+     h+='<div class="row" style="gap:6px;padding:8px 14px 0">'+opts.map(x=>'<button data-a="treeFrom" data-v="'+x[0]+'" class="pill" style="flex:1;text-align:center;font-size:11px;padding:7px 4px;'+(cur===x[0]?'border-color:var(--text);color:var(--text);background:var(--raised)':'color:var(--faint)')+'">'+x[1]+'</button>').join('')+'</div>'}
     if(S.treeLegend)h+='<div class="card" style="margin:10px 14px 0;padding:12px 14px">'+treeXLegend()+'</div>';
     h+='<div style="display:flex;align-items:center;gap:8px;padding:8px 14px 0">'+
       '<button data-a="treeZoom" data-v="out" class="btn" style="width:auto;padding:7px 13px;font-size:14px;color:var(--dim)">−</button>'+
@@ -16374,7 +16436,7 @@ function viewTree(){
       '<button data-a="findingsOpen" class="mono" style="font-size:9.5px;letter-spacing:.06em;color:var(--faint);border:1px solid var(--line);border-radius:9px;padding:6px 9px">AS A LIST</button></div>'+
       '<p style="color:var(--faint);font-size:10.5px;padding:5px 14px 0">Pinch to zoom, scroll up and down the years, tap any leaf.</p>'+
       '<div id="txwrap" style="margin-top:8px;height:calc(100dvh - 205px);overflow:auto;-webkit-overflow-scrolling:touch;touch-action:pan-x pan-y;position:relative">'+
-      '<div id="txinner" style="width:'+(100*z)+'%;margin:0 auto">'+treeXSvg(m)+'</div></div>';
+      '<div id="txinner" style="width:'+(100*z)+'%;margin:0 auto">'+treeXSvg(m,z)+'</div></div>';
     try{if(typeof deepReadyInfo==='function'&&deepReadyInfo())h+='<button data-a="deepGo" style="display:flex;align-items:center;gap:9px;margin:8px 14px 0;padding:10px 12px;width:calc(100% - 28px);text-align:left;background:var(--raised);border-radius:12px">'+
       '<span class="mono" style="color:var(--amber);font-size:9px;letter-spacing:.08em;flex:none">THIS WEEK’S READ</span><span style="flex:1;font-size:12px;color:var(--dim)">Ready. It becomes leaves too.</span><span class="mono" style="color:var(--amber);font-size:11px">›</span></button>'}catch(e){oops('treeX.read',e)}
     return h+'</div>'}
@@ -16390,7 +16452,7 @@ function treeXAfterRender(){
     if(S._txGoto){const id=S._txGoto;S._txGoto=null;
       const el=document.getElementById('tx-'+String(id).replace(/[^A-Za-z0-9_-]/g,'_'));
       if(el){const m=treeXModel();const cy=+el.getAttribute('cy')||0,cx=+el.getAttribute('cx')||0;
-        const sc=(inner.clientWidth||TX_W)/(m.W||TX_W);
+        const sc=(inner.clientWidth||TX_W)/((m.W||TX_W)*txZ());
         w.scrollTop=Math.max(0,cy*sc-w.clientHeight*0.45);w.scrollLeft=Math.max(0,cx*sc-w.clientWidth*0.5);
         S._txScroll={t:w.scrollTop,l:w.scrollLeft};return}}
     if(S._txScroll){w.scrollTop=S._txScroll.t;w.scrollLeft=S._txScroll.l}}
@@ -16421,8 +16483,11 @@ function treeXAfterRender(){
         inner.style.width=(100*zNext)+'%';
         const k=zNext/z0;
         wrap.scrollLeft=(sl0+fx)*k-fx;wrap.scrollTop=(st0+fy)*k-fy})},{passive:false});
-    const end=function(){if(!pinch)return;pinch=false;S.txZoom=Math.round(zNext*10)/10;
-      try{if(wrap)S._txScroll={t:wrap.scrollTop,l:wrap.scrollLeft}}catch(e){oops('txPinchEnd',e)}};
+    const end=function(){if(!pinch)return;pinch=false;const zq=Math.round(zNext*10)/10;
+      try{if(wrap)S._txScroll={t:wrap.scrollTop,l:wrap.scrollLeft}}catch(e){oops('txPinchEnd',e)}
+      /* the fingers lift: redraw at the new zoom so the spacing grows
+         and the dots do not — the CSS scale was only for the gesture */
+      if(zq!==S.txZoom){S.txZoom=zq;try{render()}catch(e){oops('txPinchRender',e)}}};
     document.addEventListener('touchend',end,{passive:true});
     document.addEventListener('touchcancel',end,{passive:true})}
   catch(e){oops('txPinch',e)}})();
@@ -27425,6 +27490,8 @@ function runAction(a,v,t,e){
     case 'treeZoom':{const z=Math.max(1,Math.min(6,+S.txZoom||1));
       S.txZoom=Math.round((v==='in'?Math.min(6,z*1.5):Math.max(1,z/1.5))*10)/10;render();break}
     case 'treeLegendTog':{S.treeLegend=!S.treeLegend;render();break}
+    case 'treeFrom':{S.prof=S.prof||{};S.prof.treeFrom=(v==='all')?null:v;try{lset(K_PROF,S.prof)}catch(e){oops('treeFrom',e)}
+      S._txModel=null;S._txSvg=null;S._txScroll=null;render();break}
     case 'txTap':{const s9=String(v||'');
       if(s9.indexOf('find:')===0){const id=s9.slice(5);
         try{const st=lget('training-collseen-v1',{})||{};st.ids=st.ids||{};if(!st.ids[id]){st.ids[id]=today();lset('training-collseen-v1',st)}}catch(e9){oops('txTap.seen',e9)}
