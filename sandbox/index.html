@@ -529,7 +529,26 @@ body.sesslive #hkPulse{top:calc(env(safe-area-inset-top) + 40px)}
    never assume the thing underneath is not one. */
 .sheet-bg{position:fixed;inset:0;z-index:70;display:flex;align-items:flex-end;justify-content:center;
   transform:translateZ(0)}
-.sheet-bg::before{content:'';position:absolute;inset:0;background:rgba(20,19,17,.74);
+/* ═══ A SCRIM IS OPAQUE OR IT IS DECORATION ═══════════════════════════
+   (owner, 15 Sep 2026, third report in three days: "you still haven't
+   fixed the pop ups going transparent when you touch them or move
+   exercises around".)
+
+   The two previous fixes were both real and both landed: the panel no
+   longer composites with the scrim (13 Sep), and the drag no longer
+   darkens on the way down (14 Sep). Neither touched the thing he was
+   actually looking at. THE SCRIM WAS 74% OPAQUE — a quarter see-through
+   BY DESIGN — and on a dark UI with bright numbers behind it, a quarter
+   is plenty to read a whole screen through.
+   The tell was already in the stylesheet: a special case existed to make
+   this opaque on session screens, because somebody had hit exactly this
+   and patched the one place it was worst. A general value that needs a
+   special case for the busiest screen is the wrong general value.
+   A sheet in this app is a full-attention surface. It hides the page
+   now, everywhere, and the special case is gone with it. The drag-to-
+   close still reveals the page as the finger pulls down, because that is
+   --scrim and the user is asking for it. */
+.sheet-bg::before{content:'';position:absolute;inset:0;background:var(--bg);
   opacity:var(--scrim,1);animation:bgFade .26s ease both}
 /* DRAGGING A SHEET DOWN MUST TAKE THE DARK WITH IT (owner-caught on
    video, 14 Sep 2026: "pop ups still becoming transparent when touching
@@ -546,7 +565,7 @@ body.sesslive #hkPulse{top:calc(env(safe-area-inset-top) + 40px)}
 /* over the SESSION the backdrop goes solid — the rest ring and the Skip
    rest button read straight through a 74% scrim and the two screens look
    printed on top of each other (owner-caught, 11 Sep) */
-body.sessview .sheet-bg::before{background:var(--bg)}
+/* the session special case is gone — every scrim is this now */
 /* a re-render while the sheet is already open must not replay the fade;
    a pseudo-element takes no inline style, so render() sets this class */
 .sheet-bg.nofade::before{animation:none}
@@ -1032,7 +1051,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='40a0ea';  // stamped by tools/build.py with the content hash
+const BUILD_ID='930a04';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -29767,7 +29786,10 @@ function render(){
        all of that reads clean through the sheet and the two screens look
        printed on top of each other. Stacking was never wrong; opacity
        was. */
-    try{document.body.classList.toggle('sessview',onSessionScreen())}catch(e){oops('sessview',e)}
+    /* the sessview class existed for ONE rule — an opaque scrim on the
+       session screen — and that is every scrim now, so nothing reads it.
+       A class nobody styles is dead weight that the next person has to
+       work out the purpose of. */
     /* the page behind a sheet does not change when the sheet opens —
        rebuilding it anyway repainted the whole DOM (a visible "refresh"
        on-device). Identical HTML is left alone. */
