@@ -775,7 +775,15 @@ function sessNow(s){
    becomes the next set's target. */
 function buildSets(prog,di,wk){const d=prog.days[di];if(!d)return[];const out=[];let n=0;
   d.exercises.forEach(ex=>{const l=setsForWeek(ex,wk);if(!l||!l.length)return;n++;
-    const a=adjOf(prog,ex.name);
+    let a=adjOf(prog,ex.name);
+    /* THE SAFETY NET, AT THE POINT THE PRESCRIPTION IS MADE (Dafydd's
+       skullcrusher, 15 Sep 2026 — see adjCap in 01-rpe-regulation). The
+       written weight is untouched; Allena's own addition may never carry
+       anyone more than a step past what they have actually lifted. Here,
+       not on the screen that shows it, because a target is read by the set
+       screen, the preview, the week board, the coach and the watch. */
+    try{const w0=(l.find(x=>x&&x.w!=null)||{}).w;
+      if(typeof adjCap==='function')a=adjCap(prog,ex.name,+w0||0,a)}catch(e9){oops('buildSets.cap',e9)}
     l.forEach((st,i)=>out.push({ex:ex.name,bar:!!ex.bar,rest:ex.rest??60,cue:ex.cue||null,
       exNo:n,setNo:i+1,of:l.length,targetW:st.w!=null?Math.max(0,st.w+a):null,targetReps:st.reps??null,
       targetRpe:st.rpe??null,secs:st.secs!=null?st.secs:null,perSide:!!st.perSide,warmup:ex.warmup,adj:a}))});return out}
@@ -977,7 +985,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='e933c6';  // stamped by tools/build.py with the content hash
+const BUILD_ID='c2afd4';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -1543,6 +1551,59 @@ function authoredW(prog,exName){
    that split, a user whose imported sheet was 40 kg stale would run the
    catch-up tool and then never earn another increase, which punishes
    exactly the person the catch-up tool was built for. */
+/* ═══ THE PRESCRIPTION MAY NEVER RUN AWAY FROM WHAT IS BEING LIFTED ═════
+   (beta, 15 Sep 2026, Dafydd on his EZ Skullcrusher: "in other news
+   Allena's trying to kill me — jumps me up 10 kg on skull crushers".
+   Screenshot: TARGET 37.5 kg x 10-12, "+12.5 kg adjusted from your logs",
+   RPE 8; LAST TIME 27.5 x 15 @7. A 36% jump, on a triceps isolation, at
+   the elbow. This one is injury-grade.)
+
+   THE CAUSE. regulate() judges effort and reps against the PRESCRIBED
+   weight and never once looks at what was actually on the bar. He was
+   prescribed 35 and lifted 27.5 for 15 reps at RPE 7 — top of the range,
+   well under target effort — so the engine read "that was easy" and added
+   a step. It was easy AT 27.5. It says nothing about 35, and nothing
+   whatever about 37.5. Every session the gap compounded: the prescription
+   climbed, he kept lifting what he could actually lift, and the engine
+   kept reading his ease as room at a weight he had not touched in weeks.
+
+   TWO RULES, and they are deliberately separate.
+
+   1. adjCap() is the SAFETY NET and it lives where the prescription is
+      built, not where the increase is earned — so it holds no matter how
+      the number got there: a stale import, the catch-up tool, a restore,
+      a hand edit, or six sessions of this exact drift.
+      It caps ALLENA'S OWN ADDITION only. The written program is the
+      author's intent and is never touched: if the block says 100 kg after
+      a deload week, you get 100 kg. But the part Allena invented may not
+      carry anyone further than a step past what they have actually
+      lifted — the larger of one learned increment and a tenth, which is
+      enough headroom for real progression and nowhere near a third.
+   2. regulate() stops treating a light session as evidence about a heavy
+      target (below, in its own guard). That is the cause; this is the net.
+      Injury-grade code gets both. */
+function lastTopFor(ex){
+  try{
+    const H=(S.history||[]).filter(h=>h&&h.complete&&!h.run&&!h.demo&&
+      (h.log||[]).some(l=>l&&l.ex===ex&&+l.w>0));
+    if(!H.length)return null;
+    H.sort((a,b)=>String(a.date).localeCompare(String(b.date)));
+    const last=H[H.length-1];
+    const ws=(last.log||[]).filter(l=>l&&l.ex===ex&&+l.w>0).map(l=>+l.w);
+    return ws.length?Math.max.apply(null,ws):null}
+  catch(e9){oops('lastTopFor',e9);return null}}
+function adjCap(prog,exName,writtenW,a){
+  try{
+    if(!(a>0)||!(writtenW>0))return a;
+    const top=lastTopFor(exName);
+    if(top==null||!(top>0))return a;            // never lifted: nothing to measure against
+    const step=(typeof exInc==='function')?exInc(prog,exName,top):2.5;
+    const ceiling=top+Math.max(step,top*0.10);
+    if(writtenW+a<=ceiling+0.001)return a;
+    /* the written weight always stands — clamping below it would be the
+       app overruling the programme, which is not its job */
+    return Math.max(0,ceiling-writtenW)}
+  catch(e9){oops('adjCap',e9);return a}}
 function adjCeiling(prog,exName){
   const w=authoredW(prog,exName);
   if(w==null)return Infinity;
@@ -1732,6 +1793,21 @@ function regulate(rows,c,opts){
   if(!rows.length||low==null)return null;
   /* no weight written = the reps are the prescription (audit A8) */
   if(W==null)return regFree(rows,c,opts);
+  /* ═══ A LIGHT SESSION IS NOT EVIDENCE ABOUT A HEAVY TARGET ═══════════
+     (Dafydd, 15 Sep 2026: prescribed 35, lifted 27.5 x 15 @7, and the
+     engine read top-of-range-under-effort as room and added a step.) It
+     was easy AT 27.5. Everything below this line measures reps and RPE
+     against the PRESCRIBED weight and never looks at the bar, which is
+     how a prescription walks away from a person one clean session at a
+     time. Going lighter than written is allowed and normal — it just
+     cannot earn an increase on a weight that was not attempted. */
+  const wTop9=Math.max.apply(null,rows.map(x=>+x.w||0));
+  if(W>0&&wTop9>0&&wTop9<W-Math.max((typeof exInc==='function')?exInc(opts.prog,c.ex,W):2.5,W*0.05)){
+    out.level='ok';out.outcome='held';out.delta=0;
+    out.msg='Logged at '+uwNum(wTop9)+' '+uwUnit()+' against a written '+uwNum(W)+'. That is fine — but it is evidence about '+
+      uwNum(wTop9)+', not about '+uwNum(W)+', so nothing is added on top. Take the written weight when you want the increase, or fix the number in Tune load.';
+    out.why='lifted below the prescription — no increase earned';
+    return out}
   const avg=rpes.length?rpes.reduce((a,b)=>a+b,0)/rpes.length:null;
   const mx=rpes.length?Math.max.apply(null,rpes):null;
   // effort error measured against the whole range: inside it is no error at all
