@@ -243,7 +243,33 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
 #findBig .fb-wrap{position:relative;width:100%;max-width:380px;margin:auto}
 #findBig .fb-card{padding:0;overflow:hidden;border-radius:22px}
 #findBig .fb-acts{margin-top:18px}
-@media (prefers-reduced-motion:reduce){#findBig{animation:none}}
+/* the ground breathes behind the card — slow enough to be felt rather
+   than watched, which is the difference between atmosphere and a
+   distraction on a surface you read */
+.fb-glow{position:absolute;left:50%;top:46%;width:min(86vw,460px);height:min(86vw,460px);
+  transform:translate(-50%,-50%);border-radius:50%;pointer-events:none;
+  background:radial-gradient(circle,color-mix(in srgb,var(--fbc) 26%,transparent),transparent 66%);
+  animation:fbBreathe 7.5s ease-in-out infinite}
+@keyframes fbBreathe{0%,100%{transform:translate(-50%,-50%) scale(.92);opacity:.55}
+  50%{transform:translate(-50%,-50%) scale(1.06);opacity:.95}}
+/* motes: each on its own clock, drifting up and across */
+.fb-mote{position:absolute;width:3px;height:3px;border-radius:3px;opacity:0;pointer-events:none;
+  animation:fbMote 5s ease-in-out infinite}
+@keyframes fbMote{0%{opacity:0;transform:translate(0,6px) scale(.6)}
+  25%{opacity:.75}60%{opacity:.5;transform:translate(6px,-18px) scale(1)}
+  100%{opacity:0;transform:translate(-4px,-40px) scale(.5)}}
+/* THE CARD GOES BACK WHERE IT CAME FROM (owner, 15 Sep: "when you close a
+   card it should animate back into its position nicely"). The card it was
+   opened from is measured on the tap, and the overlay card is flown from
+   that rectangle on the way in and back to it on the way out — so it
+   reads as the same object being picked up and put down, not two
+   different cards appearing. --fbdx/--fbdy/--fbs carry the delta. */
+#findBig .fb-flip{transition:transform .34s cubic-bezier(.22,1,.36,1),opacity .34s ease}
+#findBig.fb-out{animation:fbFade .3s ease both}
+@keyframes fbFade{to{opacity:0}}
+@media (prefers-reduced-motion:reduce){#findBig{animation:none}
+  .fb-glow,.fb-mote{animation:none}.fb-mote{opacity:.5}
+  #findBig .fb-flip{transition:none}#findBig.fb-out{animation:none}}
 /* THE ARRIVAL IS THE TIER (owner, 15 Sep 2026: "the level of grandiose
    animation when they popup needs to be relative to their tier level").
    Every finding used to arrive the same way, so the ladder that the
@@ -1006,7 +1032,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='6581d8';  // stamped by tools/build.py with the content hash
+const BUILD_ID='404130';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -20722,9 +20748,34 @@ function sessionReveal(){
    missing, it just never drew it. What a locked card shows is the
    CATEGORY and the honest hint — never the finding, because the finding
    has not happened and inventing it would be the fake-milestone trap. */
+/* ═══ THE READ IS A SUIT, NOT A HIGHER TIER ═══════════════════════════
+   (owner, 15 Sep 2026: "where are my deep read cards, they should be
+   legendary level".)
+
+   They were in the binder already — they were just wearing the same
+   clothes as everything else, which is the real complaint and it is a
+   fair one. A deep read is scarce: weekly at most, gated on a signed-in
+   account, on new evidence and on something already being proven.
+
+   WHAT THEY DO NOT GET IS A FIFTH TIER ABOVE BIG ONE, and the reason is
+   the whole architecture. Council sitting 5 settled it: "the read
+   TRANSLATES, it never discovers." The engine proves the relationship;
+   the model phrases it, and DEEP_SYS forbids it from adding anything to
+   the proven block. Ranking a model reading above a measured epic would
+   tell the user that interpretation outranks measurement — which is the
+   exact inversion this app exists to refuse, and it is why the rarity
+   constant says never to add a fifth tier without a real fifth rarity
+   behind it.
+   So a read is a SUIT: its own frame, its own mark, its own colour, and
+   the same honest rank underneath. A foil card, not a better one. */
+function findIsRead(d){return !!(d&&d.tag==='insight')}
+function findReadChrome(){
+  return{col:'var(--blue)',label:'THE READ',
+    sub:'A MODEL READING OF WHAT THE ENGINE PROVED'}}
 function findFace(d,opts){
   opts=opts||{};
   const c=rarChrome(d.rar,true);
+  const rd=findIsRead(d)?findReadChrome():null;
   const w=opts.w||'100%';
   const big=!!opts.big;
   const pips=[0,1,2,3].map(i=>'<span style="width:'+(i<=c.rank?4:3)+'px;height:'+(i<=c.rank?4:3)+
@@ -20736,13 +20787,18 @@ function findFace(d,opts){
     (c.glow!=='none'?';box-shadow:'+c.glow:'')+'">'+
     /* the tier band across the head of the card — the one thing you read
        from across a room, and the reason a binder reads as a binder */
-    '<div style="height:'+(big?4:3)+'px;background:'+c.col+';opacity:.9"></div>'+
+    /* the read's band is split: its own colour over the tier's, so the
+       suit reads first and the rank still reads */
+    (rd?'<div style="height:'+(big?4:3)+'px;background:linear-gradient(90deg,'+rd.col+' 62%,'+c.col+' 62%)"></div>'
+       :'<div style="height:'+(big?4:3)+'px;background:'+c.col+';opacity:.9"></div>')+
     '<div style="padding:'+(big?'13px 14px':'10px 11px')+';background:'+c.fill+'">'+
     '<div style="display:flex;align-items:center;gap:6px">'+
+      (rd?'<span style="flex:none;transform:scale(.34);transform-origin:left center;width:16px;height:9px;display:block;overflow:visible">'+
+          ((typeof depthGlyph==='function')?depthGlyph(3,false):'')+'</span>':'')+
       '<span style="display:flex;align-items:center;gap:2px;flex:none">'+pips+'</span>'+
-      '<span class="mono" style="flex:1;min-width:0;color:'+c.col+';font-size:'+(big?8.5:7.5)+'px;'+
+      '<span class="mono" style="flex:1;min-width:0;color:'+(rd?rd.col:c.col)+';font-size:'+(big?8.5:7.5)+'px;'+
         'letter-spacing:'+c.track+';font-weight:'+c.weight+';overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+
-        esc(c.label.toUpperCase())+'</span>'+
+        esc((rd?rd.label:c.label).toUpperCase())+'</span>'+
       (opts.fresh?'<span class="mono" style="flex:none;background:'+c.col+';color:#1F1E1D;font-size:7px;padding:1px 4px;border-radius:999px">NEW</span>':'')+
     '</div>'+
     '<p style="font-size:'+(big?14:12)+'px;font-weight:'+(c.rank>=3?700:600)+';line-height:1.3;margin-top:6px;'+
@@ -20770,6 +20826,7 @@ function findBigHtml(){
     const id=S.findBig;if(!id)return '';
     const e=discBank()[id];if(!e)return '';
     const r=rarityOf(e.rar),c=rarChrome(e.rar,true);
+    const rd=findIsRead(e)?findReadChrome():null;
     const when=e.when||e.found;
     const pips=[0,1,2,3].map(i=>'<span style="width:'+(i<=c.rank?7:5)+'px;height:'+(i<=c.rank?7:5)+
       'px;border-radius:50%;background:'+(i<=c.rank?r[1]:'var(--line)')+';opacity:'+(i<=c.rank?1:.4)+'"></span>').join('');
@@ -20781,22 +20838,46 @@ function findBigHtml(){
       else{const m2=String(e.d||'').match(/\bn\s*=\s*(\d+)/i);if(m2)basis=m2[1]+' paired days'}}
     catch(e9){}
     const hasEv=(typeof evidenceData==='function')&&evidenceData(id);
-    const dust=c.rank>=2?Array.from({length:14},(_,i)=>{
-      const a=i*0.618*6.283,rr=26+((i*41)%54);
-      return '<span class="find-dust" style="left:calc(50% + '+Math.round(Math.cos(a)*rr)+'px);top:calc(46% + '+
-        Math.round(Math.sin(a)*rr*0.8)+'px);background:'+r[1]+';animation-delay:'+(i*150)+'ms"></span>'}).join(''):'';
+    /* THE AIR AROUND THE CARD MOVES (owner, same message: "can we make
+       the area around the card have more movement"). Every tier gets
+       motes now, not just the top two — a Noticed simply gets few and
+       slow. They drift on their own clocks and from their own radii, so
+       the field never reads as a loop, and the ground behind them
+       breathes. Reduced motion stills all of it. */
+    const motes=[6,10,16,22][c.rank];
+    const dust=Array.from({length:motes},(_,i)=>{
+      const a=i*0.618*6.283,rr=22+((i*37)%88);
+      return '<span class="fb-mote" style="left:calc(50% + '+Math.round(Math.cos(a)*rr)+'px);top:calc(46% + '+
+        Math.round(Math.sin(a)*rr*0.85)+'px);background:'+r[1]+
+        ';animation-delay:'+(i*210)+'ms;animation-duration:'+(4.2+((i*7)%5)*0.6).toFixed(1)+'s"></span>'}).join('');
     return '<div id="findBig" style="--fbc:'+r[1]+'">'+
-      '<div id="findBigScrim" data-a="findBigClose"></div>'+dust+
-      '<div class="fb-wrap '+c.rvl+(c.rvh?' '+c.rvh:'')+'" style="--rvc:'+c.halo+'">'+
+      '<div id="findBigScrim" data-a="findBigClose"></div>'+
+      '<div class="fb-glow"></div>'+dust+
+      /* THE HALO GOES ON THE ROUNDED THING (owner-caught on video, 15 Sep:
+         "rectangle outline bug on first glow reveal"). The wrapper holds
+         the card AND the buttons and has no radius, so a box-shadow on it
+         traced a sharp-cornered rectangle around everything — the exact
+         artefact caught on 6 Sep, where a glow on a square wrapper drew a
+         rectangle around a rounded pill. The wrapper takes the POP, which
+         is a transform and has no edges; the card takes the HALO, which
+         does, and it has the radius to hug. */
+      '<div class="fb-wrap '+c.rvl+'">'+
       /* the card */
-      '<div class="card fb-card" style="border-color:'+c.border+';border-width:'+c.width+
+      '<div class="card fb-card'+(c.rvh?' '+c.rvh:'')+'" style="--rvc:'+c.halo+';border-color:'+c.border+';border-width:'+c.width+
         (c.glow!=='none'?';box-shadow:'+c.glow:'')+'">'+
-        '<div style="height:5px;background:'+r[1]+'"></div>'+
+        (rd?'<div style="height:5px;background:linear-gradient(90deg,'+rd.col+' 62%,'+r[1]+' 62%)"></div>'
+           :'<div style="height:5px;background:'+r[1]+'"></div>')+
         '<div style="padding:22px 22px 24px;background:'+c.fill+'">'+
+        (rd?'<div style="display:flex;align-items:center;gap:9px;margin-bottom:12px">'+
+            '<span style="flex:none;transform:scale(.6);transform-origin:left center;width:27px;height:14px;display:block;overflow:visible">'+
+            ((typeof depthGlyph==='function')?depthGlyph(3,false):'')+'</span>'+
+            '<span class="mono" style="color:'+rd.col+';font-size:9px;letter-spacing:.1em;font-weight:600">'+esc(rd.sub)+'</span></div>':'')+
         '<div style="display:flex;align-items:center;gap:8px">'+
           '<span style="display:flex;align-items:center;gap:3px;flex:none">'+pips+'</span>'+
-          '<span class="mono" style="color:'+r[1]+';font-size:10px;letter-spacing:'+c.track+
-            ';font-weight:'+c.weight+'">'+esc(r[2].toUpperCase())+'</span></div>'+
+          '<span class="mono" style="color:'+(rd?rd.col:r[1])+';font-size:10px;letter-spacing:'+c.track+
+            ';font-weight:'+c.weight+'">'+esc((rd?rd.label:r[2]).toUpperCase())+'</span>'+
+          (rd?'<span class="mono" style="color:'+r[1]+';font-size:9px;letter-spacing:.06em">'+esc(r[2].toUpperCase())+'</span>':'')+
+          '</div>'+
         '<p class="disp" style="font-size:24px;font-weight:'+(c.rank>=3?700:650)+';line-height:1.2;margin-top:14px;'+
           'background:none;-webkit-text-fill-color:var(--text);color:var(--text)">'+esc(e.t)+'</p>'+
         (e.d?'<p style="color:var(--dim);font-size:13.5px;line-height:1.65;margin-top:12px">'+esc(e.d)+'</p>':'')+
@@ -20815,6 +20896,46 @@ function findBigHtml(){
       '<button data-a="findBigClose" class="mono" style="display:block;width:100%;color:var(--faint);font-size:11px;letter-spacing:.06em;padding:14px 0 4px">CLOSE</button>'+
       '</div></div></div>'}
   catch(e){oops('findBigHtml',e);return ''}}
+/* ═══ THE CARD IS PICKED UP AND PUT DOWN ══════════════════════════════
+   (owner, 15 Sep 2026: "when you close a card it should animate back
+   into its position nicely".) A FLIP: the card in the grid is measured
+   on the tap, the overlay card is placed at that rectangle and released
+   to its real position, and the close plays the same move backwards. It
+   reads as ONE object moving rather than two cards appearing.
+   With no source rectangle — opened from a notification, or from the
+   tree — it falls back to a small scale from the centre, which is the
+   honest thing to do when there is nowhere to fly from. */
+function fbDelta(el){
+  const f=S._fbFrom;if(!f||!el)return null;
+  const b=el.getBoundingClientRect();
+  if(!(b.width>0&&b.height>0))return null;
+  return{dx:(f.x+f.w/2)-(b.left+b.width/2),
+         dy:(f.y+f.h/2)-(b.top+b.height/2),
+         s:Math.max(0.2,Math.min(1,f.w/b.width))}}
+function fbFlipIn(root){
+  try{
+    const el=root&&root.querySelector('.fb-card');if(!el)return;
+    const d=fbDelta(el);if(!d)return;
+    /* the pop from the motion ladder would fight the flight — the tier's
+       ceremony is the halo and the dust here, not a second transform */
+    const wrap=root.querySelector('.fb-wrap');
+    if(wrap)wrap.style.animation='none';
+    el.style.transition='none';
+    el.style.transform='translate('+d.dx.toFixed(1)+'px,'+d.dy.toFixed(1)+'px) scale('+d.s.toFixed(3)+')';
+    el.style.opacity='.35';
+    void el.offsetWidth;
+    el.classList.add('fb-flip');
+    el.style.transform='none';el.style.opacity='1'}
+  catch(e){oops('fbFlipIn',e)}}
+function fbFlipOut(root){
+  try{
+    root.classList.add('fb-out');
+    const el=root.querySelector('.fb-card');if(!el)return;
+    const d=fbDelta(el);
+    el.classList.add('fb-flip');
+    el.style.transform=d?('translate('+d.dx.toFixed(1)+'px,'+d.dy.toFixed(1)+'px) scale('+d.s.toFixed(3)+')'):'scale(.88)';
+    el.style.opacity='.2'}
+  catch(e){oops('fbFlipOut',e)}}
 function findFaceLocked(cat,hint){
   return '<div class="card" style="width:100%;padding:0;overflow:hidden;border-style:dashed;border-color:var(--line);opacity:.65">'+
     '<div style="height:3px;background:var(--line)"></div>'+
@@ -29664,6 +29785,7 @@ function render(){
        if(fb9&&fb9.dataset.id!==want){fb9.remove();fb9=null}
        if(!fb9){fb9=document.createElement('div');fb9.id='findBigHost';fb9.dataset.id=want;
          fb9.innerHTML=findBigHtml();document.body.appendChild(fb9);
+         try{fbFlipIn(fb9)}catch(e){oops('fbFlipIn',e)}
          try{const rk=rarChrome((discBank()[want]||{}).rar,true).rank;
            if(rk>=2)hapticRun('find');else haptic('light')}catch(e){oops('findBigHaptic',e)}}}
      else if(fb9)fb9.remove()}
@@ -31222,7 +31344,13 @@ function runAction(a,v,t,e){
        once and the menu still never lies about where you are.
        Backs NOT from the drawer are untouched: a chart opened from
        Progress still returns to Progress. */
-    case 'back':{const _t=S.backTo||'today';const _d=!!S.backDrawer;
+    case 'back':{
+      /* a card was open before this page: go back to the card, not past
+         it. One step at a time is what Back means. */
+      if(S._fbBack){const id9=S._fbBack;S._fbBack=null;
+        S.view=S.backTo||S.view;S.backTo=null;S.backDrawer=false;
+        S.findBig=id9;S._navQuiet=1;render();break}
+      const _t=S.backTo||'today';const _d=!!S.backDrawer;
       S.backTo=null;S.backDrawer=false;
       if(!_d)S.view=_t;
       if(_t==='you')S.backTo='data'; // You is only reached from Settings — a second back lands there, never loops
@@ -31905,7 +32033,12 @@ function runAction(a,v,t,e){
     case 'crewMake':{try{crewMake()}catch(e){}break}
     case 'crewShare':{try{crewShare(v)}catch(e){}break}
     case 'crewLeave':{try{crewLeave()}catch(e){}break}
-    case 'evidenceOpen':{S.backTo=S.view;S.backDrawer=false;S.sheet=null;S.findBig=null;
+    /* and Back from the evidence returns to the card it was opened from
+       (owner-caught on video, 15 Sep: it was landing on the collection).
+       The card is remembered rather than kept open, because the overlay
+       is fixed over everything and would cover the evidence page. */
+    case 'evidenceOpen':{S.backTo=S.view;S.backDrawer=false;S.sheet=null;
+      S._fbBack=S.findBig||null;S.findBig=null;
       S.evidenceId=v;S.view='evidence';render();break}
     case 'romOpen':{S.sheet={t:'rom'};render();break}
     case 'romStart':{
@@ -31928,9 +32061,26 @@ function runAction(a,v,t,e){
       catch(e){flash('The camera needs the Allena app.')}
       break}
     /* a finding opens on its own page now (15 Sep) — the sheet survives
-       for the notification landings that ask for it by name */
-    case 'findOpen':{S.sheet=null;S.findBig=v;render();break}
-    case 'findBigClose':{S.findBig=null;render();break}
+       for the notification landings that ask for it by name.
+       THE CARD IT CAME FROM IS MEASURED ON THE TAP, so the overlay can
+       fly from that rectangle and back to it. Reading layout in a click
+       handler is fine; the ban is on touchmove and scroll. */
+    case 'findOpen':{S.sheet=null;
+      try{const b=t&&t.getBoundingClientRect&&t.getBoundingClientRect();
+        S._fbFrom=(b&&b.width>20&&b.height>20)?{x:b.left,y:b.top,w:b.width,h:b.height}:null}
+      catch(e9){S._fbFrom=null}
+      S.findBig=v;render();break}
+    /* the close plays backwards before the state changes — clearing it
+       first would remove the element that is meant to be animating */
+    case 'findBigClose':{
+      try{const host=document.getElementById('findBigHost');
+        const el=host&&host.querySelector('#findBig');
+        if(el&&!el.classList.contains('fb-out')){
+          fbFlipOut(el);
+          setTimeout(function(){S.findBig=null;S._fbFrom=null;try{render()}catch(e9){oops('fbClose',e9)}},300);
+          break}}
+      catch(e9){oops('findBigClose',e9)}
+      S.findBig=null;S._fbFrom=null;render();break}
     case 'echoOpen':{
       try{const P=notifPrefs();const x=(P.sched||[]).find(s9=>s9.id===v);
         if(x){P.echoSeen=P.echoSeen||{};P.echoSeen[x.id]=1;lset(K_NOTIF,P);
