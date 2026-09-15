@@ -912,7 +912,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='cb2be0';  // stamped by tools/build.py with the content hash
+const BUILD_ID='314c0e';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -16540,7 +16540,20 @@ function growTreeTime(W,Hh,opts){
     (r*(POSTER?2.1:1.9)).toFixed(1)+'" fill="'+c+'" opacity="'+(POSTER?'.11':'.13')+'"/>':'';
   let out='';
   let mnX=W*0.12,mxX=W*0.88,mnY=topY,mxY=groundY;
-  const bd=(x,y,r)=>{r=r||2;if(x-r<mnX)mnX=x-r;if(x+r>mxX)mxX=x+r;
+  /* ═══ THE CANVAS IS MEASURED IN TREE UNITS (owner, on video, 15 Sep
+     2026: "zooming in and out moves the dots") ════════════════════════
+     Every call here padded the bounds by a fixed number of pixels — 3 for
+     a tip, 4 for a fork, 8-plus for a dot. At 1x that padding is most of
+     a percent of a 500-wide box; at 6x the box is 2,880 wide and the same
+     padding is a sixth of that. So the tree occupied a slightly DIFFERENT
+     fraction of its own canvas at every zoom, and since the canvas is
+     what the scroller positions, the whole drawing shifted inside the
+     frame on each redraw. The dots were pinned the entire time — measured,
+     0.7% of tree height at 6x, which is a fraction of a dot — and what
+     actually moved was everything at once.
+     The padding scales with the drawing now, so the viewBox is a pure
+     scale and a redraw lands exactly where the pinch left it. */
+  const bd=(x,y,r)=>{r=(r||2)*(EX?z:1);if(x-r<mnX)mnX=x-r;if(x+r>mxX)mxX=x+r;
     if(y-r<mnY)mnY=y-r;if(y+r>mxY)mxY=y+r};
 
   /* roots — consistency below the surface, unchanged in character */
@@ -16996,7 +17009,14 @@ function growTreeTime(W,Hh,opts){
          itself mid-pinch. Dots have their own stream now: the wood cannot
          be moved by anything hanging off it. */
       const put=(u,r9,c9,op9,v9,pr9)=>{const P=onSegs(u);
-        dots.push({x:P[0]+(RD()-0.5)*2*G,y:P[1]+(RD()-0.5)*2*G,r:sz(r9*G),kind:'leaf',c:c9,op:op9,v:v9,pr:pr9})};
+        /* the jitter that lifts a leaf off its exact tip has to scale with
+           the TREE, not with the dots. It scaled with G (z^0.35) while
+           every length around it scaled with the canvas (z), so a leaf
+           crept back toward its own tip the further you zoomed — part of
+           what made the canopy crawl under a pinch. z here, so it is the
+           same offset at 1x as it always was and a true scale above it. */
+        const JIT=EX?z:1;
+        dots.push({x:P[0]+(RD()-0.5)*2*JIT,y:P[1]+(RD()-0.5)*2*JIT,r:sz(r9*G),r0:r9,kind:'leaf',c:c9,op:op9,v:v9,pr:pr9})};
       if(b.kind==='sess'){
         if(LEAF==='sess'){
           let top=0,ns=0;(b.twigs||[]).forEach(tw=>tw.sets.forEach(st=>{ns++;if(st.rel>top)top=st.rel}));
@@ -17093,7 +17113,9 @@ function growTreeTime(W,Hh,opts){
          finds in one recent stretch used to mat into a single blob; each
          one asks for two and a half times its own halo in clear space now,
          so they spread across the crown. Nothing moved in time. */
-      dots.push({x:bx,y:by,r:br9,pad:br9*(rk9>=2?1.1:0.7)*(+opts.fan||2.4),kind:'bloom',c:rarityOf(bl.rar)[1],bl:bl});
+      const br0=rk9>=2?[1.9,2.4,3.0,3.8][rk9]:([1.9,2.4][rk9]||1.9);
+      dots.push({x:bx,y:by,r:br9,r0:br0,pad:br9*(rk9>=2?1.1:0.7)*(+opts.fan||2.4),
+        pad0:br0*(rk9>=2?1.1:0.7)*(+opts.fan||2.4),kind:'bloom',c:rarityOf(bl.rar)[1],bl:bl});
       return}
     out+=bloom(bx,by,bl.epic?3.8:2.7,rarCol(bl.epic))+
       '<circle data-tp="bloom" data-tk="'+esc(bl.k)+'" cx="'+bx.toFixed(1)+'" cy="'+by.toFixed(1)+
@@ -17124,9 +17146,39 @@ function growTreeTime(W,Hh,opts){
     (d.patterns||[]).forEach(pt=>{
       const c=pt.tone==='warn'?'var(--amber)':pt.tone==='good'?'var(--green)':'var(--dim)';
       const sx=tx(pt.f)+pt.side*(trunkHalf(pt.f)+2),sy=yAt(pt.f),stem=pt.stem*LS*0.6;
-      dots.push({x:sx+pt.side*Math.cos(pt.a)*stem,y:sy-Math.sin(pt.a)*stem,r:sz(2.6*G),kind:'pat',c:c,sx:sx,sy:sy,pt:pt})});
-    try{txSpread(dots,2.2*G+TAP*0.9*tz)}catch(e){oops('treeX.spread',e)}
-    dots.forEach(dd=>{bd(dd.x,dd.y,dd.r*2.4+8);
+      dots.push({x:sx+pt.side*Math.cos(pt.a)*stem,y:sy-Math.sin(pt.a)*stem,r:sz(2.6*G),r0:2.6,kind:'pat',c:c,sx:sx,sy:sy,pt:pt})});
+    /* ═══ THE SPREAD IS SOLVED ONCE, AT THE TREE'S OWN SCALE (owner, on
+       video, 15 Sep 2026: "zooming in and out moves the dots") ═══════════
+       The clearance it solved for was zoom-dependent — 2.2 at 1x and 11.5
+       at 6x, because both the dot radii and the gap carried z. A different
+       clearance is a different nudge solution, so every zoom level landed
+       the constellation somewhere slightly else against the same wood, and
+       pinching made the whole canopy crawl.
+       Solve it in the tree's own coordinates instead: positions divided by
+       the layout scale, radii by the dot scale, one fixed gap. The answer
+       is then the same at every zoom and only the drawn size changes.
+       It is also sufficient everywhere, not just adequate at 1x: positions
+       scale with z and radii only with z^0.35, so a pair that just cleared
+       at the base scale clears by z^0.65 more the further you zoom in. */
+    try{
+      const PS=EX?Math.max(0.001,LS):1;     // positions were laid out at this
+      /* the DRAWN radius is no use here: sz() converges every dot on one
+         tappable size by 6x, so it is not a scale of anything and cannot
+         be divided back out. Each dot carries the radius it has at its
+         own scale (r0) for exactly this. */
+      dots.forEach(dd=>{dd._rD=dd.r;dd._padD=dd.pad;
+        dd.x/=PS;dd.y/=PS;
+        dd.r=(dd.r0!=null?dd.r0:dd.r);if(dd.pad!=null)dd.pad=(dd.pad0!=null?dd.pad0:dd.pad)});
+      txSpread(dots,2.2);
+      dots.forEach(dd=>{dd.x*=PS;dd.y*=PS;dd.r=dd._rD;dd.pad=dd._padD;
+        delete dd._rD;delete dd._padD});
+    }catch(e){oops('treeX.spread',e)}
+    /* the canvas's own bounds are measured in TREE units too. Padding by
+       the drawn radius made the box 3.8% wider at 1x than at 6x once
+       normalised, because sz() converges the dots on a fixed tappable
+       size while the tree keeps growing — so the whole drawing shifted
+       inside its frame as you pinched, on top of the dots moving. */
+    dots.forEach(dd=>{bd(dd.x,dd.y,(dd.r0!=null?dd.r0:dd.r)*2.4+8);
       if(dd.kind==='leaf'){
         out+='<circle data-a="txTap" data-v="'+esc(dd.v)+'" data-tp="leaf" pointer-events="all" stroke="transparent" stroke-width="'+f1(7*G)+'" cx="'+f1(dd.x)+'" cy="'+f1(dd.y)+'" r="'+dd.r.toFixed(2)+'" fill="'+dd.c+'" opacity="'+dd.op.toFixed(2)+'"/>'+
           (dd.pr?'<circle cx="'+f1(dd.x)+'" cy="'+f1(dd.y)+'" r="'+(dd.r+1.2*G).toFixed(2)+'" fill="none" stroke="#F0EEE6" stroke-width="'+f1(0.45*SWX)+'" opacity=".55"/>':'')}
@@ -17197,7 +17249,9 @@ function growTreeTime(W,Hh,opts){
         esc(lab(f))+'</text>';
       bd(tx9-fs*3.5,y,fs*0.8)})})();
   if(gdefs.length)out='<defs>'+gdefs.join('')+'</defs>'+out;
-  const pad=8;
+  /* the frame's own margin is a tree measurement too — a flat 8 is 3.2%
+     of the box at 1x and 0.55% of it at 6x, which was most of the shift */
+  const pad=8*(EX?z:1);
   const vb=[(mnX-pad).toFixed(1),(mnY-pad).toFixed(1),
     (mxX-mnX+pad*2).toFixed(1),(mxY-mnY+pad*2).toFixed(1)].join(' ');
   if(EX)S._txVbLast={x:mnX-pad,y:mnY-pad,w:(mxX-mnX)+pad*2,h:(mxY-mnY)+pad*2};
@@ -27570,7 +27624,18 @@ function render(){
   const DOT={acl:unseenRehab(),findings:unseenPatterns()+unseenDiscoveries(),run:unseenRun(),
     signals:(typeof unseenSignals==='function'?unseenSignals():0),
     collection:(typeof collFreshN==='function'?collFreshN():0)};
-  const isOn=k=>S.view===k||(k==='today'&&(S.view==='points'||S.view==='territory'))||(k==='social'&&S.view==='social')||(k==='home'&&S.view==='quick')||(k==='acl'&&(S.view==='proto'||S.view==='aclpath'||S.view==='diary'||S.view==='report'));
+  /* ═══ ONE PAGE, ONE HIGHLIGHT (owner, on video, 15 Sep 2026: "clicking
+     back brings the hamburger but highlighting a different page than you
+     were originally on") ════════════════════════════════════════════════
+     `points` was folded into Today here back when the points screen was
+     something you reached FROM Today and had no row of its own. It has had
+     its own row — "Your tree and points" — since the drawer was rebuilt,
+     and the old clause was never removed, so standing on Points lit TWO
+     rows: its own, and Today above it. Today is first in the list, so what
+     you read is that you are somewhere you are not.
+     `territory` stays folded in: the muscle map genuinely has no row.
+     Every other page is its own row and needs no special case. */
+  const isOn=k=>S.view===k||(k==='today'&&S.view==='territory')||(k==='home'&&S.view==='quick')||(k==='acl'&&(S.view==='proto'||S.view==='aclpath'||S.view==='diary'||S.view==='report'));
   const I2=SET_ICONS;
   const drow=(k,label,ic,a,v)=>'<button data-a="'+(a||'drawerNav')+'" data-v="'+(v||k)+'" class="drow'+(isOn(k)?' on':'')+'">'+
     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">'+ic+'</svg>'+
