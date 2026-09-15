@@ -977,7 +977,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='163454';  // stamped by tools/build.py with the content hash
+const BUILD_ID='e933c6';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -1030,7 +1030,26 @@ function sessMinutes(startedAt,log,now){
     const end=last?Math.min(now||Date.now(),last+3*60000):(now||Date.now());
     return Math.max(1,Math.round((end-startedAt)/60000))}catch(e){
     return Math.max(1,Math.round(((now||Date.now())-startedAt)/60000))}}
+/* THE CLOCK NEVER REACHED THE RECORD (found 15 Sep 2026, chasing a beta
+   report from Jeremy: a session he logged later was not seen as live even
+   though his Apple Watch had him at 179 bpm that afternoon).
+   Every reader of a session's start time reads `h.startedAt`, and record()
+   has never written one — only `id` (which IS the start time, as a string)
+   and `date`. So `h.startedAt` was undefined on every row in every account,
+   and four things quietly did nothing:
+     - hrWitnessAsk() returned at its first line, every time. The HEART
+       WITNESS — the strongest proof the app has, the wrist agreeing with
+       the clock over the session's own window — has never once run.
+     - hrWitnessBackfill's clock branch filtered on it, so it was always an
+       empty list.
+     - the correlation grid's `hour` signal (time of day vs everything)
+       never had a value, so no finding about when someone trains was
+       reachable. Same shape as the `resty` signal that read `l.e.t`.
+     - the library's late-session test never fired.
+   One line, and it is the id this row is already keyed on, so nothing about
+   identity or ordering moves. */
 function record(complete){const s=S.sess;return{id:String(s.startedAt),date:new Date(s.startedAt).toISOString(),
+  startedAt:s.startedAt,
   block:s.block,progId:s.progId,dayIdx:s.dayIdx,dayTitle:s.dayName,week:s.week,
   minutes:sessMinutes(s.startedAt,s.log),
   log:s.log,note:S.note,exNotes:(s.exNotes&&Object.keys(s.exNotes).length?s.exNotes:null),complete:!!complete,planned:s.sets.length,
@@ -12315,9 +12334,16 @@ try{setTimeout(runWalkRepair,1500)}catch(e){}
    the wrist says the body was working while they did. Asked
    after each finished session and back-filled for the last few;
    corroboration upgrades, absence never demotes. */
+/* A TYPED-LATER SESSION HAS NO CLOCK TO WINDOW. quickSave stamps it at
+   12:00 on the day it names, because a record needs an id and a time — but
+   that noon is a placeholder, not a start. Windowing heart rate on it asks
+   "what was your pulse doing at midday", which is the wrong question in
+   both directions: it misses a 6pm session entirely, and it could mark one
+   live off a lunchtime walk. Those go to the day scan instead. */
+const HR_DAY_FROM=5, HR_DAY_BLOCKS=18, HR_DAY_HRS=1;
 function hrWitnessAsk(h){
   try{
-    if(!inWrapper()||!h||h.run||!h.startedAt)return;
+    if(!inWrapper()||!h||h.run||h.manual||!h.startedAt)return;
     const start=Math.round(h.startedAt/1000);
     const end=Math.round((h.startedAt+Math.max(10,(h.minutes||30))*60000)/1000);
     window.webkit.messageHandlers.allena.postMessage(JSON.stringify(
@@ -12327,34 +12353,48 @@ function hrWitnessBackfill(){
   try{
     if(!inWrapper())return;
     const cut=Date.now()-7*864e5,cutK=dayKey(new Date(cut));
-    (S.history||[]).filter(h=>h.complete&&!h.run&&!h.hr&&h.startedAt&&h.startedAt>cut)
+    (S.history||[]).filter(h=>h.complete&&!h.run&&!h.hr&&!h.manual&&h.startedAt&&h.startedAt>cut)
       .slice(-4).forEach(hrWitnessAsk);
     /* the after-the-fact witness (owner ruling, 3 Sep: 'recorded live'
        is defined by the witnesses, not the typing): a session typed
        later has no clock to window, so the day is scanned in 3-hour
        blocks — a sustained working-heart-rate block that day, with no
        run or watch workout to claim it, verifies the session. */
-    (S.history||[]).filter(h=>h.complete&&!h.run&&!h.hr&&!h.startedAt&&
+    /* AN HOUR, NOT THREE (same report). The comment above says "a
+       sustained working-heart-rate block" and the code took the mean of a
+       THREE-HOUR window — which is the one statistic guaranteed to hide
+       the thing it is looking for. Forty-five minutes at 140 inside three
+       hours of sitting still averages out under the bar, so a session that
+       plainly happened read as if it had not. One-hour blocks, and a
+       session inside one keeps its own average. */
+    (S.history||[]).filter(h=>h.complete&&!h.run&&!h.hr&&(h.manual||!h.startedAt)&&
         hKey(h)>=cutK)
       .filter(h=>{const dk=hKey(h);
         if((S.runs||[]).some(r=>String(r.date).slice(0,10)===dk))return false;
         if((typeof watchGym==='function'?watchGym():[]).some(w=>w.date===dk))return false;
         return true})
-      .slice(-2).forEach(h=>{const dk=hKey(h);
-        for(let b=0;b<6;b++){const st=new Date(dk+'T05:00').getTime()+b*3*3600e3;
+      .slice(-4).forEach(h=>{const dk=hKey(h);
+        for(let b=0;b<HR_DAY_BLOCKS;b++){
+          const st=new Date(dk+'T'+(HR_DAY_FROM<10?'0':'')+HR_DAY_FROM+':00').getTime()+b*HR_DAY_HRS*3600e3;
           try{window.webkit.messageHandlers.allena.postMessage(JSON.stringify(
-            {type:'hr',id:'DAY:'+h.id+':'+b,start:Math.round(st/1000),end:Math.round((st+3*3600e3)/1000)}))}catch(e2){}}})
+            {type:'hr',id:'DAY:'+h.id+':'+b,start:Math.round(st/1000),end:Math.round((st+HR_DAY_HRS*3600e3)/1000)}))}catch(e2){}}})
   }catch(e){}}
 function hkHR(id,res){
   try{
     if(String(id).indexOf('DAY:')===0){
       const q=String(id).split(':'),hid=q[1];
       const P=S._hrDay||(S._hrDay={});
-      const rec=(P[hid]=P[hid]||{best:null,got:0});
-      rec.got++;
-      if(res&&res.n>=10&&res.avg&&(!rec.best||res.avg>rec.best.avg))rec.best=res;
-      if(rec.got>=6){const b=rec.best;delete P[hid];
-        if(b&&b.avg>=95){
+      const rec=(P[hid]=P[hid]||{done:0});
+      if(rec.done)return;
+      /* THE FIRST BLOCK THAT CLEARS THE BAR IS THE ANSWER. It used to
+         collect every block and decide only once all six had answered,
+         which meant one dropped reply from the native side left the
+         question open forever — a feature that silently does nothing,
+         which is this repo's named disease. A working hour is a working
+         hour; there is nothing a later block can say that changes it. */
+      const b=(res&&res.n>=10&&res.avg>=95)?res:null;
+      if(b){rec.done=1;
+        {
           const h=(S.history||[]).find(x=>String(x.id)===String(hid));
           if(h&&!h.hr){h.hr={avg:Math.round(b.avg),max:Math.round(b.max),n:b.n,day:1};
             saveHistory();
