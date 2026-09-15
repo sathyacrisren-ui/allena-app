@@ -985,7 +985,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='c2afd4';  // stamped by tools/build.py with the content hash
+const BUILD_ID='91ae35';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -1677,12 +1677,44 @@ function undoAdj(){if(!S.lastAdj)return;const a=S.lastAdj;S.lastAdj=null;applyAd
 function exStep(ex,w){                       // smallest sane load step
   const name=String(ex).toLowerCase();
   const bar=/bench|squat|deadlift|press|row|rdl|romanian|hip thrust/.test(name);
-  const small=/lateral|fly|curl|pushdown|extension|raise|face pull|rear|abduction|calf/.test(name);
+  /* A SKULLCRUSHER IS AN ISOLATION AND NOBODY TOLD THIS FUNCTION
+     (beta, 15 Sep 2026, Dafydd). "EZ Skullcrusher" matches NEITHER list:
+     not the barbell family, and not the small-increment family, because
+     the small list is written in movement words — extension, pushdown,
+     curl — and this lift is known by a nickname. So a triceps isolation
+     was handed the generic 3.5% and, worse, the 2.5 kg GRAIN, which is
+     the floor that actually binds on a light lift: 27.5 x 3.5% is under
+     a kilo, so the step became 2.5 — twice what the movement deserves,
+     before anything else multiplied it.
+     The names added here are all nicknames for work already in the list
+     by its movement. `small` is tested FIRST in both lines below, so a
+     name that says both ("EZ tricep press") is correctly small. */
+  const small=/lateral|fly|curl|pushdown|extension|raise|face pull|rear|abduction|calf|skullcrush|skull ?crush|jm press|tricep|kickback|pec deck|pullover/.test(name);
   const pct=small?0.05:(bar?0.025:0.035);
   let step=(w||0)*pct;
   const grain=small?1.25:2.5;
   step=Math.round(step/grain)*grain;
   return Math.max(grain,step)}
+/* ═══ NO SINGLE SESSION MAY MOVE A LIFT A TENTH OF ITSELF ══════════════
+   (the same report, and the arithmetic behind it.) Two multipliers sit in
+   series and nobody had multiplied them out:
+     exStep     2.5 on a 27.5 kg skullcrusher   (the grain floor)
+     learnStep  x1.25 per clean session, capped at x2  -> 5
+     regulate   branch 4 pays a DOUBLE step     -> 10
+   Four times the base increment, from ONE clean session, and nothing
+   anywhere compared the result to the weight on the bar. +10 kg on 27.5
+   is +36% in a week, on the elbow.
+   Both multipliers are individually defensible — a lift that keeps coming
+   back easy should step faster, and a session miles inside target is
+   worth more than one just inside it. Their PRODUCT is not. This caps the
+   outcome against the bar rather than removing either, so the reward
+   survives on a squat (where a tenth is a real step) and cannot run away
+   on an isolation (where it is the whole exercise). Rounded DOWN to the
+   lift's own grain: a cap that rounds up is not a cap. */
+function stepCap(ex,w){
+  const grain=/lateral|fly|curl|pushdown|extension|raise|face pull|rear|abduction|calf|skullcrush|skull ?crush|jm press|tricep|kickback|pec deck|pullover/.test(String(ex).toLowerCase())?1.25:2.5;
+  if(!(w>0))return Infinity;
+  return Math.max(grain,Math.floor(w*0.10/grain)*grain)}
 function exInc(prog,ex,w){                   // learned step, defaults to exStep
   const rec=prog&&prog.inc&&prog.inc[ex];
   const base=exStep(ex,w);
@@ -1858,6 +1890,16 @@ function regulate(rows,c,opts){
   if(opts.eased&&out.delta<0){out.delta=0;out.outcome='held';
     out.msg='Rough day by your own readiness reading, so the numbers are not evidence the load is wrong. Nothing written to the program — repeat this weight when you are fresh.';
     out.why='low-readiness session, no permanent change'}
+  /* AND THE INCREASE IS CAPPED AGAINST THE BAR (see stepCap). Applied
+     after every branch has had its say, so no branch added later can
+     route around it — the same reason the AI consent gate sits in
+     claudeFetch and not on the eight buttons that reach it. */
+  if(out.delta>0){try{const cp=stepCap(c.ex,W);
+    if(isFinite(cp)&&out.delta>cp+0.001){
+      out.delta=cp;
+      out.msg=out.msg.replace(/\+\s*[\d.]+\s*\S+/,'+'+uwNum(cp)+' '+uwUnit());
+      out.msg+=' Held to '+uwNum(cp)+' '+uwUnit()+' — no single session moves a lift more than a tenth of itself.';
+      out.why+=', capped at a tenth'}}catch(e9){oops('regulate.stepCap',e9)}}
   /* bests lead the verdict — stars in the log with a silent summary
      read as the app not noticing (owner-caught, 9 Sep) */
   try{const np=rows.filter(x=>x&&x.pr).length;
