@@ -985,7 +985,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='91ae35';  // stamped by tools/build.py with the content hash
+const BUILD_ID='1ed7b4';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -2289,7 +2289,7 @@ function coachContext(){
        '. Imported runs carry NO recorded effort — never state an RPE for them; the type (race/easy/tempo) is what is known.');
      const big=rr.find(r2=>r2.km>=15||r2.type==='race');
      if(big)out.push('NOTE: a '+(big.type==='race'?'RACE':'long run')+' of '+big.km+'km this recent means the legs and the whole system are NOT fully recovered, whatever the per-muscle numbers say. Say so.')}}
-  if(S.acl&&S.acl.on){const ph=ACL_PHASES[S.acl.phase-1],g=aclGateState(S.acl.phase);
+  if(S.acl&&S.acl.on){const ph=aclPhaseDef(S.acl.phase),g=aclGateState(S.acl.phase);
     const miss=g.filter(x=>!x.met).map(x=>x.key);
     out.unshift('ACL '+(S.acl.mode==='deficient'?'non-op':'reconstruction')+' phase '+S.acl.phase+'/5 ('+ph.name+')'+
       (aclMonths()!=null?', '+aclMonths().toFixed(1)+' months in':'')+
@@ -7061,6 +7061,277 @@ function rehabStartKey(){
   Object.keys(S.rehab||{}).forEach(k=>{(((S.rehab[k]||{}).log)||[]).forEach(e=>{
     if(e&&e.date&&(!first||e.date<first))first=e.date})});
   return first}
+/* ══ THE MELBOURNE ACL REHABILITATION GUIDE 2.0 ═══════════════════════
+   Randall Cooper & Mick Hughes. Owner brief, 15 Sep 2026: "do an
+   overhaul on the ACL rehab phases, gateways, criteria — I want to use
+   this PDF to build our ACL rehab section, make it thorough, add in
+   things that are missed. this is our base."
+
+   The app's pathway before this was a defensible general ACL protocol
+   assembled from the literature. It was not THIS protocol, and the gaps
+   were not small: no pre-operative phase at all, no graded effusion, no
+   measured range, and none of the phase 2 endurance battery — the single
+   leg bridge, calf raise, side bridge, unipedal stance and single leg
+   rise, which between them are most of what "regain your strength"
+   actually means. Return to sport was five manual ticks where the guide
+   has a hundred-point instrument with two hard hurdles.
+
+   THE PROTOCOL'S OWN FIRST PRINCIPLE, and the reason every number below
+   is a criterion rather than a date: "You move through the ACL protocol
+   at your own pace, and let the criteria govern how quickly you go, not
+   a pre-determined timeline."
+
+   WHAT IS ENCODED HERE is the guide's outcome measures, their published
+   references and their goals, exactly as written. What is NOT encoded is
+   clinical judgement: the guide says "clinicians should use a clinical
+   reasoning approach" and "programs should always be individualised",
+   and the physio supremacy law (decision 0b) already says the same thing
+   in this app's own words. Nothing here overrules a physio.
+
+   WHAT IS KEPT FROM BEFORE: the non-operative (ACL-deficient) rows —
+   perturbation training, the Delaware-Oslo coper screen, the giving-way
+   count. The Melbourne guide is written for reconstruction and says so;
+   it has nothing for the person who did not have surgery, and deleting
+   that would take the pathway away from them.
+   ══════════════════════════════════════════════════════════════════ */
+const ACL_GUIDE='Melbourne ACL Rehabilitation Guide 2.0 — Cooper & Hughes';
+
+/* ── the outcome measures ──────────────────────────────────────────
+   One entry per test in the guide. `shape` drives the entry form, so a
+   measure is added here and the UI follows; `ref` is the published
+   source the guide cites, shown to the user because a criterion with a
+   citation is a criterion they can take to their physio. */
+const ACL_MEAS={
+  ext:{n:'Passive knee extension',shape:'deg',u:'°',ref:'Norkin & White 1995',
+    how:['Lie face up on a bed with the leg relaxed and supported at the heel.',
+         'A long-arm goniometer is lined up on the greater trochanter, the lateral femoral condyle and the lateral malleolus.',
+         'Zero degrees is a knee that straightens completely. Anything short of zero is an extension deficit.'],
+    why:'Extension lost early is the hardest thing to get back, and a knee that will not straighten changes how you walk. The guide is blunt about it: get the knee straight within the first 2-3 weeks, both post-injury and post-surgery, and keep it straight. Flexion can take its time.'},
+  /* the prone hang is the one paired measure that is NOT a symmetry
+     index: the guide asks for the two heels to be EQUAL, and a ratio of
+     two heel heights answers a different question. It stores the
+     difference, which is what "about 1 cm is about 1 degree" means. */
+  prone:{n:'Prone hang test',shape:'pairdiff',u:'cm',lowGood:true,ref:'Sachs et al 1989',
+    how:['Lie face down with both lower legs hanging off the end of the bed.',
+         'Let both knees drop fully into extension.',
+         'Measure the height of each heel off the bed. About 1 cm of difference is about 1 degree.'],
+    why:'It catches the last few degrees of extension that a supine measurement misses, and those last few degrees are the ones that matter. From phase 2 the goal is not "nearly straight" but equal to the other side.'},
+  flex:{n:'Passive knee flexion',shape:'deg',u:'°',ref:'Norkin & White 1995',
+    how:['Lie face up and pull the heel back toward the buttock as far as it will comfortably go.',
+         'Measured with a long-arm goniometer on the same three landmarks as extension.'],
+    why:'About 110 degrees to cycle, 125 for comfortable stairs and squatting. The guide asks for 125 or more from phase 1 onward.'},
+  stroke:{n:'Swelling — stroke test',shape:'grade',ref:'Sturgill et al 2009',
+    grades:['Zero — no wave on the downstroke',
+            'Trace — a small wave on the inside',
+            '1+ — a large bulge on the inside',
+            '2+ — fluid returns on its own after the upstroke'],
+    how:['Stroke upward two or three times on the inside of the knee to move fluid up and out of the medial side.',
+         'Stroke downward on the outside of the knee.',
+         'Watch the inside of the knee and grade what comes back.'],
+    why:'Swelling shuts the quadriceps down — the reflex is called arthrogenic muscle inhibition, and strength work on a swollen knee gives very little back. The guide names pain and swelling as the two signals that the knee is not tolerating the load.'},
+  lag:{n:'Quadriceps lag test',shape:'deg',u:'°',lowGood:true,ref:'Stillman 2004',
+    how:['Sit on the edge of a bed. Someone lifts the relaxed leg into full straightness for you.',
+         'Hold the knee straight yourself as they let go.',
+         'The lag is how far it drops. Zero to five degrees is the goal.'],
+    why:'A lag means the quadriceps cannot hold the knee straight against the weight of the shin alone. Until that is gone, loaded work has nothing underneath it.'},
+  dyno:{n:'Strength — hand-held dynamometer',shape:'pair',u:'N',ref:'Mentiplay et al 2015',
+    how:['Knee at 90 degrees, both legs, same session.',
+         'For quadriceps the dynamometer sits on the front of the shin, just above the ankle.',
+         'For hamstrings it sits on the back of the shin, just above the ankle.',
+         'Injured leg first, so fatigue works against the result rather than for it.'],
+    why:'The pre-operative strength target is the one most people skip. Attaining full range, good quadriceps and hamstring strength and minimal swelling BEFORE surgery is associated with better outcomes up to two years afterwards.'},
+  sls:{n:'Single leg squat test',shape:'rating',ref:'Crossley et al 2011',
+    ratings:['Good','Fair','Poor'],
+    how:['Stand on one leg on a 20 cm box with arms crossed.',
+         'Five single leg squats, slow and controlled, about two seconds each.',
+         'Film it from the front. It is rated good, fair or poor.'],
+    crit:['Balance is maintained throughout','The movement is smooth','The squat reaches at least 60 degrees',
+          'No trunk movement — no lateral lean, rotation or tilt','No pelvic movement — no shunt, rotation or drop',
+          'No hip adduction or internal rotation','No knee valgus','The centre of the knee stays over the centre of the foot'],
+    why:'Compensation patterns develop after an ACL tear and they are invisible without looking. The guide puts it plainly: technique is everything. All eight points have to hold for a "good".'},
+  bridge:{n:'Single leg bridge',shape:'pair',u:'reps',ref:'Freckleton et al 2013 (variation)',
+    how:['Lie on your back with one heel on a bench about 60 cm high, that knee bent about 20 degrees.',
+         'The other leg is bent to 90 degrees and held up. Arms crossed on the chest.',
+         'Lift the hips as high as they will go. Someone marks that height with their hand.',
+         'Repeat, touching that same height each time, until you cannot reach it any more.'],
+    why:'Hamstring and glute endurance on one leg. The hamstrings pull the shin backwards, which is exactly the direction the ACL resists — they are the muscular backup for the ligament.'},
+  calf:{n:'Single leg calf raise',shape:'pair',u:'reps',ref:'Hébert-Losier et al 2017',
+    how:['Stand on one foot on the edge of a step.',
+         'Full range calf raises at one every two seconds.',
+         'The test ends when you cannot reach full range or cannot hold the tempo.'],
+    why:'The calf absorbs a large share of landing forces. It is the quietest deficit after an ACL reconstruction and the easiest to leave behind.'},
+  side:{n:'Side bridge endurance',shape:'pair',u:'sec',ref:'McGill et al 1999',
+    how:['Lie on your side with legs straight, top foot in front of the bottom foot.',
+         'Lift the hips to make a straight line head to feet.',
+         'Hold until the hips drop back to the mat. Time it. Both sides.'],
+    why:'Trunk endurance, not knee strength — and that is the point. The hip and trunk control where the knee goes when you land, which is why the guide tests it before it lets anyone run.'},
+  stance:{n:'Balance — unipedal stance',shape:'eoec',u:'sec',ref:'Springer et al 2007',
+    how:['Stand on one leg, other leg raised, arms crossed on the chest.',
+         'Time it with eyes open, then again with eyes closed.',
+         'The attempt ends if the arms uncross, the raised foot touches down, the standing foot moves, the eyes open on a closed trial, or 45 seconds pass.'],
+    why:'Closing the eyes takes vision away and leaves the knee’s own position sense to do the work — which is exactly what an ACL injury damages. The normative targets are 43 seconds eyes open and 9 seconds eyes closed for 18-39 year olds.'},
+  slrise:{n:'Single leg rise',shape:'pair',u:'reps',ref:'Culvenor et al 2016; Thorstensson et al 2004',
+    how:['Sit on a chair or bench with the test knee bent to 90 degrees, 10 cm from the edge.',
+         'Arms folded across the chest.',
+         'Stand up and sit down on that leg alone, as many times as you can, two seconds up and two seconds down.',
+         'It ends when you cannot do another, or the tempo or the form goes.'],
+    why:'Quadriceps strength you can actually use. Passing a number on a machine and failing this means the strength is not yet usable.'},
+  hop1:{n:'Single hop for distance',shape:'pair',u:'cm',ref:'Noyes et al 1991; Reid et al 2007',
+    how:['Stand on one leg, hop as far forward as you can, land on the same leg and hold it.',
+         'Measure from the toe at take-off to the heel at landing.',
+         'Two valid hops each leg; the average of the two is used.'],
+    why:'The oldest and best-validated of the hop battery. The guide also asks for the operated leg to reach the best pre-operative distance, not just to match the other leg — because the other leg gets weaker too while you are injured.'},
+  hop3:{n:'Triple hop for distance',shape:'pair',u:'cm',ref:'Noyes et al 1991',
+    how:['Three consecutive hops forward on the same foot.',
+         'Measure the total distance, toe at take-off to heel at the final landing.',
+         'Two valid attempts each leg, averaged.'],
+    why:'Adds the repeated absorb-and-produce cycle a single hop does not test.'},
+  hopx:{n:'Triple crossover hop',shape:'pair',u:'cm',ref:'Noyes et al 1991',
+    how:['A 15 cm strip on the floor to cross.',
+         'Three consecutive hops on one foot, crossing the strip each time — medial, lateral, medial.',
+         'Total distance, two attempts each leg, averaged.'],
+    why:'The rotational one. It finds the deficits the straight-line hops miss, which is why it is in every serious battery.'},
+  hopside:{n:'Side hop test',shape:'pair',u:'reps',ref:'Gustavsson et al 2006',
+    how:['Stand on the test leg, hands behind the back.',
+         'Hop side to side between two parallel strips of tape for 30 seconds.',
+         'Count the hops that do not touch the tape.'],
+    why:'Frontal-plane control under fatigue. This replaces the six-metre timed hop the app used before, because it is the one the Melbourne battery and the return-to-sport score are built on.'},
+  sebt:{n:'Star excursion balance test',shape:'pair',u:'cm',ref:'Gribble et al 2012',
+    how:['Stand on one leg in the centre of three taped lines — anterior, posteromedial, posterolateral.',
+         'Reach as far as you can down each line with the other foot, touch lightly, return under control.',
+         'Add the three reaches for a composite score per leg.'],
+    why:'Dynamic balance in three directions instead of standing still. Reduced anterior reach is associated with knee injury risk.'},
+  vest:{n:'Cooper & Hughes sports vestibular balance test',shape:'passfail',ref:'Cooper & Hughes',
+    how:['Stand on one leg with a soft bend at hip, knee and ankle, hands on your waist.',
+         'Turn the head side to side through 70-90 degrees at 60 beats a minute for 15 seconds, eyes following the head.',
+         'Then tilt the head up and down at the same rate for 15 seconds.',
+         'It is passed if single leg stance holds and the hands stay on the waist for both.'],
+    why:'Sport does not happen with your eyes locked forward. Taking the visual reference away while the head moves is the closest a clinic test gets to the moment people actually get hurt.'},
+  legpress:{n:'Single leg press 1RM',shape:'bw',ref:'Campanholi Neto et al 2015',supp:true,
+    how:['A 45-degree incline leg press, seat at 90 degrees to the slide. Warm up properly.',
+         'One repetition lowered to 90 degrees of knee bend and pressed back to full extension.',
+         'The result counts the sled plus the added weight, as a multiple of body weight.'],
+    why:'A supplementary goal in the guide, not a road-block — but strongly encouraged for anyone going back to jumping, cutting and pivoting sport.'},
+  squat1rm:{n:'Squat 1RM',shape:'bw',ref:'Melbourne ACL Guide 2.0',supp:true,
+    how:['Back, front or trap bar — whichever you squat. Warm up, and have a spotter.',
+         'Squat to about 90 degrees of knee bend and stand back up.',
+         'Recorded as a multiple of body weight.'],
+    why:'Supplementary, same as the leg press. Allena reads this one from your own logged squats, so it fills itself in.'},
+  tsk:{n:'Tampa Scale of Kinesiophobia (TSK-11)',shape:'score',ref:'Woby et al 2005',
+    how:['Eleven statements about pain and movement, each rated 1 to 4.',
+         'Scored 11 to 44. Eleven to 18 passes; 19 or more does not.'],
+    why:'Fear of movement. The guide is unusually firm here: someone who fails the TSK-11 should not continue the rest of the return-to-sport testing, because return to sport should not be on the table yet. It is a hurdle, not a score.'},
+  ikdc:{n:'IKDC subjective knee evaluation',shape:'score',ref:'Anderson et al 2006',
+    how:['Eighteen scored questions about symptoms, sport and daily function.',
+         'The raw total is transformed onto 0-100. It contributes a tenth of the return-to-sport score.'],
+    why:'Your own account of the knee, in a form that can be compared against thousands of others.'},
+  rsi:{n:'ACL-RSI — psychological readiness',shape:'score',ref:'Webster et al 2008',
+    how:['Twelve questions on confidence, fear and thoughts about the knee, each 0 to 100.',
+         'Averaged to a score out of 100.'],
+    why:'Fear of reinjury predicts who actually returns, independently of how strong the leg is. In the return-to-sport score it is all or nothing: over 90 scores full marks, under 90 scores zero.'},
+  fitness:{n:'General fitness tests',shape:'passfail',ref:'Melbourne ACL Guide 2.0',
+    how:['Two sports-specific fitness tests that were done before the injury — a beep test, a T-test, an Illinois agility run, a timed run, a sprint.',
+         'The result has to match or beat the pre-injury one. Pass or fail.',
+         'If there is no pre-injury baseline, the guide says agree two tests and two acceptable results with the coach or fitness staff first.'],
+    why:'Being fit enough to play is a separate question from whether the knee is ready, and it is the one that gets forgotten. A hurdle in the return-to-sport score.'}};
+
+/* ── the goals, by phase ─────────────────────────────────────────── */
+const ACL_GOAL={
+  /* pre-op */
+  '0:ext':{v:0,cmp:'lte',t:'0°'},'0:flex':{v:125,cmp:'gte',t:'125° or more'},
+  '0:dyno':{v:90,cmp:'lsi',t:'90% of the other side'},'0:stroke':{v:2,cmp:'lte',t:'Zero to 1+'},
+  '0:hop1':{v:90,cmp:'lsi',t:'90% of the other side'},
+  /* phase 1 */
+  '1:ext':{v:0,cmp:'lte',t:'0°'},'1:flex':{v:125,cmp:'gte',t:'125° or more'},
+  '1:lag':{v:5,cmp:'lte',t:'0 to 5° of lag'},'1:stroke':{v:2,cmp:'lte',t:'Zero to 1+'},
+  /* phase 2 */
+  '2:prone':{v:0,cmp:'equal',t:'Equal to the other side'},'2:flex':{v:125,cmp:'gte',t:'125° or more'},
+  '2:sls':{v:0,cmp:'rating',t:'Good'},'2:stroke':{v:0,cmp:'lte',t:'Zero'},
+  '2:bridge':{v:85,cmp:'lsi',t:'85% of the other side, and more than 20 reps'},'2:bridgeH':{v:20,cmp:'gte'},
+  '2:calf':{v:85,cmp:'lsi',t:'85% of the other side, and more than 20 reps'},'2:calfH':{v:20,cmp:'gte'},
+  '2:side':{v:85,cmp:'lsi',t:'85% of the other side, and at least 30 seconds'},'2:sideH':{v:30,cmp:'gte'},
+  '2:stance':{v:43,cmp:'eo',t:'43 seconds eyes open, 9 seconds eyes closed'},'2:stanceEC':{v:9,cmp:'gte'},
+  '2:slrise':{v:85,cmp:'lsi',t:'85% of the other side, and more than 10 reps each leg'},'2:slriseH':{v:10,cmp:'gte'},
+  '2:legpress':{v:1.5,cmp:'gte',t:'1.5 × body weight',supp:true},
+  '2:squat1rm':{v:1.5,cmp:'gte',t:'1.5 × body weight',supp:true},
+  /* phase 3 */
+  '3:hop1':{v:95,cmp:'lsi',t:'More than 95%, and at least your best pre-op hop'},
+  '3:hop3':{v:95,cmp:'lsi',t:'More than 95% of the other side'},
+  '3:hopx':{v:95,cmp:'lsi',t:'More than 95% of the other side'},
+  '3:hopside':{v:95,cmp:'lsi',t:'More than 95% of the other side'},
+  '3:slrise':{v:22,cmp:'gte',t:'More than 22 reps on both legs'},
+  '3:sebt':{v:95,cmp:'lsi',t:'More than 95% of the other side'},
+  '3:vest':{v:1,cmp:'pass',t:'Pass on both legs'},
+  '3:legpress':{v:1.8,cmp:'gte',t:'1.8 × body weight',supp:true},
+  '3:squat1rm':{v:1.8,cmp:'gte',t:'1.8 × body weight',supp:true}};
+
+/* the hurdle the guide puts in front of phase 3 TESTING — not the phase
+   itself. "The following hurdle criteria must be met before Phase 3
+   testing is conducted." */
+const ACL_P3_HURDLE=['Full range of motion — prone hang equal to the other side, and flexion past 125°',
+  'No effusion at all on the stroke test',
+  'A "good" rating on the single leg squat test',
+  'No side-to-side difference on the single leg bridge, the calf raise or the side bridge'];
+
+/* ── the Melbourne Return to Sport Score 2.0 ───────────────────────
+   Six parts, 100 points, two of them hurdles that stop the test rather
+   than score it. Run over two sessions at least three days apart:
+   parts A-D in the first, E and F in the second. */
+const MRSS_PARTS=[
+  {k:'A',n:'Stability, swelling and range',pts:10,raw:20,
+   items:['Effusion — absent scores 5, present scores 0','Stability on the pivot shift test — nil 5, grade I 3, grade II 1, grade III-IV 0',
+          'Flexion — 5, 3 or 0','Extension on the prone hang — 5, 3 or 0'],
+   note:'Scored out of 20 and converted to 10.'},
+  {k:'B',n:'IKDC and ACL-RSI',pts:20,raw:20,
+   items:['ACL-RSI — over 90% scores 10, under 90% scores 0','IKDC — the raw score out of 100, divided by 10'],
+   note:'The one place in the score where how you feel about the knee counts as much as what it does.'},
+  {k:'C',n:'Tampa Scale of Kinesiophobia',pts:0,hurdle:true,
+   items:['TSK-11 between 11 and 18 passes','19 or more fails'],
+   note:'A hurdle, not points. The guide: someone who fails should not continue the rest of the testing — return to sport should not be considered yet.'},
+  {k:'D',n:'Functional testing',pts:50,raw:50,
+   items:['Star excursion balance test — 10','Vestibular balance test — 10','Single hop — 5','Triple hop — 5',
+          'Triple crossover hop — 5','Side hop — 5','Single leg rise — 10'],
+   note:'Half the score. Every one of these is a limb symmetry index, banded.'},
+  {k:'E',n:'General fitness',pts:0,hurdle:true,
+   items:['Two sports-specific tests, each matching or beating the pre-injury result'],
+   note:'A hurdle. Suggested before part F, because part F needs you fatigued.'},
+  {k:'F',n:'Functional testing in a fatigued state',pts:20,raw:20,
+   items:['Single hop — 5','Triple hop — 5','Triple crossover hop — 5','Side hop — 5'],
+   note:'The four hops again, after sports-specific work has taken you to 7 out of 10 on a fatigue scale. This is the part nobody else does, and it is where knees are actually injured.'}];
+
+/* THE LIMB SYMMETRY BANDS, and the thing about them that matters:
+   they are TWO-SIDED. A limb symmetry index of 140% scores zero, the
+   same as 55%. Being far stronger on the operated side is not a pass,
+   it is a sign the other leg has wasted while you were not looking —
+   and the other leg is the one the index is measured against. Dominant
+   and non-dominant legs have their own bands. */
+const MRSS_LSI=[
+  {dom:[97,105],non:[95,103],pts:1.00},
+  {dom:[90,110],non:[85,110],pts:0.80},
+  {dom:[80,120],non:[75,120],pts:0.60},
+  {dom:[70,130],non:[65,130],pts:0.40},
+  {dom:[60,140],non:[55,140],pts:0.20}];
+function mrssLsiPoints(lsi,max,dominant){
+  try{
+    if(lsi==null||!isFinite(lsi))return null;
+    for(let i=0;i<MRSS_LSI.length;i++){
+      const b=dominant?MRSS_LSI[i].dom:MRSS_LSI[i].non;
+      if(lsi>=b[0]&&lsi<=b[1])return Math.round(max*MRSS_LSI[i].pts*10)/10}
+    return 0}
+  catch(e){oops('mrssLsiPoints',e);return null}}
+
+/* ── phase 5: prevention of re-injury ──────────────────────────────
+   The guide's own emphasis, and the one most people ignore: "Once
+   people are back running with no knee pain it's easy to think that
+   it's all done. But the last 1/3 of the protocol is the most
+   important." */
+const ACL_PREVENT={
+  need:['Plyometric, balance and strengthening exercises',
+        'Performed more than once a week',
+        'Continued for at least six weeks, and then kept going',
+        'Done before training and games, not instead of them — the guide says at least 10 minutes before every session, and 15 minutes in its return-to-sport criteria'],
+  programs:[['Sportsmetrics',''],['The FIFA 11+ warm-up',''],['The PEP Program',''],
+            ['The KNEE Program','Netball Australia'],['FootyFirst','AFL']]};
 function rehabAdherence(days){
   const window=days||28;
   const start=rehabStartKey();
@@ -7493,116 +7764,271 @@ function protoProgram(k){
    treating 90% as a finish line.
    ══════════════════════════════════════════════════════════ */
 const ACL_VER=3,MAX_WEEKS=16;
+/* ═══ THE PHASES ARE THE MELBOURNE GUIDE'S (15 Sep 2026) ══════════════
+   Six phases, not five, and the extra one is at the FRONT: the guide's
+   Pre-op phase, which the app had no equivalent of at all. Someone
+   injured and waiting for surgery had no pathway here, and the evidence
+   the guide cites for that phase is not marginal — full range, good
+   quadriceps and hamstring strength and minimal swelling before surgery
+   is associated with better outcomes up to two years afterwards.
+
+   THE NUMBERS MOVED, AND ONLY DOWNWARD. The app's old phase 4 (power and
+   change of direction) is the back half of the guide's phase 3; its old
+   phase 5 (return to sport) is the guide's phase 4. Anyone already on 4
+   or 5 is stepped back one, once, by aclMelMigrate(). Stepping someone
+   DOWN is the only safe direction for a migration that changes what a
+   number means: the alternative would have silently promoted a person
+   past the return-to-sport gate, which on this pathway is the one gate
+   that exists to stop somebody tearing the graft.
+
+   Rows carrying `meas` are measured against ACL_GOAL and read their own
+   test; rows without one are still a judgement the person and their
+   physio make together. Rows marked `supp` are the guide's supplementary
+   goals: "the absence of not performing supplementary tests is not
+   considered a road-block to the next phase", so they are shown, they
+   are celebrated, and they never hold anyone back. */
 const ACL_PHASES=[
- {n:1,name:'Settle & activate',aim:'Quiet the knee, full extension, wake the quadriceps.',weeks:'usually 0–4 weeks',
+ {n:0,name:'Before surgery',aim:'Settle the knee and take strength into the operation, not out of it.',weeks:'however long you have',only:'aclr',
+  goals:['Eliminate swelling','Regain full range of motion','90% quadriceps and hamstring strength'],
+  intro:'People understandably want the operation as soon as possible. The guide is clear that letting the knee settle first pays for years: full range, good quadriceps and hamstring strength and minimal swelling before surgery is associated with better outcomes up to two years after it. Icing, range work, low-impact cycling and a progressive strength programme. Aggressive change of direction is out.',
   gate:[
-   {k:'ext',t:'Full passive extension, equal to the other side',src:null,
-    how:'Lie face up, heel propped on a rolled towel, leg relaxed. Compare how far the back of each knee drops toward the bed. Your physio measures this properly with a goniometer.',
-    why:'Extension lost early is the hardest thing to get back, and a knee that will not straighten changes how you walk, which loads the joint badly for years. This is the one non-negotiable of the first month.'},
-   {k:'eff',t:'Effusion trace or less (stroke test)',src:null,
-    how:'Stroke upward on the inside of the knee two or three times to push fluid up, then stroke down the outside. Watch the inside: a visible wave returning means more than a trace.',
-    why:'Swelling shuts the quadriceps down — the reflex is called arthrogenic muscle inhibition. Strength work on a swollen knee gives you very little back. Swelling is also the clearest signal that yesterday\'s dose was too much.'},
-   {k:'slr',t:'Straight-leg raise with no extensor lag',src:null,
-    how:'Lie flat, lock the knee straight, lift the whole leg 20 cm. If the knee bends as it leaves the bed, that is a lag and it fails.',
-    why:'A lag means the quadriceps cannot hold the knee straight under its own limb weight. Until that is gone, loaded work has nothing to build on.'},
-   {k:'flex',t:'Knee flexion ≥ 120°',src:null,
-    how:'Sit on the edge of a bed and pull the heel back toward you. 120° is roughly heel under the knee joint, well past a right angle.',
-    why:'You need about 110° to cycle and 120° for stairs and squatting. It is a gateway to almost everything in phase 2.'},
-   {k:'gait',t:'Walking without a limp and without an aid',src:null,
+   {k:'ext0',t:'Passive knee extension at 0°',meas:'ext'},
+   {k:'flex0',t:'Passive knee flexion 125° or more',meas:'flex'},
+   {k:'quad0',t:'Quadriceps strength 90% of the other side',meas:'quad'},
+   {k:'ham0',t:'Hamstring strength 90% of the other side',meas:'ham'},
+   {k:'eff0',t:'Swelling at Zero to 1+ on the stroke test',meas:'stroke'},
+   {k:'hop0',t:'Single hop 90% of the other side',meas:'hop1',
+    note:'Record this one even if nothing else gets done. Phase 3 asks the operated leg to beat your best pre-operative hop, and without a number from now there is nothing to beat.'}]},
+ {n:1,name:'Recovery from surgery',aim:'Get the knee straight, settle the swelling, get the quadriceps firing.',weeks:'usually the first 1–2 weeks, then as long as it takes',
+  goals:['Get the knee straight','Settle the swelling down','Get the quadriceps firing'],
+  intro:'Reconstruction is traumatic to the knee and it needs a period of rest. Tempting as it is to push, the guide asks for the first one to two weeks to be basic range work, quadriceps setting, ice and compression. Medication is a conversation with your doctor, not with an app.',
+  gate:[
+   {k:'ext1',t:'Passive knee extension at 0°',meas:'ext'},
+   {k:'flex1',t:'Passive knee flexion 125° or more',meas:'flex'},
+   {k:'lag1',t:'Quadriceps lag of 5° or less',meas:'lag'},
+   {k:'eff1',t:'Swelling at Zero to 1+ on the stroke test',meas:'stroke'},
+   {k:'gait',t:'Walking without a limp and without an aid',
     how:'Walk 20 metres and film it from the side. Look for equal time on each leg and a knee that bends and straightens rather than staying stiff.',
     why:'A limp is a habit that outlives the injury. Fixing it now prevents the stiff-knee gait pattern that shows up in ACL-deficient knees years later.'}]},
- {n:2,name:'Build the foundation',aim:'Restore quadriceps strength and single-leg control — in two stages, Rebuild then Build.',weeks:'usually 4–12 weeks',
+ {n:2,name:'Strength and neuromuscular control',aim:'Strength, balance and basic co-ordination — the phase that decides how the rest goes.',weeks:'as long as the knee needs',
+  goals:['Regain single leg balance','Regain muscle strength','Single leg squat with good control'],
+  intro:'Body weight work first, then a gym programme of resistance, balance and co-ordination. The guide’s instruction for this phase is to listen to the knee and progress only as fast as it allows — increasing pain or swelling means the knee is not tolerating the workload. Some clinicians start walk-jogging or mini jumps late in this phase, but the bulk of impact belongs to phase 3.',
   gate:[
-   {k:'quad70',t:'Quadriceps strength ≥ 70% of the other leg',src:'quad',need:70,
-    how:'Run the guided quadriceps test in this app. Same method, same day, both legs, injured leg tested first.',
-    why:'70% is the point where single-leg loading becomes productive rather than compensatory. Below it you will simply shift the work to the good leg and the gap widens.'},
-   {k:'sls',t:'30-second single-leg stance, level pelvis',src:null,
-    how:'Stand on the injured leg, hands on hips, eyes forward, 30 seconds. The hip must not drop on the free side and the standing foot should not skate around.',
-    why:'Balance failure here is a control problem, not a strength problem, and it predicts poor landing mechanics later.'},
-   {k:'sq',t:'Bodyweight squat to 90° with symmetrical weight',src:null,
-    how:'Squat with a foot on a bathroom scale under each leg. More than a 10% difference between scales is asymmetry worth working on.',
-    why:'Weight-shifting away from the injured leg is nearly universal after ACL injury and invisible without measuring. It carries straight into every loaded exercise.'},
-   {k:'build',t:'Moved from Rebuild A to Build B without a reaction',src:null,
-    how:'The Build session run twice with no next-day swelling and no loss of extension.',
-    why:'Phase 2 has two stages for a reason — the step from straight-leg raises to loaded single-leg work is where knees get angry. Clearing Build is the evidence you tolerated load, not just that four weeks passed.'},
-   {k:'noeff',t:'No swelling increase the day after training',src:null,
+   {k:'prone2',t:'Prone hang equal to the other side',meas:'prone'},
+   {k:'flex2',t:'Passive knee flexion 125° or more',meas:'flex'},
+   {k:'sls2',t:'A "good" rating on the single leg squat test',meas:'sls'},
+   {k:'eff2',t:'No effusion at all on the stroke test',meas:'stroke'},
+   {k:'bridge2',t:'Single leg bridge 85%, more than 20 reps',meas:'bridge'},
+   {k:'calf2',t:'Single leg calf raise 85%, more than 20 reps',meas:'calf'},
+   {k:'side2',t:'Side bridge 85%, at least 30 seconds',meas:'side'},
+   {k:'stance2',t:'Balance 43 seconds eyes open, 9 eyes closed',meas:'stance'},
+   {k:'slrise2',t:'Single leg rise 85%, more than 10 reps each leg',meas:'slrise'},
+   {k:'noeff2',t:'No swelling increase the day after training',
     how:'Check the knee each morning after a session. If it is puffier or stiffer than the day before, that session was too much.',
-    why:'Next-day swelling is the most reliable dosing signal you have. Ignoring it is the most common way people stall for months.'}]},
- {n:3,name:'Load & run',aim:'Heavy strength, landing mechanics, back to running.',weeks:'usually 3–6 months',
+    why:'Next-day swelling is the most reliable dosing signal you have, and ignoring it is the most common way people stall for months.'},
+   {k:'lp2',t:'Single leg press 1.5 × body weight',meas:'legpress',supp:true},
+   {k:'sq2',t:'Squat 1.5 × body weight',meas:'squat1rm',supp:true}]},
+ {n:3,name:'Running, agility and landings',aim:'Back to running, hopping and change of direction — with the landing mechanics to survive it.',weeks:'the knee should be pain and swelling free throughout',
+  goals:['Excellent hopping performance','Complete an agility program','Full strength and balance'],
+  intro:'Agility drills, jumping and hopping, change of direction and modified game play, on top of the gym programme. The knee should be swelling and pain free through this phase. The emphasis is on deceleration — landing and pivoting biomechanics have to be right before phase 4, not after. Much of this work is eccentric, so rest matters as much as the drills.',
+  hurdle:ACL_P3_HURDLE,
   gate:[
-   {k:'quad80',t:'Quadriceps strength ≥ 80%',src:'quad',need:80,
-    how:'Guided quadriceps test, same method as last time so the numbers are comparable.',
-    why:'Running puts two to three times bodyweight through the knee on each stride. 80% is the accepted floor before that is reasonable.'},
-   {k:'ham80',t:'Hamstring strength ≥ 80%',src:'ham',need:80,
-    how:'Guided hamstring test in this app. If your graft was taken from the hamstring, expect this to lag and to need direct work for longer.',
-    why:'Hamstrings pull the shin backwards, which is precisely the direction the ACL resists. They are the muscular backup for the ligament, and a low hamstring-to-quadriceps ratio is associated with worse outcomes.'},
-   {k:'sldl',t:'Single-leg sit-to-stand from a low box, controlled',src:null,
-    how:'Sit on a box around 40 cm, stand up on the injured leg alone without rocking or using hands, five times.',
-    why:'This is the practical expression of quadriceps strength. Passing the number on a machine but failing this means the strength is not usable yet.'},
-   {k:'land',t:'Double-leg landings with knees tracking over the toes',src:null,
-    how:'Film yourself from the front dropping off a 30 cm box and landing. The knees must not collapse inward on impact.',
-    why:'Knee valgus on landing is the single most recognisable mechanism of ACL injury. Correcting it before adding speed is the whole point of phase 3.'},
-   {k:'perturb1',t:'Perturbation training started',src:null,only:'deficient',
-    how:'Begin progressive balance-under-disturbance work twice a week: single-leg stance on a stable surface with someone nudging you, then on foam, then on a tilt or roller board.',
-    why:'Started in this phase rather than later because the neuromuscular adaptation takes weeks, and it is what allows an ACL-deficient knee to tolerate running and cutting at all.'},
-   {k:'run',t:'20 minutes continuous running, no swelling the next day',src:null,
-    how:'Build from 1 minute jogging / 1 minute walking. Add one minute of jogging per session only when the previous session caused no reaction.',
-    why:'Running is the first real impact loading. Reaching 20 unbroken minutes without a response tells you the joint tolerates repetitive load.'}]},
- {n:4,name:'Power & change of direction',aim:'Single-leg plyometrics, deceleration, planned cutting.',weeks:'usually 5–9 months',
-  gate:[
-   {k:'quad90',t:'Quadriceps strength ≥ 90%',src:'quad',need:90,
-    how:'Guided quadriceps test. Compare against pre-injury numbers if you have them.',
-    why:'Persistent quadriceps weakness is associated with abnormal knee loading and higher reinjury risk; roughly every 1% of symmetry gained has been linked to about a 3% reduction in reinjury risk. This is the most important number in the whole pathway.'},
-   {k:'ham90',t:'Hamstring strength ≥ 90%',src:'ham',need:90,
-    how:'Guided hamstring test.',
-    why:'Cutting and decelerating demand hamstring strength at speed. Bringing quadriceps to 90% while the hamstring lags leaves the knee under-protected exactly when the loads get sharp.'},
-   {k:'hop90',t:'All four hop tests ≥ 90% symmetry',src:'hop',
-    how:'Single hop, triple hop, crossover hop and 6 m timed hop, each leg, best of three. The app calculates all four.',
-    why:'Hop tests read power, control and confidence under impact in a way a strength machine cannot. Using all four catches deficits that any single test misses.'},
-   {k:'rsi',t:'ACL-RSI ≥ 65 (psychological readiness)',src:'rsi',need:65,
-    how:'The questionnaire in this app.',
-    why:'Fear of reinjury predicts who actually returns, independently of strength, and low scores have been associated with second injuries. A confident knee is trained, not talked into.'},
-   {k:'cod',t:'Planned change of direction at full effort, no apprehension',src:null,
-    how:'Marked cones, you know where you are going, full speed. Film it — look for a knee that stays over the foot as you plant.',
-    why:'Planned cutting is the rehearsal for the reactive cutting in phase 5. If it is not clean when you know what is coming, it will not be clean when you do not.'}]},
- {n:5,name:'Return to sport',aim:'Reactive agility, contact, graded return to competition.',weeks:'9 months at the earliest',
+   {k:'hop1_3',t:'Single hop over 95%, and past your pre-op best',meas:'hop1'},
+   {k:'hop3_3',t:'Triple hop over 95%',meas:'hop3'},
+   {k:'hopx3',t:'Triple crossover hop over 95%',meas:'hopx'},
+   {k:'hops3',t:'Side hop over 95%',meas:'hopside'},
+   {k:'slrise3',t:'Single leg rise over 22 reps on both legs',meas:'slrise'},
+   {k:'sebt3',t:'Star excursion balance over 95%',meas:'sebt'},
+   {k:'vest3',t:'Vestibular balance test passed on both legs',meas:'vest'},
+   {k:'land',t:'Landings with the knee tracking over the foot',
+    how:'Film yourself from the front dropping off a 30 cm box and landing. The knee must not collapse inward on impact.',
+    why:'Knee valgus on landing is the single most recognisable mechanism of ACL injury. Correcting it before adding speed is the whole point of this phase.'},
+   {k:'perturb1',t:'Perturbation training started',only:'deficient',
+    how:'Progressive balance-under-disturbance work twice a week: single leg stance on a stable surface with someone nudging you, then on foam, then on a tilt or roller board.',
+    why:'Started here rather than later because the neuromuscular adaptation takes weeks, and it is what lets an ACL-deficient knee tolerate running and cutting at all.'},
+   {k:'lp3',t:'Single leg press 1.8 × body weight',meas:'legpress',supp:true},
+   {k:'sq3',t:'Squat 1.8 × body weight',meas:'squat1rm',supp:true}]},
+ {n:4,name:'Return to sport',aim:'From restricted training to unrestricted, and back to competition when the score says so.',weeks:'9 months at the earliest',
+  goals:['95 or more on the Melbourne Return to Sport Score','Comfortable, confident and eager to go back','An injury prevention program in place'],
+  intro:'This phase is about the whole person, not just the knee. Confidence comes from repetition of successful training and match play, so the emphasis is progressive: restricted training, then unrestricted, then competition. The guide suggests a minimum of nine months and says plainly to be guided by your surgeon and sports medicine team.',
   gate:[
    {k:'time',t:'At least 9 months since surgery',src:'time',only:'aclr',
     how:'Counted from the surgery date you entered.',
     why:'Reinjury risk fell 51% for every month return was delayed up to 9 months in the Delaware-Oslo cohort, with no further benefit after that. Graft remodelling is a biological timeline that testing cannot shortcut.'},
-   {k:'nogive',t:'No giving-way episodes for at least 3 months',src:null,only:'deficient',
+   {k:'tsk4',t:'Tampa Scale of Kinesiophobia passed',meas:'tsk'},
+   {k:'mrss4',t:'Melbourne Return to Sport Score over 95',src:'mrss'},
+   {k:'fit4',t:'Both general fitness tests passed',meas:'fitness'},
+   {k:'ready4',t:'Comfortable, confident and eager to return',
+    how:'Your own answer, said out loud to your physio.',
+    why:'The guide lists this beside the score rather than inside it. A number can clear someone who is not ready, and no number should be allowed to argue with the person whose knee it is.'},
+   {k:'prevent4',t:'An injury prevention program agreed and started',
+    how:'Pick one of the established programs and put it before training, not after.',
+    why:'The guide makes this a return-to-sport criterion rather than an afterthought: the program is discussed, implemented, and continued while you are playing.'},
+   {k:'nogive',t:'No giving-way episodes for at least 3 months',only:'deficient',
     how:'Count any episode where the knee shifted, buckled or gave out — in sport, on stairs, stepping off a kerb. One episode resets the clock.',
-    why:'Without a ligament, repeated instability is what separates those who cope from those who do not, and each episode risks meniscus and cartilage damage that is permanent. There is no graft to wait for here, so your knee\'s own behaviour is the timeline.'},
-   {k:'perturb',t:'Perturbation training block completed',src:null,only:'deficient',
-    how:'Around ten sessions of progressive balance-under-disturbance work — roller board, tilt board, someone destabilising you while you hold single-leg positions — usually over four to six weeks.',
-    why:'This is the intervention with the strongest evidence for the non-operative path: potential copers who completed perturbation training were far more likely to return to sport successfully than those given standard rehab alone. It teaches the muscles to stabilise a knee the ligament no longer stabilises.'},
-   {k:'coper',t:'Coper screening passed with your physio',src:null,only:'deficient',
-    how:'The Delaware screen: timed hop ≥80% symmetry, knee-function questionnaire ≥80%, self-rated function ≥60%, and no more than one giving-way episode since the injury.',
-    why:'It separates those who can genuinely function without an ACL from those who cannot. Failing it is not a personal failure — it is the strongest indication that reconstruction deserves a serious conversation.'},
-   {k:'quad90b',t:'Quadriceps ≥ 90%, held at retest',src:'quad',need:90,re:90,
-    how:'Retest rather than reusing the phase 4 number.',
-    why:'Strength drifts down once training turns toward speed and skill. The number has to be current on the day you return.'},
-   {k:'ham90b',t:'Hamstring ≥ 90%, held at retest',src:'ham',need:90,re:90,
-    how:'Retest.',
-    why:'Same reasoning. Hamstring strength tends to fade first when sessions shift to sport.'},
-   {k:'hop90b',t:'Hop battery ≥ 90%, held at retest',src:'hop',re:90,
-    how:'Full four-hop battery again.',
-    why:'Confirms that power and control survived the transition to sport-speed training.'},
-   {k:'rsi75',t:'ACL-RSI ≥ 75',src:'rsi',need:75,re:65,
-    how:'Repeat the questionnaire.',
-    why:'A higher bar than phase 4 because competition is unpredictable. Hesitating for a fraction of a second while planting is itself a risk.'},
-   {k:'react',t:'Reactive agility and sport drills at full speed',src:null,
-    how:'Someone else calls the direction as you approach. Unplanned cutting, contact, fatigue.',
-    why:'Almost all non-contact ACL injuries happen when the movement is unplanned. Every test above measures a knee that knew what was coming.'},
-   {k:'prac',t:'Two weeks of full training with no reaction',src:null,
-    how:'Full training load, no swelling, no pain, no loss of movement quality across two weeks.',
-    why:'The last gate is exposure. Passing tests in a clinic is not the same as tolerating a week of your actual sport.'}]}];
+    why:'Without a ligament, repeated instability is what separates those who cope from those who do not, and each episode risks permanent meniscus and cartilage damage. There is no graft to wait for here, so your knee\u2019s own behaviour is the timeline.'},
+   {k:'perturb',t:'Perturbation training block completed',only:'deficient',
+    how:'Around ten sessions of progressive balance-under-disturbance work — roller board, tilt board, someone destabilising you while you hold single leg positions — usually over four to six weeks.',
+    why:'The intervention with the strongest evidence for the non-operative path: potential copers who completed perturbation training were far more likely to return to sport successfully than those given standard rehab alone.'},
+   {k:'coper',t:'Coper screening passed with your physio',only:'deficient',
+    how:'The Delaware screen: timed hop 80% symmetry or better, knee-function questionnaire 80% or better, self-rated function 60% or better, and no more than one giving-way episode since the injury.',
+    why:'It separates those who can genuinely function without an ACL from those who cannot. Failing it is not a personal failure — it is the strongest indication that reconstruction deserves a serious conversation.'}]},
+ {n:5,name:'Prevention of re-injury',aim:'The last third, and the guide says it is the most important.',weeks:'ongoing, for as long as you play',
+  goals:['Plyometric, balance and strength work','More than once a week','Six weeks, and then keep going'],
+  intro:'"Once people are back running with no knee pain it’s easy to think that it’s all done. But the last 1/3 of the protocol is the most important" — to reduce the chance of re-injury, to improve the chance of a successful return, and possibly to reduce the likelihood of osteoarthritis later. Injury prevention programs work by improving neuromuscular control in standing, cutting and landing.',
+  gate:[
+   {k:'prog5',t:'A prevention program with plyometrics, balance and strength',
+    how:'Sportsmetrics, the FIFA 11+, the PEP Program, the KNEE Program or FootyFirst — all published and free.',
+    why:'These three ingredients are what the successful programs have in common. A warm-up that is only a jog and a stretch is not one of them.'},
+   {k:'freq5',t:'Done more than once a week',
+    how:'Before training and before games, not instead of them.',
+    why:'Frequency is the ingredient most often dropped, and the one the evidence is clearest about.'},
+   {k:'dur5',t:'Kept up for at least six weeks, and then kept going',
+    how:'The guide asks for at least 10 minutes before every session, and 15 minutes in its return-to-sport criteria.',
+    why:'Six weeks is where the adaptation shows. Stopping there is where it goes again.'}]}];
 function rehabIssues(){return (S.acl&&S.acl.issues)||[]}
 function logIssue(ex,kind,phase,type){
   S.acl.issues=S.acl.issues||[];
   S.acl.issues.push({date:today(),ex:ex,kind:kind,phase:phase||(S.acl&&S.acl.phase)||null,type:type||'session'});
   aclSave()}
 function aclSave(){lset(K_ACL,S.acl)}
+/* ═══ READING A MEASURE ═══════════════════════════════════════════════
+   One reader for every outcome measure in the guide, so a phase row says
+   WHICH measure it wants and the goal table says what "met" means. The
+   alternative — a branch per test inside the gate — is how the old gate
+   ended up reading aclLatest() for a row whose own copy promised a
+   retest (audit A9). One fact, one reader. */
+function aclPhaseDef(n){return ACL_PHASES.find(p=>p.n===+n)||null}
+function aclPhases(){
+  /* the pre-op phase belongs to people heading for surgery; someone
+     managing an ACL-deficient knee never has one */
+  return ACL_PHASES.filter(p=>!p.only||p.only===(S.acl&&S.acl.mode))}
+/* THE MIGRATION, AND IT ONLY EVER STEPS SOMEONE DOWN (15 Sep 2026). The
+   app's old phase 4 is the back half of the guide's phase 3, and its old
+   phase 5 is the guide's phase 4 — so a stored 4 and 5 now mean
+   something further along than the person earned. Stepping DOWN is the
+   only safe direction when a number changes meaning: the alternative
+   promotes somebody past the return-to-sport gate, which is the one gate
+   on this pathway that exists to stop a graft being torn. Runs once,
+   stamped on the ACL blob, and never touches 1-3. */
+function aclMelMigrate(){
+  try{
+    const A=S.acl;if(!A||A.mel)return false;
+    A.mel=1;
+    const was=+A.phase||1;
+    if(was>=5)A.phase=4;else if(was===4)A.phase=3;
+    if(A.peak){const pk=+A.peak;A.peak=pk>=5?4:(pk===4?3:pk)}
+    aclSave();
+    return was!==A.phase}
+  catch(e){oops('aclMelMigrate',e);return false}}
+function aclLatestOf(kind){
+  try{const t=(S.acl.tests||[]).filter(x=>x.kind===kind);return t.length?t[t.length-1]:null}
+  catch(e){return null}}
+/* the legacy four-in-one hop record still answers for three of the four
+   hops it actually contained. It never contained a SIDE hop — that one
+   is the Melbourne battery's and the old battery's fourth test was a
+   six-metre timed hop — so it is not allowed to answer for it. */
+function aclMeasLatest(meas){
+  const direct=aclLatestOf(meas);
+  if(direct)return direct;
+  const leg={hop1:'single',hop3:'triple',hopx:'cross'}[meas];
+  if(leg){const h=aclLatestOf('hop');
+    if(h&&h[leg]!=null)return{kind:meas,date:h.date,lsi:h[leg],legacy:true}}
+  return null}
+function aclMeasVal(meas,t){
+  if(!t)return null;
+  const m=ACL_MEAS[meas]||{};
+  switch(m.shape){
+    case 'pair':return t.lsi!=null?t.lsi:null;
+    case 'pairdiff':return t.val!=null?+t.val:null;
+    case 'deg':return t.val!=null?+t.val:null;
+    case 'grade':return t.grade!=null?+t.grade:null;
+    case 'rating':return t.rating!=null?+t.rating:null;
+    case 'eoec':return t.eo!=null?+t.eo:null;
+    case 'passfail':return t.pass?1:0;
+    case 'score':return t.score!=null?+t.score:null;
+    case 'bw':return t.x!=null?+t.x:null;
+    default:return t.lsi!=null?t.lsi:null}}
+/* body weight, from the most recent source that actually measured it */
+function aclBodyW(){
+  try{
+    const sc=(S.scans||[]).filter(x=>+x.w>0);
+    if(sc.length)return +sc[sc.length-1].w;
+    if(S.prof&&+S.prof.bw>0)return +S.prof.bw;
+    return null}
+  catch(e){return null}}
+/* the two supplementary strength goals fill themselves in from logged
+   lifts where they can. The guide calls them a bonus and says the
+   absence of them is never a road-block, so a missing number here is
+   quiet, never a refusal. */
+function aclSuppAuto(meas){
+  try{
+    const bw=aclBodyW();if(!(bw>0))return null;
+    const want=meas==='squat1rm'?/\bsquat\b/i:/leg press/i;
+    let best=0,when=null;
+    (S.history||[]).forEach(h=>{if(h.run||!h.complete)return;
+      (h.log||[]).forEach(l=>{if(!l||!(+l.w>0)||!(+l.r>0))return;
+        if(!want.test(String(l.ex||'')))return;
+        const e=(typeof e1rm==='function')?e1rm(+l.w,+l.r):null;
+        if(e>best){best=e;when=hKey(h)}})});
+    if(!(best>0))return null;
+    return{x:best/bw,kg:best,bw:bw,date:when,auto:true}}
+  catch(e){oops('aclSuppAuto',e);return null}}
+function aclMeasState(ph,meas){
+  try{
+    const m=ACL_MEAS[meas]||{};
+    const g=ACL_GOAL[ph+':'+meas]||null;
+    let t=aclMeasLatest(meas);
+    if(!t&&m.supp)t=aclSuppAuto(meas);
+    if(!t)return{met:false,auto:null,detail:'',goal:g,miss:true};
+    const v=m.supp&&t.auto?t.x:aclMeasVal(meas,t);
+    const out={met:false,auto:v,detail:'',goal:g,when:t.date,legacy:!!t.legacy,autoRead:!!t.auto};
+    if(!g)return out;
+    const hurdleOK=(key,both)=>{const h=ACL_GOAL[ph+':'+key];
+      if(!h)return true;
+      const a=+t.inj,b=+t.other;
+      if(!(a>0))return false;
+      return both?(a>=h.v&&b>=h.v):(a>=h.v)};
+    switch(g.cmp){
+      case 'lte':out.met=v!=null&&v<=g.v;break;
+      case 'gte':out.met=v!=null&&v>=g.v;break;
+      case 'equal':out.met=v!=null&&Math.abs(v)<=1;break;
+      case 'rating':out.met=v===0;break;
+      case 'pass':out.met=v===1;break;
+      case 'eo':out.met=v!=null&&v>=g.v&&(+t.ec)>=((ACL_GOAL[ph+':stanceEC']||{}).v||0);break;
+      case 'lsi':{
+        const hk={bridge:'bridgeH',calf:'calfH',side:'sideH',slrise:'slriseH'}[meas];
+        out.met=v!=null&&v>=g.v&&(!hk||hurdleOK(hk,false));break}
+      default:out.met=v!=null&&v>=g.v}
+    /* the guide asks the operated leg to beat the best PRE-OPERATIVE hop,
+       not only to match the other leg today — because the other leg gets
+       weaker too while somebody is injured, and a symmetry index against
+       a wasted leg flatters everybody */
+    if(meas==='hop1'&&+ph===3&&out.met){
+      const pre=(S.acl.tests||[]).filter(x=>x.kind==='hop1'&&x.pre);
+      if(pre.length){const best=Math.max.apply(null,pre.map(x=>Math.max(+x.inj||0,+x.other||0)));
+        if(best>0&&+t.inj<best){out.met=false;
+          out.detail='symmetry is there, but '+Math.round(t.inj)+' cm is under your best pre-op hop of '+Math.round(best)+' cm'}}}
+    if(!out.detail){
+      if(m.shape==='pairdiff')out.detail=(Math.abs(v)<=1?'equal to the other side':(Math.round(Math.abs(v)*10)/10)+' cm apart')+
+        (t.inj!=null?' \u00b7 '+t.inj+' cm vs '+t.other:'');
+      else if(m.shape==='pair')out.detail=Math.round(v)+'%'+(t.inj>0?' \u00b7 '+t.inj+(m.u==='cm'?' cm':m.u==='reps'?' reps':m.u==='sec'?' s':'')+' vs '+t.other:'');
+      else if(m.shape==='grade')out.detail=(m.grades[v]||'').split(' \u2014')[0];
+      else if(m.shape==='rating')out.detail=m.ratings[v]||'';
+      else if(m.shape==='passfail')out.detail=v===1?'passed':'not passed';
+      else if(m.shape==='eoec')out.detail=t.eo+' s eyes open \u00b7 '+t.ec+' s eyes closed';
+      else if(m.shape==='bw')out.detail=(Math.round(v*100)/100)+'\u00d7 body weight'+(t.auto?' \u2014 read from your logs':'');
+      else out.detail=(Math.round(v*10)/10)+(m.u||'');
+      if(t.date)out.detail+=' \u00b7 '+fmtDate(t.date)}
+    if(t.legacy)out.detail+=' \u00b7 from your old four-hop test';
+    return out}
+  catch(e){oops('aclMeasState',e);return{met:false,auto:null,detail:'',goal:null}}}
+/* the TSK-11 is a hurdle in the guide, not a score: 11-18 passes, 19 or
+   more does not, and someone who fails "should not continue with the
+   remainder of the MRSS2.0 testing as return to sport should not be
+   considered" */
+function aclTskPass(){const t=aclLatestOf('tsk');
+  return t&&+t.score>=11&&+t.score<=18}
 function aclLatest(kind){const t=S.acl.tests.filter(x=>x.kind===kind);return t.length?t[t.length-1]:null}
 /* ═══ A RETEST IS A NEW NUMBER (14 Sep 2026, engine audit) ═══════════
    Phase 5's copy promises it out loud — "Retest rather than reusing the
@@ -7636,8 +8062,86 @@ function aclLatestRetest(kind,need){
   return{t:ts.length?ts[ts.length-1]:null,base:base}}
 function aclMonths(){if(!S.acl.date)return null;
   return (Date.now()-new Date(S.acl.date+'T12:00').getTime())/(30.44*864e5)}
+/* ═══ THE MELBOURNE RETURN TO SPORT SCORE 2.0 ════════════════════════
+   A hundred points across six parts, two of which are hurdles rather
+   than points. Built from the measures already recorded, so it is a
+   READING of the tests rather than a separate thing to fill in — the one
+   exception being the clinical exam in part A, which needs a physio's
+   hands on the knee and is entered as they give it.
+
+   What it does NOT do is guess. A part with no data is reported as
+   missing and its points are withheld; the score says how much of itself
+   has actually been measured, because a 62 built from half the tests is
+   not a 62, and the number that decides whether somebody goes back to
+   sport is the last number in this app that should be rounded up. */
+function mrssStore(){return (S.acl&&S.acl.mrss)||{}}
+function mrssScore(){
+  try{
+    const M=mrssStore(),out={parts:{},total:0,max:0,missing:[],hurdles:{},done:false,oldest:null,stale:[]};
+    const dom=!!(S.acl&&S.acl.dom);   /* is the operated leg the dominant one */
+    /* A RETEST IS A NEW NUMBER, and this is where that rule lives now
+       (audit A9, carried over 15 Sep). The old phase 5 carried explicit
+       "held at retest" rows; the guide replaces them with one scored
+       testing event, so the protection has to move with them. The score
+       records how old its oldest input is, and refuses to PASS on
+       anything older than eight weeks — the same freshness window every
+       other gate uses. Somebody does not return to sport on a hop test
+       from three months ago. */
+    const FRESH=56;
+    const age=d=>{try{return (Date.now()-new Date(d+'T12:00').getTime())/864e5}catch(e){return 1e9}};
+    const note=t=>{if(!t||!t.date)return t;
+      const a=age(t.date);
+      if(!out.oldest||t.date<out.oldest)out.oldest=t.date;
+      if(a>FRESH&&out.stale.indexOf(t.kind)<0)out.stale.push(t.kind);
+      return t};
+    const lsiPts=(meas,max)=>{
+      const t=aclMeasLatest(meas);
+      if(!t||t.lsi==null)return null;
+      note(t);
+      return mrssLsiPoints(t.lsi,max,dom)};
+    /* Part A — clinical examination, entered from the physio's findings */
+    if(M.a&&M.a.eff!=null&&M.a.stab!=null&&M.a.flex!=null&&M.a.ext!=null){
+      const raw=(+M.a.eff)+(+M.a.stab)+(+M.a.flex)+(+M.a.ext);
+      out.parts.A=Math.round(raw/2*10)/10}
+    else out.missing.push('A');
+    /* Part B — ACL-RSI is all or nothing over 90, IKDC is its raw tenth */
+    {const r=aclLatestOf('rsi'),k=aclLatestOf('ikdc');
+     if(r&&k){note(r);note(k);out.parts.B=(+r.score>90?10:0)+Math.round(+k.score)/10}
+     else out.missing.push('B')}
+    /* Part C — the kinesiophobia hurdle */
+    {const t=aclLatestOf('tsk');
+     if(t)note(t);
+     out.hurdles.C=t?aclTskPass():null;
+     if(!t)out.missing.push('C')}
+    /* Part D — functional testing */
+    {const sebt=lsiPts('sebt',10),rise=lsiPts('slrise',10);
+     const v=aclLatestOf('vest');if(v)note(v);
+     const h=['hop1','hop3','hopx','hopside'].map(x=>lsiPts(x,5));
+     if(sebt!=null&&rise!=null&&v&&h.every(x=>x!=null))
+       out.parts.D=sebt+rise+(v.pass?10:0)+h.reduce((a,b)=>a+b,0);
+     else out.missing.push('D')}
+    /* Part E — the fitness hurdle */
+    {const f=aclLatestOf('fitness');
+     if(f)note(f);
+     out.hurdles.E=f?!!f.pass:null;
+     if(!f)out.missing.push('E')}
+    /* Part F — the same four hops, fatigued to 7/10 */
+    {const g=M.f||null;
+     if(g&&['hop1','hop3','hopx','hopside'].every(k=>g[k]!=null))
+       out.parts.F=['hop1','hop3','hopx','hopside']
+         .map(k=>mrssLsiPoints(+g[k],5,dom)||0).reduce((a,b)=>a+b,0);
+     else out.missing.push('F')}
+    ['A','B','D','F'].forEach(k=>{const p=MRSS_PARTS.find(x=>x.k===k);
+      out.max+=p.pts;if(out.parts[k]!=null)out.total+=out.parts[k]});
+    out.total=Math.round(out.total*10)/10;
+    out.measured=['A','B','D','F'].filter(k=>out.parts[k]!=null)
+      .reduce((a,k)=>a+MRSS_PARTS.find(x=>x.k===k).pts,0);
+    out.done=out.missing.length===0;
+    out.pass=out.done&&out.total>95&&out.hurdles.C===true&&out.hurdles.E===true&&!out.stale.length;
+    return out}
+  catch(e){oops('mrssScore',e);return{parts:{},total:0,max:100,missing:['A','B','C','D','E','F'],hurdles:{},done:false}}}
 function aclGateState(ph){
-  const g=ACL_PHASES[ph-1];if(!g)return null;
+  const g=aclPhaseDef(ph);if(!g)return null;
   const manual=S.acl.gates||{};
   return g.gate.filter(r=>!r.only||r.only===S.acl.mode).map((row,idx)=>{
     const key=row.k,src=row.src;
@@ -7661,8 +8165,29 @@ function aclGateState(ph){
       detail='the '+fmtDate(redue.date)+' test is the one that cleared the phase below — this gate needs a new one'}
     if(src==='time'){const mo=aclMonths();
       if(mo!=null){auto=mo;met=mo>=9;detail=mo.toFixed(1)+' months since surgery'}}
+    /* a measured row reads its own outcome measure against the guide's
+       own goal; nothing about it is hand-ticked, and nothing about it is
+       inferred from a different test */
+    let meas=null,goal=null,supp=!!row.supp;
+    if(row.meas){
+      const m9=ACL_MEAS[row.meas]||{};
+      const st=aclMeasState(ph,row.meas);
+      meas=row.meas;goal=st.goal;
+      auto=st.auto;detail=st.detail;met=st.met||met;
+      if(st.met)met=true;
+      return{i:idx+1,key:key,label:row.t,meas:meas,measN:m9.n,ref:m9.ref,
+        how:(m9.how||[]).join(' '),steps:m9.how||[],crit:m9.crit||null,why:row.why||m9.why,
+        note:row.note||null,goal:goal?goal.t:'',supp:supp,
+        met:supp?st.met:met,auto:auto,detail:detail,manual:false,src:null}}
+    if(src==='mrss'){const sc=mrssScore();
+      auto=sc.total;met=!!sc.pass;
+      detail=sc.done?(sc.total+' / 100'+(sc.pass?'':' \u2014 95 is the bar'))
+        :(sc.total+' from the '+sc.measured+' points measured so far \u2014 part'+(sc.missing.length===1?'':'s')+' '+sc.missing.join(', ')+' still to do');
+      if(stale)met=false;
+      return{i:idx+1,key:key,label:row.t,met:met,auto:auto,detail:detail,manual:false,src:'mrss',mrss:sc}}
     if(stale)met=false;
-    return{i:idx+1,key:key,label:row.t,how:row.how,why:row.why,met:met,auto:auto,detail:detail+(stale?' — older than 8 weeks, retest':''),manual:!src,src:src}})}
+    return{i:idx+1,key:key,label:row.t,how:row.how,why:row.why,note:row.note||null,
+      met:met,auto:auto,detail:detail+(stale?' — older than 8 weeks, retest':''),manual:!src,src:src}})}
 
 function aclFlaresIn(days){const cut=Date.now()-days*864e5;
   return (S.acl.flares||[]).filter(f=>new Date((f.date||f)+'T12:00').getTime()>=cut)}
@@ -7687,9 +8212,28 @@ function aclHold(){
       msg:'Flare-up '+(d<1?'today':d+' day'+(d===1?'':'s')+' ago')+'. Repeat the last step that felt fine rather than progressing, and retest once it settles.'}}
   return null}
 function aclPeak(){return Math.max(S.acl.peak||1,S.acl.phase||1)}
-function phaseMet(n){const st=aclGateState(n);return !!(st&&st.length&&st.every(x=>x.met))}
-function priorPhasesMet(n){for(let i=1;i<n;i++){if(!phaseMet(i))return false}return true}
-function firstUnmetPhase(n){for(let i=1;i<n;i++){if(!phaseMet(i))return i}return null}
+/* A SUPPLEMENTARY GOAL IS NEVER A ROAD-BLOCK. The guide says so in as
+   many words: "the absence of not performing supplementary tests is not
+   considered a road-block to the next phase." So the leg press and squat
+   rows are shown, they tick when they are met, and phaseMet does not
+   look at them. */
+function phaseMet(n){const st=aclGateState(n);
+  if(!st||!st.length)return false;
+  const req=st.filter(x=>!x.supp);
+  return !!(req.length&&req.every(x=>x.met))}
+function aclPhaseSeq(){return aclPhases().map(p=>p.n)}
+function priorPhasesMet(n){const seq=aclPhaseSeq();
+  for(let i=0;i<seq.length;i++){if(seq[i]>=+n)break;if(!phaseMet(seq[i]))return false}
+  return true}
+function firstUnmetPhase(n){const seq=aclPhaseSeq();
+  for(let i=0;i<seq.length;i++){if(seq[i]>=+n)break;if(!phaseMet(seq[i]))return seq[i]}
+  return null}
+/* the guide's phase 3 gate before the phase 3 TESTS: "the following
+   hurdle criteria must be met before Phase 3 testing is conducted" */
+function aclHurdleState(ph){
+  const g=aclPhaseDef(ph);
+  if(!g||!g.hurdle)return null;
+  return{list:g.hurdle,met:phaseMet(ph-1)}}
 function aclReady(ph){if(!priorPhasesMet(ph))return false;
   const st=aclGateState(ph);
   if(!st||!st.every(x=>x.met))return false;
@@ -7777,7 +8321,7 @@ function aclProgram(ph){
       E('Nordic curl',3,'6-8',120,''),
       E('Hip thrust',3,'8-10',90,''),
       E('Calf raise',3,'10-12',75,'')])];
-  const p=ACL_PHASES[ph-1];
+  const p=aclPhaseDef(ph);
   return{id:'acl-'+ph,acl:true,ver:ACL_VER,kind:'rehab',weeks:ph===1?1:4,
     block:'ACL Phase '+ph+' — '+p.name,
     note:p.aim+' '+(mode==='deficient'?'Non-operative pathway: balance and perturbation work carries more weight here, and your physio decides whether reconstruction is on the table.':'')+(ph===1?' Daily work — the day card repeats every day.':' Run these sessions in rotation across the week; each card says how often. Retest the gate every four weeks.')+' Progression is by criteria, not by the calendar.',
@@ -7974,7 +8518,7 @@ function rehabHero(){
     const nextT=lsi==null?80:(lsi<80?80:(lsi<90?90:null));
     const sess=rehabWeekSessions(),targ=rehabWeekTarget();
     const found=Object.keys(discBank()).filter(k=>/^(aclgate:|aclphase:|lsi:)/.test(k)).length;
-    const head=lsi!=null?lsi+'% symmetry':acl?'Phase '+a.phase+' of 5':(protos[0]?protos[0].n:'The work');
+    const head=lsi!=null?lsi+'% symmetry':acl?'Phase '+a.phase+' of '+aclPhases().length:(protos[0]?protos[0].n:'The work');
     const sub=lsi!=null&&nextT?(nextT===80?'Eighty is where running usually opens — the retest is how it moves.':'Ninety is return-to-sport territory.'+iBtn('grindem'))
       :lsi!=null?'Past every threshold. The job now is holding it.'
       :acl?'Criteria-gated. Green means met — never passed through.'
@@ -8144,7 +8688,7 @@ function aclTrack(){
     const bank=(typeof discBank==='function')?discBank():{};
     const gates=[],phases=[];
     let run=0;
-    for(let ph=1;ph<=ACL_PHASES.length;ph++){
+    for(const ph of aclPhaseSeq()){
       const st=aclGateState(ph)||[];
       if(!st.length)continue;
       st.forEach(g=>{
@@ -8155,8 +8699,8 @@ function aclTrack(){
              never back-filled, never guessed */
           on:(g.met&&b&&b.found)?String(b.found).slice(0,10):null})});
       run+=st.length;
-      phases.push({n:ph,name:(ACL_PHASES[ph-1]||{}).name||('Phase '+ph),
-        weeks:(ACL_PHASES[ph-1]||{}).weeks||'',at:run,of:st.length})}
+      phases.push({n:ph,name:(aclPhaseDef(ph)||{}).name||('Phase '+ph),
+        weeks:(aclPhaseDef(ph)||{}).weeks||'',at:run,of:st.length})}
     const total=gates.length;
     if(!total)return null;
     const cleared=gates.filter(g=>g.met).length;
@@ -8191,7 +8735,7 @@ function aclTrack(){
        Ties break toward the earlier phase, then list order. */
     const gateEase=g=>{
       try{
-        const row=(ACL_PHASES[g.ph-1]||{}).gate||[];
+        const row=(aclPhaseDef(g.ph)||{}).gate||[];
         const def=row.find(r=>r.k===g.key)||{};
         if(def.src==='time')return 9;
         if(!def.src)return 1;
@@ -9799,9 +10343,9 @@ function viewAcl(){
     return h+'</div>'}
   const ph=Math.min(5,Math.max(1,S.aclView||a.phase));
   const isNow=ph===a.phase;
-  const P=ACL_PHASES[ph-1],st=aclGateState(ph),ready=isNow&&st.every(x=>x.met);
+  const P=aclPhaseDef(ph),st=aclGateState(ph),ready=isNow&&st.every(x=>x.met);
   const m=aclMonths();
-  h+='<div class="row" style="margin-top:14px;gap:6px">'+ACL_PHASES.map(x=>{
+  h+='<div class="row" style="margin-top:14px;gap:6px">'+aclPhases().map(x=>{
     const cur=x.n===ph,done=phaseMet(x.n),now=x.n===a.phase;
     return '<button data-a="aclView" data-v="'+x.n+'" class="mono" style="flex:1;padding:10px 0;border-radius:10px;font-size:12px;font-weight:600;'+
       (cur?'background:var(--amber);color:var(--bg);border:1px solid var(--amber)'
@@ -9818,7 +10362,7 @@ function viewAcl(){
       (m!=null?' · '+m.toFixed(1)+' months since '+(a.mode==='aclr'?'surgery':'injury'):' · '+(a.mode==='aclr'?'no surgery date set':'no injury date set'))+
       /* which knee, findable later if the setup was skipped (audit P8) */
       (a.side?' · '+a.side+' knee':' · which knee?')+' ›</span></button>'+
-    '<div style="display:flex;gap:4px;margin-top:12px">'+ACL_PHASES.map(x=>
+    '<div style="display:flex;gap:4px;margin-top:12px">'+aclPhases().map(x=>
       '<div style="flex:1;height:5px;border-radius:5px;background:'+(phaseMet(x.n)?'var(--green)':x.n===ph?'var(--amber)':'var(--line)')+'"></div>').join('')+'</div></div>';
 
   /* THE PRESCRIBED SESSION (owner ask, 11 Sep: "the physio pill should be
@@ -9912,14 +10456,16 @@ function viewAcl(){
   if(!isNow)return h+'</div>';
   // only the tests this phase's gates actually depend on
   const gl=(typeof P.gate==='function'?P.gate(S.acl.mode):(P.gate||P.gates||[]));
-  const srcs=(gl||[]).map(g=>g&&g.src).filter(Boolean);
-  const TESTS=[['quad','Quad strength'],['ham','Hamstring'],['hop','Hop battery'],['rsi','ACL-RSI']];
-  const need=TESTS.filter(t=>srcs.indexOf(t[0])>=0);
+  /* the outcome measures THIS phase is waiting on, named as the guide
+     names them, in the guide's order (15 Sep 2026) */
+  const need=(gl||[]).filter(g=>g&&(g.meas||g.src==='quad'||g.src==='ham'||g.src==='rsi'))
+    .map(g=>{const k=g.meas||g.src;return[k,((ACL_MEAS[k]||{}).n)||k,!!g.supp]})
+    .filter((x,i,arr)=>arr.findIndex(y=>y[0]===x[0])===i);
   if(!need.length)return h+'</div>';
-  h+='<p class="eyebrow mt2">Record a test</p>'+
-    '<p style="color:var(--faint);font-size:11.5px;line-height:1.5;margin-top:4px">Only what phase '+ph+' is waiting on.</p>'+
+  h+='<p class="eyebrow mt2">Record an outcome measure</p>'+
+    '<p style="color:var(--faint);font-size:11.5px;line-height:1.5;margin-top:4px">Only what this phase is waiting on. Every one is the test the Melbourne guide names, with its published reference.</p>'+
     '<div class="row" style="margin-top:10px;flex-wrap:wrap;gap:7px">'+
-    need.map(x=>'<button data-a="aclTest" data-v="'+x[0]+'" class="pill" style="flex:1 0 45%">'+esc(x[1])+'</button>').join('')+'</div>';
+    need.map(x=>'<button data-a="aclTest" data-v="'+esc(x[0])+'" class="pill" style="flex:1 0 45%;font-size:11.5px;padding:9px 6px'+(x[2]?';color:var(--faint)':'')+'">'+esc(x[1])+(x[2]?' \u00b7 bonus':'')+'</button>').join('')+'</div>';
   const tests=a.tests.slice().reverse();
   if(tests.length){
     h+='<p class="eyebrow mt2">Test history</p>'+
@@ -9971,10 +10517,69 @@ const ACL_METHODS={
    p:['Seated or lying curl machine, one leg at a time.','Heaviest load for 5 controlled reps, full range, no hip lifting.','3 minutes rest between attempts.','If your graft came from the hamstring, expect this side to lag well past the quadriceps.']},
   {k:'nordic',n:'Nordic hold angle',u:'degrees',min:10,
    p:['Kneel with the ankles held. Lower under control and stop where you can hold for 3 seconds.','Measure the trunk angle from vertical at that point — film side-on and use a protractor app.','One attempt per leg with the other leg supported.','A field alternative when nothing else is available.']}]};
+/* ═══ ONE FORM PER SHAPE, NOT ONE PER TEST (15 Sep 2026) ═════════════
+   Seventeen outcome measures arrived with the Melbourne overhaul. Written
+   one at a time they would drift apart within a month — this repo has
+   caught two readouts of one fact four times. The measure says its shape
+   and the form follows, so adding a test to ACL_MEAS is all it takes.
+   Every form carries the guide's own method AND its published reference,
+   because a criterion you can cite is a criterion you can take to your
+   physio and argue with. */
+function aclMeasForm(k,f){
+  const m=ACL_MEAS[k];if(!m)return '';
+  const goal=(function(){const ph=(S.acl&&S.acl.phase)!=null?S.acl.phase:1;
+    const g=ACL_GOAL[ph+':'+k];return g?g.t:''})();
+  let inner='<p class="disp" style="font-size:16px;font-weight:600">'+esc(m.n)+'</p>'+
+    (goal?'<p class="mono" style="color:var(--amber);font-size:11px;margin-top:4px">GOAL \u00b7 '+esc(goal)+'</p>':'')+
+    '<p class="mono" style="color:var(--faint);font-size:10px;letter-spacing:.04em;margin-top:3px">'+esc(m.ref)+'</p>'+
+    '<div style="margin-top:12px;display:flex;flex-direction:column;gap:7px">'+
+    (m.how||[]).map((step,n)=>'<div style="display:flex;gap:10px"><span class="mono" style="color:var(--amber);font-size:11px;flex:none">'+(n+1)+'</span>'+
+      '<span style="font-size:12.5px;color:var(--dim);line-height:1.5">'+esc(step)+'</span></div>').join('')+'</div>';
+  if(m.crit)inner+='<p class="eyebrow" style="margin-top:16px">All eight have to hold for a "good"</p>'+
+    '<div style="margin-top:7px;display:flex;flex-direction:column;gap:5px">'+
+    m.crit.map(c=>'<p style="color:var(--dim);font-size:12px;line-height:1.45">\u00b7 '+esc(c)+'</p>').join('')+'</div>';
+  const on='background:var(--text);color:var(--bg);border-color:var(--text);font-weight:600';
+  if(m.shape==='pair'||m.shape==='pairdiff')
+    inner+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:16px">'+
+      stepper('aform.inj','Operated leg',f.inj,m.u==='cm'?5:1,m.u)+
+      stepper('aform.other','Other leg',f.other,m.u==='cm'?5:1,m.u)+'</div>';
+  if(m.shape==='deg')inner+='<div style="margin-top:16px">'+stepper('aform.val',m.n,f.val,1,m.u)+'</div>';
+  if(m.shape==='grade')inner+='<p class="eyebrow" style="margin-top:16px">What came back</p>'+
+    '<div style="display:flex;flex-direction:column;gap:6px;margin-top:8px">'+
+    m.grades.map((g,i)=>'<button data-a="aclPick" data-v="grade:'+i+'" class="card" style="width:100%;text-align:left;padding:11px 14px;display:block;font-size:12.5px'+
+      (f.grade===i?';border-color:var(--amber)':'')+'">'+esc(g)+'</button>').join('')+'</div>';
+  if(m.shape==='rating')inner+='<p class="eyebrow" style="margin-top:16px">Your rating</p>'+
+    '<div class="row" style="gap:6px;margin-top:8px">'+
+    m.ratings.map((r,i)=>'<button data-a="aclPick" data-v="rating:'+i+'" class="pill" style="flex:1;'+(f.rating===i?on:'')+'">'+esc(r)+'</button>').join('')+'</div>';
+  if(m.shape==='eoec')inner+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:16px">'+
+    stepper('aform.eo','Eyes open',f.eo,1,'s')+stepper('aform.ec','Eyes closed',f.ec,1,'s')+'</div>';
+  if(m.shape==='passfail')inner+='<div class="row" style="gap:8px;margin-top:16px">'+
+    '<button data-a="aclPick" data-v="pass:1" class="pill" style="flex:1;'+(f.pass===1?on:'')+'">Passed</button>'+
+    '<button data-a="aclPick" data-v="pass:0" class="pill" style="flex:1;'+(f.pass===0?on:'')+'">Not passed</button></div>';
+  if(m.shape==='score')inner+='<div style="margin-top:16px">'+
+    stepper('aform.score',k==='tsk'?'TSK-11 total (11\u201344)':'Score out of 100',f.score,1,'')+'</div>';
+  if(m.shape==='bw'){const auto=aclSuppAuto(k);
+    if(auto)inner+='<p class="mono" style="color:var(--green);font-size:11.5px;margin-top:14px">Allena reads '+
+      (Math.round(auto.x*100)/100)+'\u00d7 body weight from your logs \u2014 '+Math.round(auto.kg)+' kg estimated max against '+Math.round(auto.bw)+' kg. Record a tested number here to override it.</p>';
+    inner+='<div style="margin-top:14px">'+stepper('aform.x','Multiple of body weight',f.x,0.1,'\u00d7')+'</div>'}
+  /* what it would read, before it is saved */
+  if((m.shape==='pair')&&+f.inj>0&&+f.other>0)
+    inner+='<p class="mono" style="color:var(--amber);font-size:14px;margin-top:12px">Symmetry '+Math.round(+f.inj/+f.other*100)+'%</p>';
+  if(m.shape==='pairdiff'&&f.inj!==''&&f.other!=='')
+    inner+='<p class="mono" style="color:var(--amber);font-size:14px;margin-top:12px">'+
+      (Math.abs(+f.inj-+f.other)<=1?'Equal to the other side':(Math.round(Math.abs(+f.inj-+f.other)*10)/10)+' cm apart \u2014 about '+(Math.round(Math.abs(+f.inj-+f.other)*10)/10)+'\u00b0')+'</p>';
+  if(k==='tsk'&&+f.score>0)inner+='<p class="mono" style="color:'+((+f.score>=11&&+f.score<=18)?'var(--green)':'var(--red)')+';font-size:13px;margin-top:12px">'+
+    ((+f.score>=11&&+f.score<=18)?'Passes. 11 to 18 is the band.':'Does not pass. The guide asks for testing to stop here \u2014 return to sport is not the question yet.')+'</p>';
+  inner+='<p style="color:var(--dim);font-size:12.5px;line-height:1.6;margin-top:16px;padding-top:14px;border-top:1px solid var(--line)">'+esc(m.why)+'</p>';
+  return inner}
 function aclTestSheet(){
   const f=S.aform;if(!f)return '';
   const k=f.kind;
   let inner='';
+  if(ACL_MEAS[k]&&['quad','ham','hop','rsi'].indexOf(k)<0){
+    inner=aclMeasForm(k,f)+
+      '<button data-a="aclTestSave" class="big disp mt" style="background:var(--amber);color:var(--bg);font-size:16px">Save</button>';
+    return wrapSheet(ACL_MEAS[k].n,inner)}
   if(k==='quad'||k==='ham'){
     const methods=ACL_METHODS[k];
     if(!f.method){
@@ -10037,11 +10642,23 @@ function aclGateSheet(){
   let inner='<p class="mono" style="color:var(--amber);font-size:11px">CRITERION '+g.i+' · PHASE '+g.ph+'</p>'+
     '<p class="disp" style="font-size:17px;font-weight:600;margin-top:4px;line-height:1.35">'+esc(g.label)+'</p>'+
     (g.detail?'<p class="mono" style="color:'+(g.met?'var(--green)':'var(--amber)')+';font-size:11.5px;margin-top:6px">'+esc(g.detail)+'</p>':'')+
+    (g.goal?'<p class="mono" style="color:var(--faint);font-size:10.5px;margin-top:4px">GOAL \u00b7 '+esc(g.goal)+(g.supp?' \u00b7 A BONUS, NEVER A ROAD-BLOCK':'')+'</p>':'')+
+    (g.ref?'<p class="mono" style="color:var(--faint);font-size:10px;letter-spacing:.04em;margin-top:2px">'+esc(g.ref)+'</p>':'')+
+    (g.note?'<p style="color:var(--dim);font-size:12.5px;line-height:1.55;margin-top:10px;border-left:2px solid var(--amber);padding-left:10px">'+esc(g.note)+'</p>':'')+
     '<p class="eyebrow" style="margin-top:18px">How to test it</p>'+
-    '<p style="color:var(--dim);font-size:13px;line-height:1.6;margin-top:6px">'+esc(g.how)+'</p>'+
+    (g.steps&&g.steps.length
+      ?'<div style="margin-top:7px;display:flex;flex-direction:column;gap:7px">'+g.steps.map((st,n)=>
+        '<div style="display:flex;gap:10px"><span class="mono" style="color:var(--amber);font-size:11px;flex:none">'+(n+1)+'</span>'+
+        '<span style="font-size:12.5px;color:var(--dim);line-height:1.5">'+esc(st)+'</span></div>').join('')+'</div>'
+      :'<p style="color:var(--dim);font-size:13px;line-height:1.6;margin-top:6px">'+esc(g.how||'')+'</p>')+
+    (g.crit?'<p class="eyebrow" style="margin-top:16px">All eight have to hold</p>'+
+      '<div style="margin-top:7px;display:flex;flex-direction:column;gap:5px">'+
+      g.crit.map(c=>'<p style="color:var(--dim);font-size:12px;line-height:1.45">\u00b7 '+esc(c)+'</p>').join('')+'</div>':'')+
     '<p class="eyebrow" style="margin-top:18px">Why it matters</p>'+
-    '<p style="color:var(--dim);font-size:13px;line-height:1.6;margin-top:6px">'+esc(g.why)+'</p>';
-  if(g.src&&g.src!=='time')inner+='<button data-a="aclTest" data-v="'+g.src+'" class="big disp mt" style="background:var(--amber);color:var(--bg);font-size:15px">Run this test</button>';
+    '<p style="color:var(--dim);font-size:13px;line-height:1.6;margin-top:6px">'+esc(g.why||'')+'</p>';
+  if(g.meas)inner+='<button data-a="aclTest" data-v="'+esc(g.meas)+'" class="big disp mt" style="background:var(--amber);color:var(--bg);font-size:15px">Record this measure</button>';
+  else if(g.src==='mrss')inner+='<button data-a="mrssOpen" class="big disp mt" style="background:var(--amber);color:var(--bg);font-size:15px">Open the Return to Sport Score</button>';
+  else if(g.src&&g.src!=='time')inner+='<button data-a="aclTest" data-v="'+g.src+'" class="big disp mt" style="background:var(--amber);color:var(--bg);font-size:15px">Run this test</button>';
   else if(g.manual)inner+='<button data-a="aclTick" data-v="'+g.ph+':'+g.key+'" class="btn mt" style="border-color:'+(g.met?'var(--line)':'var(--green)')+';color:'+(g.met?'var(--dim)':'var(--green)')+'">'+(g.met?'Mark as not met yet':'I have met this — tick it off')+'</button>';
   inner+='<button data-a="aclAsk" class="btn mt">Ask Allena about this criterion</button>';
   return wrapSheet('Criterion',inner)}
@@ -24838,12 +25455,12 @@ function lineChart(pts,opts){
   const scrub=pts.map(p=>({x:+X(p.t).toFixed(1),v:Math.round(p.v*10)/10,d:dayKey(new Date(p.t))}));
   return '<div data-scrub=\''+JSON.stringify(scrub)+'\' data-vb="'+W+'" data-suffix="'+esc(opts.suffix||'')+'" style="position:relative">'+out2+'</div>'}
 function rehabProgress(){
-  const a=S.acl,P=ACL_PHASES[a.phase-1];
+  const a=S.acl,P=aclPhaseDef(a.phase);
   const st=aclGateState(a.phase),metN=st.filter(x=>x.met).length;
   let h='<div class="card mt2" style="padding:16px;border-color:var(--amber)">'+
-    '<p class="eyebrow" style="color:var(--amber)">Phase '+a.phase+' of 5</p>'+
+    '<p class="eyebrow" style="color:var(--amber)">Phase '+a.phase+' of '+aclPhases().length+'</p>'+
     '<p class="disp" style="font-size:18px;font-weight:600;margin-top:3px">'+esc(P.name)+'</p>'+
-    '<div style="display:flex;gap:4px;margin-top:12px">'+ACL_PHASES.map(x=>
+    '<div style="display:flex;gap:4px;margin-top:12px">'+aclPhases().map(x=>
       '<div style="flex:1;height:5px;border-radius:5px;background:'+(phaseMet(x.n)?'var(--green)':x.n===a.phase?'var(--amber)':'var(--line)')+'"></div>').join('')+'</div>'+
     '<p class="mono" style="color:var(--faint);font-size:11px;margin-top:10px">'+metN+' of '+st.length+' criteria met'+
       (aclMonths()!=null?' · '+aclMonths().toFixed(1)+' months in':'')+'</p></div>';
@@ -26081,6 +26698,80 @@ function sheetHtml(){
     const nn=Math.max(1,Math.min(6,+f.sets||3));
     inner+='<button data-a="axAdd" class="big disp mt" style="background:'+(f.name.trim()?'var(--green)':'var(--raised)')+';color:'+(f.name.trim()?'var(--bg)':'var(--faint)')+';font-size:16px">Add '+nn+' set'+(nn===1?'':'s')+'</button>';
     return wrapSheet('Add exercise',inner)}
+  /* ═══ THE MELBOURNE RETURN TO SPORT SCORE 2.0 ══════════════════════
+     A hundred points and two hurdles. Most of it is already measured —
+     this reads those measures back and asks only for the two things it
+     cannot know: what a physio found with their hands on the knee
+     (part A), and the four hops repeated in a fatigued state (part F).
+     It shows how much of itself is actually measured, because a score
+     built from half the tests is not a score, and this is the last
+     number in the app that should ever be rounded up. */
+  if(S.sheet.t==='mrss'){
+    const sc=mrssScore(),M=(S.acl&&S.acl.mrss)||{};
+    const bar=(v,mx)=>'<div style="height:5px;border-radius:5px;background:var(--line);overflow:hidden;margin-top:6px">'+
+      '<div style="height:100%;width:'+Math.max(0,Math.min(100,v/mx*100)).toFixed(0)+'%;background:'+(v/mx>=0.95?'var(--green)':'var(--amber)')+'"></div></div>';
+    let inner='<p style="color:var(--dim);font-size:13px;line-height:1.6">The guide asks for 95 or more, and for both hurdles to be passed. Run it over two sessions at least three days apart \u2014 parts A to D in the first, E and F in the second.</p>';
+    inner+='<div class="card mt2" style="padding:16px;text-align:center">'+
+      '<p class="disp" style="font-size:38px;font-weight:700;line-height:1;color:'+(sc.pass?'var(--green)':'var(--text)')+'">'+sc.total+'</p>'+
+      '<p class="mono" style="color:var(--faint);font-size:10px;letter-spacing:.08em;margin-top:4px">OUT OF 100 \u00b7 95 IS THE BAR</p>'+
+      bar(sc.total,100)+
+      (sc.done
+        ?'<p class="mono" style="font-size:11px;margin-top:9px;color:'+(sc.pass?'var(--green)':'var(--amber)')+'">'+
+          (sc.pass?'Every part measured, both hurdles passed.'
+            :(sc.hurdles.C===false?'The Tampa scale was not passed \u2014 the guide asks for testing to stop there.'
+             :sc.hurdles.E===false?'The general fitness tests were not passed.'
+             :sc.stale&&sc.stale.length?'Measured, but some of it is older than eight weeks. Nobody returns to sport on a three-month-old hop test.'
+             :'Under 95.'))+'</p>'
+        :'<p class="mono" style="color:var(--faint);font-size:11px;margin-top:9px">'+sc.measured+' of the 100 points have been measured. Part'+(sc.missing.length===1?'':'s')+' '+sc.missing.join(', ')+' still to do.</p>')+
+      '</div>';
+    inner+='<div style="margin-top:14px;display:flex;flex-direction:column;gap:8px">'+
+      MRSS_PARTS.map(p9=>{
+        const got=sc.parts[p9.k],hur=sc.hurdles[p9.k];
+        const done=p9.hurdle?(hur!=null):(got!=null);
+        const ok9=p9.hurdle?hur===true:(got!=null);
+        return '<button data-a="mrssPart" data-v="'+p9.k+'" class="card" style="width:100%;text-align:left;padding:13px 15px;display:block'+
+          (done?(ok9?';border-color:var(--greensoft)':';border-color:var(--amber)'):'')+'">'+
+          '<div style="display:flex;align-items:baseline;gap:9px">'+
+          '<span class="mono" style="color:var(--amber);font-size:11px;flex:none">PART '+p9.k+'</span>'+
+          '<span style="flex:1;min-width:0;font-size:13.5px;font-weight:600">'+esc(p9.n)+'</span>'+
+          '<span class="mono" style="flex:none;font-size:11px;color:'+(done?(ok9?'var(--green)':'var(--amber)'):'var(--faint)')+'">'+
+            (p9.hurdle?(hur==null?'not done':hur?'passed':'FAILED'):(got==null?'\u2014 / '+p9.pts:got+' / '+p9.pts))+'</span></div>'+
+          '<p style="color:var(--faint);font-size:11.5px;line-height:1.45;margin-top:4px">'+esc(p9.note)+'</p></button>'}).join('')+'</div>';
+    inner+='<p style="color:var(--faint);font-size:11.5px;line-height:1.6;margin-top:16px">'+esc(ACL_GUIDE)+'. The score is a floor, not a clearance \u2014 your surgeon and physio make the call.</p>';
+    return wrapSheet('Return to Sport Score',inner)}
+  if(S.sheet.t==='mrsspart'){
+    const p9=MRSS_PARTS.find(x=>x.k===S.sheet.p);if(!p9)return '';
+    const M=(S.acl&&S.acl.mrss)||{};
+    const on='background:var(--text);color:var(--bg);border-color:var(--text);font-weight:600';
+    let inner='<p class="mono" style="color:var(--amber);font-size:11px">PART '+p9.k+(p9.hurdle?' \u00b7 A HURDLE, NOT POINTS':' \u00b7 '+p9.pts+' POINTS')+'</p>'+
+      '<p class="disp" style="font-size:17px;font-weight:600;margin-top:4px">'+esc(p9.n)+'</p>'+
+      '<div style="margin-top:12px;display:flex;flex-direction:column;gap:5px">'+
+      p9.items.map(i=>'<p style="color:var(--dim);font-size:12.5px;line-height:1.5">\u00b7 '+esc(i)+'</p>').join('')+'</div>'+
+      '<p style="color:var(--faint);font-size:12px;line-height:1.55;margin-top:12px">'+esc(p9.note)+'</p>';
+    /* part A is the physio's examination — the one part the app cannot
+       measure for itself, so it is entered exactly as they give it */
+    if(p9.k==='A'){const A=M.a||{};
+      const row=(k,label,opts)=>'<p class="eyebrow" style="margin-top:16px">'+label+'</p>'+
+        '<div class="row" style="gap:6px;margin-top:7px;flex-wrap:wrap">'+
+        opts.map(o=>'<button data-a="mrssA" data-v="'+k+':'+o[1]+'" class="pill" style="flex:1 0 30%;font-size:11.5px;padding:9px 4px;'+(A[k]===o[1]?on:'')+'">'+esc(o[0])+'</button>').join('')+'</div>';
+      inner+=row('eff','Effusion',[['Absent \u00b7 5',5],['Present \u00b7 0',0]])+
+        row('stab','Stability \u2014 pivot shift',[['Nil \u00b7 5',5],['Grade I \u00b7 3',3],['Grade II \u00b7 1',1],['Grade III\u2013IV \u00b7 0',0]])+
+        row('flex','Flexion',[['Full \u00b7 5',5],['Near \u00b7 3',3],['Limited \u00b7 0',0]])+
+        row('ext','Extension \u2014 prone hang',[['Full \u00b7 5',5],['Near \u00b7 3',3],['Limited \u00b7 0',0]])}
+    /* part F is the four hops again, after the athlete has worked to
+       7 out of 10 on a fatigue scale. Entered as symmetry percentages,
+       because that is what the scoring bands read. */
+    if(p9.k==='F'){const F=M.f||{};
+      inner+='<p style="color:var(--dim);font-size:12.5px;line-height:1.6;margin-top:14px">Do sports-specific work or match play until you are at 7 out of 10 on a fatigue scale, then run the four hops in reasonably quick time. Enter each as a symmetry percentage.</p>'+
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:14px">'+
+        [['hop1','Single hop'],['hop3','Triple hop'],['hopx','Crossover'],['hopside','Side hop']].map(x=>
+          '<div><p class="mono" style="color:var(--faint);font-size:10px;letter-spacing:.05em">'+x[1].toUpperCase()+'</p>'+
+          '<div class="row" style="gap:4px;margin-top:5px">'+
+          [80,90,95,100].map(n=>'<button data-a="mrssF" data-v="'+x[0]+':'+n+'" class="pill mono" style="flex:1;font-size:10px;padding:7px 0;'+(F[x[0]]===n?on:'')+'">'+n+'</button>').join('')+
+          '</div></div>').join('')+'</div>'}
+    if(p9.k!=='A'&&p9.k!=='F')
+      inner+='<p style="color:var(--dim);font-size:12.5px;line-height:1.6;margin-top:16px;padding-top:14px;border-top:1px solid var(--line)">This part reads the outcome measures you have already recorded. Record them from the phase screen and the score fills itself in.</p>';
+    return wrapSheet('Part '+p9.k,inner)}
   if(S.sheet.t==='beta'){
     const rep=(function(){try{
       const d=dataPoints();
@@ -27149,10 +27840,10 @@ function sheetHtml(){
     if(!T9)return wrapSheet('The gates','<p style="color:var(--dim);font-size:13px;margin-top:6px">The pathway is not running yet.</p>');
     const byPh={};T9.gates.forEach(g=>{(byPh[g.ph]=byPh[g.ph]||[]).push(g)});
     return wrapSheet('The gates',
-      '<p style="color:var(--dim);font-size:13px;line-height:1.6">'+T9.cleared+' of '+T9.total+' cleared across five phases. Tap any one to read the test and why it matters.</p>'+
+      '<p style="color:var(--dim);font-size:13px;line-height:1.6">'+T9.cleared+' of '+T9.total+' cleared across '+aclPhases().length+' phases. Tap any one to read the test and why it matters.</p>'+
       Object.keys(byPh).sort((x,y)=>x-y).map(ph=>{
         const rows=byPh[ph],done=rows.filter(g=>g.met).length;
-        const nm=(ACL_PHASES[ph-1]||{}).name||('Phase '+ph);
+        const nm=(aclPhaseDef(ph)||{}).name||('Phase '+ph);
         return '<div style="margin-top:16px">'+
           '<div style="display:flex;justify-content:space-between;align-items:baseline">'+
           '<p class="eyebrow" style="margin:0;color:'+(done===rows.length?'var(--green)':'var(--faint)')+'">Phase '+ph+' \u00b7 '+esc(nm)+'</p>'+
@@ -30382,9 +31073,20 @@ function runAction(a,v,t,e){
       S.coach.thread=[];S.coach.sent=false;
       S.coach.input='I am on ACL phase '+g.ph+'. Explain the criterion "'+g.label+'" — what exactly do I do to reach it, and what should I be training this week to get there?';
       S.sheet=null;S.coachBack='acl';S.view='coach';render();break}
-    case 'aclTest':{S.aform={kind:v,method:null,inj:'',other:'',singlei:'',singleo:'',triplei:'',tripleo:'',crossi:'',crosso:'',timedi:'',timedo:''};
+    case 'aclTest':{S.aform={kind:v,method:null,inj:'',other:'',val:'',eo:'',ec:'',score:'',x:'',
+      grade:null,rating:null,pass:null,
+      singlei:'',singleo:'',triplei:'',tripleo:'',crossi:'',crosso:'',timedi:'',timedo:''};
       S.sheet={t:'acltest'};render();break}
     case 'aclRsi':{const [i,n]=v.split(':');S.aform['q'+i]=+n;render();break}
+    /* the Melbourne measures: one picker for every non-numeric answer */
+    case 'aclPick':{if(!S.aform)break;const q=String(v||'').split(':');
+      S.aform[q[0]]=+q[1];render();break}
+    case 'mrssOpen':{S.sheet={t:'mrss'};render();break}
+    case 'mrssPart':{S.sheet={t:'mrsspart',p:v};render();break}
+    case 'mrssA':{S.acl.mrss=S.acl.mrss||{};S.acl.mrss.a=S.acl.mrss.a||{};
+      const q=String(v||'').split(':');S.acl.mrss.a[q[0]]=+q[1];aclSave();render();break}
+    case 'mrssF':{S.acl.mrss=S.acl.mrss||{};S.acl.mrss.f=S.acl.mrss.f||{};
+      const q=String(v||'').split(':');S.acl.mrss.f[q[0]]=+q[1];aclSave();render();break}
     case 'aclTestSave':{const f=S.aform,rec={kind:f.kind,date:today()};
       if(f.kind==='quad'||f.kind==='ham'){
         const mm=(ACL_METHODS[f.kind]||[]).find(x=>x.k===f.method);
@@ -30400,7 +31102,34 @@ function runAction(a,v,t,e){
         rec.cross=g('crossi','crosso');rec.timed=g('timedi','timedo',true);
         if([rec.single,rec.triple,rec.cross,rec.timed].some(x=>x==null)){flash('All four hops, both legs.');break}}
       if(f.kind==='rsi')rec.score=RSI_Q.map((q,i)=>f['q'+i]==null?50:f['q'+i]).reduce((a,b)=>a+b,0)/RSI_Q.length;
-      S.acl.tests.push(rec);aclSave();S.aform=null;S.sheet=null;render();flash('Test recorded.');break}
+      /* THE MELBOURNE MEASURES SAVE BY SHAPE (15 Sep 2026), the same way
+         they render — one place to add a test, not two. Every branch
+         refuses an empty answer rather than storing a zero, because a
+         zero here is a real result on some of these tests. */
+      {const mm9=ACL_MEAS[f.kind];
+       if(mm9&&['quad','ham','hop','rsi'].indexOf(f.kind)<0){
+         if(mm9.shape==='pair'){const a9=+f.inj,b9=+f.other;
+           if(!(a9>0&&b9>0)){flash('Both legs needed.');break}
+           rec.inj=a9;rec.other=b9;rec.lsi=a9/b9*100}
+         else if(mm9.shape==='pairdiff'){
+           if(f.inj===''||f.other===''||f.inj==null||f.other==null){flash('Both legs needed.');break}
+           rec.inj=+f.inj;rec.other=+f.other;rec.val=+f.inj-+f.other}
+         else if(mm9.shape==='deg'){if(f.val===''||f.val==null){flash('A number is needed.');break}rec.val=+f.val}
+         else if(mm9.shape==='grade'){if(f.grade==null){flash('Pick what came back.');break}rec.grade=+f.grade}
+         else if(mm9.shape==='rating'){if(f.rating==null){flash('Pick a rating.');break}rec.rating=+f.rating}
+         else if(mm9.shape==='eoec'){if(!(+f.eo>=0&&+f.ec>=0)||(f.eo===''&&f.ec==='')){flash('Both trials needed.');break}
+           rec.eo=+f.eo;rec.ec=+f.ec}
+         else if(mm9.shape==='passfail'){if(f.pass==null){flash('Passed or not passed?');break}rec.pass=f.pass===1}
+         else if(mm9.shape==='score'){if(!(+f.score>0)){flash('A score is needed.');break}rec.score=+f.score;
+           if(f.kind==='tsk'&&(+f.score<11||+f.score>44)){flash('The TSK-11 runs from 11 to 44.');break}
+           if(f.kind!=='tsk'&&+f.score>100){flash('That score runs 0 to 100.');break}}
+         else if(mm9.shape==='bw'){if(!(+f.x>0)){flash('A multiple of body weight is needed.');break}rec.x=+f.x}
+         /* the pre-op single hop is the number phase 3 has to beat, so it
+            is stamped as pre-operative when it is recorded before surgery */
+         if(f.kind==='hop1'&&(S.acl.phase===0||!S.acl.date))rec.pre=true;
+       }}
+      S.acl.tests.push(rec);aclSave();S.aform=null;S.sheet=null;render();
+      flash((ACL_MEAS[f.kind]||{}).n?((ACL_MEAS[f.kind].n)+' recorded.'):'Test recorded.');break}
     case 'aclFlareList':S.sheet={t:'flares'};render();break;
     case 'flareDel':{const gone=(S.acl.flares||[])[+v];
       S.acl.flares.splice(+v,1);
@@ -32152,6 +32881,11 @@ function dayCheck(){
   try{if(typeof ratioDupeSweep==='function')ratioDupeSweep()}catch(e){}
   try{if(typeof serialDupeSweep==='function')serialDupeSweep()}catch(e){}
   try{if(typeof stableIdSweep==='function')stableIdSweep()}catch(e){oops('stableIdSweep',e)}
+  /* the Melbourne phase renumbering, once per account, and only ever
+     downward (15 Sep 2026 — see aclMelMigrate) */
+  try{if(S.acl&&S.acl.on&&typeof aclMelMigrate==='function'&&aclMelMigrate())
+    flash('The ACL pathway is now the Melbourne ACL Rehabilitation Guide. Your phase moved back one to match its numbering \u2014 nothing you cleared was lost.')}
+  catch(e){oops('aclMelMigrate',e)}
   try{const b9=discBank();
     Object.keys(b9).forEach(k=>{const e9=b9[k];
       if(e9&&e9.t==='A PR while healing'&&/closed a door/.test(String(e9.d||''))){
