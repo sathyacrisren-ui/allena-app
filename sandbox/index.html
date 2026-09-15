@@ -977,7 +977,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='33576c';  // stamped by tools/build.py with the content hash
+const BUILD_ID='163454';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -3852,6 +3852,11 @@ A.start=di=>{
     if(!sets.length){S.prevGo=null;return flash('Nothing left after trimming.')}
     S.prevGo=null}
   if(p.weeks>1)weekClockSet(p,S.week);
+  /* a choice line opens on whichever half was done last time (15 Sep) —
+     the toggle is still there on every set, this only saves the tap */
+  try{sets.forEach(st=>{const o=exChoices(st.ex);
+    if(o.length<2)return;const comp=st.ex,pk=exPickOf(comp);
+    st.exOr=comp;if(pk&&o.indexOf(pk)>=0)st.ex=pk})}catch(e){oops('exPickSeed',e)}
   S.sess={progId:p.id,dayIdx:+di,dayName:p.days[+di].name,block:p.block,week:S.week,sets,idx:0,phase:'ready',log:[],wu:{},subs:{},startedAt:Date.now(),
     dp0:(function(){try{const d0=dataPoints();return{total:d0.total,lv:dpLevel(d0.total).lv}}catch(e){return null}})()};
   S.note={sleep:'',fatigue:'',knee:''};S.view='session';persistActive();wakeOn();render()};
@@ -4726,6 +4731,58 @@ function viewSetup(){
     '</div>'}
 
 function gBase(n){return String(n).split('—')[0].trim()}
+/* ═══ A PROGRAM LINE THAT OFFERS A CHOICE IS TWO EXERCISES ══════════════
+   (owner, 15 Sep 2026: "where they can do one or the other it should be
+   tracked independently as to not confuse the two — allow the user to
+   toggle which one they are doing for that day".)
+   His own Today card is the evidence: "RDL or hip thrust is up 114%, from
+   about 27 to 58 kg estimated max". That is not a 114% gain, it is two
+   different lifts averaged into one name — a hip thrust is heavier than an
+   RDL for almost everyone, so the "progress" is really a record of which
+   one he happened to pick. Every number keyed on the exercise name was
+   wrong for that line: the e1RM trend, the records, the goal, what the
+   regulation engine offered next week, and the finding that went on the
+   hero card. A false finding is worse than a missing one.
+   THE SPLIT IS DELIBERATELY TIMID. It fires only on a standalone "or" or a
+   slash between two or three plausible exercise names, each at least three
+   characters. "Bent over row" has no standalone or; "3/4 squat" leaves a
+   part of one character and is refused. When in doubt it does nothing and
+   the line behaves exactly as it always has. */
+function exChoices(n){
+  try{
+    const s=String(n||'').trim();
+    if(!s||s.length>90)return [];
+    if(!/\s+or\s+|\s*\/\s*/i.test(s))return [];
+    const parts=s.split(/\s+or\s+|\s*\/\s*/i).map(x=>x.trim()).filter(Boolean);
+    if(parts.length<2||parts.length>3)return [];
+    if(parts.some(x=>x.length<3||x.length>40||!/[a-z]{3}/i.test(x)))return [];
+    return parts}
+  catch(e){oops('exChoices',e);return []}}
+/* which half of a choice this person did last time. Profile blob, no new
+   storage key; it is a preference, not training data. */
+function exPickOf(comp){
+  try{return((S.prof||{}).exPick||{})[String(comp||'').toLowerCase()]||null}
+  catch(e){return null}}
+function exPickSet(comp,pick){
+  try{S.prof=S.prof||{};S.prof.exPick=S.prof.exPick||{};
+    S.prof.exPick[String(comp||'').toLowerCase()]=pick;lset(K_PROF,S.prof)}
+  catch(e){oops('exPickSet',e)}}
+/* rewrite every UNLOGGED set of one choice line to the half that was
+   picked. A set that already has a log row keeps its name — renaming it
+   would orphan the row it is matched to by (ex,setNo), which is how the
+   session knows what is done. */
+function exPickApply(s,comp,pick){
+  try{
+    if(!s||!comp||!pick)return 0;
+    const key=String(comp).toLowerCase();let n=0;
+    (s.sets||[]).forEach(st=>{
+      const c=st.exOr||st.ex;
+      if(String(c).toLowerCase()!==key)return;
+      if((s.log||[]).some(l=>l.ex===st.ex&&l.setNo===st.setNo))return;
+      if(st.ex===pick){st.exOr=st.exOr||comp;return}
+      st.exOr=st.exOr||comp;st.ex=pick;n++});
+    return n}
+  catch(e){oops('exPickApply',e);return 0}}
 function goalStats(g){
   const target=e1rm(g.w,g.r);const pts=[];let actual=false;
   S.history.forEach(h=>{let best=0;
@@ -11398,6 +11455,73 @@ function exAliasNorm(n){
      .replace(/[^a-z0-9 ]/g,' ').replace(/\b([a-z]{3,})s\b/g,'$1')
      .replace(/\s+/g,' ').trim();
   return{key:s,side:hasSide}}
+/* ═══ TYPING A NAME MUST NOT MINT A SECOND LIFT ═══════════════════════
+   (owner, 15 Sep 2026: "if a user chooses to add in an exercise that's not
+   shown on the list and therefore they type it in, make sure when they
+   type we offer them a suggested exercise that is closest to what they're
+   typing... instead of creating a whole new exercise because they wrote db
+   flat bench press rather than db press which was on their program on
+   another day — now Allena sees two different lifts and progress isn't
+   translated to both, which is wrong.")
+   This already happened to a real beta user: Dafydd's program named bench
+   three ways and his history, his learned adjustment and his regulation
+   were split three ways with it. The importer has had an alias resolver
+   since then; the KEYBOARD never did, which is the one door a person walks
+   through every week.
+   Their OWN names rank first — that is where the damage is — then the
+   program they are following, then the built-in pool. */
+function exKnownNames(){
+  const m={};
+  const bump=(n,src,c)=>{const s9=String(n||'').trim();if(s9.length<2)return;
+    const k=s9.toLowerCase();const e=m[k]||(m[k]={n:s9,cnt:0,src:src});
+    e.cnt+=(c||0);if(src<e.src)e.src=src};
+  try{(S.history||[]).forEach(h=>{if(h.run)return;(h.log||[]).forEach(l=>bump(l.ex,0,1))})}catch(e){oops('exKnown.h',e)}
+  try{((S.lib&&S.lib.programs)||[]).forEach(p9=>(p9.days||[]).forEach(d9=>
+    (d9.exercises||[]).forEach(x=>bump(x.name,1,0))))}catch(e){oops('exKnown.p',e)}
+  try{Object.keys(POOL).forEach(k=>POOL[k].forEach(x=>bump(x.n,2,0)))}catch(e){oops('exKnown.pool',e)}
+  return Object.keys(m).map(k=>m[k])}
+function exNear(typed,limit){
+  try{
+    const raw=String(typed||'').trim();
+    const t=exAliasNorm(raw);
+    if(!t.key||t.key.length<3)return [];
+    const tt=t.key.split(' ').filter(Boolean);
+    const out=[];
+    exKnownNames().forEach(c=>{
+      if(String(c.n).toLowerCase()===raw.toLowerCase())return;  // already the same words
+      const k=exAliasNorm(c.n);if(!k.key)return;
+      const ct=k.key.split(' ').filter(Boolean);
+      const setT={};tt.forEach(x=>{setT[x]=1});
+      const shared=ct.filter(x=>setT[x]).length;
+      const mx=Math.max(tt.length,ct.length),mn=Math.min(tt.length,ct.length);
+      let sim;
+      if(k.key===t.key)sim=1;                       // the same lift, spelled differently
+      else if(shared===mn)sim=0.72+0.28*(mn/mx);    // one name contains the other
+      else if(shared>=2)sim=shared/mx;              // real overlap, not one shared word
+      else return;                                  /* "leg press" and "leg extension" share
+                                                       exactly one word and are not the same
+                                                       lift — one word is never enough */
+      if(sim<0.5)return;
+      out.push({n:c.n,sim:sim,cnt:c.cnt,src:c.src,same:k.key===t.key})});
+    out.sort((a,b)=>b.sim-a.sim||a.src-b.src||b.cnt-a.cnt||a.n.length-b.n.length);
+    return out.slice(0,limit||3)}
+  catch(e){oops('exNear',e);return []}}
+/* the strip under the box. It is written straight into the DOM as they
+   type (29-scrub) rather than through render(), because a render on every
+   keystroke closes the keyboard and loses the caret. */
+function exNearHtml(typed){
+  try{
+    const near=exNear(typed,3);
+    if(!near.length)return '';
+    return '<p class="mono" style="color:var(--faint);font-size:9px;letter-spacing:.08em;margin-top:10px">ALREADY IN YOUR TRAINING</p>'+
+      '<p style="color:var(--dim);font-size:11.5px;line-height:1.45;margin-top:3px">Tap one and this work joins it, so the trend, the records and the learned load stay one lift.</p>'+
+      '<div style="display:flex;flex-direction:column;gap:6px;margin-top:7px">'+
+      near.map(x=>'<button data-a="axNear" data-v="'+esc(x.n)+'" class="card" style="width:100%;text-align:left;padding:10px 13px;display:flex;align-items:center;gap:9px">'+
+        '<span style="flex:1;min-width:0;font-size:13px;font-weight:600">'+esc(x.n)+'</span>'+
+        '<span class="mono" style="flex:none;color:var(--faint);font-size:9.5px">'+
+          (x.same?'SAME LIFT':x.cnt?(x.cnt+' SET'+(x.cnt===1?'':'S')):(x.src===1?'IN YOUR PROGRAM':'IN THE LIBRARY'))+'</span></button>').join('')+
+      '</div>'}
+  catch(e){oops('exNearHtml',e);return ''}}
 function histAliasBuild(weeks){
   const stats={};   // key -> {names:{raw:count}, ws:[], side:false}
   (weeks||[]).forEach(w=>(w.sessions||[]).forEach(sx=>(sx.exercises||[]).forEach(e=>{
@@ -16768,8 +16892,16 @@ function growTreeTime(W,Hh,opts){
      as a tree. Scrolled into at the top, the same taper is a hairline
      holding up limbs. It keeps a third of itself all the way up. */
   const topFade=u=>EX?Math.max(0.34,1-Math.pow(u,5.5)):Math.max(0,1-Math.pow(u,2.6));
-  const trunkDrawn=f=>{const u=Math.max(0,Math.min(1,f))/ (TTOP||1);
-    return trunkHalf(f)*topFade(Math.min(1,u))*flare(Math.min(1,u))};
+  /* IT HAS TO READ THE TRUNK WHERE THE TRUNK IS PAINTED (found measuring
+     the card, 15 Sep 2026). The polygon samples its half-width at index
+     round(u*(N-1)) where u is the fraction of the DRAWN trunk; this read
+     it at round(f*(N-1)), the fraction of the whole timeline. They are the
+     same number only when the trunk runs the full height, which is true on
+     the explorer (trunkTop 1) and false on the card (0.88) — so every cap
+     that leans on this was reading the trunk lower down, where it is
+     wider, and letting limbs through at a third instead of a fifth. */
+  const trunkDrawn=f=>{const u=Math.min(1,Math.max(0,f)/(TTOP||1));
+    return smooth(Math.min(N-1,Math.round(u*(N-1))))*topFade(u)*flare(u)};
   (function(){const h0=smooth(0)*flare(0);
     L.push([tx(0)-h0,groundY+4]);Rt.push([tx(0)+h0,groundY+4])})();
   for(let i=0;i<NT;i++){
@@ -17000,7 +17132,15 @@ function growTreeTime(W,Hh,opts){
        the person had trained. A limb is now a FIFTH of the trunk it
        leaves, which is what a heavy tree already drew and what a light
        one never did — so the two look alike, at any zoom. */
-    if(EX&&!follows)bwid=Math.min(bwid,Math.max(WMIN,trunkDrawn(f)*2*0.20));
+    /* AND IT WAS ONLY EVER APPLIED ON THE EXPLORER (owner, 15 Sep 2026:
+       "for the tree card proportionately smallen the branches and dots to
+       the trunk smallening"). The card's trunk was reopened the same week
+       and came down from wMax 34 to the sapling's 11; the limb stayed the
+       flat 2.4 it had been tuned to against the fat one. Measured on his
+       card: trunk 5.7 wide at mid-height carrying limbs at 2.4 — 42% of
+       it, against the fifth the explorer has had since the day the law was
+       written. Same law, both surfaces. */
+    if(!follows)bwid=Math.min(bwid,Math.max(WMIN,trunkDrawn(f)*2*0.20));
     out+='<path data-tp="branch" data-tn="'+esc(b.n)+'" data-tk="'+esc(b.k)+
       (EX?'" data-a="txTap" data-v="'+esc(b.kind+':'+b.id)+'" id="'+txElId(b.kind,b.id)+'" pointer-events="all':'')+
       '" d="'+limbPath(bx,y0,mx,my,x1,y1,b._s||0)+'" stroke="'+bstroke+'" stroke-width="'+bwid.toFixed(2)+
@@ -17227,12 +17367,22 @@ function growTreeTime(W,Hh,opts){
       dots.push({x:bx,y:by,ax:bx,ay:by,r:br9,r0:br0,pad:br9*(rk9>=2?1.1:0.7)*(+opts.fan||2.4),
         pad0:br0*(rk9>=2?1.1:0.7)*(+opts.fan||2.4),kind:'bloom',c:rarityOf(bl.rar)[1],bl:bl});
       return}
-    out+=bloom(bx,by,bl.epic?3.8:2.7,rarCol(bl.epic))+
+    /* THE FINDS WERE SIZED AGAINST THE OLD FAT TRUNK TOO (same message).
+       An epic sat at r 3.2 — six and a half wide, more than the trunk
+       anywhere above its own ankle, before its halo took it to twelve. So
+       the card read as a scatter of planets on a stick. The biggest find
+       is a fifth of the trunk's widest point, the same law the limbs
+       follow, and the tiers keep their spacing because the whole ladder
+       scales by the one factor. The poster keeps its own sizes: it is
+       printed at A2, where a find is a dot you walk up to. */
+    const BP=(POSTER||EX)?1:Math.min(1,(wMax*0.20)/3.2);
+    const bR=(bl.epic?(POSTER?3.8:3.2):(POSTER?2.7:2.2))*BP;
+    out+=bloom(bx,by,(bl.epic?3.8:2.7)*BP,rarCol(bl.epic))+
       '<circle data-tp="bloom" data-tk="'+esc(bl.k)+'" cx="'+bx.toFixed(1)+'" cy="'+by.toFixed(1)+
-      '" r="'+(bl.epic?(POSTER?3.8:3.2):(POSTER?2.7:2.2))+'" fill="'+rarCol(bl.epic)+
+      '" r="'+bR.toFixed(2)+'" fill="'+rarCol(bl.epic)+
       '" opacity="'+(bl.epic?'.97':'.85')+'"/>'+
       /* the epic ring is the ladder's top step made visible at a glance */
-      (bl.epic?'<circle cx="'+bx.toFixed(1)+'" cy="'+by.toFixed(1)+'" r="'+(POSTER?6.4:5.4)+
+      (bl.epic?'<circle cx="'+bx.toFixed(1)+'" cy="'+by.toFixed(1)+'" r="'+((POSTER?6.4:5.4)*BP).toFixed(2)+
         '" fill="none" stroke="'+rarCol(true)+'" stroke-width=".6" opacity="'+
         (POSTER?'.5':'.35')+'"/>':'')});
 
@@ -17873,17 +18023,36 @@ function txSpread(dots,gap){
       if(!moved)break}
     dots.forEach(rein)}
   catch(e){oops('txSpread',e)}}
+/* ═══ THE KEY EXPLAINS EVERYTHING THAT IS DRAWN ════════════════════════
+   (owner, 15 Sep 2026: "fix the information legend, a lot of things
+   missing that are in the tree but not on the legend".) A key that
+   explains most of a picture is not a key, it is a caption — and this one
+   named seven of the fourteen kinds of mark on the page. Every row below
+   was checked against what the renderer actually emits; where a colour is
+   involved it is READ from the same constant the drawing paints with
+   (TREE_RAMP, rarityOf), because a key that disagrees with its picture
+   does not merely fail to explain, it misinforms.
+   If you add a mark to the drawing, add it here. */
 function treeXLegend(){
-  const dot=c=>'<span style="display:inline-block;width:9px;height:9px;border-radius:9px;background:'+c+';vertical-align:-1px;margin-right:6px"></span>';
+  const dot=(c,r)=>'<span style="display:inline-block;width:'+(r||9)+'px;height:'+(r||9)+'px;border-radius:9px;background:'+c+';vertical-align:-1px;margin-right:5px"></span>';
+  const line=(c,w,op)=>'<span style="display:inline-block;width:16px;height:'+(w||2)+'px;border-radius:2px;background:'+c+';opacity:'+(op||1)+';vertical-align:2px;margin-right:5px"></span>';
+  const R9=TREE_RAMP.n;
   const rows=[
-    ['<span style="display:inline-block;width:9px;height:14px;border-radius:2px;background:'+TREE_RAMP.n.climb[3]+';vertical-align:-3px;margin-right:6px"></span>','The trunk','Height is time, the ground is your first logged day, the top is today. Width is that week’s work. The colour climbs your own stage ladder.'],
-    [dot(TREE_RAMP.n.lift[4]),'A branch is a session','One per lifting session (green), rehab session (rose), run (blue) or ride (slate), at the day it happened. Longer when there was more in it.'],
-    [dot(TREE_RAMP.n.lift[5]),'A twig is an exercise','In the order you did them, off the session it belongs to.'],
-    [dot(TREE_RAMP.n.lift[6]),'A leaf is a set','On its exercise’s twig, in set order. Bigger when it was heavier against your best ever on that lift. A thin ring means a PR. On a run, a leaf is a kilometre.'],
-    [dot(rarityOf('common')[1])+dot(rarityOf('uncommon')[1])+dot(rarityOf('rare')[1])+dot(rarityOf('epic')[1]),'A blossom is a finding','At the day it was found, coloured by the same ladder as everywhere else: Noticed, Worth knowing, Rare find, Big one. A new one pulses until you look.'],
-    ['<span style="display:inline-block;width:8px;height:12px;background:var(--amber);opacity:.7;transform:rotate(45deg) scale(.7);vertical-align:-2px;margin-right:6px"></span>','A seed is a pattern','Something that is the case right now, on the day Allena first showed it. Amber when it carries a warning, green when it is good news. Tap it for what to do.'],
-    [dot('#C96442'),'A rehab phase cleared','The flat grey line is the surgery or injury date.']];
-  return rows.map(r=>'<div style="display:flex;gap:10px;align-items:flex-start;margin-top:9px"><span style="flex:none;padding-top:2px">'+r[0]+'</span><span style="flex:1;min-width:0"><b style="font-size:12.5px">'+r[1]+'</b><span style="display:block;color:var(--dim);font-size:11.5px;line-height:1.5;margin-top:2px">'+r[2]+'</span></span></div>').join('')}
+    ['<span style="display:inline-block;width:9px;height:14px;border-radius:2px;background:'+R9.climb[3]+';vertical-align:-3px;margin-right:5px"></span>','The trunk','Height is time — the ground is your first logged day, the top is today. Its width at any height is the work you did that week, so a quiet stretch draws as a waist. Its colour climbs your own stage ladder, and the height where it changes is the height where your banked work crossed into the next stage.'],
+    [line('var(--faint)',1,.6),'The dates down the left','Every month is ticked, January is longer and carries the year. On a short tree the ticks are days. THE FIRST LOGGED DAY and TODAY name the two ends.'],
+    [dot(R9.lift[4])+dot(R9.reh[4])+dot(R9.run[4])+dot(R9.ride[4]),'A branch is a session','One per lifting session (green), rehab session (rose), run (blue) or ride (slate), at the day it happened, on alternating sides. Longer when there was more in it. The first session of a week owns the wood; the rest of that week hang off it in day order. Tap any branch for what was in it.'],
+    [dot(R9.lift[5],7),'A twig is an exercise','Off the session it belongs to, in the order you did them.'],
+    [dot(R9.lift[6],6),'A leaf is a set','On its exercise’s twig, in set order, further out for a later set. Bigger when it was heavier against your best ever on that lift — for a hold, against your longest. A thin pale ring means a PR. On a run, a leaf is a kilometre. Tap it for the numbers.'],
+    [line(R9.lift[5],1,.6),'A stem is where a dot belongs','Dots are nudged apart so none of them hides behind another. The hairline is the line back to the exact twig it grew on.'],
+    [dot(rarityOf('common')[1])+dot(rarityOf('uncommon')[1])+dot(rarityOf('rare')[1])+dot(rarityOf('epic')[1]),'A blossom is a finding','At the day it would have been found, on the same four-step ladder as everywhere else: Noticed, Worth knowing, Rare find, Big one. The top two carry a halo, and the brightest sit on their own ring.'],
+    ['<span style="display:inline-block;width:9px;height:9px;border-radius:9px;border:1.5px solid '+rarityOf('epic')[1]+';vertical-align:-1px;margin-right:5px"></span>','A pulsing ring','A finding you have not looked at yet. It stops once you have.'],
+    ['<span style="display:inline-block;width:8px;height:12px;background:var(--amber);opacity:.7;transform:rotate(45deg) scale(.7);vertical-align:-2px;margin-right:5px"></span>','A seed is a pattern','Something that is the case right now, on the day Allena first showed it. Amber when it carries a warning, green when it is good news. Tap it for what to do.'],
+    [dot('#C96442'),'A terracotta dot is a phase cleared','A rehab phase you met every criterion for.'],
+    [line('var(--faint)',1,.5),'The flat grey line is the scar','Your surgery or injury date, drawn across the trunk at its own height.'],
+    [line('#9CC4A8',2,.7),'The roots','One per week you showed up. They spread as the habit does, and they fade into the ground.'],
+    ['<span class="mono" style="color:var(--faint);font-size:10px;margin-right:5px">×</span>','Pinch, or the buttons','Zoom is a magnifying glass — the drawing never changes, it only gets bigger, so a crowded crown opens up and every dot stays where it was.'],
+    ['<span class="mono" style="color:var(--faint);font-size:10px;margin-right:5px">≡</span>','The window','Older entries can be folded into the ground rather than stretching the tree. Nothing is ever deleted — the ground line says how many are folded in.']];
+  return rows.map(r=>'<div style="display:flex;gap:10px;align-items:flex-start;margin-top:9px"><span style="flex:none;padding-top:2px;white-space:nowrap">'+r[0]+'</span><span style="flex:1;min-width:0"><b style="font-size:12.5px">'+r[1]+'</b><span style="display:block;color:var(--dim);font-size:11.5px;line-height:1.5;margin-top:2px">'+r[2]+'</span></span></div>').join('')}
 function viewTree(){
   try{
     const m=treeXModel();
@@ -17902,20 +18071,34 @@ function viewTree(){
       ((m.patterns||[]).length?' · '+m.patterns.length+' PATTERN'+(m.patterns.length===1?'':'S'):'')+
       (m.folded?' · '+m.folded+' FOLDED':'')+'</p>';
     /* the window: fold the old years into the ground, nothing deleted */
+    /* ONE FILTER, NOT FOUR PILLS (owner, 15 Sep 2026: "condense the all,
+       this year, 12 months, since surgery pills into a neat drop down
+       filter"). Four mutually exclusive values with one answer is what a
+       select is for; it cannot truncate, and it is one tap rather than a
+       row that eats a line of the page above the drawing. Same call the
+       rep-target pills got on 14 Sep. */
     {const cur=(S.prof&&S.prof.treeFrom)||'all';
-     const opts=[['all','All'],['this','This year'],['year','12 months']].concat((S.acl&&S.acl.date)?[['scar','Since surgery']]:[]);
-     h+='<div class="row" style="gap:6px;padding:8px 14px 0">'+opts.map(x=>'<button data-a="treeFrom" data-v="'+x[0]+'" class="pill" style="flex:1;text-align:center;font-size:11px;padding:7px 4px;'+(cur===x[0]?'border-color:var(--text);color:var(--text);background:var(--raised)':'color:var(--faint)')+'">'+x[1]+'</button>').join('')+'</div>'}
+     const opts=[['all','All of it'],['this','This year'],['year','Last 12 months']].concat((S.acl&&S.acl.date)?[['scar','Since surgery']]:[]);
+     h+='<div style="display:flex;align-items:center;gap:8px;padding:8px 14px 0">'+
+       '<select data-in="prof.treeFrom" data-treefrom="1" style="flex:1;min-width:0;font-size:13px;padding:9px 12px">'+
+       opts.map(x=>'<option value="'+x[0]+'"'+(cur===x[0]?' selected':'')+'>'+x[1]+'</option>').join('')+'</select>'+
+       (m.newN?'<button data-a="treeNewest" class="mono" style="flex:none;font-size:9.5px;letter-spacing:.06em;color:var(--green);border:1px solid var(--green);border-radius:9px;padding:8px 9px">NEWEST FIND</button>':'')+
+       '<button data-a="findingsOpen" class="mono" style="flex:none;font-size:9.5px;letter-spacing:.06em;color:var(--faint);border:1px solid var(--line);border-radius:9px;padding:8px 9px">AS A LIST</button></div>'}
     if(S.treeLegend)h+='<div class="card" style="margin:10px 14px 0;padding:12px 14px">'+treeXLegend()+'</div>';
-    h+='<div style="display:flex;align-items:center;gap:8px;padding:8px 14px 0">'+
-      '<button data-a="treeZoom" data-v="out" class="btn" style="width:auto;padding:7px 13px;font-size:14px;color:var(--dim)">−</button>'+
-      '<span id="txzlab" class="mono" style="font-size:10px;color:var(--faint);min-width:30px;text-align:center">'+(Math.round(z*10)/10)+'×</span>'+
-      '<button data-a="treeZoom" data-v="in" class="btn" style="width:auto;padding:7px 13px;font-size:14px;color:var(--dim)">+</button>'+
-      '<span style="flex:1"></span>'+
-      (m.newN?'<button data-a="treeNewest" class="mono" style="font-size:9.5px;letter-spacing:.06em;color:var(--green);border:1px solid var(--green);border-radius:9px;padding:6px 9px">NEWEST FIND</button>':'')+
-      '<button data-a="findingsOpen" class="mono" style="font-size:9.5px;letter-spacing:.06em;color:var(--faint);border:1px solid var(--line);border-radius:9px;padding:6px 9px">AS A LIST</button></div>'+
-      '<p style="color:var(--faint);font-size:10.5px;padding:5px 14px 0">Pinch to zoom, scroll up and down the years, tap any leaf.</p>'+
-      '<div id="txwrap" style="margin-top:8px;height:calc(100dvh - 205px);overflow:auto;-webkit-overflow-scrolling:touch;touch-action:pan-x pan-y;position:relative">'+
-      '<div id="txinner" style="width:'+(100*z)+'%;margin:0 auto">'+treeXSvg(m)+'</div></div>';
+    h+='<p style="color:var(--faint);font-size:10.5px;padding:7px 14px 0">Pinch to zoom, scroll up and down the years, tap any leaf.</p>'+
+      /* THE ZOOM GETS OUT OF THE WAY (owner, same message: "get rid of the
+         zoom -+ pill, looks ugly, or move it to the bottom right of the
+         tree page"). It was a row of chrome above the drawing on a page
+         whose whole job is the drawing. It floats over the bottom-right
+         corner of the canvas now, where a thumb already is. */
+      '<div style="position:relative;margin-top:8px">'+
+      '<div id="txwrap" style="height:calc(100dvh - 196px);overflow:auto;-webkit-overflow-scrolling:touch;touch-action:pan-x pan-y;position:relative">'+
+      '<div id="txinner" style="width:'+(100*z)+'%;margin:0 auto">'+treeXSvg(m)+'</div></div>'+
+      '<div style="position:absolute;right:14px;bottom:14px;display:flex;align-items:center;gap:1px;background:color-mix(in srgb,var(--raised) 92%,transparent);border:1px solid var(--line);border-radius:13px;padding:2px;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);z-index:4">'+
+      '<button data-a="treeZoom" data-v="out" aria-label="Zoom out" style="width:38px;height:38px;border-radius:11px;color:var(--dim);font-size:17px;line-height:1">\u2212</button>'+
+      '<span id="txzlab" class="mono" style="font-size:9.5px;color:var(--faint);min-width:26px;text-align:center">'+(Math.round(z*10)/10)+'\u00d7</span>'+
+      '<button data-a="treeZoom" data-v="in" aria-label="Zoom in" style="width:38px;height:38px;border-radius:11px;color:var(--dim);font-size:17px;line-height:1">+</button>'+
+      '</div></div>';
     try{if(typeof deepReadyInfo==='function'&&deepReadyInfo())h+='<button data-a="deepGo" style="display:flex;align-items:center;gap:9px;margin:8px 14px 0;padding:10px 12px;width:calc(100% - 28px);text-align:left;background:var(--raised);border-radius:12px">'+
       '<span class="mono" style="color:var(--amber);font-size:9px;letter-spacing:.08em;flex:none">THIS WEEK’S READ</span><span style="flex:1;font-size:12px;color:var(--dim)">Ready. It becomes leaves too.</span><span class="mono" style="color:var(--amber);font-size:11px">›</span></button>'}catch(e){oops('treeX.read',e)}
     return h+'</div>'}
@@ -24219,6 +24402,21 @@ function viewSession(){
   body+='<p class="eyebrow">Set '+cur.setNo+' of '+cur.of+' · Exercise '+cur.exNo+'</p>'+
    '<h1 class="disp" style="font-size:18px;font-weight:600;line-height:1.15;margin-top:2px">'+esc(cur.ex)+'</h1>'+
    (cur.origEx?'<p class="mono" style="color:var(--amber);font-size:11px;margin-top:3px">SWAPPED FROM '+esc(cur.origEx.toUpperCase())+(cur.subUnit?' · '+esc(cur.subUnit):'')+'</p>':'')+
+   /* THE CHOICE IS A TOGGLE, AND IT IS ON THE SET SCREEN (owner, 15 Sep
+      2026). The program says "RDL or hip thrust"; the log has to say which
+      one, or every number keyed on the name is an average of two lifts.
+      It shows while the set has not been logged, so switching your mind
+      before the first rep costs one tap and nothing after it lies. */
+   (function(){try{
+     if(s.phase!=='ready')return '';
+     const comp=cur.exOr||cur.ex,opts=exChoices(comp);
+     if(opts.length<2)return '';
+     const onS='background:var(--text);color:var(--bg);border-color:var(--text);font-weight:600';
+     return '<p class="mono" style="color:var(--faint);font-size:9px;letter-spacing:.08em;margin-top:7px">WHICH ONE TODAY</p>'+
+       '<div class="row" style="gap:6px;margin-top:5px">'+
+       opts.map(o=>'<button data-a="exPick" data-v="'+esc(o)+'" class="pill" style="flex:1;font-size:12px;padding:8px 6px;'+
+         (cur.ex===o?onS:'color:var(--dim)')+'">'+esc(o)+'</button>').join('')+'</div>'}
+     catch(e){oops('exChoiceUi',e);return ''}})()+
    '<div class="card mt" style="padding:'+(s.phase==='logging'?'11px 14px':'11px 14px')+';border-top:3px solid '+acc+'">';
   if(s.phase==='logging'){
     // the set is done — the card is a reference strip, not a billboard
@@ -25704,7 +25902,10 @@ function sheetHtml(){
         (f.name===x.n?';border-color:var(--amber)':'')+'">'+
         '<span style="font-size:13.5px;font-weight:600;display:block">'+esc(x.n)+'</span>'+
         '<span style="color:var(--faint);font-size:11.5px">'+esc(x.why||'')+'</span></button>').join('')+'</div>';
-    inner+='<input data-in="axf.name" value="'+esc(f.name)+'" placeholder="Or type any exercise name" autocomplete="off" style="width:100%;margin-top:12px">';
+    inner+='<input data-in="axf.name" value="'+esc(f.name)+'" placeholder="Or type any exercise name" autocomplete="off" style="width:100%;margin-top:12px">'+
+      /* the near-name strip, written live as they type (12b) so a new
+         spelling of a lift they already do never becomes a second lift */
+      '<div id="axnear">'+(typeof exNearHtml==='function'?exNearHtml(f.name):'')+'</div>';
     inner+='<div class="row" style="margin-top:14px"><button data-a="axHold" data-v="0" class="pill" style="flex:1;'+(!f.hold?onS:'')+'">Reps</button><button data-a="axHold" data-v="1" class="pill" style="flex:1;'+(f.hold?onS:'')+'">Timed hold</button></div>';
     if(f.hold)inner+='<div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px;margin-top:12px">'+stepper('axf.sets','Sets',f.sets,1,'')+stepper('axf.secs','Seconds',f.secs,5,'s')+'</div>'+
       '<button data-a="axPerSide" class="pill mt" style="'+(f.perSide?onS:'')+'">Per side</button>';
@@ -28925,6 +29126,18 @@ document.addEventListener('input',e=>{const d=e.target.dataset;
     render();return}
   if(k&&k.indexOf('rform.z')===0){S.rform[k.slice(6)]=+e.target.value||0;render();return}
   if(k==='paste'){S.paste=e.target.value;return}setPath(k,e.target.value);
+  /* THE SUGGESTIONS FOLLOW THE KEYSTROKES, WITHOUT A RENDER (15 Sep). A
+     render() here rebuilds the sheet, which closes the keyboard and throws
+     away the caret — so the strip is the one thing that is written
+     directly. Nothing else on the sheet depends on the name as it is
+     typed, so nothing else goes stale. */
+  if(k==='axf.name'){try{const host=document.getElementById('axnear');
+    if(host&&typeof exNearHtml==='function')host.innerHTML=exNearHtml(e.target.value);
+    const b9=document.querySelector('[data-a="axAdd"]');
+    if(b9){const on9=String(e.target.value).trim();
+      b9.style.background=on9?'var(--green)':'var(--raised)';
+      b9.style.color=on9?'var(--bg)':'var(--faint)'}}
+    catch(e9){oops('axNearLive',e9)}return}
   if(k==='coach.input'){try{const b=document.querySelector('.sendbtn');
     if(b)b.style.opacity=String(e.target.value).trim()?'1':'.35';
     e.target.style.height='auto';
@@ -28941,6 +29154,11 @@ document.addEventListener('input',e=>{const d=e.target.dataset;
     if(c9.length===8)acctVerify(c9)}});
 document.addEventListener('blur',e=>{if(S.needRender&&e.target&&e.target.dataset&&e.target.dataset.in){S.needRender=0;render()}},true);
 document.addEventListener('change',e=>{const d=e.target.dataset;
+  /* the tree window is a select now, but it is not a plain setPath: it
+     has to drop the cached model, the cached drawing and the scroll, and
+     it stores "all" as nothing. The action already knows all that. */
+  if(d.treefrom&&e.target.tagName==='SELECT'){
+    try{runAction('treeFrom',e.target.value)}catch(e9){oops('treeFromSel',e9)}return}
   if(d.in&&e.target.tagName==='SELECT'){
     if(d.in==='rform.type'&&S.rform){S.rform.type=e.target.value;
       S.rform.rpe=({easy:4,recovery:3,long:5,tempo:7,interval:8,hills:7,race:9})[e.target.value]||5;
@@ -29500,6 +29718,16 @@ function runAction(a,v,t,e){
        lose the scroll position and the animation both. */
     case 'treeZoom':{const z=Math.max(1,Math.min(6,+S.txZoom||1));
       txApplyZoom(v==='in'?z*1.5:z/1.5,true);break}
+    /* a program line that offers a choice is two exercises (15 Sep). The
+       pick renames every unlogged set of that line and is remembered, so
+       the same choice opens by default next week. */
+    case 'exPick':{const s9=S.sess;if(!s9)break;
+      const cur9=s9.sets[Math.min(s9.idx,s9.sets.length-1)];if(!cur9)break;
+      const comp9=cur9.exOr||cur9.ex;
+      if(exChoices(comp9).indexOf(v)<0)break;
+      exPickApply(s9,comp9,v);exPickSet(comp9,v);
+      try{persistActive()}catch(e9){oops('exPickSave',e9)}
+      render();break}
     case 'treeLegendTog':{S.treeLegend=!S.treeLegend;render();break}
     case 'treeFrom':{S.prof=S.prof||{};S.prof.treeFrom=(v==='all')?null:v;try{lset(K_PROF,S.prof)}catch(e){oops('treeFrom',e)}
       S._txModel=null;S._txSvg=null;S._txScroll=null;render();break}
@@ -31130,6 +31358,11 @@ function runAction(a,v,t,e){
     case 'axOpen':S.sheet=null;S.axf={cat:'pushH',name:'',sets:3,reps:'8-12',w:'',hold:false,secs:30,perSide:false,perm:false};S.sheet={t:'addex',mode:v||'live'};render();break;
     case 'axCat':S.axf.cat=v;S.axf.name='';render();break;
     case 'axPick':S.axf.name=t.dataset.v;render();break;
+    /* tapping a near name ADOPTS it — the work joins the lift they already
+       do instead of minting a second one under a new spelling (15 Sep) */
+    case 'axNear':{if(!S.axf)break;S.axf.name=String(v||'');
+      flash('Logged as \u201c'+String(v||'')+'\u201d \u2014 same lift, one trend.');
+      render();break}
 
     case 'axHold':S.axf.hold=v==='1';render();break;
     case 'axPerSide':S.axf.perSide=!S.axf.perSide;render();break;
