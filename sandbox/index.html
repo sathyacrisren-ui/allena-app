@@ -223,6 +223,27 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
 @keyframes ceremony{0%{box-shadow:0 0 0 0 rgba(232,229,220,.35)}70%{box-shadow:0 0 34px 10px rgba(232,229,220,.12)}100%{box-shadow:0 0 22px 4px rgba(232,229,220,.10)}}
 .an-ceremony{animation:ceremony 1.4s ease-out forwards}
 @media (prefers-reduced-motion:reduce){.an-ceremony{animation:none}}
+/* THE CARD ON ITS STAGE (owner, 15 Sep 2026: "make the cards more
+   grandiose, like they're full page card popups"). The grandeur is
+   SPACE and the tier's own light behind the card — not bevels and
+   gradients, which decision 6c rules out on a surface somebody lives
+   in. --fbc is the tier colour, set on the element. */
+#findBig{position:fixed;inset:0;z-index:945;display:flex;align-items:center;justify-content:center;
+  padding:22px;overflow-y:auto;animation:deepCurtain .28s ease both}
+/* TWO LAYERS, AND THE BOTTOM ONE IS OPAQUE. Written as a single
+   radial gradient this was 78% TRANSPARENT at its centre and only went
+   solid at 62% of the radius — so the page underneath read straight
+   through the middle of the card, and both screens were legible at
+   once. That is the same fault as the sheet that dissolved (13 Sep),
+   arriving through a different door: a scrim's job is to remove what is
+   behind it, and a tint is not a scrim. The glow now sits ON an opaque
+   ground rather than being asked to be one. */
+#findBigScrim{position:absolute;inset:0;
+  background:radial-gradient(circle at 50% 44%,color-mix(in srgb,var(--fbc) 24%,transparent),transparent 62%),var(--bg)}
+#findBig .fb-wrap{position:relative;width:100%;max-width:380px;margin:auto}
+#findBig .fb-card{padding:0;overflow:hidden;border-radius:22px}
+#findBig .fb-acts{margin-top:18px}
+@media (prefers-reduced-motion:reduce){#findBig{animation:none}}
 /* THE ARRIVAL IS THE TIER (owner, 15 Sep 2026: "the level of grandiose
    animation when they popup needs to be relative to their tier level").
    Every finding used to arrive the same way, so the ladder that the
@@ -985,7 +1006,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='99af63';  // stamped by tools/build.py with the content hash
+const BUILD_ID='5f2129';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -20729,6 +20750,71 @@ function findFace(d,opts){
     (big&&d.d?'<p style="color:var(--dim);font-size:12px;line-height:1.5;margin-top:5px">'+esc(String(d.d).slice(0,160))+'</p>':'')+
     (when?'<p class="mono" style="color:var(--faint);font-size:'+(big?9:8)+'px;margin-top:'+(big?8:6)+'px">'+esc(fmtDate(when+'T12:00'))+'</p>':'')+
     '</div></button>'}
+/* ═══ THE CARD GETS A STAGE (owner, 15 Sep 2026, with a Clash Royale
+   hero screen: "can you make the cards more grandiose, like they're
+   full page card popups") ══════════════════════════════════════════════
+   What is taken from that screen is the STAGING, not the look: the card
+   presented as a physical object, alone, lit from behind, with its tier
+   badge and its actions as furniture around it rather than a list under
+   it. What is NOT taken is the look itself — gold bevels, drop shadows,
+   cartoon gradients. Decision 6c governs the surfaces somebody lives in
+   and this is one of them; the grandeur here comes from SPACE and from
+   the tier's own colour behind the card, which is the same amendment the
+   tree explorer got: a full-screen thing you open on purpose is allowed
+   a bigger voice than a row on a dashboard.
+   It reuses the rarity motion ladder, so a Noticed arrives quietly and a
+   Big one pops and haloes twice. A card is worth the ceremony its tier
+   earned and no more. */
+function findBigHtml(){
+  try{
+    const id=S.findBig;if(!id)return '';
+    const e=discBank()[id];if(!e)return '';
+    const r=rarityOf(e.rar),c=rarChrome(e.rar,true);
+    const when=e.when||e.found;
+    const pips=[0,1,2,3].map(i=>'<span style="width:'+(i<=c.rank?7:5)+'px;height:'+(i<=c.rank?7:5)+
+      'px;border-radius:50%;background:'+(i<=c.rank?r[1]:'var(--line)')+';opacity:'+(i<=c.rank?1:.4)+'"></span>').join('');
+    /* the basis line — the count the finding stands on, read out of its
+       own body rather than written fresh (same rule as the share card) */
+    let basis='';
+    try{const m=String(e.d||'').match(/(?:across|over)\s+(\d+)\s+([a-z\- ]+?)(?:[,.]|\s+your|\s+the|$)/i);
+      if(m)basis=m[1]+' '+m[2].trim();
+      else{const m2=String(e.d||'').match(/\bn\s*=\s*(\d+)/i);if(m2)basis=m2[1]+' paired days'}}
+    catch(e9){}
+    const hasEv=(typeof evidenceData==='function')&&evidenceData(id);
+    const dust=c.rank>=2?Array.from({length:14},(_,i)=>{
+      const a=i*0.618*6.283,rr=26+((i*41)%54);
+      return '<span class="find-dust" style="left:calc(50% + '+Math.round(Math.cos(a)*rr)+'px);top:calc(46% + '+
+        Math.round(Math.sin(a)*rr*0.8)+'px);background:'+r[1]+';animation-delay:'+(i*150)+'ms"></span>'}).join(''):'';
+    return '<div id="findBig" style="--fbc:'+r[1]+'">'+
+      '<div id="findBigScrim" data-a="findBigClose"></div>'+dust+
+      '<div class="fb-wrap '+c.rvl+(c.rvh?' '+c.rvh:'')+'" style="--rvc:'+c.halo+'">'+
+      /* the card */
+      '<div class="card fb-card" style="border-color:'+c.border+';border-width:'+c.width+
+        (c.glow!=='none'?';box-shadow:'+c.glow:'')+'">'+
+        '<div style="height:5px;background:'+r[1]+'"></div>'+
+        '<div style="padding:22px 22px 24px;background:'+c.fill+'">'+
+        '<div style="display:flex;align-items:center;gap:8px">'+
+          '<span style="display:flex;align-items:center;gap:3px;flex:none">'+pips+'</span>'+
+          '<span class="mono" style="color:'+r[1]+';font-size:10px;letter-spacing:'+c.track+
+            ';font-weight:'+c.weight+'">'+esc(r[2].toUpperCase())+'</span></div>'+
+        '<p class="disp" style="font-size:24px;font-weight:'+(c.rank>=3?700:650)+';line-height:1.2;margin-top:14px;'+
+          'background:none;-webkit-text-fill-color:var(--text);color:var(--text)">'+esc(e.t)+'</p>'+
+        (e.d?'<p style="color:var(--dim);font-size:13.5px;line-height:1.65;margin-top:12px">'+esc(e.d)+'</p>':'')+
+        (basis?'<p class="mono" style="color:'+r[1]+';font-size:10.5px;letter-spacing:.06em;margin-top:16px">FROM '+esc(basis.toUpperCase())+' OF YOUR OWN DATA</p>':'')+
+        (e.x?'<p style="color:var(--faint);font-size:12px;line-height:1.55;margin-top:14px;padding-top:12px;border-top:1px solid var(--line)">'+esc(e.x)+'</p>':'')+
+        '<p class="mono" style="color:var(--faint);font-size:10px;margin-top:16px">'+
+          (when?'FOUND '+esc(fmtDate(when+'T12:00')).toUpperCase():'IN YOUR OWN NUMBERS')+
+          ' \u00b7 KEPT WITH THE NUMBERS IT HAD</p>'+
+        '</div></div>'+
+      /* the furniture, under the card rather than inside it */
+      '<div class="fb-acts">'+
+      (hasEv?'<button data-a="evidenceOpen" data-v="'+esc(id)+'" class="big disp" style="background:'+r[1]+';color:var(--bg);font-size:14.5px">See the evidence</button>':'')+
+      '<div class="row" style="gap:8px;margin-top:8px">'+
+      '<button data-a="findShare" data-v="'+esc(id)+'" class="btn" style="flex:1;border-color:'+r[1]+';color:'+r[1]+';font-size:12.5px">Share this card</button>'+
+      '<button data-a="collOpen" class="btn" style="flex:1;color:var(--dim);font-size:12.5px">The collection</button></div>'+
+      '<button data-a="findBigClose" class="mono" style="display:block;width:100%;color:var(--faint);font-size:11px;letter-spacing:.06em;padding:14px 0 4px">CLOSE</button>'+
+      '</div></div></div>'}
+  catch(e){oops('findBigHtml',e);return ''}}
 function findFaceLocked(cat,hint){
   return '<div class="card" style="width:100%;padding:0;overflow:hidden;border-style:dashed;border-color:var(--line);opacity:.65">'+
     '<div style="height:3px;background:var(--line)"></div>'+
@@ -29571,6 +29657,16 @@ function render(){
        else if(bh.dataset.step!=String(S.boot)){bh.dataset.step=S.boot;
          const bl=bh.querySelector('#bootlines');if(bl)bl.innerHTML=bootLineHtml(S.boot)}}
      else if(bh)bh.remove()}
+    /* the full-page find card mounts like the reveal does — outside the
+       body, so opening one does not rebuild the page under it */
+    {let fb9=document.getElementById('findBigHost');
+     if(S.findBig){const want=String(S.findBig);
+       if(fb9&&fb9.dataset.id!==want){fb9.remove();fb9=null}
+       if(!fb9){fb9=document.createElement('div');fb9.id='findBigHost';fb9.dataset.id=want;
+         fb9.innerHTML=findBigHtml();document.body.appendChild(fb9);
+         try{const rk=rarChrome((discBank()[want]||{}).rar,true).rank;
+           if(rk>=2)hapticRun('find');else haptic('light')}catch(e){oops('findBigHaptic',e)}}}
+     else if(fb9)fb9.remove()}
     {let sh9=document.getElementById('signalHost');
      if(S.signalReveal){if(!sh9){sh9=document.createElement('div');sh9.id='signalHost';
        sh9.innerHTML=signalRevealHtml();document.body.appendChild(sh9);
@@ -30910,7 +31006,7 @@ function runAction(a,v,t,e){
       else{S.openSec[v]=1;S._rvl={k:v,t:Date.now()}}}render();break}
     case 'collBy':{S.collBy=v;S.scrollTo=null;render();break}
     case 'findShare':{findShareRun(v);break}
-    case 'collOpen':{S.backTo=S.view;S.backDrawer=false;S._navQuiet=1;S.sheet=null;S.view='collection';
+    case 'collOpen':{S.backTo=S.view;S.backDrawer=false;S._navQuiet=1;S.sheet=null;S.findBig=null;S.view='collection';
       /* a group key lands the tap on its shelf (owner-caught, 7 Sep:
          '6 GATES' dumped the reader at the top of everything found) */
       if(v){S.openSec['grp:'+v]=1;S.scrollTo='grp-'+v}
@@ -31809,7 +31905,7 @@ function runAction(a,v,t,e){
     case 'crewMake':{try{crewMake()}catch(e){}break}
     case 'crewShare':{try{crewShare(v)}catch(e){}break}
     case 'crewLeave':{try{crewLeave()}catch(e){}break}
-    case 'evidenceOpen':{S.backTo=S.view;S.backDrawer=false;S.sheet=null;
+    case 'evidenceOpen':{S.backTo=S.view;S.backDrawer=false;S.sheet=null;S.findBig=null;
       S.evidenceId=v;S.view='evidence';render();break}
     case 'romOpen':{S.sheet={t:'rom'};render();break}
     case 'romStart':{
@@ -31831,7 +31927,10 @@ function runAction(a,v,t,e){
       try{webkit.messageHandlers.allena.postMessage(JSON.stringify({type:'rom',mode:'squat'}))}
       catch(e){flash('The camera needs the Allena app.')}
       break}
-    case 'findOpen':{S.sheet={t:'find',id:v};render();break}
+    /* a finding opens on its own page now (15 Sep) — the sheet survives
+       for the notification landings that ask for it by name */
+    case 'findOpen':{S.sheet=null;S.findBig=v;render();break}
+    case 'findBigClose':{S.findBig=null;render();break}
     case 'echoOpen':{
       try{const P=notifPrefs();const x=(P.sched||[]).find(s9=>s9.id===v);
         if(x){P.echoSeen=P.echoSeen||{};P.echoSeen[x.id]=1;lset(K_NOTIF,P);
