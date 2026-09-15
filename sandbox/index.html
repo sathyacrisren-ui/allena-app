@@ -977,7 +977,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='e3b4c9';  // stamped by tools/build.py with the content hash
+const BUILD_ID='9d1c8a';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -17709,23 +17709,67 @@ function txOnQ(x0,y0,mx,my,x1,y1,t){const u=1-t;return[u*u*x0+2*u*t*mx+t*t*x1,u*
    laws (spread harder than scale, dots grow slowly and converge on one
    tappable size, no buds when zoomed) live inside it. */
 function txZ(){return Math.max(1,Math.min(6,+S.txZoom||1))}
+/* ══ THE ZOOM IS A MAGNIFYING GLASS, NOT A REDRAW ══════════════════════
+   (owner, on video, 15 Sep 2026: "the zoom feature isn't smooth, it resets
+   every zoom — it should be that you zoom in and it just becomes more
+   opened and easier to see the dots and click them".)
+
+   It reset because that was the design, and the design was mine. Zoom was
+   a RE-LAYOUT: during the pinch the canvas was CSS-scaled for speed, and
+   the moment the fingers lifted the whole tree was REGENERATED at the new
+   zoom — branch lengths z^1.3, twigs z^1.4, dot radii z^0.35, the spread
+   pass re-solved, the fork depth re-chosen. So the picture you were
+   pinching was never the picture you got: on release every dot jumped to
+   a new place and shrank. That was built to an earlier instruction of his
+   ("dots shouldn't be enlarging at the same rate as the zoom"), and the
+   re-layout was the wrong way to obey it — a layout that is a function of
+   how close you are standing cannot be smooth, because there is nothing
+   continuous between one solution and the next.
+
+   The tree is drawn ONCE, at its own scale. Zoom is the width of the box
+   it sits in, applied live to the same DOM: continuous, interruptible,
+   nothing regenerated, nothing to snap back to. The spread pass still
+   guarantees no dot hides behind another — it runs once, at the tree's
+   own scale, and magnification preserves that separation exactly while
+   multiplying the gaps in pixels. Which is the ask: more open, easier to
+   see, easier to hit.
+
+   THE EARLIER RULE IS SUPERSEDED, deliberately. Dots now grow with the
+   zoom like everything else. That rule existed so a zoomed-in crown would
+   not be a mat of fat overlapping circles — and it is not, because the
+   drawing spreads by the same factor. Big dots far apart are easier to
+   hit than small dots far apart. Do not reintroduce a per-zoom re-layout
+   to shrink them; counter-scaling a thousand SVG circles per frame is the
+   other way to buy it, and it costs a style recalc on every node of the
+   drawing on every frame of a pinch — the exact bill that made this page
+   laggy in the first place.
+   ══════════════════════════════════════════════════════════════════════ */
 function treeXSvg(m,zIn){
   try{
     if(!m||m.empty)return '';
-    const z=Math.max(1,Math.min(6,+zIn||txZ()));
-    const key=m.stamp+'@'+z;
+    const key=m.stamp;
     if(S._txSvg&&S._txSvg.key===key)return S._txSvg.svg;
     S._txVbLast=null;
-        /* the height scales with the zoom like everything else. It used to
-           grow z^1.15, which stretched the day axis away from the limbs and
-           was half of why a pinch jumped (see A ZOOM IS A SCALE in
-           14-tree.js) */
-    const svg=growTreeTime(TX_W*z,m.H*z,{explore:true,zoom:z});
+    const svg=growTreeTime(TX_W,m.H,{explore:true,zoom:1});
     S._txSvg={key:key,svg:svg,vb:S._txVbLast||null};
     return svg}
   catch(e){oops('treeXSvg',e);return ''}}
 function txVb(){try{const v=S._txSvg&&S._txSvg.vb;if(v)return v}catch(e){oops('txVb',e)}
-  const m=treeXModel(),z=txZ();return{x:0,y:0,w:(m.W||TX_W)*z,h:(m.H||TX_MINH)*z}}
+  const m=treeXModel();return{x:0,y:0,w:(m.W||TX_W),h:(m.H||TX_MINH)}}
+/* the one place zoom is applied, so the pinch, the buttons and the guide
+   cannot drift into three different answers. No render(): re-rendering is
+   what threw the drawing away and built a new one. */
+function txApplyZoom(z,smooth){
+  try{
+    z=Math.max(1,Math.min(6,+z||1));
+    S.txZoom=z;
+    const inner=document.getElementById('txinner');
+    if(inner){inner.style.transition=smooth?'width .22s cubic-bezier(.22,1,.36,1)':'';
+      inner.style.width=(100*z)+'%'}
+    const lab=document.getElementById('txzlab');
+    if(lab)lab.textContent=(Math.round(z*10)/10)+'\u00d7';
+    return z}
+  catch(e){oops('txApplyZoom',e);return 1}}
 function txSpread(dots,gap){
   /* push any two dots apart until they clear each other by `gap`; a few
      passes over a spatial hash, so a canopy of thousands stays cheap.
@@ -17805,14 +17849,14 @@ function viewTree(){
     if(S.treeLegend)h+='<div class="card" style="margin:10px 14px 0;padding:12px 14px">'+treeXLegend()+'</div>';
     h+='<div style="display:flex;align-items:center;gap:8px;padding:8px 14px 0">'+
       '<button data-a="treeZoom" data-v="out" class="btn" style="width:auto;padding:7px 13px;font-size:14px;color:var(--dim)">−</button>'+
-      '<span class="mono" style="font-size:10px;color:var(--faint);min-width:30px;text-align:center">'+(Math.round(z*10)/10)+'×</span>'+
+      '<span id="txzlab" class="mono" style="font-size:10px;color:var(--faint);min-width:30px;text-align:center">'+(Math.round(z*10)/10)+'×</span>'+
       '<button data-a="treeZoom" data-v="in" class="btn" style="width:auto;padding:7px 13px;font-size:14px;color:var(--dim)">+</button>'+
       '<span style="flex:1"></span>'+
       (m.newN?'<button data-a="treeNewest" class="mono" style="font-size:9.5px;letter-spacing:.06em;color:var(--green);border:1px solid var(--green);border-radius:9px;padding:6px 9px">NEWEST FIND</button>':'')+
       '<button data-a="findingsOpen" class="mono" style="font-size:9.5px;letter-spacing:.06em;color:var(--faint);border:1px solid var(--line);border-radius:9px;padding:6px 9px">AS A LIST</button></div>'+
       '<p style="color:var(--faint);font-size:10.5px;padding:5px 14px 0">Pinch to zoom, scroll up and down the years, tap any leaf.</p>'+
       '<div id="txwrap" style="margin-top:8px;height:calc(100dvh - 205px);overflow:auto;-webkit-overflow-scrolling:touch;touch-action:pan-x pan-y;position:relative">'+
-      '<div id="txinner" style="width:'+(100*z)+'%;margin:0 auto">'+treeXSvg(m,z)+'</div></div>';
+      '<div id="txinner" style="width:'+(100*z)+'%;margin:0 auto">'+treeXSvg(m)+'</div></div>';
     try{if(typeof deepReadyInfo==='function'&&deepReadyInfo())h+='<button data-a="deepGo" style="display:flex;align-items:center;gap:9px;margin:8px 14px 0;padding:10px 12px;width:calc(100% - 28px);text-align:left;background:var(--raised);border-radius:12px">'+
       '<span class="mono" style="color:var(--amber);font-size:9px;letter-spacing:.08em;flex:none">THIS WEEK’S READ</span><span style="flex:1;font-size:12px;color:var(--dim)">Ready. It becomes leaves too.</span><span class="mono" style="color:var(--amber);font-size:11px">›</span></button>'}catch(e){oops('treeX.read',e)}
     return h+'</div>'}
@@ -17856,14 +17900,20 @@ function treeXAfterRender(){
       if(e.cancelable)e.preventDefault();
       if(!raf)raf=requestAnimationFrame(function(){raf=0;
         if(!inner||!wrap)return;
+        inner.style.transition='';   // a finger is the animation
         inner.style.width=(100*zNext)+'%';
         const k=zNext/z0;
         wrap.scrollLeft=(sl0+fx)*k-fx;wrap.scrollTop=(st0+fy)*k-fy})},{passive:false});
-    const end=function(){if(!pinch)return;pinch=false;const zq=Math.round(zNext*10)/10;
+    const end=function(){if(!pinch)return;pinch=false;
       try{if(wrap)S._txScroll={t:wrap.scrollTop,l:wrap.scrollLeft}}catch(e){oops('txPinchEnd',e)}
-      /* the fingers lift: redraw at the new zoom so the spacing grows
-         and the dots do not — the CSS scale was only for the gesture */
-      if(zq!==S.txZoom){S.txZoom=zq;try{render()}catch(e){oops('txPinchRender',e)}}};
+      /* the fingers lift and NOTHING HAPPENS — which is the fix. The zoom
+         the fingers left behind is the zoom, kept exactly, unrounded. The
+         redraw that used to run here is what made every pinch end in a
+         jump. */
+      try{S.txZoom=Math.max(1,Math.min(6,zNext));
+        const lab=document.getElementById('txzlab');
+        if(lab)lab.textContent=(Math.round(S.txZoom*10)/10)+'\u00d7'}
+      catch(e){oops('txPinchEnd2',e)}};
     document.addEventListener('touchend',end,{passive:true});
     document.addEventListener('touchcancel',end,{passive:true})}
   catch(e){oops('txPinch',e)}})();
@@ -17944,11 +17994,20 @@ function treeGuide(kind,id){
         inner.style.transition='transform 1000ms cubic-bezier(.2,.7,.2,1)';
         inner.style.transform='scale(3)';
         try{hapticRun('find')}catch(e9){}
-        setTimeout(function(){try{inner.style.transition='';inner.style.transform='';inner.style.transformOrigin=''}catch(e9){}
-          const wasSheet=S.sheet;S.sheet=null;
+        /* the flight used to end by re-rendering at 3x — the same redraw
+           that made every pinch jump, run once more as the finale. The
+           drawing it flew over IS the drawing at 3x now, so the transform
+           hands straight over to the width and nothing moves (15 Sep). */
+        setTimeout(function(){try{
+            const vb2=txVb();const sc2=(TX_W*3)/(vb2.w||TX_W);
+            const px2=(P[0]-vb2.x)*sc2,py2=(P[1]-vb2.y)*sc2;
+            inner.style.transition='';inner.style.transform='';inner.style.transformOrigin='';
+            txApplyZoom(3,false);
+            w.scrollTop=Math.max(0,py2-w.clientHeight*0.45);
+            w.scrollLeft=Math.max(0,px2-w.clientWidth*0.5);
+            S._txScroll={t:w.scrollTop,l:w.scrollLeft}}catch(e9){oops('treeGuide.hand',e9)}
           try{if(S.view!=='tree')return}catch(e9){}
-          S.txZoom=3;S._txGoto=elId;render();
-          setTimeout(function(){try{treeGuideTo(kind,id)}catch(e9){oops('treeGuide.end',e9)}},380)},1080)}
+          setTimeout(function(){try{treeGuideTo(kind,id)}catch(e9){oops('treeGuide.end',e9)}},260)},1080)}
       catch(e9){oops('treeGuide.zoom',e9);treeGuideTo(kind,id)}},760)}
     catch(e9){oops('treeGuide.step',e9);treeGuideTo(kind,id)}},140)}
   catch(e){oops('treeGuide',e)}}
@@ -29359,7 +29418,12 @@ function runAction(a,v,t,e){
     /* THE TREE IS THE DOOR (owner, 14 Sep): the header icon lands on the
        explorer with the newest unseen find in view; looking clears the
        badge after the same 2.5s grace every reveal uses */
-    case 'treeOpen':{S._navQuiet=1;if(S.view!=='tree'){S.backTo=S.view;S.backDrawer=false}
+    /* the tree row was the one drawer row with its own action, and that
+       action cleared backDrawer — so Back from the tree was the one Back
+       that did not bring the menu with it (owner-caught on video, 15 Sep).
+       Opening from the drawer is what decides it, not which action ran. */
+    case 'treeOpen':{S._navQuiet=1;const _fd=!!S.drawerOpen;
+      if(S.view!=='tree'){S.backTo=S.view;S.backDrawer=_fd}
       S.sheet=null;S.drawerOpen=false;S.view='tree';
       const fid=(typeof treeXFocusId==='function')?treeXFocusId():null;
       S.treeFocus=fid;S._txGoto=fid?txElId('find',fid):null;if(!fid)S._txScroll=null;
@@ -29372,8 +29436,11 @@ function runAction(a,v,t,e){
     case 'treePopHide':{S._txPopHide=today();render();break}
     case 'runUndelete':{const n=runUndelete();S.patCache=null;render();
       flash(n?'Forgotten. Health syncs them back on the next open, or now if it can.':'Nothing was deleted.');break}
+    /* the buttons take the same road as the pinch (15 Sep): the box grows,
+       the drawing is untouched. render() here would rebuild the page and
+       lose the scroll position and the animation both. */
     case 'treeZoom':{const z=Math.max(1,Math.min(6,+S.txZoom||1));
-      S.txZoom=Math.round((v==='in'?Math.min(6,z*1.5):Math.max(1,z/1.5))*10)/10;render();break}
+      txApplyZoom(v==='in'?z*1.5:z/1.5,true);break}
     case 'treeLegendTog':{S.treeLegend=!S.treeLegend;render();break}
     case 'treeFrom':{S.prof=S.prof||{};S.prof.treeFrom=(v==='all')?null:v;try{lset(K_PROF,S.prof)}catch(e){oops('treeFrom',e)}
       S._txModel=null;S._txSvg=null;S._txScroll=null;render();break}
@@ -29642,8 +29709,25 @@ function runAction(a,v,t,e){
       if(dr){dr.classList.remove('open');setTimeout(function(){S.drawerOpen=false;render()},240)}
       else{S.drawerOpen=false;render()}break}
     case 'drawerNav':{const _f=S.view;S.drawerOpen=false;S._navQuiet=1;runAction('nav',v);S.backTo=_f;S.backDrawer=true;break}
+    /* BACK FROM A DRAWER PAGE GOES BACK TO THE DRAWER (owner, on video,
+       15 Sep 2026: "if you click a page on the hamburger and you click
+       back from that page it should always bring back the hamburger, but
+       the page that is highlighted in the hamburger should be the same
+       page that you have just clicked back in").
+       It used to do half of that: the drawer reopened, but it navigated
+       you to the page you had come FROM first — so you left the collection,
+       landed on Today, and the menu correctly said Today. The highlight
+       was never wrong; the destination was. Reaching a room from the menu
+       makes the menu the place you came from, so that is where Back goes,
+       and the room you are standing in is the row that is lit.
+       The drawer IS the navigation here (the tab bar was removed), so this
+       is the only reading where both halves of that sentence are true at
+       once and the menu still never lies about where you are.
+       Backs NOT from the drawer are untouched: a chart opened from
+       Progress still returns to Progress. */
     case 'back':{const _t=S.backTo||'today';const _d=!!S.backDrawer;
-      S.backTo=null;S.backDrawer=false;S.view=_t;
+      S.backTo=null;S.backDrawer=false;
+      if(!_d)S.view=_t;
       if(_t==='you')S.backTo='data'; // You is only reached from Settings — a second back lands there, never loops
       /* ALL backs are instant (owner-caught three times on heavy
          pages): the view-transition snapshot of two big pages is the
