@@ -985,7 +985,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='e02845';  // stamped by tools/build.py with the content hash
+const BUILD_ID='577c7c';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -2543,6 +2543,32 @@ function snapshotData(){
     tree:{pts:tr.pts,sessions:tr.sessions,lifts:tr.liftCount,runs:tr.runs,
       km:tr.km,rare:tr.rare,found:tr.found,weeks:tr.weeks,days:tr.days},
     collection_count:st.total};
+  /* ═══ THE CARD COUNTS (owner, 15 Sep 2026: "you can see how many of
+     each card your friends have and your rank") ═══════════════════════
+     FOUR INTEGERS AND A TOTAL — how many of each tier, and the
+     rarity-weighted discovery points the rank reads from.
+     WHICH cards somebody holds does NOT travel, and that is a decision
+     rather than an oversight. A finding's identity is health data: "A PR
+     while healing" says the person is injured, an ACL gate card says
+     they had surgery, a blood-draw card says they had bloods taken. The
+     published privacy policy promises the score card carries no health
+     details, with the pod bracket and exempt flag as the only named
+     exceptions — and those are said out loud on the opt-in screen before
+     anyone joins. Per-card identity would break that promise for
+     everybody, silently, to fill a leaderboard.
+     A tier count cannot say any of it. Twelve commons is twelve
+     commons. Rides social7.sql; self-detects, like crews and pods. */
+  /* THE KEYS ARE SPELT OUT, and the privacy test is why. The first cut
+     shortened them to c/u/r/e and tripped the snapshot ban on `"r":` —
+     which exists because `r` means REPS everywhere else in this app. The
+     test was right twice over: about the collision, and about the
+     abbreviation. A payload that needs a decoder is a payload nobody can
+     audit at a glance, and this is the one payload that has to be
+     auditable at a glance. */
+  try{const ct=collTiers();
+    out.finds={common:ct.common,uncommon:ct.uncommon,rare:ct.rare,epic:ct.epic,
+      pts:(typeof findPoints==='function')?Math.round(findPoints()):0}}
+  catch(e){oops('snapFinds',e)}
   /* the race fields (Part 3, 7 Sep): weekly LIVE points + a chosen
      first name — score card still, nothing else. Activation = 3 live
      sessions inside the first tracked week, computed on-device. */
@@ -2686,7 +2712,13 @@ async function frLoad(force){
          just needed them for everyone, so this costs no server work
          and no new column. The graduated fallbacks below still carry
          an older schema. */
-      let r2=await fetch(CLOUD.url+'/rest/v1/snapshots?select=user_id,display,week_live,week_sessions,live_points,points,tier,tree,collection_count,prev_week_live,prev_week_key,av,updated_at&user_id=in.('+ids.map(encodeURIComponent).join(',')+')',{headers:h});
+      /* the card counts ride the same batch and self-detect: a database
+         without social7.sql 400s on the column, and the next line down
+         is the schema that came before it (the same graduated fallback
+         the av column and the crew columns already use) */
+      let r2=await fetch(CLOUD.url+'/rest/v1/snapshots?select=user_id,display,week_live,week_sessions,live_points,points,tier,tree,collection_count,finds,prev_week_live,prev_week_key,av,updated_at&user_id=in.('+ids.map(encodeURIComponent).join(',')+')',{headers:h});
+      if(r2.ok)S.findsCap=true;else S.findsCap=false;
+      if(!r2.ok)r2=await fetch(CLOUD.url+'/rest/v1/snapshots?select=user_id,display,week_live,week_sessions,live_points,points,tier,tree,collection_count,prev_week_live,prev_week_key,av,updated_at&user_id=in.('+ids.map(encodeURIComponent).join(',')+')',{headers:h});
       if(!r2.ok)r2=await fetch(CLOUD.url+'/rest/v1/snapshots?select=user_id,display,week_live,week_sessions,live_points,tier,prev_week_live,prev_week_key,av,updated_at&user_id=in.('+ids.map(encodeURIComponent).join(',')+')',{headers:h});
       if(!r2.ok)r2=await fetch(CLOUD.url+'/rest/v1/snapshots?select=user_id,display,week_live,week_sessions,live_points,tier,updated_at&user_id=in.('+ids.map(encodeURIComponent).join(',')+')',{headers:h});
       S.frSnaps=r2.ok?await r2.json():[]}
@@ -2852,7 +2884,7 @@ function raceField(){
     const w9=snWeeks(sn);
     out.push({crew:1,id:id,name:local||sn.display||'A racer',named:!!(local||sn.display),
       week:w9.cur,last:w9.prev,sess:(w9.at===questWeekKey()?sn.week_sessions:0)||0,tier:sn.tier||'',allp:sn.live_points||0,av:sn.av||'',seen:sn.updated_at||null,
-      tree:sn.tree||null,finds:sn.collection_count||0,pts:sn.points||0})})}catch(e){}
+      tree:sn.tree||null,finds:sn.collection_count||0,pts:sn.points||0,cards:sn.finds||null})})}catch(e){}
   return out}
 async function crewMake(nm){
   {const c9=nameClean(nm);
@@ -2956,7 +2988,7 @@ function frLinked(){
     const w9=snWeeks(sn);
     return{code:x.code,id:fid,name:local||sn.display||'Your friend',named:!!(local||sn.display),
       week:w9.cur,last:w9.prev,sess:(w9.at===questWeekKey()?sn.week_sessions:0)||0,tier:sn.tier||'',allp:sn.live_points||0,av:sn.av||'',seen:sn.updated_at||null,
-      tree:sn.tree||null,finds:sn.collection_count||0,pts:sn.points||0}})}
+      tree:sn.tree||null,finds:sn.collection_count||0,pts:sn.points||0,cards:sn.finds||null}})}
 const AV_COLS=['var(--line)','var(--green)','var(--chart)','var(--gold)','#E8927C','#B8B4A8'];
 const AV_GLYPHS={
   1:'<svg viewBox="0 0 24 24" width="55%" height="55%" fill="currentColor"><path d="M12 2c1 4-3 5-3 9a3 3 0 0 0 6 0c0-1.5-.8-2.6-1.4-3.6C15.8 8.6 19 10.5 19 15a7 7 0 0 1-14 0C5 8.5 10.5 6.5 12 2z"/></svg>',
@@ -3160,6 +3192,64 @@ function friendRows(){
         act:(f.week>0?2:0)+(d.s>0?1:0)}})
       .sort((a,b)=>(b.act-a.act)||(b.sess-a.sess))}
   catch(e){return []}}
+/* the four tier counts as a row of coloured pips. Silent when the
+   database has not got social7.sql yet, and silent for a friend whose
+   app has not synced since — never a row of zeroes, which would read as
+   "they have found nothing" rather than "this is not known yet". */
+function cardRow(c){
+  try{
+    if(!c)return '';
+    const tot=(+c.common||0)+(+c.uncommon||0)+(+c.rare||0)+(+c.epic||0);
+    if(!tot)return '';
+    const cell=k=>{const r=rarityOf(k),n=+c[k]||0;
+      return '<div style="flex:1;min-width:0;display:flex;align-items:center;gap:4px;justify-content:center">'+
+        '<span style="width:7px;height:7px;border-radius:7px;flex:none;background:'+r[1]+';opacity:'+(n?1:.3)+'"></span>'+
+        '<span class="mono" style="font-size:11px;font-weight:600;color:'+(n?'var(--text)':'var(--faint)')+'">'+n+'</span></div>'};
+    return '<div style="display:flex;gap:4px;margin-top:9px;padding-top:9px;border-top:1px solid var(--line)">'+
+      ['common','uncommon','rare','epic'].map(cell).join('')+'</div>'}
+  catch(e){oops('cardRow',e);return ''}}
+/* ═══ THE COLLECTION BOARD ════════════════════════════════════════════
+   (owner, 15 Sep 2026: "you can see how many of each card your friends
+   have and your rank".)
+
+   IT IS DELIBERATELY NOT THE RACE, and the two must never merge. The
+   race is witnessed points this week and it competes on SHOWING UP,
+   which is the law that keeps it open to somebody who is injured. A
+   collection ranks on what has been FOUND, and findings need data —
+   more sessions, a watch, tracked macros. Ranked together, the person
+   the app exists for finishes last every week.
+   So this is a second board in its own room, on the app's existing
+   rarity-weighted currency (epic 75 / rare 30 / uncommon 12 / common 5),
+   with its own named ranks. Nobody is knocked down it: it only ever
+   goes up, because a find is never taken away. */
+function collBoard(){
+  try{
+    const R=friendRows().filter(f=>f.cards&&(+f.cards.pts>=0));
+    const mine=(typeof findPoints==='function')?Math.round(findPoints()):0;
+    const rows=R.map(f=>({n:f.name,p:+f.cards.pts||0,c:f.cards,me:false}))
+      .concat([{n:'You',p:mine,c:collTiers(),me:true}])
+      .sort((a,b)=>b.p-a.p);
+    if(rows.length<2)return '';
+    const myRank=rows.findIndex(x=>x.me)+1;
+    const rk=(typeof findRank==='function')?findRank(mine):null;
+    return '<p class="eyebrow" style="margin-top:22px">The collection board</p>'+
+      '<p style="color:var(--faint);font-size:11.5px;line-height:1.55;margin-top:4px">'+
+      'Ranked on what has been found, weighted by how rare it is. This is not the race — the race is showing up, and it stays that way.</p>'+
+      '<div class="card mt" style="padding:6px 0">'+
+      rows.map((x,i)=>'<div style="display:flex;align-items:center;gap:10px;padding:9px 14px'+
+        (x.me?';background:color-mix(in srgb,var(--amber) 8%,transparent)':'')+'">'+
+        '<span class="mono" style="flex:none;width:18px;color:'+(i===0?'var(--amber)':'var(--faint)')+';font-size:12px;font-weight:600">'+(i+1)+'</span>'+
+        '<span style="flex:1;min-width:0;font-size:13.5px;font-weight:'+(x.me?600:400)+';overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(x.n)+'</span>'+
+        '<span style="flex:none;display:flex;gap:5px;align-items:center">'+
+        ['epic','rare'].map(k=>{const r=rarityOf(k),n=+(x.c||{})[k]||0;
+          return n?'<span class="mono" style="font-size:10px;color:'+r[1]+'">'+n+'</span>':''}).join('')+
+        '</span>'+
+        '<span class="mono" style="flex:none;font-size:12px;font-weight:600;min-width:46px;text-align:right">'+x.p.toLocaleString()+'</span></div>').join('')+
+      '</div>'+
+      '<p class="mono" style="color:var(--faint);font-size:10px;letter-spacing:.04em;margin-top:7px">'+
+      'YOU ARE '+myRank+(myRank===1?'ST':myRank===2?'ND':myRank===3?'RD':'TH')+' OF '+rows.length+
+      (rk?' · '+esc(String(rk.name).toUpperCase()):'')+'</p>'}
+  catch(e){oops('collBoard',e);return ''}}
 function friendsPanel(){
   const R=friendRows();
   let h='<div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-top:14px">'+
@@ -3183,6 +3273,11 @@ function friendsPanel(){
       '</div>'+
       '<div style="display:flex;gap:6px;margin-top:12px">'+
         st(f.sess,'SESSIONS')+st(f.lifts,'LIFTS')+st(f.km,'KM')+st(f.finds,'FINDS')+'</div>'+
+      /* THE SET THEY HOLD (15 Sep 2026). Four counts, in the ladder's own
+         colours, which is the whole of what travels — see snapshotData.
+         The cards themselves stay on their own phone, because a card
+         name can say "injured", "operated on" or "had bloods taken". */
+      cardRow(f.cards)+
       (mv?'<p style="color:var(--green);font-size:11.5px;line-height:1.5;margin-top:10px">Since you last looked: '+
         [mv.s>0?mv.s+' session'+(mv.s===1?'':'s'):'',mv.k>0?mv.k+' km':'',mv.f>0?mv.f+' find'+(mv.f===1?'':'s'):'']
           .filter(Boolean).join(' \u00b7 ')+'</p>':'')+
@@ -3190,7 +3285,7 @@ function friendsPanel(){
       '<button data-a="nudgeOpen" data-v="'+esc(String(f.id))+'" class="btn" style="flex:1;color:var(--dim);font-size:12px;padding:9px 4px;border-radius:12px">Nudge</button>'+
       '<button data-a="frOpen" data-v="'+esc(String(f.id))+'" class="btn" style="flex:1;color:var(--dim);font-size:12px;padding:9px 4px;border-radius:12px">Their card</button></div>'+
       '</div>'}).join('')+'</div>';
-  return h}
+  return h+collBoard()}
 function raceMineRows(){
   try{
     const d=dataPoints(),items=(d.raceItems||[]).slice();
@@ -16759,6 +16854,99 @@ function shareLevelRun(gained,lv){
         else openSheet()}catch(e){openSheet()}},'image/png')}
     else openSheet()
   }catch(e){flash('Could not draw the card.')}}
+/* ═══ A FINDING AS A CARD YOU CAN POST ═══════════════════════════════
+   (owner, 15 Sep 2026, alongside the daily series: findings are
+   collectible cards, coloured by tier, and they can be shared.)
+
+   There were share cards for the tree, the monthly wrap, the level-up
+   and the muscle map, and none for a FINDING — which is the moat, and
+   the only one of the five that a stranger would stop scrolling for.
+
+   THE NUMBER IS NOT THE POINT; THE EVIDENCE IS. Anybody can post "sleep
+   matters". What nobody else can post is "across 27 sessions, n=27,
+   your own data". So the card carries the finding's own basis line
+   under it, and it is drawn from the finding's stored body rather than
+   written fresh — a share card that paraphrases its own app is how a
+   claim drifts from the thing that proved it.
+
+   WHAT NEVER GOES ON IT: the same rule as every other card in this
+   family. No name, no bodyweight, no pain score, no exercise load. The
+   finding's own words and its own count, which is what is already on
+   the screen the user tapped Share from. */
+function findShareRun(id){
+  try{
+    const e=discBank()[id];
+    if(!e){flash('That find is in the collection.');return}
+    const r=rarityOf(e.rar),chrome=rarChrome(e.rar,true);
+    const c=document.createElement('canvas');c.width=1080;c.height=1920;
+    const x=c.getContext('2d');
+    x.fillStyle='#151310';x.fillRect(0,0,1080,1920);
+    /* the halo takes the tier's colour, so the card reads as its rarity
+       from across a feed before a word of it is read */
+    const halo=x.createRadialGradient(540,760,60,540,760,880);
+    halo.addColorStop(0,r[3].replace(/[\d.]+\)$/,'0.30)'));
+    halo.addColorStop(1,'rgba(0,0,0,0)');
+    x.fillStyle=halo;x.fillRect(0,0,1080,1920);
+    x.textAlign='center';
+    x.fillStyle='#8A8578';x.font='600 30px -apple-system,system-ui,sans-serif';
+    x.fillText('A  L  L  E  N  A',540,140);
+    try{const mk=new Image();mk.src=MARK;if(mk.complete||mk.width)x.drawImage(mk,510,180,60,60)}catch(e9){}
+    /* the tier band and its pips — the same ladder as the binder */
+    x.fillStyle=r[1];x.fillRect(240,330,600,6);
+    const rk=chrome.rank;
+    for(let i=0;i<4;i++){x.beginPath();
+      x.arc(486+i*26,400,i<=rk?9:6,0,Math.PI*2);
+      x.fillStyle=i<=rk?r[1]:'#3A3733';x.fill()}
+    x.fillStyle=r[1];x.font='700 40px ui-monospace,monospace';
+    x.fillText(r[2].toUpperCase().split('').join(' '),540,500);
+    /* THE BLOCK IS CENTRED ON WHAT IT ACTUALLY CONTAINS. Drawing from a
+       fixed top left a short finding stranded in the upper third with a
+       third of the card empty under it, which on a feed reads as a
+       broken image. Measure first, then place: the text is wrapped once
+       with the pen up to learn its height, and drawn once centred. */
+    const wrap=(txt,font,maxW,lh,startY,fill,cap,dry)=>{
+      x.font=font;if(!dry)x.fillStyle=fill;
+      const words=String(txt||'').split(/\s+/);let line='',y=startY,n=0;
+      for(let i=0;i<words.length;i++){
+        const t=line?line+' '+words[i]:words[i];
+        if(x.measureText(t).width>maxW&&line){
+          if(!dry)x.fillText(line,540,y);
+          y+=lh;line=words[i];n++;
+          if(cap&&n>=cap){if(!dry)x.fillText(line+'\u2026',540,y);return y+lh}}
+        else line=t}
+      if(line){if(!dry)x.fillText(line,540,y);y+=lh}
+      return y};
+    const TITLE='800 82px -apple-system,system-ui,sans-serif',BODY='400 42px -apple-system,system-ui,sans-serif';
+    const hT=wrap(e.t,TITLE,880,96,0,'',5,true);
+    const hB=e.d?wrap(e.d,BODY,860,60,0,'',7,true):0;
+    const block=hT+(hB?hB+60:0);
+    /* between the tier label (500) and the footer (1740), centred */
+    let y=Math.max(660,560+((1740-560)-block)/2);
+    y=wrap(e.t,TITLE,880,96,y,'#F0EEE6',5);
+    if(e.d)y=wrap(e.d,BODY,860,60,y+60,'#B9B5AC',7);
+    /* THE BASIS LINE — the count the finding stands on, pulled out of its
+       own body rather than invented. This is the half that makes it
+       psychic instead of a horoscope. */
+    let basis='';
+    try{const m=String(e.d||'').match(/(?:across|over)\s+(\d+)\s+([a-z\- ]+?)(?:[,.]|\s+your|\s+the|$)/i);
+      if(m)basis=m[1]+' '+m[2].trim();
+      else{const m2=String(e.d||'').match(/\bn\s*=\s*(\d+)/i);if(m2)basis=m2[1]+' paired days'}}
+    catch(e9){}
+    if(basis){x.fillStyle=r[1];x.font='600 38px ui-monospace,monospace';
+      x.fillText('FROM '+basis.toUpperCase()+' OF YOUR OWN DATA',540,Math.min(1690,y+70))}
+    x.fillStyle='#8A8578';x.font='500 34px -apple-system,system-ui,sans-serif';
+    const when=e.when||e.found;
+    x.fillText('found '+(when?fmtDate(when+'T12:00'):'in your own numbers'),540,1790);
+    x.fillText('the statistics ran on the phone first',540,1850);
+    S.shareImg=c.toDataURL('image/png');S.shareTitle=e.t;
+    const openSheet=function(){S.sheet={t:'treeshare'};render()};
+    if(navigator.share&&navigator.canShare&&c.toBlob){
+      c.toBlob(function(b){try{
+        const f=new File([b],'allena-find.png',{type:'image/png'});
+        if(navigator.canShare({files:[f]}))navigator.share({files:[f]}).catch(function(){});
+        else openSheet()}catch(e9){openSheet()}},'image/png')}
+    else openSheet()}
+  catch(e){oops('findShareRun',e);flash('Could not draw the card.')}}
 /* ══ WHEN THE TREE ACTUALLY CHANGED ════════════════════════════
    Owner call, 13 Sep: the tree was the lowest-priority surface in
    the app — collectTeaser bids 15, behind everything, so it only
@@ -20492,6 +20680,69 @@ function sessionReveal(){
   const order={epic:0,rare:1,uncommon:2,common:3};
   fresh.sort((a,b)=>order[a.rar]-order[b.rar]);
   return{show:fresh[0],more:fresh.length-1}}
+/* ═══ A FINDING IS A CARD ═════════════════════════════════════════════
+   (owner, 15 Sep 2026: "we need something collectible like cards, and
+   cards are coloured as per their rarity and tier and can be shared.
+   one thing also they should be accessible to the user — right now
+   they're not.")
+
+   He was right that they were not. The collection was six collapsed
+   accordions of plain text rows: two taps to see anything, nothing to
+   look at when you got there, and no way to hold one up. Sixty-eight
+   findings on a mature account and not one of them was an object.
+
+   ONE FACE, EVERY SURFACE. The binder, the find sheet and the share
+   image all draw from findFace(), and its colours come from rarChrome()
+   — the same constant the tree paints its blossoms with. A card that is
+   gold here and amber there is two facts about one finding.
+
+   THE LOCKED SLOT IS PART OF THE SET. A collectible people can complete
+   needs a shape with holes in it; the catalogue already knew what was
+   missing, it just never drew it. What a locked card shows is the
+   CATEGORY and the honest hint — never the finding, because the finding
+   has not happened and inventing it would be the fake-milestone trap. */
+function findFace(d,opts){
+  opts=opts||{};
+  const c=rarChrome(d.rar,true);
+  const w=opts.w||'100%';
+  const big=!!opts.big;
+  const pips=[0,1,2,3].map(i=>'<span style="width:'+(i<=c.rank?4:3)+'px;height:'+(i<=c.rank?4:3)+
+    'px;border-radius:50%;background:'+(i<=c.rank?c.col:'var(--line)')+';opacity:'+(i<=c.rank?1:.45)+'"></span>').join('');
+  const when=d.when||d.found;
+  return '<button data-a="findOpen" data-v="'+esc(d.id)+'" class="card'+(opts.fresh?' find-glow':'')+'" '+
+    'style="width:'+w+';text-align:left;display:block;padding:0;overflow:hidden;position:relative;'+
+    'border-color:'+c.border+';border-width:'+c.width+
+    (c.glow!=='none'?';box-shadow:'+c.glow:'')+'">'+
+    /* the tier band across the head of the card — the one thing you read
+       from across a room, and the reason a binder reads as a binder */
+    '<div style="height:'+(big?4:3)+'px;background:'+c.col+';opacity:.9"></div>'+
+    '<div style="padding:'+(big?'13px 14px':'10px 11px')+';background:'+c.fill+'">'+
+    '<div style="display:flex;align-items:center;gap:6px">'+
+      '<span style="display:flex;align-items:center;gap:2px;flex:none">'+pips+'</span>'+
+      '<span class="mono" style="flex:1;min-width:0;color:'+c.col+';font-size:'+(big?8.5:7.5)+'px;'+
+        'letter-spacing:'+c.track+';font-weight:'+c.weight+';overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+
+        esc(c.label.toUpperCase())+'</span>'+
+      (opts.fresh?'<span class="mono" style="flex:none;background:'+c.col+';color:#1F1E1D;font-size:7px;padding:1px 4px;border-radius:999px">NEW</span>':'')+
+    '</div>'+
+    '<p style="font-size:'+(big?14:12)+'px;font-weight:'+(c.rank>=3?700:600)+';line-height:1.3;margin-top:6px;'+
+      (big?'':'display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;min-height:'+(12*1.3*3)+'px')+'">'+esc(d.t)+'</p>'+
+    (big&&d.d?'<p style="color:var(--dim);font-size:12px;line-height:1.5;margin-top:5px">'+esc(String(d.d).slice(0,160))+'</p>':'')+
+    (when?'<p class="mono" style="color:var(--faint);font-size:'+(big?9:8)+'px;margin-top:'+(big?8:6)+'px">'+esc(fmtDate(when+'T12:00'))+'</p>':'')+
+    '</div></button>'}
+function findFaceLocked(cat,hint){
+  return '<div class="card" style="width:100%;padding:0;overflow:hidden;border-style:dashed;border-color:var(--line);opacity:.65">'+
+    '<div style="height:3px;background:var(--line)"></div>'+
+    '<div style="padding:10px 11px">'+
+    '<p class="mono" style="color:var(--faint);font-size:7.5px;letter-spacing:.08em">NOT FOUND YET</p>'+
+    '<p style="font-size:12px;font-weight:600;line-height:1.3;margin-top:6px;color:var(--faint)">'+esc(cat)+'</p>'+
+    '<p style="color:var(--faint);font-size:10px;line-height:1.4;margin-top:4px">'+esc(hint)+'</p>'+
+    '</div></div>'}
+/* how the set breaks down by tier — the only shape of this that can
+   ever travel to a friend, see collTierCounts in 02b */
+function collTiers(){
+  const l=bankList(),out={common:0,uncommon:0,rare:0,epic:0};
+  l.forEach(d=>{if(out[d.rar]!=null)out[d.rar]++});
+  return out}
 function viewCollection(){
   const st=bankStats(),l=bankList();
   const GROUPS=[
@@ -20532,61 +20783,71 @@ function viewCollection(){
         '<b style="color:var(--text)">'+esc(c[1])+'</b> — '+esc(c[3])+'</p>').join('')+
       '<p style="color:var(--faint);font-size:11px;line-height:1.5;margin-top:9px">'+
       'Most of these need a few weeks of data before they can appear. They are not hidden, they just do not exist yet.</p></div>'}
-  /* SIX groups, not eighteen pills (owner call, 5 Sep): stored tags
-     never change — this is display-layer folding. The red dot runs
-     all the way to the exact entry: fresh group glows with a count,
-     auto-opens, the page scrolls to it, and the new entries inside
-     wear their own NEW chips. First-ever visit baselines silently. */
+  /* ═══ THE BINDER (owner, 15 Sep 2026) ══════════════════════════════
+     Six collapsed accordions of text rows became a grid of cards you can
+     actually look at. The grouping and the seen-tracking are kept exactly
+     as they were — the folding, the red dot that runs to the exact entry,
+     the first-visit baseline — because all of that was right. What
+     changed is that a finding is now an object on a shelf instead of a
+     line in a list, and the shelf shows its empty slots.
+
+     THE TIER FILTER IS THE COLLECTOR'S VIEW. Sorting a set by how rare
+     things are is the first thing anybody does with one, and it is the
+     only way to see the ladder as a ladder. Category stays the default,
+     because category is how you find a particular card. */
   const seenC=lget('training-collseen-v1',null);
   const seenIds=(seenC&&seenC.ids)||{};
   const freshBy={},freshIds={};
   if(seenC)l.forEach(d=>{if(!seenIds[d.id]){freshIds[d.id]=1;freshBy[gOf(d)]=(freshBy[gOf(d)]||0)+1}});
   try{const all={};l.forEach(d=>all[d.id]=1);lset('training-collseen-v1',{ids:all})}catch(e){}
-  const firstFresh=GROUPS.find(g=>freshBy[g[0]]);
-  if(firstFresh){S.openSec['grp:'+firstFresh[0]]=1;
-    if(!S.scrollTo)S.scrollTo='grp-'+firstFresh[0]}
-  GROUPS.slice().sort((a,b)=>(freshBy[b[0]]||0)-(freshBy[a[0]]||0)).forEach(g=>{
-    const mine=l.filter(d=>gOf(d)===g[0]).sort((a,b)=>{
+  const mode=S.collBy||'cat';
+  const onP='border-color:var(--text);color:var(--text);background:var(--raised)';
+  h+='<div class="row mt2" style="gap:6px">'+
+    [['cat','By category'],['tier','By rarity'],['new','Newest']].map(x=>
+      '<button data-a="collBy" data-v="'+x[0]+'" class="pill" style="flex:1;text-align:center;font-size:11.5px;padding:8px 4px;'+
+      (mode===x[0]?onP:'color:var(--faint)')+'">'+x[1]+'</button>').join('')+'</div>';
+  const grid=cards=>'<div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin-top:10px;align-items:start">'+cards.join('')+'</div>';
+  const face=d=>findFace(d,{fresh:!!freshIds[d.id]});
+  if(mode==='tier'){
+    ['epic','rare','uncommon','common'].forEach(rr=>{
+      const r=rarityOf(rr),mine=l.filter(d=>d.rar===rr)
+        .sort((a,b)=>String(b.when||b.found||'').localeCompare(String(a.when||a.found||'')));
+      if(!mine.length)return;
+      h+='<div style="display:flex;align-items:center;gap:8px;margin-top:18px">'+
+        '<span style="width:9px;height:9px;border-radius:9px;background:'+r[1]+';flex:none"></span>'+
+        '<span class="mono" style="font-size:10px;letter-spacing:.08em;color:'+r[1]+'">'+esc(r[2].toUpperCase())+'</span>'+
+        '<span style="flex:1;height:1px;background:var(--line)"></span>'+
+        '<span class="mono" style="font-size:10px;color:var(--faint)">'+mine.length+'</span></div>'+
+        grid(mine.map(face))})}
+  else if(mode==='new'){
+    const mine=l.slice().sort((a,b)=>{
       const fa=freshIds[a.id]?1:0,fb=freshIds[b.id]?1:0;
-      return fb-fa||String(b.found||'').localeCompare(String(a.found||''))});
-    const open=!!S.openSec['grp:'+g[0]];
-    const frN=freshBy[g[0]]||0;
-    if(frN)h+='<div style="position:relative;border-radius:20px" class="find-glow">'+
-      '<span style="position:absolute;top:-6px;right:-4px;min-width:19px;height:19px;border-radius:19px;background:#FF453A;color:#fff;font-size:10.5px;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 5px;z-index:6;box-shadow:0 2px 8px rgba(0,0,0,.4)">'+frN+'</span>';
-    h+='<div class="card mt" id="grp-'+g[0]+'" style="padding:0;overflow:hidden'+(open?';border-color:var(--text);border-width:2px':(frN?';border-color:var(--greensoft)':''))+(mine.length?'':';opacity:.55')+'">'+
-      '<button data-a="secToggle" data-v="grp:'+g[0]+'" style="width:100%;text-align:left;padding:13px 15px;display:flex;align-items:center;gap:11px">'+
-      '<span style="flex:1;min-width:0"><span style="display:block;font-size:14px;font-weight:600">'+esc(g[1])+'</span>'+
-      '<span style="display:block;color:var(--faint);font-size:11.5px;line-height:1.4">'+esc(mine.length?g[3]:g[4])+'</span></span>'+
-      '<span class="mono" style="color:'+(mine.length?'var(--amber)':'var(--faint)')+';font-size:11px;flex:none">'+(mine.length||'\u2014')+'</span>'+
-      '<span class="mono" style="color:var(--faint);font-size:13px;flex:none">'+(open?'\u2304':'\u203a')+'</span></button>'+
-      (open&&mine.length?(function(){
-        const row9=d=>{const r=rarityOf(d.rar);
-          const hot=(d.found===today())&&(d.rar==='rare'||d.rar==='epic');
-          return '<div class="'+(hot?'find-glow':'')+'"'+(hot?' style="position:relative;border-radius:12px;padding:7px 9px;margin:-2px -9px"':'')+'>'+
-          '<div style="display:flex;align-items:baseline;gap:8px">'+
-          (freshIds[d.id]?'<span class="mono" style="color:var(--green);font-size:8.5px;letter-spacing:.06em">\u25cf NEW</span>':'')+
-          '<span class="mono" style="color:'+r[1]+';font-size:9px;letter-spacing:.06em">'+esc(r[2].toUpperCase())+'</span>'+
-          '<span class="mono" style="color:var(--faint);font-size:9.5px">'+esc(fmtDate(d.found+'T12:00'))+'</span></div>'+
-          '<p style="font-size:13.5px;font-weight:600;margin-top:3px">'+esc(d.t)+'</p>'+
-          '<p style="color:var(--dim);font-size:12px;line-height:1.55;margin-top:2px">'+esc(d.d)+'</p></div>'};
-        /* last 3 days (and anything NEW) show straight away; the rest
-           folds behind Earlier so a drawer never spills its history */
-        const cut3=dayKey(new Date(Date.now()-3*864e5));
-        const recent9=mine.filter(d=>freshIds[d.id]||String(d.found||'')>=cut3);
-        const older9=mine.filter(d=>!(freshIds[d.id]||String(d.found||'')>=cut3));
-        const allOpen=!!S.openSec['grpall:'+g[0]];
-        return '<div style="border-top:1px solid var(--line);padding:10px 14px;display:flex;flex-direction:column;gap:9px">'+
-          recent9.map(row9).join('')+
-          (older9.length?'<button data-a="secToggle" data-v="grpall:'+g[0]+'" style="width:100%;text-align:left;display:flex;align-items:center;gap:8px;padding:5px 0'+(recent9.length?';border-top:1px solid var(--line);padding-top:11px':'')+'">'+
-            '<span class="mono" style="color:var(--faint);font-size:12px;flex:none">'+(allOpen?'\u2304':'\u203a')+'</span>'+
-            '<span style="flex:1;color:var(--dim);font-size:12.5px;font-weight:600">Earlier</span>'+
-            '<span class="mono" style="color:var(--faint);font-size:10.5px;flex:none">'+older9.length+' find'+(older9.length===1?'':'s')+'</span></button>'+
-            (allOpen?older9.map(row9).join(''):''):'')+
-          '</div>'})()
-        :open?'<div style="border-top:1px solid var(--line);padding:13px 14px">'+
-          '<p style="color:var(--faint);font-size:12px;line-height:1.55">Nothing here yet. '+esc(g[4])+'</p></div>':'')+
-      '</div>';
-    if(frN)h+='</div>'});
+      return fb-fa||String(b.when||b.found||'').localeCompare(String(a.when||a.found||''))});
+    h+=grid(mine.map(face))}
+  else{
+    const firstFresh=GROUPS.find(g=>freshBy[g[0]]);
+    if(firstFresh&&!S.scrollTo)S.scrollTo='grp-'+firstFresh[0];
+    GROUPS.slice().sort((a,b)=>(freshBy[b[0]]||0)-(freshBy[a[0]]||0)).forEach(g=>{
+      const mine=l.filter(d=>gOf(d)===g[0]).sort((a,b)=>{
+        const fa=freshIds[a.id]?1:0,fb=freshIds[b.id]?1:0;
+        return fb-fa||String(b.when||b.found||'').localeCompare(String(a.when||a.found||''))});
+      const frN=freshBy[g[0]]||0;
+      h+='<div id="grp-'+g[0]+'" style="display:flex;align-items:center;gap:8px;margin-top:20px;position:relative">'+
+        '<span class="mono" style="font-size:10px;letter-spacing:.08em;color:'+(mine.length?'var(--text)':'var(--faint)')+'">'+esc(g[1].toUpperCase())+'</span>'+
+        (frN?'<span class="mono" style="background:#FF453A;color:#fff;font-size:9px;font-weight:700;padding:1px 6px;border-radius:999px">'+frN+' NEW</span>':'')+
+        '<span style="flex:1;height:1px;background:var(--line)"></span>'+
+        '<span class="mono" style="font-size:10px;color:var(--faint)">'+mine.length+'</span></div>'+
+        '<p style="color:var(--faint);font-size:11px;line-height:1.45;margin-top:4px">'+esc(mine.length?g[3]:g[4])+'</p>';
+      /* THE EMPTY SLOTS ARE PART OF THE SET. A collectible needs a shape
+         with holes in it, and the catalogue already knew which ones were
+         missing — it was only ever printed as three lines of prose on a
+         near-empty account. A locked card names the CATEGORY and the
+         honest hint, never an invented finding. */
+      const gapCards=DISC_CATALOG.filter(c=>(tag2g[c[0]]||'bests')===g[0]&&!st.by[c[0]])
+        .slice(0,mine.length?2:4).map(c=>findFaceLocked(c[1],c[3]));
+      const all=mine.map(face).concat(gapCards);
+      h+=all.length?grid(all)
+        :'<p style="color:var(--faint);font-size:11.5px;margin-top:8px">Nothing here yet.</p>'})}
   return h+'</div>'}
 
 /* ══ one pattern engine ═════════════════════════════════════
@@ -27970,7 +28231,9 @@ function sheetHtml(){
       '<p style="color:var(--faint);font-size:11px;line-height:1.5;margin-top:14px">Kept with the numbers it had the day it was found \u2014 beating it never erases it.</p>'+
       ((typeof evidenceData==='function'&&evidenceData(S.sheet.id))
         ?'<button data-a="evidenceOpen" data-v="'+esc(S.sheet.id)+'" class="big disp mt2" style="background:var(--amber);color:var(--bg);font-size:14.5px">See the evidence \u2014 the charts behind this</button>':'')+
-      '<button data-a="collOpen" class="btn mt2" style="color:var(--dim);font-size:12.5px">See it in the collection</button>')}
+      '<div class="row mt2" style="gap:8px">'+
+      '<button data-a="findShare" data-v="'+esc(S.sheet.id)+'" class="btn" style="flex:1;border-color:'+rc.col+';color:'+rc.col+';font-size:12.5px">Share this card</button>'+
+      '<button data-a="collOpen" class="btn" style="flex:1;color:var(--dim);font-size:12.5px">The collection</button></div>')}
   if(S.sheet.t==='ledger'){
     /* the Proof Ledger (dossier idea 1): no consumer product scores its
        own predictions to the user — Allena does. Forecast research
@@ -30645,6 +30908,8 @@ function runAction(a,v,t,e){
        WHICH card was just opened, so a re-render cannot replay the rest */
     case 'findCard':{if(v){if(S.openSec[v]){delete S.openSec[v];S._rvl=null}
       else{S.openSec[v]=1;S._rvl={k:v,t:Date.now()}}}render();break}
+    case 'collBy':{S.collBy=v;S.scrollTo=null;render();break}
+    case 'findShare':{findShareRun(v);break}
     case 'collOpen':{S.backTo=S.view;S.backDrawer=false;S._navQuiet=1;S.sheet=null;S.view='collection';
       /* a group key lands the tap on its shelf (owner-caught, 7 Sep:
          '6 GATES' dumped the reader at the top of everything found) */
