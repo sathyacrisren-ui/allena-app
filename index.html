@@ -1051,7 +1051,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='dbdd62';  // stamped by tools/build.py with the content hash
+const BUILD_ID='8ac0f5';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -6672,7 +6672,7 @@ function noticedToday(){
          The find-comes-to-you rule is for things the ENGINE found in the
          background. A read the user tapped for stays where it was made;
          the collection keeps it. */
-      .filter(x=>x.found===today()&&RANKF(x)<9&&x.tag!=='call'&&x.tag!=='insight'&&!x.contra)   // a backwards pattern never headlines
+      .filter(x=>annIsToday(x)&&RANKF(x)<9&&x.tag!=='call'&&x.tag!=='insight'&&!x.contra)   // a backwards pattern never headlines
       .sort((a,b)=>RANKF(a)-RANKF(b))
       .map(f=>({t:f.t,d:f.d,tier:0,find:1,id:f.id}))}catch(e){oops('noticedFinds',e)}
   /* S.daily carries the fuse counter, so it must EXIST before ntc points
@@ -14330,6 +14330,24 @@ function archiveSweep(){
     try{const st=lget('training-collseen-v1',{})||{};st.ids=st.ids||{};
       Object.keys(discBank()).forEach(id=>{if(!st.ids[id])st.ids[id]=today()});
       lset('training-collseen-v1',st)}catch(e9){oops('archive.collseen',e9)}
+    /* AND THE DRIP AGREES (15 Sep). The arrival queue paces finds about days
+       already lived, which is what a catalogue is made of entirely — so
+       without this a bulk import would trickle its archive at the user for
+       weeks, which is this card's own complaint arriving slowly instead of
+       all at once. A catalogued find is marked announced on the spot and
+       never enters the queue. Signals are exempt for the same reason they
+       are exempt above: they are current truths about the body, few in
+       number, and the sentence three lines up already promised they would
+       be paced. */
+    try{const bk=discBank();let a=0;
+      Object.keys(bk).forEach(id=>{const b=bk[id];
+        if(!b||b.ann||b.tag==='signal')return;
+        /* stamped with its own EVENT day, never the day the import ran. A
+           catalogue stamped "today" is announced today — forty at once, which
+           is the love-bomb this sweep exists to stop. Its announcement
+           belongs in the past because that is where the find happened. */
+        b.ann=annEvent(b)||b.found||today();a++});
+      if(a)bankSave()}catch(e9){oops('archive.ann',e9)}
     return n}catch(e){return 0}}
 function newDiscoveries(){
   const seen=discoverySeen();
@@ -15778,7 +15796,7 @@ function revealDue(){
     const seen=lget('training-revealseen-v1',{})||{};
     const bank=discBank();
     const cand=Object.keys(bank).map(id=>Object.assign({id:id},bank[id]))
-      .filter(x=>x.found===today()&&!seen[x.id]&&x.tag!=='insight'&&(   /* a read is not a reveal (14 Sep) */
+      .filter(x=>annIsToday(x)&&!seen[x.id]&&x.tag!=='insight'&&(   /* a read is not a reveal (14 Sep); a batch sync is not a day of news (15 Sep) */
         (x.rar==='epic'&&x.tag!=='signal')||
         String(x.id).slice(0,5)==='corr:'||
         String(x.id).slice(0,7)==='unlock:'))
@@ -18669,6 +18687,37 @@ const TX_LIMBGAP=104;         // clear trunk between one limb and the next
    day is still the cluster: once there are more active days than limbs, a
    limb carries two or three days, spread along it in day order. */
 const TX_LIMBS=12;
+/* ═══ THE TRUNK GROWS WITH THE DATA (owner, 15 Sep 2026, from Angus's tree
+   at 3,000 points: "points overlapping, seems like trunk isn't growing to
+   allow room for new data causing overcrowding") ══════════════════════════
+   Twelve was settled on 14 Sep against the sapling, on a window holding
+   about twelve active days — one limb each. It was written as a CONSTANT,
+   so an account with two hundred active days wore the same twelve: seventeen
+   days and two hundred dots to a limb, and five months of work stacked into
+   one blob at the top of a trunk whose height never moved either, because
+   the height IS limbs x the gap. Measured on a life like his: 198 branches
+   on 12 limbs, and every band of the crown holding 150+ dots.
+   A limb is a day, and stays a day until the page gets silly. Past that the
+   limb count keeps climbing — so the crowd always thins — but the GAP eases
+   as it climbs, so the height grows fast enough to make room and slowly
+   enough that the silhouette at 1x is still a tree you can take in. The
+   floor is the sapling's twelve, so a young tree is untouched. */
+const TX_LIMBCAP=72;
+/* ONE ANSWER, NOT TWO. The height is budgeted from the limb count and the
+   grouping derives its own; the first cut let them disagree (a trunk with
+   room for seventy-two wearing fifty, a third of it bare). Both ask this. */
+function txLimbPlan(nDays){
+  const d=Math.max(1,nDays|0);
+  const want=Math.max(TX_LIMBS,Math.min(TX_LIMBCAP,d));
+  const grp=Math.max(1,Math.ceil(d/want));
+  return{grp:grp,limbs:Math.max(1,Math.ceil(d/grp))}}
+function txLimbGap(n){
+  /* 104 of clear trunk is right for a dozen limbs. At seventy-two it would
+     make a page thirteen screens tall at 1x, so it eases toward 62 — the
+     tree still gets four times the trunk it had, and the crowd per limb
+     falls by six. */
+  const t=Math.max(0,Math.min(1,(n-TX_LIMBS)/(TX_LIMBCAP-TX_LIMBS)));
+  return TX_LIMBGAP*(1-0.40*Math.pow(t,0.8))}
 function txSeenIds(){try{return (lget('training-collseen-v1',{})||{}).ids||{}}catch(e){return {}}}
 function treeXNewN(){
   /* the icon's badge: finds nobody has looked at yet, and patterns too */
@@ -18737,10 +18786,11 @@ function treeXModel(){
        happened to give, and close-packed limbs draw a herringbone however
        well each one is drawn. Height is free — the page scrolls — so the
        tree is as tall as it needs to be for its limbs to stand apart. */
-    const nLimbDays=(function(){const dd={};
+    const nActive=(function(){const dd={};
       H.forEach(h=>dd[hKey(h)]=1);R9.forEach(r=>dd[String(r.date).slice(0,10)]=1);   // auditcheck-allow: utc-day-key — a run row stores a local YYYY-MM-DD
-      const n=Object.keys(dd).length;return Math.min(TX_LIMBS,Math.max(1,n))})();
-    const Hh=Math.max(TX_MINH,span*TX_PPD+120,nLimbDays*TX_LIMBGAP+160);
+      return Object.keys(dd).length})();
+    const nLimb=txLimbPlan(nActive).limbs;
+    const Hh=Math.max(TX_MINH,span*TX_PPD+120,nLimb*txLimbGap(nLimb)+160);
     const groundY=Hh-40,topY=50,usable=groundY-topY;
     const yAt=f=>groundY-f*usable;
     const td=(typeof treeData==='function')?treeData():{seed:'x',pts:0};
@@ -18856,7 +18906,7 @@ function treeXModel(){
          time: the limb leaves the trunk at its first day. */
       const allDays=[];branches.forEach(b=>{if(allDays.indexOf(b.k)<0)allDays.push(b.k)});
       allDays.sort();
-      const grp=Math.max(1,Math.ceil(allDays.length/TX_LIMBS));
+      const grp=txLimbPlan(allDays.length).grp;
       branches.forEach(b=>{
         const lk='d'+Math.floor(allDays.indexOf(b.k)/grp);
         b.lk=lk;
@@ -19210,9 +19260,9 @@ function txElPoint(el){
    held in place and the leaf's sheet opens. Reduced motion skips
    straight to the end. */
 function treePopFinds(){
-  try{const tk=today(),seen=txSeenIds();
+  try{const seen=txSeenIds();
     const ORD={epic:0,rare:1,uncommon:2,common:3};
-    return bankList().filter(x=>x.t&&x.found===tk&&!seen[x.id]).sort((a,b)=>(ORD[a.rar]??3)-(ORD[b.rar]??3))}
+    return annToday().filter(x=>x.t&&!seen[x.id]).sort((a,b)=>(ORD[a.rar]??3)-(ORD[b.rar]??3))}
   catch(e){oops('treePopFinds',e);return []}}
 function treePopHtml(){
   try{
@@ -20703,7 +20753,111 @@ function bankDiscoveries(){
     if(d.contra)bank[d.id].contra=1;if(d.x)bank[d.id].x=d.x;
     fresh.push(Object.assign({},d,{found:today()}))});
   if(fresh.length||touched)bankSave();
+  /* the drip is decided the moment the bank changes, so nothing reaches a
+     surface unstamped and every surface sees the same answer this render */
+  try{S._annK=null;annFresh()}catch(e9){oops('bankDiscoveries.ann',e9)}
   return fresh}
+/* ═══ A BATCH SYNC IS NOT A DAY OF NEWS (owner, 15 Sep 2026, from Angus:
+   "he gets very repetitive and frequent card pop ups, need to stop doing
+   that. He gets spammed a lot with new finds, it seems because he wears a
+   Garmin and his Garmin releases data points in batches causing flooding of
+   findings etc. we should drip feed them when that happens to disperse
+   them, otherwise it makes users like that get overwhelmed and not want to
+   use the app") ══════════════════════════════════════════════════════════
+   A Garmin writes into Health in batches, so a fortnight of sleep, HRV and
+   resting-HR can land in one sync. The engines are right to fire on it —
+   the data is real and the findings are real — but every announcing surface
+   asks the same question, "was this banked today", and on a catch-up day the
+   answer is yes for twenty things at once. So the user gets twenty
+   full-screen reveals for a fortnight he already lived.
+   THE BANK IS NOT PACED. A find is banked the moment it is found, keeps its
+   found date, and is in the collection, on the tree and in the list
+   immediately — the "nothing is withheld" rule is not up for negotiation.
+   What is paced is the ANNOUNCEMENT, and only for finds about days that
+   have already been and gone.
+   THE DISCRIMINATOR IS IN THE DATA ALREADY. A find whose EVENT day is today
+   is news you just made — a PR from the session you just finished — and it
+   lands now, uncapped, because that is the core loop. A find whose event
+   day is in the past arrived because a sync caught up: it is an archive
+   entry, and archives queue. Same principle as "a bulk load is an archive,
+   not news" (14 Sep), applied to the drip rather than the dump.
+   The queue drains rarest-first at ANN_RATE a day, faster when it is long,
+   so a twenty-find batch disperses over about a week instead of one evening
+   and never becomes a backlog nobody reaches the end of. */
+/* THE FLOOR IS THE CARD'S OWN CAP. An ordinary day banks two or three finds
+   about days just gone — yesterday's session read this morning — and those
+   must arrive untouched; the drip exists for the catch-up sync, not for
+   normal use. Three is what the Found-today card shows in full anyway, so at
+   the floor the card is never holding anything back. */
+const ANN_RATE=3;        // backdated finds announced per day, at the floor
+const ANN_DRAIN=7;       // ...and a long queue still clears in about a week
+/* AND A CEILING, because "clears in a week" read alone will happily announce
+   nine in an evening off a big enough queue, which is the flood again with a
+   division sign in front of it. A catalogue never reaches the queue at all
+   (archiveSweep stamps it on arrival), so what is left is signals — few, and
+   the loudest thing the app makes. Five is the most of those anyone should
+   meet in a day. */
+const ANN_MAX=5;
+function annEvent(x){return x?String(x.when||x.found||''):''}
+function annSweep(){
+  /* stamps `ann` — the day a find is announced — on the bank in place.
+     Idempotent: run it as often as you like, the day's allowance is
+     counted from what is already stamped, never from how many times this
+     ran. No new storage key; `ann` rides the bank entry beside `when`,
+     so it round-trips through backup and restore for free. */
+  try{
+    const bank=discBank(),tk=today();let dirty=0;
+    const ids=Object.keys(bank);
+    /* entries from before this shipped: a find banked on an earlier day was
+       announced on that day, whatever happened. Stamp it once and move on —
+       the drip must never re-announce somebody's history at them. */
+    ids.forEach(id=>{const b=bank[id];if(!b||b.ann)return;
+      if(String(b.found||'')<tk){b.ann=b.found;dirty++}});
+    const queue=[],ORD={epic:0,rare:1,uncommon:2,common:3};
+    let usedToday=0;
+    ids.forEach(id=>{const b=bank[id];if(!b)return;
+      const backdated=annEvent(b)!==tk;
+      if(b.ann){if(b.ann===tk&&backdated)usedToday++;return}
+      /* today's own work announces itself, always */
+      if(!backdated){b.ann=tk;dirty++;return}
+      queue.push({id:id,b:b})});
+    if(queue.length){
+      const rate=Math.max(ANN_RATE,Math.min(ANN_MAX,Math.ceil(queue.length/ANN_DRAIN)));
+      let room=Math.max(0,rate-usedToday);
+      if(room){
+        queue.sort((a,b)=>(ORD[a.b.rar]??3)-(ORD[b.b.rar]??3)||
+          annEvent(b.b).localeCompare(annEvent(a.b))||String(a.id).localeCompare(String(b.id)));
+        queue.slice(0,room).forEach(q=>{q.b.ann=tk;dirty++})}}
+    if(dirty)bankSave();
+    return dirty}
+  catch(e){oops('annSweep',e);return 0}}
+function annFresh(){
+  /* A FIND BANKED ANYWHERE MUST STILL BE STAMPED. Twenty-odd places write
+     straight into the bank (a quest completing, a gate cleared, a duel won)
+     and only some of them go through bankDiscoveries. If the stamp were only
+     applied there, a find banked by any of the others would read as "not
+     announced" on every surface and silently never arrive — this repo's own
+     named disease. So the readers sweep too, memoized on the day and the
+     size of the bank, which is the only thing that can change the answer. */
+  try{const n=Object.keys(discBank()).length,k=today()+':'+n;
+    if(S._annK!==k){S._annK=k;annSweep()}}
+  catch(e){oops('annFresh',e)}}
+function annToday(){
+  /* THE ONE READER for "what is today's news". Every announcing surface —
+     the hero, the Found-today card, the reveal ceremony, the tree capsule,
+     the hot badges — asks this and nothing else, so they cannot disagree
+     about which finds the user is being shown today. */
+  try{annFresh();const tk=today();
+    return bankList().filter(x=>x.ann===tk)}
+  catch(e){oops('annToday',e);return []}}
+function annIsToday(x){
+  if(!x)return false;
+  annFresh();
+  const b=discBank()[x.id];
+  return String((b&&b.ann)||x.ann||'')===today()}
+function annQueueN(){
+  const bank=discBank();
+  return Object.keys(bank).filter(id=>bank[id]&&!bank[id].ann).length}
 function bankList(){
   const bank=discBank();
   return Object.keys(bank).map(k=>Object.assign({id:k},bank[k]))
@@ -23553,7 +23707,7 @@ function newFindsCard(){
        (14 Sep): the user tapped for them and read them on the Findings
        page; repeating the paragraph here is the thing the beta called
        repetitive. Engine finds still come to you. */
-    const L=bankList().filter(x=>x.found===tk&&x.tag!=='insight')
+    const L=annToday().filter(x=>x.tag!=='insight')
       .sort((a,b)=>(ORD[a.rar]??3)-(ORD[b.rar]??3));
     if(!L.length)return '';
     const show=L.slice(0,3);
@@ -23722,7 +23876,7 @@ function lensWord(k){
     if(!ks.length)return '';
     ks.sort((a,b)=>String(B[b].found||'').localeCompare(String(B[a].found||'')));
     const rows=ks.slice(0,6).map(id=>{const e2=B[id];
-      const hot=(e2.found===today())&&(e2.rar==='rare'||e2.rar==='epic');
+      const hot=annIsToday(e2)&&(e2.rar==='rare'||e2.rar==='epic');
       return '<button data-a="findOpen" data-v="'+esc(id)+'" class="'+(hot?'find-glow':'')+'" style="width:100%;text-align:left;display:flex;gap:10px;align-items:baseline;margin-top:11px;position:relative;border-radius:10px'+(hot?';padding:7px 9px;margin-left:-9px;margin-right:-9px':'')+'">'+
       '<span style="width:7px;height:7px;border-radius:7px;flex:none;background:var(--faint);transform:translateY(-1px)"></span>'+
       '<span style="flex:1;min-width:0;font-size:14px;line-height:1.5">'+esc(e2.t)+'</span>'+
@@ -28275,7 +28429,7 @@ function sheetHtml(){
     const ORD={epic:0,rare:1,uncommon:2,common:3};
     const L9=bankList().slice().sort((a,b)=>String(b.found||'').localeCompare(String(a.found||''))||(ORD[a.rar]??3)-(ORD[b.rar]??3)).slice(0,8);
     return wrapSheet('Recent finds',
-      (L9.length?L9.map(x=>{const r=rarityOf(x.rar);const hot=x.found===today();
+      (L9.length?L9.map(x=>{const r=rarityOf(x.rar);const hot=annIsToday(x);
         return '<button data-a="findOpen" data-v="'+esc(x.id)+'" class="'+(hot?'find-glow':'')+'" style="display:block;width:100%;text-align:left;margin-top:11px;position:relative;border-radius:10px'+(hot?';padding:7px 9px;margin-left:-9px;margin-right:-9px':'')+'">'+
         '<div style="display:flex;align-items:baseline;gap:8px">'+
         '<span class="mono" style="color:'+r[1]+';font-size:8.5px;letter-spacing:.08em">'+esc(r[2].toUpperCase())+'</span>'+
