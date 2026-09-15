@@ -912,7 +912,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='8e26da';  // stamped by tools/build.py with the content hash
+const BUILD_ID='00e38b';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -31035,14 +31035,34 @@ function demoPsychic(){
  /* PSYCHIC-GRADE DEMO (owner, 10 Sep: 'crazy psychic findings' for
     filming). The engine never fakes a find, so the demo DATA carries
     real, strong relationships and the engine discovers them honestly.
-    56 days, deterministic. Baked in:
-      sleep 7.5h+            -> bench top ~+7%     (sleep x strength)
-      carbs 350g+ yesterday  -> squat top ~+6%     (the day-before effect)
+    84 days, deterministic. Baked in:
+      sleep 7.5h+            -> bench top ~+16%    (sleep x strength)
+      carbs 350g+ yesterday  -> squat top ~+15%    (the day-before effect)
       protein late in the day -> higher HRV next morning
-      rest day               -> HRV +12% next morning
       long sleep             -> easy-run pace faster
+      (a rest day still lifts HRV in the data, but it is NOT findable as
+       a correlation and never was: a rest day writes no load row at all,
+       so `load -> next-morning HRV` only ever pairs training days and
+       the rest-day half of the effect is invisible to the grid. It was
+       advertised here for months. Measured: rho -0.08, unstable.)
       deadlift HIGHER after SHORT sleep -- a deliberate confound so the
-      engine shows its 'backwards pattern' honesty on camera */
+      engine shows its 'backwards pattern' honesty on camera
+
+    WIDENED 56 -> 84 DAYS (15 Sep 2026). The effective-n gate arrived the
+    same day and the backwards-pattern moment stopped clearing the bar:
+    deadlift sits on half of the training days, which is fourteen in 56,
+    and twelve once a lag is paired off the ends. Twelve READINGS of a
+    lift trained twice a week is thin evidence and the gate was right to
+    say so. The honest answer is more life in the demo, never a lower bar
+    -- 84 days puts deadlift on 21, which clears it on its merits.
+
+    AND THE CARBS WERE ON A RIGID CYCLE. `i%3` high-carb days beating
+    against the `i%2` training cycle and the `i%4` upper/lower split
+    manufactured a carb->deadlift link that nothing had planted -- which
+    is the exact trap the note on the sleep line warns about, two lines
+    below where it was written. That was the 'backwards pattern' showing
+    on camera, and it was an artefact, not the confound. Carbs are random
+    now, and the planted sleep->deadlift confound is the one that shows. */
  try{
   const st=hkDailyStore();st.days=st.days||{};
   S.daily=S.daily||{on:true,days:{}};S.daily.days=S.daily.days||{};
@@ -31050,39 +31070,71 @@ function demoPsychic(){
   const R=n=>{const x=Math.sin(n*12.9898)*43758.5453;return x-Math.floor(x)};
   const pick=(e,r)=>Math.round((e/(1+r/30))/2.5)*2.5;   // e1rm -> plate-round load
   let prevCarb=300,prevEprot=0.4,prevSleep=450,prevTrained=false;
-  for(let i=56;i>=1;i--){
+  for(let i=84;i>=1;i--){
    const k=dayKey(new Date(Date.now()-i*864e5));
    const longN=R(i*3+1)<0.55;   // random, not cyclic — a rigid cycle manufactures fake 'backwards' links
    const sleep=longN?Math.round(455+R(i)*40):Math.round(335+R(i+7)*30);
    const eprot=Math.round((0.25+R(i+3)*0.4)*100)/100;
-   let hrv=58+(prevTrained?-3:+7)+(prevEprot-0.45)*30+(longN?3:-3)+(R(i+11)-0.5)*3;
+   /* ═══ ONE DRIVER PER OUTCOME, AND THE PROXIES STAY NOISY ═══════════
+      Every planted effect used to compete with a CLEANER copy of itself.
+      rhr, HRV and readiness were all near-deterministic functions of the
+      same longN flag that drove sleep, so on any outcome sleep moved,
+      those three moved harder — and the engine correctly reported the
+      proxy instead of the thing that was planted. Measured before:
+      sleep->bench rho +0.59 (just under the bar) while rhr->bench hit
+      -0.82 and took the slot.
+      They carry real day-to-day noise of their own now, which is what a
+      body does, so the planted driver is the strongest predictor of its
+      own outcome. Each headline find also owns a DIFFERENT outcome —
+      bench, squat, next-morning HRV, easy pace, deadlift — so none of
+      them has to beat another to be shown. */
+   let hrv=58+(prevEprot-0.45)*48+(prevTrained?-3.5:+2.5)+(R(i+11)-0.5)*4;
    hrv=Math.round(hrv*10)/10;
-   const rhr=Math.round(52+(longN?-2:2)+(R(i+13)-0.5)*2);   // same-night sleep only
+   const rhr=Math.round(52+(longN?-1:1)+(R(i+13)-0.5)*5);
    const d=st.days[k]=st.days[k]||{};
    d.sleep=sleep;d.hrv=hrv;d.rhr=rhr;d.steps=Math.round(5500+R(i+17)*8000);
-   d.sldeep=Math.round(sleep*0.19);d.slrem=Math.round(sleep*0.23);d.eprot=eprot;
+   /* stages are their own numbers, not a fixed slice of the total. At a
+      flat 19% and 23% they were EXACT linear clones of sleep duration, so
+      the engine kept reporting "a REM-heavy night" for a relationship
+      that had been planted on the length of the night — and two people
+      could never tell the two apart, which is the whole reason to collect
+      stages. Real proportions drift night to night; these do too. */
+   d.sldeep=Math.round(sleep*(0.13+R(i+71)*0.10));
+   d.slrem=Math.round(sleep*(0.17+R(i+73)*0.11));d.eprot=eprot;
    d.msteps=Math.round(0.2+R(i+19)*0.5*100)/100;
-   const carb=(i%3===0)?Math.round(380+R(i+23)*60):Math.round(190+R(i+29)*60);
+   /* random, never a cycle: a rigid one beats against the training split
+      and invents links nobody planted (see the header) */
+   const carb=(R(i*7+23)<0.34)?Math.round(380+R(i+23)*60):Math.round(190+R(i+29)*60);
    const dd=S.daily.days[k]=S.daily.days[k]||{};
-   dd.pr=Math.round(125+R(i+31)*60);dd.carb=carb;dd.fat=Math.round(70+R(i+37)*30);
+   /* protein and fat swing properly too, so the day's calories are not
+      simply the carb number wearing a different unit — they were, and
+      "a big-eating day" rode in beside every carb finding saying the
+      same thing twice */
+   dd.pr=Math.round(110+R(i+31)*110);dd.carb=carb;dd.fat=Math.round(55+R(i+37)*75);
    dd.kcal=Math.round(dd.pr*4+carb*4+dd.fat*9);
-   S.gar.days[k]={am:Math.max(25,Math.min(96,Math.round(40+sleep/9+(R(i+61)-0.5)*14)))};
+   S.gar.days[k]={am:Math.max(25,Math.min(96,Math.round(46+sleep/11+(R(i+61)-0.5)*26)))};
    const trained=(i%2===0);
    if(trained){
     const upper=((i/2)%2===0);
     const dt=new Date(Date.now()-i*864e5);dt.setHours(17,30,0,0);
     const log=[];
     if(upper){
-     const eB=118*(1+(sleep>=450?0.08:-0.04))*(1+(R(i+41)-0.5)*0.02);
+     /* PLANTED: the night before owns the bench */
+     const eB=118*(1+(sleep>=450?0.11:-0.055))*(1+(R(i+41)-0.5)*0.012);
      const wB=pick(eB,5);
      log.push({ex:'Bench',setNo:1,w:wB,r:5,rpe:8},{ex:'Bench',setNo:2,w:wB-7.5,r:8,rpe:7},{ex:'Bench',setNo:3,w:wB-7.5,r:8,rpe:7.5});
      log.push({ex:'Chest-supported row',setNo:1,w:60,r:12,rpe:7},{ex:'Chest-supported row',setNo:2,w:60,r:12,rpe:8});
      log.push({ex:'Overhead press',setNo:1,w:50,r:8,rpe:7},{ex:'Overhead press',setNo:2,w:50,r:8,rpe:8});
     }else{
-     const eS=150*(1+(prevCarb>=350?0.06:-0.03))*(1+(sleep>=450?0.03:-0.02))*(1+(R(i+43)-0.5)*0.015);
+     /* PLANTED: YESTERDAY'S carbs own the squat — and nothing else does,
+        so the day-before effect is not diluted by the same night's sleep */
+     const eS=150*(1+(prevCarb>=350?0.10:-0.05))*(1+(R(i+43)-0.5)*0.012);
      const wS=pick(eS,5);
      log.push({ex:'Back squat',setNo:1,w:wS,r:5,rpe:8},{ex:'Back squat',setNo:2,w:wS-10,r:8,rpe:7},{ex:'Back squat',setNo:3,w:wS-10,r:8,rpe:7.5});
-     const eD=180*(1+(sleep<360?0.045:-0.015))*(1+(R(i+47)-0.5)*0.015);
+     /* THE DELIBERATE CONFOUND: the deadlift goes UP after a short night.
+        Nothing physiological — it is here so the engine has something to
+        be honest about on camera, and it must be unmistakable. */
+     const eD=180*(1+(sleep<360?0.07:-0.025))*(1+(R(i+47)-0.5)*0.01);
      const wD=pick(eD,4);
      log.push({ex:'Deadlift',setNo:1,w:wD,r:4,rpe:8},{ex:'Deadlift',setNo:2,w:wD-15,r:6,rpe:7});
      log.push({ex:'Leg press',setNo:1,w:200,r:10,rpe:7},{ex:'Leg press',setNo:2,w:200,r:10,rpe:8});
@@ -31092,7 +31144,8 @@ function demoPsychic(){
        week:1,minutes:58,complete:true,note:{},planned:log.length,log:log});
    }else{
     /* an easy run on every rest day: long sleep runs it faster */
-    const pace=5.95-(sleep>=450?0.38:0)+(R(i+53)-0.5)*0.08;
+    /* PLANTED: long sleep runs the easy pace faster */
+    const pace=5.95-(sleep>=450?0.45:0)+(R(i+53)-0.5)*0.06;
     const km=6,mins=Math.round(km*pace*10)/10;
     try{runAdd({id:'dp'+i,date:k,type:'easy',km:km,mins:mins,rpe:4,hr:141,elev:30,note:'',
       z:{z1:Math.round(mins*0.2),z2:Math.round(mins*0.62),z3:Math.round(mins*0.16),z4:Math.round(mins*0.02),z5:0}})}catch(e9){}
