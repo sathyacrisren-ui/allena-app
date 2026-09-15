@@ -977,7 +977,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='9af022';  // stamped by tools/build.py with the content hash
+const BUILD_ID='1ce796';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -16476,10 +16476,16 @@ function growTreeTime(W,Hh,opts){
      detail as you go in; it may never rearrange the roads. Depth is a
      property of the tree now, not of how close you are standing. */
   const MAXD=EX?(NLIMB>34?3:5):4;
-  /* buds are structure too, so they stay at every zoom — they simply
-     stop growing, so they shrink away from the data leaves instead of
-     vanishing between one pinch and the next */
-  const BUDS=true;
+  /* EVERY DOT ON THE EXPLORER IS A DATA POINT (owner, 15 Sep 2026: "there
+     are dots that do nothing — every dot must be a data point, if it's
+     there just for effect get rid of it"). Buds are the card's texture: a
+     small dot on a free tip so a fifteen-branch drawing does not read as
+     bare wire. On the explorer they were 557 of them against 166 real
+     leaves, each with a halo behind it — more than three quarters of the
+     dots on the page carrying nothing, on the one surface whose entire
+     promise is that every dot can be tapped for what it was. They are
+     gone here. The card keeps them: it is a picture, not an index. */
+  const BUDS=!EX;
   /* BUDS ARE TEXTURE, AND TEXTURE HAS A BUDGET (owner, 14 Sep: "the tree
      is extremely laggy"). One bud per free tip is right for a fifteen-
      branch card; on a page where every session is a branch it was more
@@ -17105,7 +17111,15 @@ function growTreeTime(W,Hh,opts){
            what made the canopy crawl under a pinch. z here, so it is the
            same offset at 1x as it always was and a true scale above it. */
         const JIT=EX?z:1;
-        dots.push({x:P[0]+(RD()-0.5)*2*JIT,y:P[1]+(RD()-0.5)*2*JIT,r:sz(r9*G),r0:r9,kind:'leaf',c:c9,op:op9,v:v9,pr:pr9})};
+        /* ax/ay is the point on the WOOD this dot grew from, kept so the
+           drawing can put a stem back between them (owner, 15 Sep: "a lot
+           of the dots are just hovering, unconnected to a twig"). The
+           jitter and the spread pass both move a dot off its twig on
+           purpose — that is how they stop hiding behind each other — and
+           at 1x nobody could see the gap. Magnified six times, a leaf two
+           units off its twig is a dot floating in the dark. */
+        dots.push({x:P[0]+(RD()-0.5)*2*JIT,y:P[1]+(RD()-0.5)*2*JIT,ax:P[0],ay:P[1],
+          r:sz(r9*G),r0:r9,kind:'leaf',c:c9,op:op9,v:v9,pr:pr9})};
       if(b.kind==='sess'){
         if(LEAF==='sess'){
           let top=0,ns=0;(b.twigs||[]).forEach(tw=>tw.sets.forEach(st=>{ns++;if(st.rel>top)top=st.rel}));
@@ -17129,10 +17143,17 @@ function growTreeTime(W,Hh,opts){
        per tip keeps the seasonal colour meaningful without hiding the
        twigs that took the work to draw. */
     tips.forEach(tp=>{
-      if(!BUDS)return;
+      /* THE DRAWS HAPPEN EVEN WHEN THE BUD DOES NOT. The wood is seeded
+         from one stream, so skipping these three R() calls pulls different
+         numbers for every branch after this one and the whole tree
+         reshapes — which is exactly the fault the comment above `put`
+         describes, and it is what turning buds off on the explorer did on
+         the first attempt (1,379 twigs became 1,624). Take the numbers,
+         then decide whether to draw. */
       if(R()>BUDP)return;
       const rr=((POSTER?0.62:0.8)+R()*(POSTER?0.5:0.6))*G;
       const lc=leafColOf(b,(R()-0.5)*0.9);   /* no two leaves the same */
+      if(!BUDS)return;
       bd(tp[0],tp[1],POSTER?3.4:1.8);
       out+=bloom(tp[0],tp[1],rr,lc)+
         '<circle data-tp="'+(EX?'bud':'leaf')+'" cx="'+tp[0].toFixed(1)+'" cy="'+tp[1].toFixed(1)+'" r="'+rr.toFixed(1)+
@@ -17203,7 +17224,7 @@ function growTreeTime(W,Hh,opts){
          one asks for two and a half times its own halo in clear space now,
          so they spread across the crown. Nothing moved in time. */
       const br0=rk9>=2?[1.9,2.4,3.0,3.8][rk9]:([1.9,2.4][rk9]||1.9);
-      dots.push({x:bx,y:by,r:br9,r0:br0,pad:br9*(rk9>=2?1.1:0.7)*(+opts.fan||2.4),
+      dots.push({x:bx,y:by,ax:bx,ay:by,r:br9,r0:br0,pad:br9*(rk9>=2?1.1:0.7)*(+opts.fan||2.4),
         pad0:br0*(rk9>=2?1.1:0.7)*(+opts.fan||2.4),kind:'bloom',c:rarityOf(bl.rar)[1],bl:bl});
       return}
     out+=bloom(bx,by,bl.epic?3.8:2.7,rarCol(bl.epic))+
@@ -17256,10 +17277,18 @@ function growTreeTime(W,Hh,opts){
          be divided back out. Each dot carries the radius it has at its
          own scale (r0) for exactly this. */
       dots.forEach(dd=>{dd._rD=dd.r;dd._padD=dd.pad;
-        dd.x/=PS;dd.y/=PS;
+        dd.x/=PS;dd.y/=PS;if(dd.ax!=null){dd.ax/=PS;dd.ay/=PS}
         dd.r=(dd.r0!=null?dd.r0:dd.r);if(dd.pad!=null)dd.pad=(dd.pad0!=null?dd.pad0:dd.pad)});
-      txSpread(dots,2.2);
-      dots.forEach(dd=>{dd.x*=PS;dd.y*=PS;dd.r=dd._rD;dd.pad=dd._padD;
+      /* THE CLEARANCE IS BOUGHT HERE OR NOWHERE (owner, 15 Sep 2026: "still
+         a lot of overlapping"). It used to be bought twice: this pass ran
+         at 2.2, and the zoom re-laid the tree out with the gap carrying z,
+         so at 6x dots were shoved 11 units apart. The zoom is a pure
+         magnification now, which is right — but it means the only
+         separation a reader will ever get is the separation solved at the
+         tree's own scale, multiplied. So it is solved properly here. */
+      txSpread(dots,3.4);
+      dots.forEach(dd=>{dd.x*=PS;dd.y*=PS;if(dd.ax!=null){dd.ax*=PS;dd.ay*=PS}
+        dd.r=dd._rD;dd.pad=dd._padD;
         delete dd._rD;delete dd._padD});
     }catch(e){oops('treeX.spread',e)}
     /* the canvas's own bounds are measured in TREE units too. Padding by
@@ -17267,7 +17296,22 @@ function growTreeTime(W,Hh,opts){
        normalised, because sz() converges the dots on a fixed tappable
        size while the tree keeps growing — so the whole drawing shifted
        inside its frame as you pinched, on top of the dots moving. */
+    /* NO DOT HOVERS (owner, 15 Sep 2026: "a lot of the dots are just
+       hovering, unconnected to a twig"). A dot is nudged off its wood on
+       purpose — by the jitter, and by the spread pass that stops it hiding
+       behind its neighbour — and at the tree's own scale the nudge is a
+       unit or two, invisible. Magnified, it is a dot floating in the dark
+       with nothing to say which twig it belongs to. The stem is drawn back
+       in: it is the same hairline the pattern seeds have always had, and
+       it says the thing the position was supposed to say. */
+    const stemOf=dd=>{
+      if(dd.ax==null)return '';
+      const dx=dd.x-dd.ax,dy=dd.y-dd.ay,L=Math.hypot(dx,dy);
+      if(L<=(dd.r0!=null?dd.r0:dd.r)*0.5)return '';   // still sitting on it
+      return '<path data-tp="stem" d="M'+f1(dd.ax)+' '+f1(dd.ay)+' L'+f1(dd.x)+' '+f1(dd.y)+
+        '" stroke="'+dd.c+'" stroke-width="'+f1(0.5*SWX)+'" opacity=".5" stroke-linecap="round" pointer-events="none"/>'};
     dots.forEach(dd=>{bd(dd.x,dd.y,(dd.r0!=null?dd.r0:dd.r)*2.4+8);
+      if(dd.kind!=='pat')out+=stemOf(dd);
       if(dd.kind==='leaf'){
         out+='<circle data-a="txTap" data-v="'+esc(dd.v)+'" data-tp="leaf" pointer-events="all" stroke="transparent" stroke-width="'+f1(7*G)+'" cx="'+f1(dd.x)+'" cy="'+f1(dd.y)+'" r="'+dd.r.toFixed(2)+'" fill="'+dd.c+'" opacity="'+dd.op.toFixed(2)+'"/>'+
           (dd.pr?'<circle cx="'+f1(dd.x)+'" cy="'+f1(dd.y)+'" r="'+(dd.r+1.2*G).toFixed(2)+'" fill="none" stroke="#F0EEE6" stroke-width="'+f1(0.45*SWX)+'" opacity=".55"/>':'')}
@@ -17770,6 +17814,11 @@ function txApplyZoom(z,smooth){
     if(lab)lab.textContent=(Math.round(z*10)/10)+'\u00d7';
     return z}
   catch(e){oops('txApplyZoom',e);return 1}}
+/* the furthest a dot may ever travel from its own wood, in tree units.
+   Named and capped rather than left to a ratio: a blossom's budget is a
+   multiple of its radius, and on the rarest tier that came out at a fifth
+   of the tree's width — a dot on the end of a wire. */
+const TXMV=40;
 function txSpread(dots,gap){
   /* push any two dots apart until they clear each other by `gap`; a few
      passes over a spatial hash, so a canopy of thousands stays cheap.
@@ -17785,14 +17834,24 @@ function txSpread(dots,gap){
      its own allowance from that spot. A find may wander further than a set
      because the fan is deliberate, but it is still tied to its own tip. */
   try{
+    /* THE BUDGET, AND WHY IT GREW (owner, 15 Sep 2026: "still a lot of
+       overlapping"). Every pair that was still overlapping sat in the
+       crown — the recent weeks, where dozens of sessions and finds land at
+       almost the same height because they happened at almost the same
+       time. A dot there needs further to travel than one on a quiet
+       branch, and it can afford to: the stem now draws the line back to
+       the twig it came from, so distance no longer costs the reader the
+       one thing it used to cost them, which was knowing where it belongs.
+       Five passes also stopped short in exactly that crowd — the reins run
+       after every pass, so a dense knot unpicks slowly. */
     dots.forEach(d=>{d._ox=d.x;d._oy=d.y;
-      d._mv=(d.kind==='bloom')?Math.max(d.r*4.5,gap*2.2)
-           :(d.kind==='pat')?Math.max(d.r*3,gap*1.6)
-           :Math.max(d.r*2.6,gap*1.4)});
+      d._mv=Math.min(TXMV,(d.kind==='bloom')?Math.max(d.r*14,gap*7)
+           :(d.kind==='pat')?Math.max(d.r*8,gap*4)
+           :Math.max(d.r*8,gap*4))});
     const rein=d=>{const dx=d.x-d._ox,dy=d.y-d._oy,m=Math.hypot(dx,dy);
       if(m>d._mv&&m>0.001){const k=d._mv/m;d.x=d._ox+dx*k;d.y=d._oy+dy*k}};
     const cell=Math.max(4,gap*4);
-    for(let pass=0;pass<5;pass++){
+    for(let pass=0;pass<24;pass++){
       const grid={};let moved=0;
       dots.forEach((d,i)=>{const k=Math.floor(d.x/cell)+':'+Math.floor(d.y/cell);(grid[k]=grid[k]||[]).push(i)});
       dots.forEach((a,i)=>{
