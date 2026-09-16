@@ -70,6 +70,16 @@ html,body{touch-action:manipulation}
   --ease-out:cubic-bezier(.32,.72,0,1);
   --ease-spring:cubic-bezier(.34,1.26,.64,1);
 }
+/* ANTICIPATION IS A KEYFRAME HERE, NOT A CURVE (16 Sep 2026). A curve
+   with a negative control point — Ant Design ships one as
+   motionEaseInBack — is the usual way to buy Williams' "before we go
+   one way, first go the other way". It does not work on an ENTRANCE,
+   because the backswing happens while the element is still
+   transparent and nobody sees it. The crouch has to be a keyframe
+   that lands AFTER opacity reaches 1, which is what rvlPop does
+   below. A token was declared for the curve and then never used by
+   anything, which is the CSS form of the disease this repo gates for
+   in JS; it is gone rather than left sitting in the file. */
 /* LIGHT MODE (owner call, 3 Sep): warm cream, not clinical white — the
    near-white --amber accent flips to terracotta (the flame identity)
    so it reads on light; greens/blues darken a touch to hold contrast.
@@ -283,6 +293,33 @@ body:has(.tabbar) #app:has(.sessfix),body:has(.tabbar) #app:has(.pinpage){paddin
    different padding-top values and eight hand-built header rows are why
    the title and the menu button jumped on every navigation. */
 .phpad{padding-top:24px}
+/* ══ THE PHASE CEREMONY (16 Sep 2026) ═══════════════════════════════
+   Choreographed as anticipation → hold → payoff rather than everything
+   arriving at once, which is the difference between a reward moment and
+   a screen appearing. The glow builds under the number BEFORE the
+   number lands, so the eye is already there when it does.
+   Timings are deliberately slower than UI motion: this happens perhaps
+   five times in a year of rehab, and a moment that rare is allowed to
+   take a second and a half. Everything is cut under reduced-motion,
+   where the whole screen simply appears. */
+.phcer{animation:phcerIn .5s var(--ease-out) both}
+@keyframes phcerIn{from{opacity:0}to{opacity:1}}
+.phcer-glow{position:absolute;left:50%;top:44%;width:340px;height:340px;margin:-170px 0 0 -170px;
+  border-radius:var(--r-full);pointer-events:none;
+  background:radial-gradient(circle, color-mix(in srgb, var(--gold) 26%, transparent), transparent 66%);
+  opacity:0;animation:phcerGlow 2.6s var(--ease-out) .18s both}
+@keyframes phcerGlow{0%{opacity:0;transform:scale(.5)}45%{opacity:1;transform:scale(1.04)}100%{opacity:.55;transform:scale(1)}}
+.phcer-a{opacity:0;animation:phcerUp .5s var(--ease-out) .25s both}
+/* the number is the payoff, so it arrives last of the three and it
+   arrives with weight — a spring overshoot rather than a fade */
+.phcer-b{opacity:0;animation:phcerPop .72s var(--ease-spring) .62s both}
+.phcer-c{opacity:0;animation:phcerUp .5s var(--ease-out) 1.02s both}
+.phcer-d{opacity:0;animation:phcerUp .5s var(--ease-out) 1.22s both}
+.phcer-e{opacity:0;animation:phcerUp .5s var(--ease-out) 1.5s both}
+@keyframes phcerUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+@keyframes phcerPop{0%{opacity:0;transform:scale(.72)}62%{opacity:1;transform:scale(1.06)}100%{opacity:1;transform:scale(1)}}
+@media (prefers-reduced-motion:reduce){
+  .phcer,.phcer-glow,.phcer-a,.phcer-b,.phcer-c,.phcer-d,.phcer-e{animation:none;opacity:1;transform:none}}
 .phead{display:flex;align-items:center;gap:10px;min-height:44px}
 .phead .pright{display:flex;align-items:center;gap:6px;flex:none}
 /* THE TITLE ARRIVES, IT DOES NOT SNAP (owner: "so sharp and instant it
@@ -329,7 +366,7 @@ body:has(.tabbar) #app:has(.sessfix),body:has(.tabbar) #app:has(.pinpage){paddin
    so it gets to glow. Slow on purpose \u2014 3.4s reads as alive, anything
    faster reads as a notification demanding something. */
 @keyframes ptsGlow{0%,100%{box-shadow:0 0 15px -2px rgba(48,209,88,.20),0 0 3px 0 rgba(48,209,88,.30)}50%{box-shadow:0 0 27px 0 rgba(48,209,88,.34),0 0 5px 0 rgba(48,209,88,.44)}}
-.pts-glow{animation:ptsGlow 3.4s ease-in-out infinite}
+.pts-glow{box-shadow:0 0 15px -2px rgba(48,209,88,.20),0 0 3px 0 rgba(48,209,88,.30);animation:ptsGlow 3.4s ease-in-out 3}
 @media (prefers-reduced-motion:reduce){.pts-glow{animation:none;box-shadow:0 0 18px -2px rgba(48,209,88,.22),0 0 4px 0 rgba(48,209,88,.32)}}
 .find-dust{position:absolute;width:3px;height:3px;border-radius:3px;background:var(--green);opacity:0;pointer-events:none;z-index:6;animation:findDust 2.8s ease-out infinite}
 @media (prefers-reduced-motion:reduce){.find-dust{display:none}.find-glow{box-shadow:0 0 12px 0 rgba(48,209,88,.18)}}
@@ -355,7 +392,11 @@ body:has(.tabbar) #app:has(.sessfix),body:has(.tabbar) #app:has(.pinpage){paddin
 @keyframes anBreathe{0%,100%{opacity:.55}50%{opacity:1}}
 .an-breathe{animation:anBreathe 2.6s ease-in-out infinite}
 @keyframes sigLink{from{stroke-dasharray:0 400}to{stroke-dasharray:400 0}}
-@keyframes sigPop{0%{transform:scale(0);opacity:0}60%{transform:scale(1.5)}100%{transform:scale(1);opacity:1}}
+/* NOTHING IN THE WORLD APPEARS FROM NOTHING. scale(0) is the one
+   entrance shape every motion reference rules out: it has no mass and
+   it reads as a glitch rather than as an arrival. From .4 with the
+   overshoot kept, it reads as the same pop and has a body. */
+@keyframes sigPop{0%{transform:scale(.4);opacity:0}60%{transform:scale(1.5)}100%{transform:scale(1);opacity:1}}
 @keyframes sigDust{0%{opacity:0}40%{opacity:.7}100%{opacity:0;transform:translateY(-8px)}}
 @keyframes sigRise{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
 @keyframes sigFade{from{opacity:0}to{opacity:1}}
@@ -399,8 +440,75 @@ body:has(.tabbar) #app:has(.sessfix),body:has(.tabbar) #app:has(.pinpage){paddin
 #findBigScrim{position:absolute;inset:0;
   background:radial-gradient(circle at 50% 44%,color-mix(in srgb,var(--fbc) 24%,transparent),transparent 62%),var(--bg)}
 #findBig .fb-wrap{position:relative;width:100%;max-width:380px;margin:auto}
-#findBig .fb-card{padding:0;overflow:hidden;border-radius:20px}
+#findBig .fb-card{padding:0;overflow:hidden;border-radius:20px;position:relative}
 #findBig .fb-acts{margin-top:20px}
+/* ── THE UNKNOWN BEAT, THE BACKLIGHT, AND THE FLASH ────────────────
+   Taken off real Clash Royale chest openings frame by frame (16 Sep
+   2026, owner: "look up gameplay... take things from there that you
+   aren't already implementing"). Three things it does that this app
+   did not, and not one of them is the part decision 6c rules out —
+   there are no bevels here, no cartoon gradients and no gold. They
+   are all staging and light, which is the half that travels.
+
+   (1) THE OBJECT ARRIVES BEFORE ITS IDENTITY DOES. Their card rises
+   out of the chest at full size, in position, wearing a question
+   mark: you know something is there and you do not yet know what.
+   Allena's card arrived already showing its title, so the whole
+   reveal was one beat where theirs is two. The veil is that beat.
+   NOTHING IS WITHHELD — the tier's colour is visible the entire time
+   (their card back says the same), the card underneath is fully
+   rendered underneath it, and this is four tenths of a second of
+   staging on a surface you opened on purpose.
+
+   (2) THE LIGHT COMES FROM BEHIND, NOT FROM AROUND. Rays fire
+   outward from behind the card. A glow drawn AROUND an object reads
+   as a sticker; a light source BEHIND it reads as the object having
+   arrived from somewhere. Built from a repeating-conic-gradient with
+   a radial mask and no filter, because the tree's law is no CSS
+   filter on anything a surface repeats and blur is what made that
+   page lag. The fire and the spin are on separate elements: two
+   animations writing `transform` on one element do not compose, the
+   later one simply wins.
+
+   (3) THE FLASH HIDES THE SWAP. Their card face goes white for about
+   a tenth of a second at the exact moment identity resolves, so the
+   change from unknown to known is never actually seen. It is the
+   oldest trick in the reveal book and it is why their cut reads as
+   clean rather than as a cross-fade.
+
+   All three climb the rarity ladder like everything else: a Noticed
+   gets none of it and arrives plainly, which is the ladder's point.
+   --fbv is the beat's length, set per tier on the element. */
+.fb-rays{position:absolute;left:50%;top:46%;width:min(150vw,720px);height:min(150vw,720px);
+  transform:translate(-50%,-50%);pointer-events:none;
+  animation:fbRayFire 1s var(--ease-out) both}
+/* THE RAYS ARRIVE AND THEN HOLD STILL. A perpetual slow rotation was
+   built first and cut: it is decoration running forever on a surface
+   somebody READS, which is the thing the tree's forever-animation
+   ration exists to stop — and going back to the reference frames,
+   their rays do not rotate either. They fire outward once and sit
+   there. The one animation left is the arrival. */
+.fb-rays i{position:absolute;inset:0;display:block;
+  background:repeating-conic-gradient(from 0deg,
+    color-mix(in srgb,var(--fbc) 60%,transparent) 0deg 2.4deg,
+    transparent 2.4deg 12deg);
+  -webkit-mask-image:radial-gradient(circle,transparent 15%,#000 33%,transparent 66%);
+  mask-image:radial-gradient(circle,transparent 15%,#000 33%,transparent 66%)}
+@keyframes fbRayFire{0%{opacity:0;transform:translate(-50%,-50%) scale(.3)}
+  30%{opacity:.9}100%{opacity:.3;transform:translate(-50%,-50%) scale(1)}}
+/* TWO SOLID LAYERS CROSS-FADING, NEVER AN ANIMATED COLOUR. The first
+   cut ran `background` from the tier colour to white inside the
+   keyframes, which is a PAINT on every frame across the whole card —
+   the one thing motion is not allowed to do, and the same class of
+   bill as the drop-shadows that made the tree lag. Transform and
+   opacity only: the face holds the tier, the flash sits on top of it
+   and is brought up and down on opacity alone. */
+.fb-veil,.fb-veil i{position:absolute;inset:0;border-radius:20px;pointer-events:none}
+.fb-veil{z-index:3;background:var(--fbc);animation:fbVeilOut var(--fbv,620ms) var(--ease-out) both}
+.fb-veil i{display:block;background:#FFF;animation:fbFlash var(--fbv,620ms) var(--ease-out) both}
+@keyframes fbVeilOut{0%,70%{opacity:1}100%{opacity:0}}
+@keyframes fbFlash{0%,52%{opacity:0}62%,70%{opacity:1}100%{opacity:1}}
+@media (prefers-reduced-motion:reduce){.fb-rays,.fb-veil{display:none}}
 /* the ground breathes behind the card — slow enough to be felt rather
    than watched, which is the difference between atmosphere and a
    distraction on a surface you read */
@@ -442,7 +550,16 @@ body:has(.tabbar) #app:has(.sessfix),body:has(.tabbar) #app:has(.pinpage){paddin
    halo would end by deleting it. It ends, the resting glow returns.
    --rvc is the tier's colour, set on the element. */
 @keyframes rvlIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
-@keyframes rvlPop{0%{opacity:0;transform:scale(.95) translateY(7px)}58%{opacity:1;transform:scale(1.025) translateY(0)}100%{opacity:1;transform:none}}
+/* THE CROUCH IS VISIBLE OR IT IS NOT ANTICIPATION (16 Sep 2026). This
+   already started at scale(.95) and rose — but it started at opacity 0
+   as well, so the compression happened while the card was invisible
+   and what a reader actually saw was a plain rise. The card is opaque
+   BEFORE it compresses now: it arrives, gathers, then throws. The
+   gather sits at ~26% of the run, which is 120ms on the Rare card and
+   160ms on a Big one — inside Williams' one-to-three-frame band at the
+   bottom, and deliberately past it at the top, because the biggest
+   tier is the one worth waiting a beat for. */
+@keyframes rvlPop{0%{opacity:0;transform:scale(.99) translateY(7px)}26%{opacity:1;transform:scale(.955) translateY(1px)}62%{opacity:1;transform:scale(1.028) translateY(0)}100%{opacity:1;transform:none}}
 @keyframes rvlHalo{0%{box-shadow:0 0 0 0 rgba(0,0,0,0)}45%{box-shadow:0 0 26px 5px var(--rvc,transparent)}100%{box-shadow:0 0 0 0 rgba(0,0,0,0)}}
 .rvl-0{animation:rvlIn .24s ease-out both}
 .rvl-1{animation:rvlIn .34s cubic-bezier(.22,1,.36,1) both}
@@ -454,7 +571,21 @@ body:has(.tabbar) #app:has(.sessfix),body:has(.tabbar) #app:has(.pinpage){paddin
 .rvh-3{animation:rvlHalo 1.5s ease-out .08s 2}
 @media (prefers-reduced-motion:reduce){.rvl-0,.rvl-1,.rvl-2,.rvl-3,.rvh-2,.rvh-3{animation:none}}
 .an-pop{animation:anPop .42s cubic-bezier(.34,1.4,.5,1) both}
-.an-glow{animation:anGlow 2.4s ease-in-out infinite}
+/* A GLOW THAT NEVER STOPS IS NOT A SIGNAL, IT IS WALLPAPER (16 Sep
+   2026, animation audit). This pulsed a BOX-SHADOW forever, on twelve
+   call sites, several of which sit on Today — so the default view
+   repainted a shadow every frame for as long as the app was open, and
+   the thing it was meant to point at had stopped pointing within a
+   few seconds of anyone looking at it. Emil Kowalski's rule for a
+   frequently-seen element is blunt: motion with no purpose is a block,
+   and the strongest fix is usually to delete it.
+   It pulses THREE TIMES and holds a soft steady glow. The card still
+   reads as the notable one — it simply stops asking. No fill-mode on
+   purpose: an animation with fill:both outranks a specified value
+   (the sheet-drag bug, 14 Sep), so without this the card would end
+   locked on whatever the last keyframe said instead of settling onto
+   the resting shadow below. */
+.an-glow{box-shadow:0 0 14px -2px rgba(240,238,230,.16);animation:anGlow 2.4s ease-in-out 3}
 .an-shimmer{background:linear-gradient(90deg,var(--dim) 20%,var(--amber) 50%,var(--dim) 80%);background-size:220% 100%;
   -webkit-background-clip:text;background-clip:text;color:transparent;animation:anShimmer 2.1s linear infinite}
 .an-bar{transform-origin:left;animation:anBarGrow .8s cubic-bezier(.22,1,.36,1) both}
@@ -1081,6 +1212,20 @@ function backupDays(){const t=lget(K_BK,null);if(!t)return null;
   return Math.floor((Date.now()-t)/864e5)}
 function backupDue(){const d=backupDays();return S.history.length>=1&&(d===null||d>=7)}
 const mmss=s=>{s=Math.max(0,Math.round(s));return Math.floor(s/60)+':'+String(s%60).padStart(2,'0')};
+/* 4:60 /km (owner-reported on his own Running page, 16 Sep 2026).
+   ELEVEN separate places formatted a decimal-minutes pace or time the
+   same wrong way — `Math.floor(p) + ':' + Math.round((p%1)*60)` — and
+   every one of them had the same fault: the minutes and the seconds
+   are rounded INDEPENDENTLY, so any pace whose fraction lands above
+   59.5 seconds prints :60 instead of rolling over. 4.9958 min/km came
+   out as "4:60 /km" on the easy-pace card. It is not a display
+   nicety: an app whose whole claim is that it reports real numbers
+   printed a time that does not exist.
+   mmss already did it correctly — round the TOTAL seconds, then
+   split — so this is that, for callers holding decimal minutes. One
+   reader, because eleven copies of an arithmetic bug is what eleven
+   copies of arithmetic gets you. */
+const mmMin=m=>mmss((+m||0)*60);
 /* Epley, RPE-aware (owner-caught, 6 Sep: reading a 1RM off an RPE-6
    volume set treats four reps in the tank as zero and craters the
    estimate — "asking a blind man to play darts"). When the set carries
@@ -1223,7 +1368,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='6e7564';  // stamped by tools/build.py with the content hash
+const BUILD_ID='2fd31d';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -1311,14 +1456,36 @@ function setWeek(w,pid){
 function weekFor(pid){return (S.weekMap&&S.weekMap[pid])||1}
 function persistActive(){if(S.sess)lset(K_A,Object.assign({},S.sess,{note:S.note}));
   try{if(typeof restNotifSync==='function')restNotifSync()}catch(e){}}
-function isPR(e){
+/* ONE READER for "what was the best on this lift before this set".
+   isPR asks whether the bar moved; prMag asks by how much. Written
+   separately they drift, and the day they disagree the celebration
+   is the wrong size for the thing being celebrated. */
+function prBest(e){
   let best=0;
   S.history.forEach(h=>h.log.forEach(l=>{if(l===e)return;
     if(e.secs!=null){if(l.ex===e.ex&&l.secs!=null)best=Math.max(best,l.secs)}
     else if(l.ex===e.ex&&l.w&&l.r)best=Math.max(best,e1rm(l.w,l.r,l.rpe))}));
-  if(e.secs!=null)return best>0&&e.secs>best?'longest hold yet ('+e.secs+'s)':null;
-  const cur=e.w&&e.r?e1rm(e.w,e.r,e.rpe):0;
-  return best>0&&cur>best?'best est 1RM yet ('+Math.round(cur)+' kg)':null}
+  const cur=e.secs!=null?(+e.secs||0):(e.w&&e.r?e1rm(e.w,e.r,e.rpe):0);
+  return{best:best,cur:cur}}
+function isPR(e){
+  const b=prBest(e);
+  if(e.secs!=null)return b.best>0&&e.secs>b.best?'longest hold yet ('+e.secs+'s)':null;
+  return b.best>0&&b.cur>b.best?'best est 1RM yet ('+Math.round(b.cur)+' kg)':null}
+/* HOW BIG A BEST IS, AS A FRACTION OF ITSELF. A 2.5 kg move on a
+   100 kg bench and a 2.5 kg move on a 20 kg lateral raise are not
+   the same event, so the dial is RELATIVE — which is the same reason
+   stepCap and exStep work in percentages rather than kilos.
+   The band is 1.5% to 6%: a single smallest-plate step on a heavy
+   compound sits near the bottom, and anything past six per cent in
+   one session is a genuinely big day on any lift. */
+const PR_MAG_LO=0.015, PR_MAG_HI=0.06;
+function prMag(e){
+  try{
+    const b=prBest(e);
+    if(!(b.best>0)||!(b.cur>b.best))return 0;
+    const rel=(b.cur-b.best)/b.best;
+    return Math.max(0,Math.min(1,(rel-PR_MAG_LO)/(PR_MAG_HI-PR_MAG_LO)))}
+  catch(e9){oops('prMag',e9);return 0}}
 const MODELS=[['claude-haiku-4-5-20251001','Haiku — fast, near-free'],['claude-sonnet-4-6','Sonnet — smarter']];
 const COACH_SYS="You are Allena, a strength coach inside a training app. Bench wave 5wk (100x4/102.5x3/105x2/100x5/102.5x4), +2.5kg per block; back-offs 90% of top set, top reps +2-3; volume bench 87.5x4x8 -> 90 when all four hit 8 @RPE<=8; accessories double progression; wk6 deload. Goal bench 100x8. ACL-deficient knee: any knee pain/swelling/instability -> stop, log, physio decides. Under 80 words. One concrete call (kg x reps) first, then one line why. No fluff. If a programmed load should change, end your reply with a line exactly like ADJUST|<exercise name as given>|<number in kg>, e.g. ADJUST|Bench — back-off|-2.5 (one only, nothing else on that line).";
 function repLow(t){if(typeof t==='number')return t;const m=String(t||'').match(/\d+/);return m?+m[0]:null}
@@ -1569,6 +1736,357 @@ function qrSvg(text,px){
     for(let r=0;r<n;r++)for(let c=0;c<n;c++)if(m[r][c])d+='M'+(c+q)+' '+(r+q)+'h1v1h-1z';
     return '<svg viewBox="0 0 '+(n+2*q)+' '+(n+2*q)+'" width="'+s+'" height="'+s+'" shape-rendering="crispEdges" style="display:block;background:#fff;border-radius:12px">'+
       '<path d="'+d+'" fill="#111"/></svg>'}catch(e){return ''}}
+/* ══════════════════════════════════════════════════════════════════
+   FEEL — the engagement layer, and the switch that kills it
+                                                    (16 Sep 2026)
+
+   Owner brief: "Go all in on making this app compulsively engaging.
+   This is an aggressive build for a small, informed beta group so we can
+   find the ceiling and then tune back." And: "build a kill switch: every
+   aggressive mechanic behind a feature flag so we can dial any of it
+   down instantly without a release."
+
+   So the flags come FIRST, before a single animation, because a kill
+   switch added afterwards is a kill switch nobody trusts. Precedent is
+   PREM_LIVE in 19c: a finished feature sitting behind one boolean.
+
+   ── THE ONE HARD LIMIT, AS CODE ────────────────────────────────────
+   "Nothing that pushes a user to train, restrict food, or ignore rest
+   when their own recovery data says otherwise."
+
+   That is `feelPushOk()`, and it is not advice in a comment — every
+   mechanic that could nudge somebody toward training asks it first.
+   The app already computes the inputs: hrvGate() runs the Vesterinen
+   band, and morning readiness is on the daily store. This reads them
+   and returns false on a day the body is saying no. A mechanic that
+   forgets to ask is a bug, and the gate in tests/ui-test looks for it.
+
+   NOTE the asymmetry, which is deliberate: feelPushOk() gates PUSHING.
+   It never gates CELEBRATING. Somebody who trained on a rough day and
+   logged it honestly has earned the full ceremony — withholding the
+   reward because their HRV was low would punish the exact behaviour the
+   app wants, and would be the app moralising at somebody who already
+   did the work.
+   ══════════════════════════════════════════════════════════════════ */
+
+/* Every aggressive mechanic, individually killable. `false` here is a
+   full stop: the code path does not run, nothing renders, no storage is
+   written. Flipping one costs a deploy of the web build, which reaches
+   the installed app over the air — no App Store release. */
+const FEEL={
+  haptics:   true,   /* the whole haptic vocabulary */
+  ceremony:  true,   /* full-screen reward moments */
+  rank:      true,   /* the tier chase on the weekly race */
+  streakEsc: true,   /* escalating streak value */
+  rivalry:   true,   /* "someone passed you", head-to-head surfacing */
+  pushHard:  true,   /* the aggressive notification ladder */
+  motion:    true    /* the extra animation layer over the base app */
+};
+
+/* one reader, so a flag cannot mean two things in two places. It folds
+   in the user's own settings and the OS reduced-motion preference,
+   because a flag that ignores an accessibility setting is not a
+   feature flag, it is a bug with a boolean in front of it. */
+function feelOn(k){
+  try{
+    if(!FEEL[k])return false;
+    const P=(S.prof&&S.prof.feel)||{};
+    if(P[k]===false)return false;
+    if(k==='haptics'&&P.haptics===false)return false;
+    if((k==='motion'||k==='ceremony')&&feelReduced())return false;
+    return true}
+  catch(e){oops('feelOn',e);return false}}
+
+function feelReduced(){
+  try{return !!(window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches)}
+  catch(e){return false}}
+
+/* ── THE HARD LIMIT ────────────────────────────────────────────────
+   Returns {ok:false, why:'...'} on a day the user's own data says they
+   are under-recovered. Every pushing mechanic asks this and says the
+   reason rather than going quiet, because a silent withdrawal reads as
+   the app losing interest.
+   FAILS OPEN on purpose: with no recovery data there is nothing to
+   contradict, and refusing to encourage somebody because their watch is
+   flat would be the app inventing a reason to go quiet. */
+function feelPushOk(){
+  try{
+    /* the readiness the user logged this morning, if they did */
+    let rd=null;
+    try{const g=(S.gar&&S.gar.days)||{},d=g[today()]||{};
+      rd=(d.am!=null?+d.am:(d.day!=null?+d.day:null))}catch(e){oops('feelRd',e)}
+    if(rd!=null&&rd<40)return{ok:false,why:'readiness'};
+    /* the trial-validated HRV band — hrvGate carries the citations and
+       is the ONE reader for that rule (the 15 Sep ruling) */
+    try{if(typeof hrvGate==='function'){const g9=hrvGate();
+      if(g9&&g9.low)return{ok:false,why:'hrv'}}}catch(e){oops('feelHrv',e)}
+    /* a flagged rehab check-in outranks everything: pain, swelling or an
+       issue means the app does not campaign at somebody today */
+    try{const r=(S.rehab&&S.rehab.days&&S.rehab.days[today()])||null;
+      if(r&&(+r.pain>=5||r.swell||r.flag))return{ok:false,why:'checkin'}}catch(e){oops('feelChk',e)}
+    return{ok:true,why:null}}
+  catch(e){oops('feelPushOk',e);return{ok:true,why:null}}}
+
+function feelPushLine(why){
+  /* what the app says INSTEAD of pushing. Plain register, no metaphor,
+     and it never implies the user has failed something. */
+  return why==='hrv'?'Your recovery numbers are under your own band today. Nothing here is asking you to train.'
+    :why==='readiness'?'You logged a rough morning. Today is not a day this app pushes.'
+    :why==='checkin'?'Your check-in flagged something today. The race can wait.'
+    :''}
+
+/* ── THE HAPTIC VOCABULARY ─────────────────────────────────────────
+   Named by MEANING rather than by strength, so a call site says what
+   happened and this decides how it feels. That is what stops the
+   vocabulary drifting into forty-two hand-picked numbers, which is
+   what the audit found (vib(10) eleven times, vib(12) nine times,
+   vib(8) five times — three different taps for the same class of
+   event, chosen by whoever was typing).
+   Every pattern below is composed from the four bridge kinds the
+   SHIPPED wrapper already understands, so none of this needs a native
+   build to work. */
+/* ── THREE NUMBERS THE WHOLE PAYOFF LAYER IS BUILT FROM ────────────
+   All three are published, and all three are here rather than spread
+   through the call sites, because the fault this replaces was forty
+   hand-picked numbers chosen by whoever was typing.
+
+   FEEL_ANTIC — Williams' second principle: "before we go one way,
+   first go the other way", and ONE TO THREE FRAMES (42-125 ms at
+   24 fps) is enough to be FELT while being invisible. Ant Design
+   ships it as a curve whose control point is negative, so the thing
+   literally moves backwards before it moves forwards. Here it is a
+   single light tick ahead of the pattern: the hand is told something
+   is about to happen, and then it happens.
+
+   FEEL_FLOOR — Material ships MINIMUM_PRESS_MS = 225. Release a press
+   after 20 ms and the feedback still holds for 225, because THE
+   PAYOFF'S LENGTH IS INDEPENDENT OF THE INPUT THAT TRIGGERED IT.
+   That is exactly why a fast tap still feels like something happened
+   rather than like nothing did.
+
+   FEEL_HOLD — the loud rung's extra settle (see feelMag). */
+const FEEL_ANTIC=90;
+const FEEL_FLOOR=225;
+const FEEL_HOLD=180;
+/* opt-in, because anticipation on `tap` would make every control in
+   the app feel like it had lag. Celebrations only. */
+const FEEL_ANTIC_ON={climb:1,win:1,rank:1,phase:1};
+
+const FEEL_HAPTIC={
+  tap:     [['select',0]],                                   /* a control answered */
+  commit:  [['medium',0]],                                   /* a set logged, a thing saved */
+  arrive:  [['light',0],['light',90]],                       /* a surface opened that matters */
+  climb:   [['light',0],['medium',120],['heavy',260]],       /* progress upward */
+  win:     [['medium',0],['heavy',150],['success',330]],     /* a personal best */
+  rank:    [['light',0],['light',110],['medium',220],['heavy',360],['success',560],['heavy',760]],
+  passed:  [['medium',0],['medium',170]],                    /* a rival went by */
+  phase:   [['light',0],['light',90],['light',180],['medium',330],['heavy',500],['success',700],['heavy',900],['success',1150]],
+  /* ── THE SIGNATURE ───────────────────────────────────────────
+     The set commit is the most repeated action in the product — an
+     active user performs it several hundred times a week — and it
+     carried `haptic('light')`, the same generic tap as every other
+     button in the app. The single most frequent gesture in Allena
+     had no signature at all.
+     Two events and no more: the anticipation tick, then the landing
+     90ms later. Deliberately SHORT — a drumroll fired three hundred
+     times a week is unbearable by Thursday, and Emil Kowalski's
+     frequency rule is blunt about it (a hundred-plus times a day
+     gets no motion at all). It is meant to be recognisable, not loud.
+     A THIRD BEAT AT THE 225ms FLOOR WAS BUILT AND CUT. Material's
+     number is how long the VISUAL feedback holds, not a licence to
+     add a buzz a third of a second after the tap — which is what it
+     was, and it read as lag rather than as weight. The floor belongs
+     to the payoff animations, where it came from; the reveal ladder
+     already clears it at every tier.
+     NOTHING ANIMATES. The set screen is a fixed instrument (owner
+     rule, 31 Aug) and this adds no motion to it. The mid-session ban
+     is about the next number arriving instantly, which it still
+     does; a haptic is not an animation. */
+  sig:     [['select',0],['medium',FEEL_ANTIC]],
+  quiet:   []                                                /* deliberately nothing */
+};
+/* WARNING IS AN ERROR SOUND, AND AN OVERTAKE IS NOT AN ERROR (failure
+   research, track 11). 'passed' opened on Apple's `warning` notification
+   haptic — the one the OS reserves for something having gone wrong. A
+   rival going by is competitive news. Firing an error pattern at it tells
+   the body a failure occurred in the ONE channel the copy law cannot
+   reach: every overtake string is already written gain-framed and then
+   the phone buzzed an error under it. Two medium taps read as attention
+   without the error semantics. Castonguay 2016 is the reason this is
+   worth a line of code — shame does not fail to motivate, it CONVERTS
+   motivation into the introjected form that predicts dropout, and the
+   haptic is a shame channel nobody reviews. */
+
+/* THE DEAL CLIMBS WITH THE CARD (track 1). Allena ships no audio, so the
+   haptic ladder is its only non-visual rarity channel, and the deal — the
+   scarcest moment in the app — was firing one flat `light` per card
+   whatever landed. Clash Royale encodes rarity redundantly across three
+   reward systems; muted, its visual ladder carries the whole load, which
+   is the position Allena is in permanently. A tier that is visible and
+   not felt is a tier half-told. */
+const FEEL_TIER={common:'tap',uncommon:'commit',rare:'climb',epic:'win'};
+function feelTier(k){
+  try{return feel(FEEL_TIER[k]||'tap')}
+  catch(e){oops('feelTier',e);return false}}
+let _feelUntil=0;
+/* the one place a pattern is actually fired. Everything above hands a
+   SEQUENCE to this; nothing else calls haptic() on a ceremony path,
+   so the throttle, the kill switch and the anticipation rule cannot
+   be routed around by a new call site. */
+function feelSeq(seq){
+  try{
+    if(!feelOn('haptics'))return false;
+    if(!seq)return false;
+    if(!seq.length)return true;
+    const now=Date.now();
+    if(now<_feelUntil&&seq.length>1)return false;
+    const last=seq[seq.length-1][1];
+    if(seq.length>1)_feelUntil=now+last+120;
+    seq.forEach(step=>{
+      if(!step[1]){try{haptic(step[0])}catch(e){oops('feelFire',e)}return}
+      setTimeout(()=>{try{haptic(step[0])}catch(e){oops('feelFire',e)}},step[1])});
+    return true}
+  catch(e){oops('feelSeq',e);return false}}
+
+function feel(name){
+  /* fire a named pattern. One ceremony at a time — a second request
+     inside a running pattern is dropped, because three overlapping
+     drumrolls is noise rather than celebration (the 3 Sep rule, kept). */
+  try{
+    const seq=FEEL_HAPTIC[name];
+    if(!seq)return false;
+    return feelSeq(FEEL_ANTIC_ON[name]?feelAntic(seq):seq)}
+  catch(e){oops('feel',e);return false}}
+
+/* ── ANTICIPATION ──────────────────────────────────────────────────
+   One light tick FEEL_ANTIC ahead of everything else, with the rest
+   of the pattern pushed back to make room. The hand is told something
+   is about to happen, and then it happens — which is most of what
+   separates a payoff that reads as expensive from one that reads as
+   cheap, and it costs 90 ms.
+   It is added to the pattern rather than built into each one so the
+   tables stay readable as MEANING (what happened) instead of as
+   timing, and so turning it off is one constant. */
+function feelAntic(seq){
+  try{
+    if(!seq||!seq.length)return seq;
+    return [['select',0]].concat(seq.map(st=>[st[0],st[1]+FEEL_ANTIC]))}
+  catch(e){oops('feelAntic',e);return seq}}
+
+/* ── MAGNITUDE: ONE DIAL, THREE RUNGS ──────────────────────────────
+   Celeste scales its landing squash continuously with impact speed,
+   and because the recovery is a constant RATE a bigger deformation
+   also takes longer to settle — the size and the duration come off
+   one number. Street Fighter V ladders hit-stop across light, medium
+   and heavy at 8/12/15 frames, and across 566 moves its freeze
+   correlates with damage at rho 0.746. Both say the same thing: THE
+   SIZE OF THE PAYOFF IS A FUNCTION OF THE SIZE OF THE EVENT.
+
+   What this app had instead was `vib([40,60,40,60,40,60,140])` for a
+   goal and `vib([25,45,25,45,90])` for a personal best: two arrays
+   typed by hand, with no relationship to each other and none at all
+   to how big the thing actually was. A 2.5 kg personal best and a
+   30 kg one felt identical, and the goal — which is the larger event
+   — was simply longer because somebody typed more numbers.
+
+   THREE RUNGS, NOT A CONTINUUM. A wrist cannot tell 340 ms of
+   drumroll from 380; SFV ladders in three and that is about the
+   resolution a hand has. The rungs differ in KIND as well as length —
+   fewer beats, every beat, every beat and a held chord — because
+   doubling a duration is not felt and a new beat is. Same finding as
+   the 15 Sep rarity motion ladder, arriving in the other channel.
+
+   The quiet rung keeps the pattern's OPENING and never its tail: the
+   last beat of every pattern here is the chord, and a small event
+   that still lands on the chord has not been scaled down at all. */
+const FEEL_RUNG_LO=0.34, FEEL_RUNG_HI=0.67;
+function feelMag(name,mag){
+  try{
+    const seq0=FEEL_HAPTIC[name];
+    if(!seq0)return false;
+    if(seq0.length<2)return feel(name);
+    const m=Math.max(0,Math.min(1,+mag||0));
+    const seq=FEEL_ANTIC_ON[name]?feelAntic(seq0):seq0;
+    if(m<FEEL_RUNG_LO)return feelSeq(seq.slice(0,Math.max(1,Math.ceil(seq.length/2))));
+    if(m<FEEL_RUNG_HI)return feelSeq(seq);
+    const last=seq[seq.length-1];
+    return feelSeq(seq.concat([[last[0],last[1]+FEEL_HOLD]]))}
+  catch(e){oops('feelMag',e);return false}}
+
+/* ══ THE FLOORS, SAID OUT LOUD ═════════════════════════════════════
+   Allena keeps five promises and has been keeping them silently.
+   Every one was already true in the code and said nowhere a person
+   would actually read it — buried inside an (i) body, or printed
+   only on the day it happened to apply, which is the day AFTER the
+   day somebody needed to know.
+
+   Clash Royale states its no-demotion rule verbatim in five places
+   across five different systems. That is not redundancy. A floor
+   nobody knows about does no work at all, because the fear it exists
+   to remove is felt long before the floor is ever reached — so the
+   floor has to be legible before then too.
+
+   ONE CONSTANT, ONE READER, because five promises phrased five ways
+   by five surfaces is exactly how a promise quietly stops being one.
+   Everyday register: these are read by a tired person who is worried
+   about losing something, so they are short, plain and contain no
+   metaphor. Four of them were named in the plan; `finds` is the
+   fifth and belongs to the same family. */
+const FLOORS={
+  rank:  'Nobody drops a tier here. The ladder only counts up.',
+  week:  'The week resets for everyone on Monday. Nothing you earned is taken back.',
+  quiet: 'One quiet day a week bridges a gap. It is already counted.',
+  rest:  'Training is optional. A rest day still completes the list.',
+  finds: 'A find is never taken away. Beating a record does not erase the old one.'
+};
+function floorHtml(k){
+  try{
+    const t=FLOORS[k];if(!t)return '';
+    return '<p class="mono" style="color:var(--faint);font-size:11px;line-height:1.5;margin-top:8px">'+esc(t)+'</p>'}
+  catch(e){oops('floorHtml',e);return ''}}
+
+/* ══ THE PHASE CEREMONY ════════════════════════════════════════════
+   THE AUDIT'S WORST FINDING (16 Sep 2026). Clearing an ACL phase is the
+   single biggest event in this app for the audience it was built for —
+   months of criteria-gated rehab, and the whole product exists for that
+   person. What it did was:
+
+       flash('Phase 3 loaded.');render();
+
+   A grey toast. Meanwhile finishing an ordinary set gets a drumroll.
+   That is the flattest moment in the product measured against what it
+   means to the person having it.
+
+   It mounts OUTSIDE the render body, the way the find overlay and the
+   deep-read curtain already do, so opening it does not rebuild the page
+   underneath and a re-render cannot replay it.
+   It celebrates, so it does NOT ask feelPushOk() — see the asymmetry
+   note at the top of this file. Somebody who cleared a phase on a bad
+   week has earned it more, not less. */
+function phaseCerHtml(){
+  try{
+    const c=S._phaseCer;if(!c)return '';
+    if(!feelOn('ceremony'))return '';
+    const gold='var(--gold)';
+    return '<div data-a="phaseCerDone" class="phcer" style="position:fixed;inset:0;z-index:96;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px;text-align:center">'+
+      '<div class="phcer-glow"></div>'+
+      '<p class="mono phcer-a" style="font-size:var(--t-caption2);letter-spacing:.18em;color:var(--faint)">CRITERIA MET</p>'+
+      '<p class="disp phcer-b" style="font-size:var(--d-5);font-weight:600;letter-spacing:-.03em;line-height:1;margin-top:14px;color:'+gold+'">Phase '+esc(String(c.to))+'</p>'+
+      '<p class="disp phcer-c" style="font-size:var(--d-2);font-weight:600;letter-spacing:-.018em;margin-top:10px">'+esc(c.name||'')+'</p>'+
+      (c.days?'<p class="phcer-d" style="color:var(--dim);font-size:var(--t-sub);line-height:1.55;margin-top:18px;max-width:300px">'+
+        esc(c.days+' days in phase '+c.from+'. Every gate measured, none of it assumed.')+'</p>':'')+
+      '<p class="phcer-d" style="color:var(--faint);font-size:var(--t-foot);line-height:1.6;margin-top:22px;max-width:300px">Your physio still makes the calls. This is the scorekeeping catching up with the work.</p>'+
+      '<button data-a="phaseCerDone" class="big disp phcer-e" style="margin-top:30px;background:var(--text);color:var(--bg);font-size:var(--t-sub);max-width:280px">See what phase '+esc(String(c.to))+' asks for</button>'+
+      '</div>'}
+  catch(e){oops('phaseCerHtml',e);return ''}}
+
+function phaseCerFire(from,to,name,days){
+  /* called by the router the moment a phase is cleared */
+  try{
+    S._phaseCer={from:from,to:to,name:name||'',days:days||0};
+    feel('phase');
+    return true}
+  catch(e){oops('phaseCerFire',e);return false}}
 function rpeLow(v){const m=String(v==null?'':v).match(/(\d+(?:\.\d+)?)/);return m?parseFloat(m[1]):NaN}
 function rpeHigh(v){const m=String(v==null?'':v).match(/(\d+(?:\.\d+)?)\s*[-–—to]+\s*(\d+(?:\.\d+)?)/);
   return m?parseFloat(m[2]):rpeLow(v)}
@@ -3313,6 +3831,13 @@ function overtakeCard(){
  try{
   const a=acct()||{};const o=a.ovMe;
   if(!o||o.d!==today()||o.x)return '';
+  /* THE OVERTAKE WAS SILENT (feel audit, 16 Sep 2026) — and the research
+     puts this trigger class at the top of the evidence: a position change
+     is the best-documented return driver in competitive apps. Once per
+     event, keyed on the rival, because render() runs constantly and a
+     fanfare per keystroke is the opposite of a moment. */
+  try{const k9='ov:'+String(o.id||o.name||'')+':'+o.d;
+    if(S._ovRung!==k9){S._ovRung=k9;feel('win')}}catch(e9){oops('ovFeel',e9)}
   /* `a.display` is computed for the SERVER row and never stored locally,
      so this drew a literal Y for everyone (audit P13). Same source as
      every other surface: your own profile name, then your email. */
@@ -3650,6 +4175,7 @@ function friendsSection(){
       '<p class="mono" style="font-size:9px;color:var(--faint);letter-spacing:.06em">THIS WEEK \u203a</p></button></div>';
     return profCard+'<p class="eyebrow mt2">The weekly race</p>'+
       '<p style="color:var(--faint);font-size:11px;line-height:1.55;margin-top:4px">Live points only — sessions your phone or watch actually witnessed — fresh every Monday. Typed-in history never scores.'+iBtn('racelaw')+'</p>'+
+      floorHtml('rank')+floorHtml('week')+
       iBody('racelaw','Every honest number in a witnessed session earns — each set\u2019s weight, reps and effort, plus one for finishing — capped per day. Witnessed means your watch overlapped the session at working heart rate, or the phone ran the clock and the sets spread like real training. Imported, typed-later and demo sessions earn regular points but never race. Your score uploads when your app opens; you see theirs as of their last open. A group link races everyone who joins it on one board, and the weekly crown settles across everyone on it \u2014 friends and group alike. A mate who has not opened the app since Monday shows 0 until they do; their last week still counts.')+
       (L.length?(function(){
         const myFirst=String((S.prof&&S.prof.name)||'').split(' ')[0];
@@ -3659,9 +4185,31 @@ function friendsSection(){
           if(h9<12)return null;
           return h9<48?Math.round(h9)+'h':Math.round(h9/24)+'d'}catch(e9){return null}};
         const rb9=(acct()||{}).rowBase||{};
-        const R=[{me:1,name:myFirst||'You',init:myInit,week:mine,av:(acct()||{}).av||''}]
+        /* ══ THE WEEK CARRIES THE TENSION, THE LADDER CARRIES THE ARC
+           (16 Sep 2026, gamification research track 2) ══════════════════
+           The board showed this week's number and nothing else, so there
+           was nothing to climb: every Monday everyone is back at zero and
+           a whole competitive history evaporates. LIVE_TIERS has been
+           sitting in 07-daily-loop since the race shipped — seven steps on
+           LIFETIME witnessed points, the exact currency the race scores —
+           and `live_points` is already on every friend's snapshot as
+           `allp`, so this costs nothing at the server.
+           IT IS THE RIGHT LADDER for this page specifically. dpTier
+           rewards LOGGING and the tree stage is deliberately the
+           non-comparable thing (it stays on the friends panel, which is
+           the room that does not compare). This page is about witnessed
+           work, so it wears the witnessed ladder.
+           AND IT NEVER FALLS. LIVE_TIERS is monotonic on a lifetime total,
+           so a bad week costs a rank nothing — which is the whole reason
+           it is safe to show beside a score that resets. A tier that could
+           drop would be relegation with the serial numbers filed off, and
+           AUDIT.md bans that by name. */
+        const tierOf=n9=>{try{return (typeof liveTier==='function')?liveTier(+n9||0):null}catch(e9){oops('rowTier',e9);return null}};
+        const myAll=(function(){try{return Math.round(dp0.live||0)}catch(e9){oops('myAll',e9);return 0}})();
+        const R=[{me:1,name:myFirst||'You',init:myInit,week:mine,av:(acct()||{}).av||'',tr:tierOf(myAll)}]
           .concat(L.map(f=>({me:0,id:f.id,code:f.code,name:f.name,av:f.av||'',
             d9:(rb9[f.id]!=null?Math.max(0,(f.week||0)-rb9[f.id]):0),
+            tr:tierOf(f.allp),
             init:(f.named?String(f.name).slice(0,1).toUpperCase():'?'),week:f.week||0,stale:staleT(f.seen)})));
         R.sort((a,b)=>b.week-a.week||(a.me?-1:1));
         R.forEach((x,i)=>{x.rank=i+1});
@@ -3689,8 +4237,12 @@ function friendsSection(){
             return '<div style="display:flex;align-items:center;gap:12px;padding:10px 2px 0">'+
             '<span class="mono" style="width:18px;flex:none;text-align:center;font-size:11px;font-weight:700;color:'+(x.rank===1?'var(--green)':'var(--faint)')+'">'+x.rank+'</span>'+
             '<span style="width:26px;height:26px;border-radius:26px;background:var(--raised);border:1.5px solid '+avRing(x.av,(x.me?'var(--green)':'var(--line)'))+';display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex:none">'+avInner(x.av,x.init,'var(--text)')+'</span>'+
-            (x.me?'<button data-a="raceMineOpen" style="flex:1;min-width:0;font-size:13px;font-weight:600;text-align:left;padding:0">You <span style="color:var(--faint);font-size:11px">\u203a</span></button>'
-              :'<button data-a="frOpen" data-v="'+esc(x.id)+'" style="flex:1;min-width:0;font-size:13px;text-align:left;padding:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(x.name)+' <span style="color:var(--faint);font-size:11px">\u203a</span></button>')+
+            '<div style="flex:1;min-width:0">'+
+            (x.me?'<button data-a="raceMineOpen" style="width:100%;min-width:0;font-size:13px;font-weight:600;text-align:left;padding:0">You <span style="color:var(--faint);font-size:11px">\u203a</span></button>'
+              :'<button data-a="frOpen" data-v="'+esc(x.id)+'" style="width:100%;min-width:0;font-size:13px;text-align:left;padding:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(x.name)+' <span style="color:var(--faint);font-size:11px">\u203a</span></button>')+
+            /* the arc, under the name: earned for life, never lost */
+            (x.tr?'<p class="mono" style="font-size:var(--t-caption2);letter-spacing:.06em;color:'+esc(x.tr[2])+';margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(String(x.tr[1]).toUpperCase())+'</p>':'')+
+            '</div>'+
             (x.me?'':(x.stale?'<span class="mono" style="color:var(--faint);font-size:9px;flex:none">as of '+x.stale+' ago</span>'
               :'<span class="mono" style="color:'+(lead>=0?'var(--green)':'var(--amber)')+';font-size:9px;flex:none">'+(lead>=0?'+'+lead+' you':'+'+(-lead)+' them')+'</span>'))+
             '<span class="mono" data-cu="row-'+esc(String(x.me?'me':x.id))+'" style="font-size:15px;font-weight:700;flex:none'+(x.d9>0?';color:var(--green)':'')+'">'+x.week+'</span>'+
@@ -3930,10 +4482,30 @@ function accountSection(){
      the score never enters it; the SQL has no score column in it (2).
    - No synthetic member exists anywhere. The empty state is honest:
      "Two more people at your stage and this starts. 1 waiting." (3).
-   - Score = the lowest NON-EXEMPT member's witnessed sessions this
-     week. A member whose knee is flagged this week — pain 5+,
-     swelling, or a flagged issue — is exempt and the pod counts the
-     other two. An injured person is never the reason a pod loses (4).
+   - Score = the SUM of the non-exempt members' witnessed sessions
+     this week. A member whose knee is flagged — pain 5+, swelling,
+     or a flagged issue — is exempt and the pod counts the others,
+     and WHICH member is never named on any surface. An injured
+     person is never the reason a pod loses (4).
+     THE MINIMUM WAS TRIED FIRST AND REPLACED (owner call, 16 Sep
+     2026, on the social research). STEP UP (JAMA Internal Medicine,
+     n=602) ran three-person groups in three flavours over 24 weeks.
+     The COLLABORATION arm — three people whose score depends on the
+     least active one, which is exactly what a minimum builds — was
+     the only one of the three that left NOTHING behind at follow-up:
+     +637 steps during, +126 at twelve weeks, p=.49. Competition kept
+     +569 (p=.009) and support +428 (p=.04). The trialists' own
+     explanation is that their FAMILY version worked because those
+     people already knew each other, and pod-mates are strangers by
+     design. A separate trial found the pure collective incentive the
+     worst performer of four (0.17 against a control's 0.18) and a
+     HYBRID — individual accountability with a social multiplier —
+     the best at 0.35. A sum is that hybrid: everybody's own sessions
+     are in the number, and nobody's absence erases anybody's work.
+     And it removes the disclosure the minimum needed. Naming who is
+     exempt tells two strangers that a named person is symptomatic,
+     which is a health disclosure the privacy policy does not cover;
+     under a sum the count is all anyone needs.
    - No "let down", no "holding back", no red, no downward glyph (5).
    - Leaving is one tap, immediate, and tells the leaver nothing (6).
    - A series is four Monday-to-Monday weeks; the fifth Monday re-deals
@@ -4087,7 +4659,7 @@ async function podOptOut(){
   catch(e){oops('podOptOut',e)}}
 function podRows(){
   /* me and my pod-mates, with this week's witnessed sessions and the
-     exemption; the score is the lowest non-exempt number */
+     exemption; the score is the SUM of the non-exempt numbers */
   try{
     podHydrate();
     const p=S.pod;if(!p||!p.id)return null;
@@ -4096,8 +4668,11 @@ function podRows(){
     const rows=[{me:1,id:'me',name:myFirst,init:myFirst.slice(0,1).toUpperCase(),av:(acct()||{}).av||'',sess:mine,exempt:podExempt()}]
       .concat((p.mates||[]).map(m=>({me:0,id:m.id,name:m.name,named:m.named,init:(m.named?String(m.name).slice(0,1):'?').toUpperCase(),av:m.av,sess:+m.sess||0,exempt:!!m.exempt,seen:m.seen})));
     const counted=rows.filter(r=>!r.exempt);
-    const score=counted.length?Math.min.apply(null,counted.map(r=>r.sess)):0;
-    const low=counted.filter(r=>r.sess===score);
+    const score=counted.reduce((a,r)=>a+(+r.sess||0),0);
+    /* `low` is kept as the quiet members — those on zero — rather than
+       as "whoever is the score", because under a sum nobody IS the
+       score. It is only ever used to say a nudge costs nothing. */
+    const low=counted.filter(r=>!r.sess);
     return{rows:rows,score:score,counted:counted.length,low:low,start:p.start,end:podSeriesEnd(p.start),bracket:p.bracket,
       weekN:Math.min(4,Math.max(1,Math.floor((new Date(questWeekKey()+'T12:00')-new Date(String(p.start).slice(0,10)+'T12:00'))/(7*864e5))+1))}}
   catch(e){oops('podRows',e);return null}}
@@ -4108,31 +4683,52 @@ function podLine(P){
   try{
     const me=P.rows[0];
     const ex=P.rows.filter(r=>r.exempt&&!r.me);
-    const exLine=ex.length?ex.map(r=>r.name+'’s knee is flagged this week').join('; ')+' — the pod counts '+(P.counted===1?'one':P.counted===2?'two':P.counted)+'.':'';
-    if(me.exempt)return 'Your knee is flagged this week, so the pod counts the others. Rest is the session.'+(exLine?' '+exLine:'');
-    if(me.sess===P.score&&P.score===0)return 'Your pod’s on 0 until you are. One session moves all three.'+(exLine?' '+exLine:'');
+    /* THE COUNT TRAVELS, THE NAME DOES NOT. This used to read
+       "Jordan's knee is flagged this week", which tells two strangers
+       that a named person is symptomatic — a health disclosure, and
+       one the privacy policy does not cover. The pod needs to know
+       its number counts two; it does not need to know whose. */
+    const exLine=ex.length?'The pod counts '+(P.counted===1?'one':P.counted===2?'two':P.counted)+' this week.':'';
+    if(me.exempt)return 'Your knee is flagged this week, so the pod counts the others. Rest is the session.';
+    if(!me.sess&&!P.score)return 'Your pod is on 0. Your first session is the pod’s first session.'+(exLine?' '+exLine:'');
+    if(!me.sess)return 'The pod is on '+P.score+' without you. Yours adds straight onto it.'+(exLine?' '+exLine:'');
     const quiet=P.low.filter(r=>!r.me);
-    if(quiet.length&&P.score===0)return quiet[0].name+' has 0 this week. A nudge costs nothing.'+(exLine?' '+exLine:'');
-    if(me.sess===P.score)return 'You’re the pod’s number this week. One more session lifts all three.'+(exLine?' '+exLine:'');
-    if(quiet.length)return quiet[0].name+' is the pod’s number at '+P.score+'. One more from them lifts everyone.'+(exLine?' '+exLine:'');
-    return 'Three at '+P.score+' or better. Showing up is the whole race.'+(exLine?' '+exLine:'')}
+    if(quiet.length)return 'You have '+me.sess+' in the pod’s '+P.score+'. A nudge costs nothing.'+(exLine?' '+exLine:'');
+    return 'All of you are in the '+P.score+'. Showing up is the whole race.'+(exLine?' '+exLine:'')}
   catch(e){oops('podLine',e);return ''}}
 function podCard(){
   /* Today: takes the duel card's place while a series is running */
   try{
     if(!podActive())return '';
     const P=podRows();if(!P)return '';
-    const ring=r=>r.exempt?'var(--line)':(r.sess>0?'var(--green)':'var(--line)');
+    /* A PER-MEMBER NUMBER IS A RANKING, AND A DASH IS A DISCLOSURE
+       (16 Sep 2026). This drew each member's own session count, and
+       a "—" plus a FLAGGED · NOT COUNTED label on anyone exempt — so
+       two strangers were told, by name, that the third is
+       symptomatic. That is health data, and the privacy policy does
+       not cover it: the pod's bracket and a yes/no exempt flag are
+       the only health-related fields that ever leave a phone, and
+       both are said out loud on the opt-in screen before anyone
+       joins. Whose flag it is was never on that list.
+       Showing everyone's number anyway and leaving the exempt one
+       out of the total does not fix it either — with a visible total
+       and three visible numbers, which one was excluded is
+       arithmetic.
+       So the pod has ONE number and the members are people. That is
+       this module's own law ("nobody is ranked inside a pod"), which
+       a per-member column was quietly breaking. A green ring still
+       says somebody trained this week, because training is not a
+       symptom. */
+    const ring=r=>r.sess>0?'var(--green)':'var(--line)';
     const col=r=>'<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;min-width:0">'+
-      '<div style="width:50px;height:50px;border-radius:50px;background:var(--raised);border:2.5px solid '+ring(r)+';display:flex;align-items:center;justify-content:center;font-size:19px;font-weight:700'+(r.sess>0&&!r.exempt?';box-shadow:0 0 14px 0 color-mix(in srgb, var(--green) 35%, transparent)':'')+'">'+
+      '<div style="width:50px;height:50px;border-radius:50px;background:var(--raised);border:2.5px solid '+ring(r)+';display:flex;align-items:center;justify-content:center;font-size:19px;font-weight:700'+(r.sess>0?';box-shadow:0 0 14px 0 color-mix(in srgb, var(--green) 35%, transparent)':'')+'">'+
       ((typeof avInner==='function')?avInner(r.av,r.init,r.sess>0?'var(--green)':'var(--text)'):esc(r.init))+'</div>'+
-      '<span style="font-size:11px;font-weight:600;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(r.me?'You':r.name)+'</span>'+
-      '<span class="mono" style="font-size:13px;font-weight:700;color:'+(r.exempt?'var(--faint)':(r.sess>0?'var(--green)':'var(--text)'))+'">'+(r.exempt?'—':r.sess)+'</span></div>';
+      '<span style="font-size:11px;font-weight:600;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(r.me?'You':r.name)+'</span></div>';
     return '<div data-a="nav" data-v="social" class="card mt" style="width:100%;text-align:center;padding:15px 16px;display:block;cursor:pointer">'+
       '<p class="mono" style="font-size:9px;letter-spacing:.12em;color:var(--faint)">YOUR POD · WEEK '+P.weekN+' OF 4 · '+esc(String(POD_BRACKETS[P.bracket]||'').toUpperCase())+'</p>'+
       '<div style="display:flex;align-items:flex-end;gap:8px;margin-top:12px;padding:0 2px">'+P.rows.map(col).join('')+'</div>'+
       '<p class="disp" style="font-size:30px;font-weight:700;line-height:1;margin-top:12px;color:'+(P.score>0?'var(--green)':'var(--text)')+'">'+P.score+'</p>'+
-      '<p class="mono" style="font-size:9px;letter-spacing:.1em;color:var(--faint);margin-top:3px">THE POD’S NUMBER · WHOEVER HAS SHOWN UP LEAST</p>'+
+      '<p class="mono" style="font-size:9px;letter-spacing:.1em;color:var(--faint);margin-top:3px">THE POD’S NUMBER · EVERY WITNESSED SESSION, ADDED UP</p>'+
       '<p style="color:var(--dim);font-size:11px;line-height:1.5;margin-top:8px">'+esc(podLine(P))+'</p>'+
       '</div>'}
   catch(e){oops('podCard',e);return ''}}
@@ -4157,10 +4753,13 @@ function podPanel(){
         '<p style="color:var(--dim);font-size:13px;line-height:1.6;margin-top:4px">'+w+' waiting'+(w===1?'':'')+'. Nobody is invented to fill the gap — a pod is three real people or it isn’t a pod.</p>'+
         '<button data-a="podOptOut" class="btn mt" style="color:var(--faint);font-size:13px">Leave the pool</button></div>';
       return h}
+    /* same law as the card above: one number for the pod, and MY own
+       count is the only one attributable to a person, because it is
+       mine */
     const rowH=r=>'<div style="display:flex;align-items:center;gap:12px;padding:10px 2px 0">'+
-      '<span style="width:28px;height:28px;border-radius:28px;background:var(--raised);border:1.5px solid '+(r.sess>0&&!r.exempt?'var(--green)':'var(--line)')+';display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex:none">'+((typeof avInner==='function')?avInner(r.av,r.init,'var(--text)'):esc(r.init))+'</span>'+
-      '<span style="flex:1;min-width:0;font-size:13px;font-weight:'+(r.me?600:500)+';overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(r.me?'You':r.name)+(r.exempt?' <span class="mono" style="color:var(--faint);font-size:9px;letter-spacing:.06em">FLAGGED · NOT COUNTED</span>':'')+'</span>'+
-      '<span class="mono" style="font-size:15px;font-weight:700;flex:none;color:'+(r.exempt?'var(--faint)':(r.sess>0?'var(--green)':'var(--text)'))+'">'+(r.exempt?'—':r.sess)+'</span>'+
+      '<span style="width:28px;height:28px;border-radius:28px;background:var(--raised);border:1.5px solid '+(r.sess>0?'var(--green)':'var(--line)')+';display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex:none">'+((typeof avInner==='function')?avInner(r.av,r.init,'var(--text)'):esc(r.init))+'</span>'+
+      '<span style="flex:1;min-width:0;font-size:13px;font-weight:'+(r.me?600:500)+';overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(r.me?'You':r.name)+'</span>'+
+      '<span class="mono" style="font-size:15px;font-weight:700;flex:none;color:'+(r.me?(r.sess>0?'var(--green)':'var(--text)'):'var(--faint)')+'">'+(r.me?r.sess:'\u00b7')+'</span>'+
       (r.me?'':'<button data-a="nudgeOpen" data-v="'+esc(String(r.id))+'" class="mono" style="font-size:9px;letter-spacing:.08em;flex:none;padding:4px 7px;border:1px solid var(--line);border-radius:8px;color:var(--dim)">NUDGE</button>')+'</div>';
     h+='<div class="card mt2" style="padding:16px">'+
       '<div style="display:flex;align-items:baseline;gap:12px">'+
@@ -4168,11 +4767,11 @@ function podPanel(){
       '<span class="mono" style="font-size:9px;color:var(--faint)">'+esc(String(POD_BRACKETS[P.bracket]||'').toUpperCase())+'</span></div>'+
       '<div style="display:flex;align-items:baseline;gap:12px;margin-top:12px">'+
       '<p class="disp" style="font-size:34px;font-weight:700;line-height:1;color:'+(P.score>0?'var(--green)':'var(--text)')+'">'+P.score+'</p>'+
-      '<p class="mono" style="font-size:9px;letter-spacing:.08em;color:var(--faint)">THE POD’S NUMBER · SESSIONS THIS WEEK, WHOEVER HAS FEWEST</p></div>'+
+      '<p class="mono" style="font-size:9px;letter-spacing:.08em;color:var(--faint)">THE POD’S NUMBER · EVERY WITNESSED SESSION, ADDED UP</p></div>'+
       '<p style="color:var(--dim);font-size:13px;line-height:1.55;margin-top:8px">'+esc(podLine(P))+'</p>'+
       '<div style="margin-top:8px;border-top:1px solid var(--line)">'+P.rows.map(rowH).join('')+'</div>'+
       '<p class="mono" style="color:var(--faint);font-size:9px;letter-spacing:.05em;margin-top:12px">SERIES ENDS '+esc(libDateShort(P.end).toUpperCase())+' · EVERYONE IS RE-DEALT THEN'+iBtn('podlaw')+'</p>'+
-      iBody('podlaw','Three people at the same stage share one number for four weeks: the fewest witnessed sessions among them. A member whose knee check-in is flagged that week — pain 5 or more, swelling, or a flagged issue — is not counted, and the pod counts the others. Nobody is ranked inside a pod. Pods in the same bracket are ranked against each other by that number. Leaving is one tap and costs nothing; the other two are re-dealt on Monday. The score card is all a pod-mate can see: a first name, a stage bracket, this week’s witnessed sessions, and the tree. Never a set, a weight, a pain score or a note.')+
+      iBody('podlaw','Three people at the same stage share one number for four weeks: every witnessed session the three of you do, added together. A member whose knee check-in is flagged that week — pain 5 or more, swelling, or a flagged issue — is not counted, and the pod counts the others; which member that is never shows anywhere. Nobody is ranked inside a pod. Pods in the same bracket are ranked against each other by that number. Leaving is one tap and costs nothing; the other two are re-dealt on Monday. The score card is all a pod-mate can see: a first name, a stage bracket, this week’s witnessed sessions, and the tree. Never a set, a weight, a pain score or a note.')+
       '</div>';
     /* the bracket board: pods ranked by their number — aggregates only */
     try{const B=((S.pod&&S.pod.board)||[]).slice().sort((x,y)=>y.score-x.score);
@@ -4182,7 +4781,7 @@ function podPanel(){
           B.slice(0,6).map((x,i)=>'<div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px;margin-top:'+(i?6:9)+'px">'+
             '<span style="flex:1;font-size:13px;color:'+(x.mine?'var(--text)':'var(--dim)')+';font-weight:'+(x.mine?600:400)+'">'+(i+1)+' · '+(x.mine?'Your pod':'A pod of '+x.members)+'</span>'+
             '<span class="mono" style="font-size:13px;font-weight:700;color:'+(x.mine?'var(--green)':'var(--dim)')+'">'+x.score+'</span></div>').join('')+
-          '<p style="color:var(--faint);font-size:11px;line-height:1.5;margin-top:8px">Other pods are a number, never names. Ranked by the pod’s lowest member, so the way up is everyone showing up.</p></div>'}}
+          '<p style="color:var(--faint);font-size:11px;line-height:1.5;margin-top:8px">Other pods are a number, never names. Ranked by the pod’s total, so every session anybody does is in it.</p></div>'}}
     catch(e){oops('podPanel.board',e)}
     h+='<div class="row mt" style="gap:8px">'+
       '<button data-a="podLeave" class="btn" style="flex:1;font-size:13px;color:var(--dim)">Leave this pod</button>'+
@@ -4208,7 +4807,7 @@ function podSheet(){
   /* the opt-in: the rule, and the one thing a stranger will learn */
   const b=podBracket();
   return wrapSheet('Race three people at your stage',
-    '<p style="color:var(--dim);font-size:13px;line-height:1.65;margin-top:4px">Every Monday, people in the pool are dealt into threes by stage. For four weeks your pod shares one number: the fewest witnessed sessions among the three. The quiet one is the person the other two are racing for.</p>'+
+    '<p style="color:var(--dim);font-size:13px;line-height:1.65;margin-top:4px">Every Monday, people in the pool are dealt into threes by stage. For four weeks your pod shares one number: every witnessed session the three of you do, added together. Nobody can undo anybody else’s work, and a week when you can only manage one still puts one on the board.</p>'+
     '<p style="color:var(--dim);font-size:13px;line-height:1.65;margin-top:12px">If your knee check-in is flagged in a week — pain 5 or more, swelling, or a flagged issue — you are not counted that week and the pod counts the other two. Rest never costs a pod.</p>'+
     '<div class="card mt" style="padding:12px 14px;border-color:var(--amber)">'+
     '<p style="font-size:13px;line-height:1.6"><b>People in your pod will know '+(b.rehab?'you’re rehabbing, and roughly how far along':'roughly how often you train')+'.</b> Your bracket is <b>'+esc(b.label)+'</b>. They see that, your first name, your avatar, this week’s witnessed sessions and your tree. Never a set, a weight, a pain score or a note.</p></div>'+
@@ -4386,7 +4985,9 @@ A.finish=()=>{S.holdWait=false;const c=S.sess.sets[S.sess.idx],p=lastFor(c.ex,c.
   persistActive();render()};
 A.commit=(confirmed)=>{const s=S.sess,c=s.sets[s.idx],timed=!!c.secs;
   if(timed?!(+S.draft.secs>0):(S.draft.rpe==null||!S.draft.r))return;
-  try{haptic('light')}catch(e){}
+  /* THE SIGNATURE (16 Sep 2026). The most repeated action in the app
+     fired the same generic tap as every other button in it. */
+  try{feel('sig')}catch(e){oops('commitSig',e)}
   const e={ex:c.ex,setNo:c.setNo,targetW:c.targetW,targetReps:c.targetReps,targetRpe:c.targetRpe};
   if(timed){e.secs=+S.draft.secs;e.perSide=c.perSide;e.w=0;e.r=0;e.rpe=S.draft.rpe
     /* the prescription is the prescription (owner ruling, 9 Sep,
@@ -4420,8 +5021,15 @@ A.commit=(confirmed)=>{const s=S.sess,c=s.sets[s.idx],timed=!!c.secs;
   /* a PR or goal-hit flash paints OVER the regulator's note — the
      old `if(auto){}` swallow meant an increase on the last set could
      mute NEW BEST entirely (owner-caught, 9 Sep) */
-  if(gHit){vib([40,60,40,60,40,60,140]);flash('GOAL HIT · '+gHit.ex+' '+gHit.w+' × '+gHit.r,true)}
-  else if(pr){vib([25,45,25,45,90]);try{prBurst('NEW BEST')}catch(e9){oops('commit.prBurst',e9)}flash('NEW BEST · '+c.ex+' · '+pr,true)}};
+  /* ONE DIAL (16 Sep 2026). These were two hand-typed vibration
+     arrays with no relationship to each other and none to how big
+     the event was — a 2.5 kg best and a 30 kg best felt identical,
+     and the goal was merely longer because somebody typed more
+     numbers. A goal is the top of the dial by definition: it is the
+     thing the person told the app they were trying to do. A best
+     scales with how far the bar actually moved. */
+  if(gHit){feelMag('win',1);flash('GOAL HIT · '+gHit.ex+' '+gHit.w+' × '+gHit.r,true)}
+  else if(pr){feelMag('win',prMag(e));try{prBurst('NEW BEST')}catch(e9){oops('commit.prBurst',e9)}flash('NEW BEST · '+c.ex+' · '+pr,true)}};
 A.adv=i=>{audioCancel();S.restEnd=null;S.holdEnd=null;S.holdWait=false;const s=S.sess;
   if(i>=s.sets.length){s.phase='done';try{S.sessReveal=sessionReveal()}catch(e){}}else{s.idx=i;s.phase='ready'}persistActive();render()};
 A.exPlan=()=>{const s=S.sess,seen=[],by={};
@@ -5228,6 +5836,45 @@ function viewSetup(){
     '</div>'}
 
 function gBase(n){return String(n).split('—')[0].trim()}
+/* A GOAL NAMED "Bench" FOUND NOTHING IN 172 LOGGED "Bench press" ROWS
+   (owner-reported, 16 Sep 2026: the Progress page showed
+   "0 / 127 kg est 1RM — No Bench sessions logged yet" on an account
+   with 43 sessions and 318 tonnes in it).
+   Goals matched on `gBase(l.ex) === g.ex`, a strict string compare.
+   This is the alias fragmentation that already bit a real beta user,
+   whose imported program named bench three ways and split his
+   history, his learned adjustment and his regulation three ways with
+   it. The importer got a resolver after that, and the keyboard got
+   one on 15 Sep. Goals never did, and a goal is the single place
+   where finding nothing is loudest.
+   DELIBERATELY TIMID, for the reason exNear is: a loose match on a
+   goal is worse than no match, because it would credit the wrong
+   lift's numbers toward a target. Exact wins; failing that the
+   normalised keys must match, or one must be a WHOLE-WORD prefix of
+   the other ("bench" of "bench press", never "row" of "upright
+   row" — a prefix is the start of the name, which is where people
+   shorten, not the middle where the traps live). And it only counts
+   when exactly ONE logged lift matches: two candidates means the app
+   cannot know which one the goal meant, so it stays strict and says
+   nothing rather than guessing. */
+function goalExMatch(goalEx,names){
+  try{
+    const g=String(goalEx||'').trim();if(!g)return null;
+    if(names.indexOf(g)>=0)return [g];
+    if(typeof exAliasNorm!=='function')return null;
+    const gk=exAliasNorm(g).key;if(!gk)return null;
+    const hit=names.filter(nm=>{
+      const k=exAliasNorm(nm).key;
+      if(k===gk)return true;
+      return k.indexOf(gk+' ')===0||gk.indexOf(k+' ')===0});
+    return hit.length===1?hit:null}
+  catch(e){oops('goalExMatch',e);return null}}
+function goalNames(g){
+  try{
+    const all=[];
+    S.history.forEach(h=>(h.log||[]).forEach(l=>{const b=gBase(l.ex);if(b&&all.indexOf(b)<0)all.push(b)}));
+    return goalExMatch(g&&g.ex,all)||[String((g&&g.ex)||'').trim()]}
+  catch(e){oops('goalNames',e);return [String((g&&g.ex)||'').trim()]}}
 /* ═══ A PROGRAM LINE THAT OFFERS A CHOICE IS TWO EXERCISES ══════════════
    (owner, 15 Sep 2026: "where they can do one or the other it should be
    tracked independently as to not confuse the two — allow the user to
@@ -5282,8 +5929,9 @@ function exPickApply(s,comp,pick){
   catch(e){oops('exPickApply',e);return 0}}
 function goalStats(g){
   const target=e1rm(g.w,g.r);const pts=[];let actual=false;
+  const NM=goalNames(g);
   S.history.forEach(h=>{let best=0;
-    h.log.forEach(l=>{if(gBase(l.ex)!==g.ex||!l.w||!l.r)return;
+    h.log.forEach(l=>{if(NM.indexOf(gBase(l.ex))<0||!l.w||!l.r)return;
       best=Math.max(best,e1rm(l.w,l.r,l.rpe));if(l.w>=g.w&&l.r>=g.r)actual=true});
     if(best>0)pts.push({t:new Date(h.date).getTime(),v:best})});
   pts.sort((a,b)=>a.t-b.t);
@@ -5345,6 +5993,81 @@ function creatineCard(){
    never counts as a lateral raise. Secondary involvement lives
    in SECONDARY below; this table is what counts as a hard set.
    ══════════════════════════════════════════════════════════ */
+
+/* ══ DAY ZERO — THE PAYOFF SCREEN ══════════════════════════════════
+   The wizard ended on Review, which is a RECEIPT: it reads back what
+   you just typed and then drops you on the Program tab. Everything
+   the app is actually for was still invisible, and the one function
+   that can speak on day zero — `Where you stand` — was never invoked.
+
+   What the reference apps do here is not theatre. Across WHOOP, Oura,
+   Garmin, Athlytic and Gentler Streak: none uses demo data and none
+   runs a fake countdown. They publish a PRICE LIST — WHOOP says
+   coloured Recovery at 3 nights and VO2max at 14, and both numbers
+   are published — everything genuinely true today, and a finishable
+   checklist whose tasks build the baseline. Deleting a fake
+   "building your plan" screen measured +22% trial conversions.
+   Honest converts better.
+
+   Allena's day zero is stronger than it was being given credit for.
+   Six of the correlation engine's outcomes need NO logged lifting
+   session at all — sleep, HRV, resting heart rate, pace, beats per
+   km and ride efficiency — so with Health connected there are
+   hundreds of live hypotheses on install day.
+
+   Every number on this screen is read from `watchList()`, which is
+   the same ladder the app already shows on Today, with the same real
+   thresholds. Nothing here is invented, nothing counts down to a
+   deadline that does not exist, and the empty case says plainly that
+   it is empty. */
+function day0Rows(){
+  try{
+    const W=(typeof watchList==='function')?watchList():[];
+    return W.slice(0,4)}
+  catch(e){oops('day0Rows',e);return []}}
+function viewDay0(){
+  const nm=String((S.prof&&S.prof.name)||'').split(' ')[0];
+  const flow=(typeof healthFlowing==='function')&&healthFlowing();
+  const W=(typeof watchList==='function')?watchList():[];
+  const met=W.met||0;
+  const rows=day0Rows();
+  const p=(typeof activeProgSafe==='function')?activeProgSafe():null;
+  const days=p&&p.days?p.days.length:(S.prof&&S.prof.days)||0;
+  let h='<div class="view pad stg phpad" style="padding-top:26px">'+
+    '<p class="mono" style="color:var(--faint);font-size:11px;letter-spacing:.1em">DAY ZERO</p>'+
+    '<h1 class="disp vh1" style="margin-top:4px">'+(nm?esc(nm)+', here is what Allena can already see.':'Here is what Allena can already see.')+'</h1>';
+  /* the two true things on install day, stated as counts */
+  h+='<div class="row mt2" style="gap:12px">'+
+    bigNum(days||'—','days a week, written')+
+    bigNum(met,'already answerable')+'</div>';
+  /* THE PRICE LIST. Every row is a real threshold with a real
+     distance to it, and it is the SAME list the app shows from then
+     on — so nothing here is a promise that a different surface has
+     to keep. */
+  if(rows.length){
+    h+='<p class="eyebrow mt2">What it is working on, and what each one costs</p>'+
+      '<div class="card mt" style="padding:6px 16px 14px">'+
+      rows.map(w=>'<div style="padding:12px 0;border-bottom:1px solid var(--line)">'+
+        '<div style="display:flex;justify-content:space-between;gap:12px;align-items:baseline">'+
+        '<span style="font-size:13px">'+esc(w.t)+'</span>'+
+        '<span class="mono" style="color:var(--faint);font-size:11px;flex:none">'+w.have+' / '+w.need+'</span></div>'+
+        '<p style="color:var(--faint);font-size:11px;line-height:1.5;margin-top:4px">'+esc(w.d)+'</p>'+
+        '<div style="height:4px;border-radius:4px;background:var(--line);overflow:hidden;margin-top:8px">'+
+        '<div class="an-bar" style="height:4px;width:'+Math.max(2,w.pct)+'%;background:var(--amber)"></div></div>'+
+        '</div>').join('')+'</div>'}
+  /* the honest empty case, and the one door that changes it */
+  if(!flow){
+    h+='<div class="card mt2" style="padding:15px 16px;border-color:var(--amber)">'+
+      '<p class="mono" style="color:var(--amber);font-size:9px;letter-spacing:.08em">THE BIGGEST ONE IS NOT CONNECTED</p>'+
+      '<p style="color:var(--dim);font-size:13px;line-height:1.6;margin-top:6px">'+
+      'Six of the things Allena looks for need no logged session at all — sleep, HRV, resting heart rate, pace, beats per km, ride efficiency. '+
+      'They come from Apple Health, and until it is connected none of them can be answered.</p>'+
+      '<button data-a="nav" data-v="signals" class="btn mt" style="width:100%;border-color:var(--amber);color:var(--amber);font-size:13px">Connect Apple Health</button></div>'}
+  h+='<p style="color:var(--faint);font-size:13px;line-height:1.6;margin-top:18px">'+
+    'Nothing on this screen is a guess. Every number is a real threshold in your own data, and the same list follows you into the app.</p>'+
+    '<button data-a="day0Go" class="big disp mt" style="background:var(--amber);color:var(--bg);font-size:17px">Start</button>'+
+    '</div>';
+  return h}
 const MUSCLE_RULES=[
  ['Chest',/bench press|chest press|chest-supported press|push[\s-]?up|weighted dip|chest dip|(?<!rear delt )(?<!rear-delt )(?<!reverse )\bfly\b|(?<!rear delt )(?<!rear-delt )(?<!reverse )flye|pec deck|crossover|incline (db |dumbbell |barbell |machine |smith )?press|machine incline|high press|neutral-?grip db press|decline press|svend|\bbp\b(?![\s\S]*dip)|\bbench\b(?![\s-]?dip)/i,40],
  ['Front delts',/shoulder press|overhead press|military press|landmine press|push press|arnold|wall slide|front raise|half-kneeling db press|seated dumbbell press|standing barbell press|smith machine press|overhead carry|\bohp\b/i,40],
@@ -6656,7 +7379,7 @@ function noticedPool(){
       const a3=p9.slice(0,Math.min(5,p9.length)).reduce((x,y)=>x+y,0)/Math.min(5,p9.length);
       const b3=p9.slice(-5).reduce((x,y)=>x+y,0)/Math.min(5,p9.length);
       const dp=a3-b3;
-      const pf=v=>Math.floor(v)+':'+String(Math.round((v%1)*60)).padStart(2,'0');
+      const pf=v=>mmMin(v);
       if(dp>0.08)add('Your easy pace has dropped '+Math.round(dp*60)+' seconds',
         'From about '+pf(a3)+'/'+udUnit()+' to '+pf(b3)+'/'+udUnit()+' across your easy runs. Same effort, more speed \u2014 that is aerobic base being built, and it is the quietest kind of progress.',1)}}catch(e){}
   // heaviest week vs this block's average
@@ -9649,7 +10372,7 @@ function viewRun(){
   const pbs=[[5,'5K'],[10,'10K'],[21.1,'Half'],[42.2,'Marathon']].map(x=>{
     const b=runPB(x[0]),eq=(typeof runPBeq==='function')?runPBeq(x[0]):null;
     return (b||eq)?{n:x[1],d:x[0],b:b,eq:eq}:null}).filter(Boolean);
-  const tstr=m=>Math.floor(m)+':'+String(Math.round((m%1)*60)).padStart(2,'0');
+  const tstr=m=>mmMin(m);
   try{const cs9=(typeof criticalSpeed==='function')?criticalSpeed():null;
    if(cs9)h+='<p class="eyebrow mt2">Critical speed</p><div class="card mt" style="padding:14px 16px">'+
     '<div style="display:flex;justify-content:space-between;align-items:baseline">'+
@@ -9987,7 +10710,7 @@ function runPlanAdjust(){
     const Z9=runZones();
     if(Z9&&Math.abs(Z9.vdot-rp.z.vdot)>=1.5){
       const up=Z9.vdot>rp.z.vdot;
-      const pS9=p=>{const m=Math.floor(p),s2=Math.round((p-m)*60);return m+':'+(s2<10?'0':'')+s2};
+      const pS9=p=>mmMin(p);
       rp.z=Z9;
       why=(why?why+' ':'')+'Fitness check: your best recent effort moved the model '+(up?'up':'down')+' \u2014 from here, easy is '+pS9(Z9.easyHi)+'\u2013'+pS9(Z9.easyLo)+', threshold '+pS9(Z9.thr)+', intervals '+pS9(Z9.int)+' /km.'}}}catch(e){}
   rp.adjWk=wk;
@@ -10187,7 +10910,7 @@ function runPlanGoal(goal,dateStr,timeStr,daysPick,longPick){
       freq=Math.max(minD,Math.min(5,freqs[Math.floor(freqs.length/2)]||3));
       days=rpDefaultDays(freq)}
     const longDay=(longPick&&days.indexOf(longPick)>=0)?longPick:rpLongDayFor(days);
-    const pS=p=>{const m=Math.floor(p),s2=Math.round((p-m)*60);return m+':'+(s2<10?'0':'')+s2};
+    const pS=p=>mmMin(p);
     /* paces come from the VDOT model on the runner's own best recent
        effort — zone ratios that change with ability, the way Daniels,
        Garmin and every serious system derive them. The old fixed
@@ -10271,7 +10994,7 @@ function runPlanGoal(goal,dateStr,timeStr,daysPick,longPick){
         desc:desc+' — ~'+wkKm+' km ('+phase+')'});
       if(!down&&!inTaper)km=km*1.08}
     if(G.race>=40&&lngRef<25)longNote='Straight talk: growing your long run safely from '+udNum(Math.max(longStart,longest30||longStart))+' '+udUnit()+' reaches about '+udNum(lngRef)+' '+udUnit()+' in this block — marathoners whose longest run stays under 25 km tend to run slower on the day. More weeks would serve this goal better.';
-    const tStr=goalMins?(goalMins>=90?Math.floor(goalMins/60)+':'+String(Math.round(goalMins%60)).padStart(2,'0'):Math.floor(goalMins)+':'+String(Math.round((goalMins%1)*60)).padStart(2,'0')):null;
+    const tStr=goalMins?(goalMins>=90?Math.floor(goalMins/60)+':'+String(Math.round(goalMins%60)).padStart(2,'0'):mmMin(goalMins)):null;
     const combined=rpCombinedWeek(days,longDay);
     return{goal:goal,goalName:G.name,date:dateStr||null,goalTime:tStr,goalPace:goalMins?pS(raceP):null,paceNote:paceNote,base:base,freq:freq,
       days:days,longDay:longDay,pace:pS(easyP),items:items,template:combined?combined.template:null,
@@ -10414,7 +11137,7 @@ function runPlanGen(daysPick,longPick){
     const paced=R.filter(r=>r.km>1&&r.mins>0).slice(-20);
     const paces=paced.map(r=>r.mins/r.km).sort((a,b)=>a-b);
     const easyP=paces.length?paces[Math.floor(paces.length/2)]*1.03:null;
-    const pStr=p2=>{const m2=Math.floor(p2),s2=Math.round((p2-m2)*60);return m2+':'+(s2<10?'0':'')+s2};
+    const pStr=p2=>mmMin(p2);
     // the weekdays: the runner's answer first, their history second
     const days=(daysPick&&daysPick.length>=2)?daysPick.slice():rpDefaultDays(freq);
     const nFreq=days.length;
@@ -11261,8 +11984,7 @@ function runUndelete(){
     try{if(typeof inWrapper==='function'&&inWrapper())window.webkit.messageHandlers.allena.postMessage('sync')}catch(e9){oops('runUndelete.sync',e9)}
     return n}catch(e){oops('runUndelete',e);return 0}}
 function paceStr(min,km){if(!min||!km)return '';const p=UNITS.d==='mi'?min/(km*MI_KM):min/km;
-  const m=Math.floor(p),sec=Math.round((p-m)*60);
-  return m+':'+String(sec).padStart(2,'0')+' /'+udUnit()}
+  return mmMin(p)+' /'+udUnit()}
 function paceMin(r){return (r.km&&r.mins)?r.mins/r.km:null}
 function runLoad(r){
   // session load: minutes × intensity, the standard sRPE approach
@@ -11323,8 +12045,7 @@ function aeroEngine(){
     latest:l[l.length-1].date}}
 function aeroCard(){
   const e=aeroEngine();if(!e)return '';
-  const mm=Math.floor(e.p150*(UNITS.d==='mi'?1/MI_KM:1)),ss=Math.round((e.p150*(UNITS.d==='mi'?1/MI_KM:1)-mm)*60);
-  const pace=mm+':'+String(ss).padStart(2,'0');
+  const pace=mmMin(e.p150*(UNITS.d==='mi'?1/MI_KM:1));
   const up=e.pct>=1,down=e.pct<=-1;
   return '<div class="card mt" style="padding:15px 16px">'+
     '<p class="mono" style="font-size:9px;color:var(--faint);letter-spacing:.06em">THE ENGINE · PACE AT 150 BPM</p>'+
@@ -11415,8 +12136,12 @@ function rgStore(){const v=lget(K_RGOAL,null);
   return (v&&Array.isArray(v.list))?v:{list:[]}}
 function rgSave(st){lset(K_RGOAL,(st&&Array.isArray(st.list))?st:{list:[]})}
 function rgCreatedKey(g){try{return dayKey(new Date(+(g&&g.created)||Date.now()))}catch(e){return today()}}
-function rgTimeStr(mins){const m=Math.max(0,Math.floor(mins)),s=Math.round((mins-m)*60);
-  return (s===60?(m+1)+':00':m+':'+String(s).padStart(2,'0'))}
+/* this ONE site carried a local `s===60` patch while ten others did
+   not — somebody hit the rollover here, fixed it where they saw it,
+   and the general fault stayed general. Same shape as the scrim that
+   needed a special case for the busiest screen: a value that needs a
+   patch at one call site is the wrong value everywhere. */
+function rgTimeStr(mins){return mmMin(Math.max(0,mins))}
 function rgLabel(g){
   if(!g)return '';
   const d=udNum(g.km)+' '+udUnit();
@@ -13165,7 +13890,24 @@ const K_NOTIF='training-notif-v1';
    "best five a day" while notifPlan enforced one, two or four — the page
    that exists to answer "what will this app send me?" was overstating it
    by more than double on the default. Both read this now. */
-const NOTIF_BUDGET={quiet:1,standard:2,chatty:4};
+/* CHATTY CAME DOWN FROM FOUR (owner call, 16 Sep 2026, on the
+   notification research). The "2-5 a week" figure everyone quotes
+   traces to a 2017 survey of stated intent whose primary source no
+   longer exists. What replaces it: Wohllebe 2021, 17,500 users, five
+   groups over seven weeks — each additional push per week raised
+   uninstalls by 2.50 percentage points (p=.006, R2=.94), LINEARLY,
+   with no cliff and no free band, and the control group was the only
+   one whose open rate went up.
+   The caveat that saves the feature is that those were unpersonalised
+   retail pushes, and a health-app RCT found DAILY notifications did
+   not deter engagement. So frequency is not the variable — relevance
+   is, and frequency is what makes irrelevance expensive. Duolingo
+   sends ONE reminder a day and picks which, not how many.
+   Two a day is the defensible ceiling. The only per-day tolerance
+   figure anywhere in the literature is three, and a tolerance limit
+   is the cliff edge rather than the optimum — so Chatty sits ON it
+   for the person who asked for more, and nothing sits past it. */
+const NOTIF_BUDGET={quiet:1,standard:2,chatty:3};
 window.notifTapped=function(id){
   /* the PR-recipe whisper opens its evidence page directly (owner
      vision, 8 Sep) — the freshest recipe find is the subject */
@@ -13337,7 +14079,7 @@ function notifPlan(){
   /* THE PACE BUDGET (beta-caught, 7 Sep: testers reported dozens a
      day). Appointment reminders are exempt — user-created, two per
      visit at most. Everything else competes for a daily budget:
-     Quiet 1 / Standard 2 / Chatty 4, default Standard. Pings that
+     Quiet 1 / Standard 2 / Chatty 3, default Standard. Pings that
      ALREADY FIRED today count against it, so an afternoon replan can
      never top the day back up. */
   const budget=NOTIF_BUDGET[P.pace||'standard']||NOTIF_BUDGET.standard;
@@ -16334,7 +17076,7 @@ function whisperGen(){
       if(echo){const ago=nowY-echo.y,agoTxt=ago===1?'A year ago this week':ago+' years ago this week';
         out.push({slot:at(12,30),id:'wh-echo'+today(),
           body:echo.kind==='run'
-            ?agoTxt+' you ran '+echo.km+' km at '+Math.floor(echo.pace)+':'+String(Math.round((echo.pace%1)*60)).padStart(2,'0')+'/km.'
+            ?agoTxt+' you ran '+echo.km+' km at '+mmMin(echo.pace)+'/km.'
             :agoTxt+', your best '+echo.ex+' worked out to ~'+Math.round(echo.e1)+' kg.'})}}catch(e){}
     // 5. THE CHASE — an old PR, resurfaced ONLY when current form is
     //    provably within reach (no fake urgency, ever)
@@ -20120,7 +20862,7 @@ function restPool(){
   try{ // running pace
     if(S.runOn&&(S.runs||[]).length>=6){const rs=S.runs.filter(r=>paceMin(r)).sort((a,b)=>a.date.localeCompare(b.date));
       if(rs.length>=6){const last=paceMin(rs[rs.length-1]),avg=rs.slice(0,-1).reduce((a,r)=>a+paceMin(r),0)/(rs.length-1);
-        const f=p=>Math.floor(p)+':'+String(Math.round((p%1)*60)).padStart(2,'0');
+        const f=p=>mmMin(p);
         add('Your last run went at '+f(last)+'/'+udUnit()+' against a '+f(avg)+' average. '+(last<avg?'Fitness moving the right way.':'Slower is fine — most runs should be.'),'nav','run')}}}catch(e){}
   try{ // month km
     if(S.runOn){const ym=today().slice(0,7);
@@ -20480,8 +21222,31 @@ function dashTiles(){
     ' class="card" style="flex:1;min-width:0;padding:13px 10px;text-align:center;display:block">'+
     '<p class="mono" style="font-size:21px;font-weight:800;line-height:1;color:'+(col||'var(--text)')+'">'+esc(String(v))+'</p>'+
     '<p class="mono" style="color:var(--faint);font-size:9px;letter-spacing:.04em;margin-top:4px">'+esc(l)+'</p></button>';
+  /* A COUNT IS A FACT. A PERCENTAGE AGAINST A TARGET IS A VERDICT.
+     (16 Sep 2026, from the failure-presentation research.) This tile
+     showed weekAdherence's pct — sets done against sets planned for
+     the WHOLE week — on the dashboard, every day, coloured by
+     adhTone, which paints anything under 75 in --dim. On a Tuesday
+     morning that is arithmetically guaranteed to be low: a fortnight
+     of Mondays reading "12%" in grey, about a week nobody has had a
+     chance to finish yet.
+     Celeste counts every death from the first one and shows the
+     number NOWHERE — not during play, and not on the
+     chapter-complete screen; the chapter-select counter is gated on
+     `Completed` for the A-side, so the tally of your losses appears
+     only once you have won, and then it is a statistic you own. The
+     number is not deleted or softened. It is DEFERRED past the
+     moment where it would read as a verdict.
+     So the dashboard carries the count, which is a thing you did,
+     and the percentage lives one tap away in the adherence sheet,
+     which is where you go when you want to be judged. The tone can
+     only be neutral or green: a week in progress is never behind,
+     because it is not over. */
   if(p&&!p.acl){const a=weekAdherence(p,S.week);
-    if(a&&a.setsPlanned)out.push(tile(a.pct==null?'—':a.pct+'%','THIS WEEK',adhTone(a.pct),'adhOpen'))}
+    if(a&&a.setsPlanned){
+      const done=a.sessions||0,plan=a.sessionsPlanned||0;
+      out.push(tile(plan?done+' of '+plan:String(done),'SESSIONS THIS WEEK',
+        (plan&&done>=plan)?'var(--green)':'var(--text)','adhOpen'))}}
   {const k=today(),g=(S.gar&&S.gar.days||{})[k]||{};
    /* logged → the trend graph; unlogged → the prompt (owner ask:
       'where is the body battery trend graph?' — here.) */
@@ -21743,9 +22508,25 @@ function findBigHtml(){
       return '<span class="fb-mote" style="left:calc(50% + '+Math.round(Math.cos(a)*rr)+'px);top:calc(46% + '+
         Math.round(Math.sin(a)*rr*0.85)+'px);background:'+r[1]+
         ';animation-delay:'+(i*210)+'ms;animation-duration:'+(4.2+((i*7)%5)*0.6).toFixed(1)+'s"></span>'}).join('');
+    /* CEREMONY IS FOR AN ARRIVAL, NOT FOR BROWSING (16 Sep 2026).
+       A card opened from the binder was MEASURED on the tap and flies
+       from its own rectangle — it is the same object being picked up,
+       and sealing it would be two arrivals fighting each other for
+       the same half-second. A card with no source rectangle came from
+       nowhere: the deal, a notification tap, a fresh reveal. That is
+       the one that gets the unknown beat. A Noticed never gets it at
+       any door, because a plain arrival is what the bottom of the
+       rarity ladder MEANS. */
+    const seal=!S._fbFrom&&c.rank>=1;
+    /* every beat is a multiple of the payoff floor, so the constant is
+       load-bearing rather than a number in a comment: the shortest is
+       nearly twice Material's 225 and the longest a bit over three
+       times it. [0, 428, 563, 698] */
+    const beat=[0,Math.round(FEEL_FLOOR*1.9),Math.round(FEEL_FLOOR*2.5),Math.round(FEEL_FLOOR*3.1)][c.rank];
     return '<div id="findBig" style="--fbc:'+r[1]+'">'+
       '<div id="findBigScrim"'+(dl?'':' data-a="findBigClose"')+'></div>'+
-      '<div class="fb-glow"></div>'+dust+
+      '<div class="fb-glow"></div>'+
+      (seal&&c.rank>=2?'<div class="fb-rays"><i></i></div>':'')+dust+
       /* THE HALO GOES ON THE ROUNDED THING (owner-caught on video, 15 Sep:
          "rectangle outline bug on first glow reveal"). The wrapper holds
          the card AND the buttons and has no radius, so a box-shadow on it
@@ -21758,6 +22539,7 @@ function findBigHtml(){
       /* the card */
       '<div class="card fb-card'+(c.rvh?' '+c.rvh:'')+'" style="--rvc:'+c.halo+';border-color:'+c.border+';border-width:'+c.width+
         (c.glow!=='none'?';box-shadow:'+c.glow:'')+'">'+
+        (seal?'<div class="fb-veil" style="--fbv:'+beat+'ms"><i></i></div>':'')+
         (rd?'<div style="height:5px;background:linear-gradient(90deg,'+rd.col+' 62%,'+r[1]+' 62%)"></div>'
            :'<div style="height:5px;background:'+r[1]+'"></div>')+
         '<div style="padding:22px 22px 24px;background:'+c.fill+'">'+
@@ -21794,7 +22576,21 @@ function findBigHtml(){
           '<div style="display:flex;justify-content:center;gap:8px;margin-top:16px">'+
             dl.ids.map((_,n)=>'<span style="width:'+(n===dl.i?16:6)+'px;height:6px;border-radius:8px;background:'+
               (n<=dl.i?(rd?rd.col:r[1]):'var(--line)')+';opacity:'+(n<=dl.i?1:.5)+';transition:width .3s ease"></span>').join('')+
-          '</div></div>'
+          '</div>'+
+          /* EVERY REFERENCE SHIPS A SKIP (16 Sep 2026). Hearthstone
+             waits for a click per card and Pokemon Pocket for a swipe;
+             the one sequential reveal running on its own clock is EA
+             FC's 25-second walkout, and it is the one taking a
+             community backlash. Allena's deal is already user-paced,
+             which is the important half — but a person who has seen
+             it, or who opened the app for something else, must be able
+             to leave without tapping through four cards. Nothing is
+             lost: they are banked, they are in the binder, and the
+             read they land on holds all of them. */
+          (dl.i+1<dl.ids.length
+            ?'<button data-a="deepDealAll" class="btn" style="width:100%;margin-top:14px;border:0;color:var(--faint);font-size:12px">See them all on the read</button>'
+            :'')+
+          '</div>'
         :'<div class="fb-acts">'+
           (hasEv?'<button data-a="evidenceOpen" data-v="'+esc(id)+'" class="big disp" style="background:'+r[1]+';color:var(--bg);font-size:15px">See the evidence</button>':'')+
           '<div class="row" style="gap:8px;margin-top:8px">'+
@@ -21873,6 +22669,7 @@ function viewCollection(){
    '<button data-a="back" class="btn" style="width:auto;padding:8px 14px;color:var(--dim);font-size:13px;margin-bottom:14px">\u2039 Back</button>'+
    '<h1 class="disp vh1">Everything Allena has found</h1>'+
    '<p style="color:var(--dim);font-size:13px;line-height:1.6;margin-top:8px">Everything found, kept for good.'+iBtn('collintro')+'</p>'+
+   floorHtml('finds')+
    iBody('collintro','Each find is kept with the numbers it had the day it was found \u2014 beating a record never erases the old one. Six shelves; the fresh one glows.')+
    (function(){const fp=findPoints(),rk=findRank(fp);
      return '<div class="card mt2" style="padding:15px 16px">'+
@@ -25876,7 +26673,7 @@ function ceremonyHtml(c){
     '<span class="mono" style="font-size:15px;font-weight:700;color:'+(win?'var(--bg)':'var(--dim)')+'">'+r.pts+'</span></div></div>'}).join('')+
   '</div>'+
   ((c.iWon&&c.reign>=1)?'<p class="mono cerF" style="font-size:11px;letter-spacing:.14em;color:var(--gold);margin-top:24px;animation:cerf .6s 1.6s both">CROWN HELD '+c.reign+' WEEK'+(c.reign===1?'':'S')+'</p>':'')+
-  (c.pod?'<p class="cerF" style="color:var(--faint);font-size:11px;margin-top:16px;animation:cerf .6s 2s both">Each bar is a pod\u2019s lowest member, as of your last open. Nobody is named.</p>':'')+
+  (c.pod?'<p class="cerF" style="color:var(--faint);font-size:11px;margin-top:16px;animation:cerf .6s 2s both">Each bar is a pod\u2019s total, as of your last open. Nobody is named.</p>':'')+
   '<p class="cerF" style="color:var(--faint);font-size:13px;margin-top:24px;animation:cerf .6s 2.4s both">Fresh week. Tap to start it.</p></div>'}
 function viewToday(){
   const dateLine=new Date().toLocaleDateString(undefined,{weekday:'long',day:'numeric',month:'long'});
@@ -25955,6 +26752,18 @@ function viewToday(){
         '<div style="position:relative;width:58px;height:58px;border-radius:58px;background:var(--raised);border:2.5px solid '+ringCol+';display:flex;align-items:center;justify-content:center;font-size:23px;font-weight:700'+(glow?';box-shadow:0 0 16px 0 color-mix(in srgb, '+ringCol+' 45%, transparent)':'')+'">'+(crowned?CROWN:'')+esc(init)+'</div>'+
         '<span style="font-size:13px;font-weight:600;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(nm)+'</span></div>';
       const endLine=(function(){
+        /* ══ THE ONE HARD LIMIT, ON THE SURFACE THAT PUSHES HARDEST
+           (16 Sep 2026) ═══════════════════════════════════════════════
+           Every line below this is a nudge to train tonight, and the
+           race is the most competitive surface in the app. On a day the
+           user's OWN data says they are under-recovered, it says so
+           instead. It does not go quiet — a card that simply stops
+           talking reads as the app losing interest, and the honest
+           thing is to name the reason.
+           The board, the scores and the crown are untouched: this
+           silences the CAMPAIGN, never the information. */
+        try{if(typeof feelPushOk==='function'){const pk=feelPushOk();
+          if(!pk.ok)return feelPushLine(pk.why)}}catch(e9){oops('duelPush',e9)}
         const dl=7-(new Date().getDay()||7);
         if(lead>0)return dl<=1?('Final '+(dl===0?'day':'days')+' \u2014 you lead by '+lead+'. Hold the door.')
           :'You lead by '+lead+' \u2014 a logged session holds it.';
@@ -26028,7 +26837,14 @@ function viewToday(){
   h+=todayOrder().join('');
   /* a hit goal outranks the weekly podium — it is the rarer moment */
   try{const gc=goalCerDue();if(gc)h+=goalCerHtml(gc);
-    else if(!S.sheet){const cer=ceremonyDue();if(cer)h+=ceremonyHtml(cer)}}catch(e){oops('goalCer',e)}
+    else if(!S.sheet){const cer=ceremonyDue();if(cer){
+      /* THE WEEK ROLLOVER WAS SILENT (feel audit, 16 Sep 2026). A whole
+         week settles, a crown lands, and the screen did it without a
+         sound. Fires ONCE per ceremony rather than on every render,
+         because render() runs on every state change and a drumroll per
+         keystroke is the opposite of a moment. */
+      try{if(S._cerRung!==cer.wk){S._cerRung=cer.wk;feel('rank')}}catch(e9){oops('cerFeel',e9)}
+      h+=ceremonyHtml(cer)}}}catch(e){oops('goalCer',e)}
   return h+'</div>'}
 
 /* ══ THE GOAL CEREMONY ══════════════════════════════════════
@@ -26830,7 +27646,19 @@ function trendSlope(pts){const win=pts.filter(p=>p.t>=Date.now()-120*864e5);
   const n=win.length;let mx=0,my=0;win.forEach(p=>{mx+=p.t;my+=p.v});mx/=n;my/=n;
   let num=0,den=0;win.forEach(p=>{num+=(p.t-mx)*(p.v-my);den+=(p.t-mx)*(p.t-mx)});
   const sl=den?num/den:0;
-  return sl*7*864e5<=0.05?0:sl}
+  /* THE NOISE FLOOR IS TWO-SIDED, AND THIS ONE WAS NOT (16 Sep 2026,
+     found by the test written for the trend card). The guard reads
+     "is the weekly slope under 0.05 kg" — but written without an
+     absolute value it is true of EVERY negative slope, however steep.
+     A lift falling 173 to 136 over twelve weeks returned exactly 0.
+     trendSlope could not report a decline at all, in any caller,
+     since the day it was written.
+     That is not a rounding nicety in this app. "Never phrase a
+     decline as a plateau" is one of the four safety rules in
+     CLAUDE.md, written because a falling number points at a physio
+     and a flat one points at adding load — and this made every
+     decline structurally invisible to anything reading the slope. */
+  return Math.abs(sl*7*864e5)<=0.05?0:sl}
 function fmtShort(t){return new Date(t).toLocaleDateString(undefined,{day:'numeric',month:'short'})}
 function liftChart(ex,goal){
   const pts=liftPts(ex);
@@ -27452,11 +28280,40 @@ function viewProgress(){
   SECREF.trends=SEC.trends=()=>{
     const waiting=others.filter(b=>liftPts(b).length===1);
     let inner='';
-    if(charted.length)inner=charted.map(b=>{const pts=liftPts(b),d=pts[pts.length-1].v-pts[0].v,wks=Math.round((pts[pts.length-1].t-pts[0].t)/6048e5);
+    /* TWO SESSIONS MONTHS APART IS NOT A TREND (owner-reported, 16 Sep
+       2026: "the program running and progress pages are all bugged
+       out"). This read pts[last] - pts[0] — the difference between two
+       single sessions — on a measure that moves a few kilos either way
+       with sleep, the time of day and which set you happened to take
+       to failure. Measured on a freshly seeded demo: THREE OF FOUR
+       lifts printed "+0 kg · 11 wks" while every one of them was
+       visibly climbing on the chart directly beneath the number,
+       because the first and last sessions happened to land on the same
+       estimated max. A page of "+0" on an account that is plainly
+       moving reads as broken, and it was.
+       trendSlope has been sitting next to liftPts in 24-charts the
+       whole time: a least-squares fit over the last 120 days that
+       already returns 0 when the weekly slope is under 0.05 kg — its
+       own noise floor, and R19's rule that a change smaller than the
+       measure's own noise is not a change. So: the fitted move, over
+       the window the label names (ban 9), and the word "holding" when
+       there is genuinely nothing to report, because "+0 kg" reads as a
+       failure where "holding" reads as a fact.
+       AND A DECLINE IS NOT RED. Red means stop — pain, delete, a flag
+       — and nothing else (decision 6c). A main lift drifting down is
+       worth attention, which is what amber is for. */
+    if(charted.length)inner=charted.map(b=>{const pts=liftPts(b);
+      const win=pts.filter(p=>p.t>=Date.now()-120*864e5);
+      const use=win.length>=3?win:pts;
+      const wks=Math.max(1,Math.round((use[use.length-1].t-use[0].t)/6048e5));
+      const sl=(typeof trendSlope==='function')?trendSlope(pts):null;
+      const d=Math.round(sl==null?(use[use.length-1].v-use[0].v):sl*wks*6048e5);
+      const col=d>0?'var(--green)':d<0?'var(--amber)':'var(--faint)';
+      const lab=d===0?'holding':(d>0?'+':'')+uwNum(d)+' '+uwUnit();
       return '<button data-a="chartOpen" data-v="lift:'+esc(b)+'" class="card mt" style="width:100%;text-align:left;padding:14px 16px;display:block">'+
         '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px">'+
         '<span style="font-size:15px;font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(b)+'</span>'+
-        '<span class="mono" style="font-size:11px;color:'+(d>=0?'var(--green)':'var(--red)')+';white-space:nowrap">'+(d>=0?'+':'')+uwNum(Math.round(d))+' '+uwUnit()+' · '+wks+' wks</span></div>'+
+        '<span class="mono" style="font-size:11px;color:'+col+';white-space:nowrap">'+lab+' · '+wks+' wks</span></div>'+
         liftChart(b,null)+'</button>'}).join('');
     if(waiting.length)inner+='<div class="card mt" style="padding:13px 16px"><p style="color:var(--dim);font-size:13px;line-height:1.5">A trend needs the same lift in two sessions. One more and these start charting: '+
       waiting.slice(0,10).map(esc).join(', ')+'</p></div>';
@@ -27919,7 +28776,7 @@ function notifPageHtml(){
     '<p style="font-size:13px;font-weight:600">How often</p>'+
     '<p style="color:var(--faint);font-size:11px;line-height:1.5;margin-top:3px">Rest timers and appointment reminders always come through. This caps everything else.</p>'+
     '<div class="row" style="gap:8px;margin-top:12px">'+
-    [['quiet','Quiet','1 a day'],['standard','Standard','2 a day'],['chatty','Chatty','4 a day']].map(p9=>
+    [['quiet','Quiet','1 a day'],['standard','Standard','2 a day'],['chatty','Chatty','3 a day']].map(p9=>
       '<button data-a="notifPace" data-v="'+p9[0]+'" class="pill'+((NP.pace||'standard')===p9[0]?' on':'')+'" style="flex:1;font-size:11px;padding:8px 0;line-height:1.35">'+p9[1]+'<br><span style="font-size:9px;color:var(--faint)">'+p9[2]+'</span></button>').join('')+
     '</div></div>':'')+
     '<div class="card mt" style="padding:13px 15px">'+
@@ -28756,10 +29613,22 @@ function sheetHtml(){
   if(S.sheet.t==='today'){
     const pr=todayProgress(),st=dayStreak(),pts=todayPoints();
     return wrapSheet('Today',
-      '<p style="color:var(--dim);font-size:13px;line-height:1.6">Each of these changes what Allena can tell you. Training is optional — a rest day still counts.</p>'+
+      '<p style="color:var(--dim);font-size:13px;line-height:1.6">Each of these changes what Allena can tell you.</p>'+
+      floorHtml('rest')+
       (st>1||pts?'<p class="mono" style="color:var(--faint);font-size:11px;margin-top:8px">'+
         (st>1?st+' days in a row':'')+(st>1&&pts?' \u00b7 ':'')+(pts?'+'+pts+' points today':'')+'</p>':'')+
-      (st>1&&dayStreakInfo().quietThisWeek?'<p class="mono" style="color:var(--faint);font-size:11px;margin-top:4px">\u25e6 streak includes 1 quiet day this week \u2014 the one each week that can pass unlogged</p>':'')+
+      /* THE FLOOR IS STATED WHETHER OR NOT IT HAS BEEN USED (16 Sep
+         2026). This only appeared on a week where the quiet day had
+         ALREADY been spent — which is the week after the one where
+         somebody needed to know it existed. Sharif & Shu (JMR 2017)
+         found people persist with reserve goals BECAUSE THEY WANT TO
+         AVOID SPENDING THE RESERVE, so the unspent one is the half
+         doing the work, and an unspent reserve nobody can see is not
+         a reserve. It says whether it is still held. */
+      (st>0?'<p class="mono" style="color:var(--faint);font-size:11px;line-height:1.5;margin-top:4px">'+
+        (dayStreakInfo().quietThisWeek
+          ?'\u25e6 This week\u2019s quiet day is spent, and the streak held.'
+          :'\u25e6 '+esc(FLOORS.quiet))+'</p>':'')+
       (st>1?'<p style="color:var(--faint);font-size:11px;line-height:1.5;margin-top:4px">A missed day never breaks a habit \u2014 the research is clear on that (Lally 2010, 96 people followed for 12 weeks). Same time, same place is what builds it.</p>':'')+
       '<div style="margin-top:16px;display:flex;flex-direction:column;gap:12px">'+
       /* a SKIPPED row reads as skipped, never as a green tick, and keeps
@@ -30462,6 +31331,7 @@ function render(){
   else if(S.view==='progress')body=viewProgress();
   else if(S.view==='data')body=viewData();
   else if(S.view==='setup')body=viewSetup();
+  else if(S.view==='day0')body=viewDay0();
   else if(S.view==='quick')body=viewQuick();
   else if(S.view==='coach')body=viewCoach();
   else if(S.view==='scans')body=viewScans();
@@ -30574,7 +31444,7 @@ function render(){
 
   const tabBarHtml=()=>{
     if(S.sess&&S.view==='session')return '';
-    if(S.boot||S.view==='setup'||S.view==='welcome')return '';
+    if(S.boot||S.view==='setup'||S.view==='welcome'||S.view==='day0')return '';
     /* SOCIAL IS A TAB, REHAB IS A DRAWER ROOM (owner, 16 Sep 2026).
        Worth recording the trade, because it cuts against the wedge: the
        injured athlete is who this app is FOR, and their room is now one
@@ -30711,6 +31581,7 @@ function render(){
   const piece=(fn,tag)=>{try{return fn()}catch(e9){oops(tag,e9);return ''}};
   const extraHtml=piece(tourHtml,'tourHtml')+piece(sessPillHtml,'sessPillHtml')+
     piece(drawerHtml,'drawerHtml')+piece(tabBarHtml,'tabBarHtml')+sheetSafe()+
+    piece(function(){return (typeof phaseCerHtml==='function')?phaseCerHtml():''},'phaseCer')+
     piece(function(){return (typeof treePopHtml==='function')?treePopHtml():''},'treePop')+
     (S.toast?'<div class="toast"><div class="'+(S.toastGold?'gold':'')+'">'+esc(S.toast)+'</div></div>':'');
   const keyA=S.view+'|'+(S.sess&&S.view==='session'?S.sess.phase+':'+S.sess.idx:'');
@@ -32435,8 +33306,18 @@ function runAction(a,v,t,e){
         S.sheet=null;S.agate=null}
       flash(now?'Marked as met.':'Unticked — back to outstanding.');render();break}
     case 'aclAdvance':{if(!aclReady(S.acl.phase))break;
-      S.aclView=null;S.acl.phase=Math.min(5,S.acl.phase+1);S.acl.peak=Math.max(aclPeak(),S.acl.phase);aclSave();aclInstall(S.acl.phase);
-      flash('Phase '+S.acl.phase+' loaded.');render();break}
+      {const _from=S.acl.phase;
+       let _days=0;try{const st=S.acl.phaseStart&&S.acl.phaseStart[_from];
+         if(st)_days=Math.max(0,Math.round((Date.now()-new Date(st+'T12:00').getTime())/864e5))}catch(e9){oops('aclDays',e9)}
+       S.aclView=null;S.acl.phase=Math.min(5,S.acl.phase+1);S.acl.peak=Math.max(aclPeak(),S.acl.phase);
+       try{S.acl.phaseStart=S.acl.phaseStart||{};S.acl.phaseStart[S.acl.phase]=today()}catch(e9){oops('aclStamp',e9)}
+       aclSave();aclInstall(S.acl.phase);
+       /* THE BIGGEST MOMENT IN THE APP STOPS BEING A TOAST (16 Sep 2026) */
+       let _cer=false;
+       try{if(typeof phaseCerFire==='function')_cer=phaseCerFire(_from,S.acl.phase,((aclPhaseDef(S.acl.phase)||{}).name||''),_days)}catch(e9){oops('aclCer',e9)}
+       if(!_cer)flash('Phase '+S.acl.phase+' loaded.');
+       render();break}}
+    case 'phaseCerDone':{S._phaseCer=null;runAction('nav','acl');break}
     case 'aclStartDay':{const [pid,di]=v.split(':');
       {const ph3=parseInt(String(pid).replace('acl-',''),10);
        if(ph3&&ph3>S.acl.phase){flash('That is phase '+ph3+' work and you are on phase '+S.acl.phase+'. Clear the criteria first.');break}}
@@ -33205,9 +34086,14 @@ function runAction(a,v,t,e){
        first would remove the element that is meant to be animating */
     /* one card off the top of the deck at a time; the last one lands on
        the read itself, where all of them live from then on */
+    /* the skip lands exactly where the last card would have landed,
+       so leaving early and tapping through arrive at the same place */
+    case 'deepDealAll':{S.deepDeal=null;S.findBig=null;S._fbFrom=null;
+      if(S.view!=='deep'){S.backTo=S.view;S.backDrawer=false;S.view='deep'}
+      render();break}
     case 'deepDealNext':{const dl=S.deepDeal;if(!dl){S.findBig=null;render();break}
       if(dl.i+1<dl.ids.length){dl.i++;S.findBig=dl.ids[dl.i];S._fbFrom=null;
-        try{haptic('light')}catch(e9){oops('dealTick',e9)}
+        try{const bk9=discBank()[dl.ids[dl.i]];feelTier(bk9&&bk9.rar)}catch(e9){oops('dealTick',e9)}
         render();break}
       S.deepDeal=null;S.findBig=null;S._fbFrom=null;
       if(S.view!=='deep'){S.backTo=S.view;S.backDrawer=false;S.view='deep'}
@@ -33841,9 +34727,16 @@ function runAction(a,v,t,e){
         if(!S.lib.programs.some(x=>x.id==='trunk-1'))S.lib.programs.push(trunkProgram());}
       saveLib();setWeek(1,pg.id);
       const wantAcl=st&&st.restr&&(st.restr.rehabWanted||st.restr.acl)&&!S.acl.mode;
-      S.setup=null;S.view='home';
-      if(wantAcl){S.sheet={t:'aclpick'}}
-      render();flash('Your program is ready. The first sessions calibrate the weights.');break}
+      S.setup=null;
+      /* the wizard used to end on its own receipt. It ends on what the
+         engine can already see instead — see viewDay0. The ACL picker
+         still comes first when it applies, because choosing a pathway
+         outranks a payoff screen. */
+      if(wantAcl){S.view='home';S.sheet={t:'aclpick'};render();
+        flash('Your program is ready. The first sessions calibrate the weights.');break}
+      S.view='day0';render();break}
+    case 'day0Go':{S.view='today';render();
+      flash('Your program is ready. The first sessions calibrate the weights.');break}
     case 'suSkip':{S.prof={skipped:true};lset(K_PROF,S.prof);
       S.setup=null;S.sheet=null;S.view='today';render();
       flash('Have a look around \u2014 the Program tab builds you a block whenever you\u2019re ready.');break}
@@ -34228,6 +35121,11 @@ function demoSeed(){
       restr:{acl:1,patTendon:1},notes:'Left knee, ACL reconstruction. Physio-guided.'};
     lset(K_PROF,S.prof)}
   // goals
+    /* 'Bench' is what demoPsychic logs, so the goal matches it exactly.
+     (Checked: an earlier rename to 'Bench press' was made against a
+     STALE browser profile whose history predated demoPsychic — the
+     fixture was fine and the measurement was not. Re-seed before
+     believing what a demo account says about itself.) */
   if(!S.goals.length){S.goals=[{id:'g1',ex:'Bench',w:100,r:8,created:Date.now()-40*864e5,done:null},
     {id:'g2',ex:'Leg press',w:250,r:10,created:Date.now()-40*864e5,done:null}];lset(K_GOALS,S.goals)}
   // readiness + bodyweight so the charts have something to say
