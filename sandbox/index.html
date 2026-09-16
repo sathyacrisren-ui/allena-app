@@ -361,7 +361,6 @@ body:has(.tabbar) #app:has(.sessfix),body:has(.tabbar) #app:has(.pinpage){paddin
 .view.anim{animation:fadeUp .38s cubic-bezier(.16,1,.3,1) both}
 
 
-@keyframes anCount{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
 @keyframes anPop{0%{transform:scale(.82);opacity:0}60%{transform:scale(1.06)}100%{transform:scale(1);opacity:1}}
 @keyframes anGlow{0%,100%{box-shadow:0 0 0 0 rgba(240,238,230,0)}50%{box-shadow:0 0 22px 0 rgba(240,238,230,.28)}}
 @keyframes iRev{from{opacity:0;transform:translateY(-5px)}to{opacity:1;transform:translateY(0)}}
@@ -762,6 +761,26 @@ body:not(:has(.tabbar)) .txpop{bottom:calc(env(safe-area-inset-bottom, 10px) + 1
    the page, and a translucent one is indistinguishable from a bug. */
 .sheet{animation:sheetUp .32s cubic-bezier(.16,1,.3,1)}
 @keyframes sheetUp{from{transform:translateY(26px)}to{transform:none}}
+/* ── A SHEET LEAVES THE WAY IT ARRIVED (16 Sep 2026) ───────────────
+   It slid up on sheetUp and then, whenever anything closed it,
+   vanished in a single frame: 141 call sites set S.sheet=null and
+   re-render, and the DOM went with it. Half the gesture was animated
+   and half was a cut — which is the same fault as the backdrop that
+   used to snap while the panel travelled, one layer down.
+   Dragging it closed already animated, so the app had TWO answers for
+   the same action depending on how you performed it.
+   EXIT IS FASTER THAN ENTRY, on purpose. Opening is a deliberate act
+   and can take its time at 320ms; closing is the system answering,
+   and a system response snaps — 220ms, out of the way before you
+   look for what is behind it. */
+.sheet-bg.closing{pointer-events:none}
+.sheet-bg.closing>.sheet{animation:sheetDown .22s cubic-bezier(.4,0,.9,.3) both}
+.sheet-bg.closing::before{animation:bgFadeOut .22s ease-out both}
+@keyframes sheetDown{from{transform:none}to{transform:translateY(100%)}}
+@keyframes bgFadeOut{from{opacity:var(--scrim)}to{opacity:0}}
+@media (prefers-reduced-motion:reduce){
+  .sheet-bg.closing>.sheet{animation:none}
+  .sheet-bg.closing::before{animation:bgFadeOut .12s linear both}}
 @keyframes prPulse{0%{box-shadow:0 0 0 0 rgba(240,238,230,.45)}100%{box-shadow:0 0 0 14px rgba(240,238,230,0)}}
 .toast div.gold{border-color:var(--amber);color:var(--amber);animation:capDrop .38s cubic-bezier(.32,1.3,.5,1),prPulse .9s ease-out}
 .toast div.gold::before{background:var(--amber)}
@@ -828,7 +847,15 @@ body.sesslive #hkPulse{top:calc(env(safe-area-inset-top) + 40px)}
 @keyframes modalrise{from{transform:translateY(5.5%);opacity:0}to{transform:none;opacity:1}}
 .modalrise{animation:modalrise .32s cubic-bezier(.22,1,.36,1) both}
 @keyframes pillpop{0%{transform:translateX(-50%) scale(.45);opacity:0}60%{transform:translateX(-50%) scale(1.06)}100%{transform:translateX(-50%) scale(1);opacity:1}}
-#drawer{position:fixed;inset:0;z-index:60;pointer-events:none;transform:translateZ(0)}
+#drawer,#drawerOut{position:fixed;inset:0;z-index:60;pointer-events:none;transform:translateZ(0)}
+/* the copy that is leaving: same rules, no taps */
+#drawerOut{pointer-events:none!important}
+#drawerOut .scrim{position:absolute;inset:0;background:rgba(0,0,0,.55);opacity:0;transition:opacity .22s ease}
+#drawerOut .panel{overscroll-behavior:contain;position:absolute;top:0;left:0;bottom:0;width:84%;max-width:330px;background:var(--bg);
+  border-right:1px solid var(--line);transform:translateX(-103%);transition:transform .26s cubic-bezier(.32,.9,.35,1);
+  padding:calc(22px + env(safe-area-inset-top)) 16px calc(16px + env(safe-area-inset-bottom));overflow-y:auto;display:flex;flex-direction:column}
+#drawerOut.open .scrim{opacity:1}
+#drawerOut.open .panel{transform:none}
 #drawer .scrim{position:absolute;inset:0;background:rgba(0,0,0,.55);opacity:0;transition:opacity .22s ease}
 #drawer .panel{overscroll-behavior:contain;position:absolute;top:0;left:0;bottom:0;width:84%;max-width:330px;background:var(--bg);
   border-right:1px solid var(--line);transform:translateX(-103%);transition:transform .26s cubic-bezier(.32,.9,.35,1);
@@ -954,6 +981,11 @@ body.sesslive #hkPulse{top:calc(env(safe-area-inset-top) + 40px)}
   padding:10px 18px;font-size:13px;font-weight:600;max-width:400px;margin:0 16px;animation:capDrop .38s cubic-bezier(.32,1.3,.5,1)}
 .toast div::before{content:'';width:7px;height:7px;border-radius:8px;background:var(--green);flex:none}
 @keyframes capDrop{from{transform:translateY(-26px);opacity:0}to{transform:translateY(0);opacity:1}}
+/* it leaves the way it came, and faster — nobody is waiting on a toast */
+.toast.closing{pointer-events:none}
+.toast.closing div{animation:capLift .2s cubic-bezier(.4,0,.9,.3) both}
+@keyframes capLift{from{transform:translateY(0);opacity:1}to{transform:translateY(-20px);opacity:0}}
+@media (prefers-reduced-motion:reduce){.toast.closing div{animation:capLift .14s linear both}}
 @media (prefers-reduced-motion: reduce){.toast div{animation:none}}
 .logline{display:flex;justify-content:space-between;width:100%;padding:10px 0;
   border-bottom:1px solid var(--line);font-size:13px;text-align:left;gap:8px}
@@ -1423,7 +1455,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='3921a5';  // stamped by tools/build.py with the content hash
+const BUILD_ID='e4b625';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -31353,7 +31385,7 @@ function wrapSheet(title,inner){
    '<button data-a="closeSheet" style="color:var(--dim);font-size:13px">Close</button></div>'+inner+'</div></div>'}
 
 /* ══ render ═════════════════════════════════════════════ */
-let lastAnimKey=null,lastSheetKey=null;
+let lastAnimKey=null,lastSheetKey=null,lastDrawerOpen=false,lastToastTxt=null;
 
 function viewGuide(){
   /* the file guide, full-page and swipeable (owner call, 3 Sep): one
@@ -31802,7 +31834,10 @@ function render(){
   const sheetKey=S.sheet?S.sheet.t:'';
   const viewChanged=keyA!==lastAnimKey,sheetChanged=sheetKey!==lastSheetKey;
   const big=viewChanged||sheetChanged;
-  lastAnimKey=keyA;lastSheetKey=sheetKey;
+  /* the sheet that was open going INTO this render — lastSheetKey is
+     overwritten on the next line, and the exit below runs after it */
+  const prevSheetKey=lastSheetKey,prevDrawer=lastDrawerOpen,prevToast=lastToastTxt;
+  lastAnimKey=keyA;lastSheetKey=sheetKey;lastDrawerOpen=!!S.drawerOpen;lastToastTxt=S.toast||null;
   /* view transitions are for VIEW changes only. Running one for a sheet
      open snapshots the whole page and, in the iOS wrapper, flashes the
      background black (owner-reported). The sheet has its own slide-up. */
@@ -31878,6 +31913,66 @@ function render(){
       document.getElementById('app').innerHTML=body}
     let extra=document.getElementById('extra');
     if(!extra){extra=document.createElement('div');extra.id='extra';document.body.appendChild(extra)}
+    /* ── LET A CLOSING SHEET LEAVE (16 Sep 2026) ────────────────────
+       #extra's innerHTML is replaced wholesale, so the instant
+       S.sheet went null the panel was destroyed mid-air. 141 call
+       sites close a sheet that way and every one of them cut rather
+       than animated — while dragging it down animated properly, so
+       the app had two different answers for the same action depending
+       on how you performed it.
+       The panel is MOVED OUT of #extra first, onto the body, where
+       the innerHTML write cannot reach it; it plays its exit there
+       and removes itself. One place, every call site.
+       It skips a sheet that carries an inline transform — that is the
+       drag handler already animating it, and two animations on one
+       element is worse than none. */
+    try{
+      if(prevSheetKey&&!sheetKey){
+        const old=extra.querySelector('.sheet-bg');
+        if(old&&!old.classList.contains('closing')){
+          const pan=old.querySelector('.sheet');
+          const dragging=pan&&pan.style&&pan.style.transform;
+          if(!dragging){
+            document.body.appendChild(old);
+            old.classList.remove('nofade');
+            old.classList.add('closing');
+            setTimeout(function(){try{old.remove()}catch(e9){oops('sheetExitRm',e9)}},260);
+          }
+        }
+      }
+      /* THE DRAWER HAD THE ANIMATION ALL ALONG. Its panel and scrim are
+         driven by TRANSITIONS on #drawer.open, which animate in both
+         directions for free — and never got to run on the way out,
+         because the element was destroyed in the same frame the class
+         would have come off. Same move: out of #extra, drop .open, let
+         the transitions it already has do the work. */
+      if(prevDrawer&&!S.drawerOpen){
+        const dr=extra.querySelector('#drawer');
+        if(dr&&dr.classList.contains('open')){
+          const pn=dr.querySelector('.panel');
+          const dragging=pn&&pn.style&&pn.style.transform;
+          if(!dragging){
+            dr.id='drawerOut';
+            document.body.appendChild(dr);
+            requestAnimationFrame(function(){try{dr.classList.remove('open')}catch(e9){oops('drawerExitCls',e9)}});
+            setTimeout(function(){try{dr.remove()}catch(e9){oops('drawerExitRm',e9)}},320);
+          }
+        }
+      }
+      /* THE TOAST, third surface with the same fault. It drops in on
+         capDrop and then, 2.4 seconds later, blinked out of existence
+         in one frame. A thing that announced itself should leave the
+         way it came — up and out, quickly, because nobody is waiting
+         on it. */
+      if(prevToast&&!S.toast){
+        const tw=extra.querySelector('.toast');
+        if(tw&&!tw.classList.contains('closing')){
+          document.body.appendChild(tw);
+          tw.classList.add('closing');
+          setTimeout(function(){try{tw.remove()}catch(e9){oops('toastExitRm',e9)}},240);
+        }
+      }
+    }catch(e){oops('sheetExit',e)}
     extra.innerHTML=extraHtml;
     try{if(S._pillPop){S._pillPop=0;const pb=document.getElementById('sessBanner');
       if(pb)pb.style.animation='pillpop .38s cubic-bezier(.34,1.56,.64,1)'}}catch(e){}
@@ -31898,7 +31993,7 @@ function render(){
     /* the scrim's fade lives on ::before now (a parent opacity was
        compositing the panel with it), and a pseudo-element takes no
        inline style — a class is the only way to stop it replaying */
-    try{if(!sheetChanged){const bg=extra.querySelector('.sheet-bg');if(bg)bg.classList.add('nofade')}}catch(e){}
+    try{if(!sheetChanged){const bg=extra.querySelector('.sheet-bg');if(bg)bg.classList.add('nofade')}}catch(e){oops('sheetNofade',e)}
     try{if(!sheetChanged){const sh=extra.querySelector('.sheet');if(sh)sh.style.animation='none'}
       const tEl=extra.querySelector('.toast div');
       if(tEl&&render.__lastToast===S.toast)tEl.style.animation='none';
