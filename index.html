@@ -934,7 +934,23 @@ body.sesslive #hkPulse{top:calc(env(safe-area-inset-top) + 40px)}
    colour now lives on ::before, which is a SIBLING of the panel in paint
    order, so it can fade without taking the panel with it.
    Law: never animate opacity on an element that contains the sheet. */
-@keyframes bgFade{from{opacity:0}to{opacity:1}}
+/* ── THE DIM LANDS FAST; THE SHEET TRAVELS ────────────────────────
+   (owner, 16 Sep 2026, FOURTH report of "transparency bug still live",
+   and this time measured frame by frame rather than reasoned about.)
+   Every earlier fix was real and every one addressed the scrim AT
+   REST: the colour, the opacity value, the layer it lives on. The
+   panel measures fully opaque at every instant. What nobody checked
+   was the RAMP — sampled at 0/60/130/200ms, the scrim reads 0, 0.37,
+   0.80, 0.97. So for the first eighth of a second of EVERY sheet
+   open, the page behind is plainly legible, and on a busy screen with
+   bright numbers that is long enough to read it. That is what the
+   recordings have been showing all along, and it is why the tests
+   kept saying the value was already right: they pinned the resting
+   state, and the bug was never in the resting state.
+   iOS darkens essentially on contact and lets the sheet travel
+   afterwards. So does this now: full dark by ~100ms while the panel
+   still takes its 320ms to arrive. */
+@keyframes bgFade{0%{opacity:0}34%{opacity:.94}100%{opacity:1}}
 /* ═══ THE OVERLAY IS ITS OWN LAYER (owner, 14 Sep 2026, sixth report,
    with the frame that proves it: the tree's branches painted over the
    sheet while the header behind was at FULL brightness — so the scrim was
@@ -975,7 +991,7 @@ body.sesslive #hkPulse{top:calc(env(safe-area-inset-top) + 40px)}
    close still reveals the page as the finger pulls down, because that is
    --scrim and the user is asking for it. */
 .sheet-bg::before{content:'';position:absolute;inset:0;background:var(--bg);
-  opacity:var(--scrim,1);animation:bgFade .26s ease both}
+  opacity:var(--scrim,1);animation:bgFade .3s cubic-bezier(.2,.9,.3,1) both}
 /* DRAGGING A SHEET DOWN MUST TAKE THE DARK WITH IT (owner-caught on
    video, 14 Sep 2026: "pop ups still becoming transparent when touching
    or dragging down, also background turns a different shade a few too
@@ -1501,7 +1517,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='a3ec53';  // stamped by tools/build.py with the content hash
+const BUILD_ID='e173d9';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
