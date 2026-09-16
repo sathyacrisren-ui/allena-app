@@ -1368,7 +1368,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='eac34e';  // stamped by tools/build.py with the content hash
+const BUILD_ID='1fc683';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -10298,7 +10298,6 @@ function markRunSeen(){try{const a=acwr();S.runSeen=S.runSeen||{};
 function viewRun(){
   const R=runs(),wk=weeklyKm(8),a=acwr(),sp=intensitySplit(28),f=runFitness();
   let h='<div class="view pad stg phpad">'+
-    '<div style="display:flex;justify-content:space-between;align-items:center;gap:12px">'+
     pageHead('Running');
   /* RUNNING GOALS sit where the lifting goals sit — at the top of their
      own room (owner ask, 11 Sep: "make running goals a pill in the
@@ -27009,8 +27008,20 @@ function viewHome(){
   const ws=weekState(p,S.week);
   const dateLine=new Date().toLocaleDateString(undefined,{weekday:'long',day:'numeric',month:'long'});
   let h='<div class="view pad stg phpad">';
-  h+='<div style="display:flex;justify-content:space-between;align-items:center;gap:12px">'+
-    pageHead('Program',p.empty?'':weekChip());
+/* THE HEADER WRAPPER WAS NEVER CLOSED (owner, 16 Sep 2026: "Running
+   program and progress All broken"). Four pages opened a flex ROW
+   around pageHead and never emitted the closing tag, so every block
+   that followed on that page became a flex CHILD of it and got laid
+   out side by side — the whole page crushed into vertical slivers in
+   the corner of the screen. Program, Running and both Progress
+   variants: exactly the three pages he named, and no others.
+   The wrapper was redundant from the moment it was written.
+   `pageHead` already returns `<div class="phead">`, which IS the
+   header's flex row, with a `.pright` slot for the chip on the
+   right — which is what the second argument fills. Deleting it is
+   the fix; adding a closing tag would just nest one flex row inside
+   another for no reason. */
+  h+=pageHead('Program',p.empty?'':weekChip());
   try{h+=(typeof resumeCard==='function'?resumeCard():'')}catch(e){}
   try{h+=(typeof mergeCard==='function'?mergeCard():'')}catch(e){}
   if(p.empty){
@@ -28220,7 +28231,6 @@ function collapser(key,title,sub,inner){
 var SECREF={};
 function viewProgress(){
   if(!S.history.length)return '<div class="view pad stg phpad">'+
-    '<div style="display:flex;justify-content:space-between;align-items:center;gap:12px">'+
     pageHead('Progress')+
     '<p style="color:var(--dim);font-size:15px;margin-top:12px">Log a few sessions and your trends show up here.</p></div>';
   const bests={},weekVol={};
@@ -28373,7 +28383,6 @@ function viewProgress(){
     ['goals','trends'].forEach(k=>{if(S.openSec[k]===undefined)S.openSec[k]=true})}
   const tabRehab=(S.acl&&S.acl.on);
   let h='<div class="view pad stg phpad">'+
-    '<div style="display:flex;justify-content:space-between;align-items:center;gap:12px">'+
     pageHead('Progress');
   if(S.newPattern){h+='<div class="card mt" style="padding:12px 15px;border-color:var(--amber);display:flex;align-items:center;gap:12px">'+
     '<span style="width:8px;height:8px;border-radius:8px;background:var(--amber);flex:none"></span>'+
