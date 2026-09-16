@@ -1517,7 +1517,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='846fbf';  // stamped by tools/build.py with the content hash
+const BUILD_ID='b2806d';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -9845,14 +9845,20 @@ function rehabBankMoments(){
     try{
       const cs=(S.acl.checks||[]).filter(c=>c.conf!=null)
         .map(c=>({d:c.date,v:+c.conf})).sort((a,b)=>a.d.localeCompare(b.d));
-      const wk7=cs.slice(-7);
+      /* A WEEK OF CHECK-INS IS SEVEN DAYS OF THEM (audit, 16 Sep
+         2026; ban 9). `cs.slice(-7)` took the last seven check-ins
+         whenever they happened — three a week makes that a fortnight,
+         called "a week" — and these bank RARE and EPIC finds on the
+         rehab climb, which is the surface this app exists for. */
+      const cutW=dayKey(new Date(Date.now()-7*864e5));
+      const wk7=cs.filter(c=>c.d>cutW);
       if(wk7.length>=5){
         const avg=wk7.reduce((a,b)=>a+b.v,0)/wk7.length;
         const everLow=cs.some(c=>c.v<=4);
         if(avg>=7)put('conf:7','rare','Trust in the knee is back above 7',
-          'A week of check-ins averaging '+(Math.round(avg*10)/10)+' out of 10'+(everLow?' — up from days it sat at 4 or under':'')+'. Fear of reinjury predicts return to sport independently of strength; this number coming back is a milestone, not a footnote.');
+          wk7.length+' check-ins this week averaging '+(Math.round(avg*10)/10)+' out of 10'+(everLow?' — up from days it sat at 4 or under':'')+'. Fear of reinjury predicts return to sport independently of strength; this number coming back is a milestone, not a footnote.');
         if(avg>=9)put('conf:9','epic','The knee is yours again',
-          'Confidence averaging '+(Math.round(avg*10)/10)+' out of 10 across a week of honest answers. The head comes back too — and yours has.')}}catch(e9){}
+          'Confidence averaging '+(Math.round(avg*10)/10)+' out of 10 across '+wk7.length+' honest answers this week. The head comes back too — and yours has.')}}catch(e9){}
     if(dirty){bankSave();try{haptic('success')}catch(e){}}}catch(e){}}
 
 /* ── the hero (Sep 2026 rebuild) ─────────────────────────────
@@ -15884,11 +15890,23 @@ function healthDiscoveries(){
     /* resting HR trend — the engine idling cheaper */
     try{
       const r=hkdSeries('rhr',60);
+      /* "THIS WEEK" IS SEVEN DAYS (audit, 16 Sep 2026; ban 9). This
+         took the last seven READINGS of resting heart rate and called
+         them this week. A Garmin worn four nights a week makes that
+         nearly a fortnight — and this banks as a RARE find, so the
+         wrong window goes into the collection permanently, in those
+         words. Cut by date, and say how many mornings it stands on. */
       if(r.length>=21){
-        const now9=hkdMed(r.slice(-7).map(x=>x.v)),before=hkdMed(r.slice(0,-14).map(x=>x.v));
-        if(now9&&before&&before-now9>=3)
-          add('rare','Resting heart rate down '+Math.round(before-now9)+' bpm · '+mn,
-            'This week idles at ~'+Math.round(now9)+' bpm against ~'+Math.round(before)+' earlier — the classic signature of a growing aerobic base.','signal',null,r[r.length-1].date)}}catch(e){}
+        const cut7=dayKey(new Date(Date.now()-7*864e5));
+        const cut14=dayKey(new Date(Date.now()-14*864e5));
+        const wk=r.filter(x=>x.date>cut7).map(x=>x.v);
+        const earlier=r.filter(x=>x.date<=cut14).map(x=>x.v);
+        if(wk.length>=4&&earlier.length>=10){
+          const now9=hkdMed(wk),before=hkdMed(earlier);
+          if(now9&&before&&before-now9>=3)
+            add('rare','Resting heart rate down '+Math.round(before-now9)+' bpm · '+mn,
+              'The last week idles at ~'+Math.round(now9)+' bpm across '+wk.length+' mornings, against ~'+Math.round(before)+
+              ' before that — the classic signature of a growing aerobic base.','signal',null,r[r.length-1].date)}}}catch(e){oops('rhrDrop',e)}
     /* HRV × rest days — recovery visible in the nervous system */
     try{
       const st=hkDailyStore();
@@ -23216,7 +23234,11 @@ function unlockAnswer(title){
     if(/weight.*moving|scale/.test(t)){
       const d9=(S.daily&&S.daily.days)||{};
       const ks=Object.keys(d9).filter(k=>d9[k]&&+d9[k].bw>0).sort();
-      const a=med(ks.slice(-14,-7).map(k=>+d9[k].bw)),b=med(ks.slice(-7).map(k=>+d9[k].bw));
+      /* "week over week" over the last seven WEIGH-INS is a
+         fortnight for anyone who steps on the scale twice a week
+         (audit, 16 Sep 2026; ban 9) */
+      const c7=dayKey(new Date(Date.now()-7*864e5)),c14=dayKey(new Date(Date.now()-14*864e5));
+      const a=med(ks.filter(k=>k>c14&&k<=c7).map(k=>+d9[k].bw)),b=med(ks.filter(k=>k>c7).map(k=>+d9[k].bw));
       if(a&&b){const df=Math.round((b-a)*10)/10;
         return 'Right now: '+(Math.abs(df)<0.2?'flat \u2014 your weight is holding steady week over week.':(df>0?'up ':'down ')+Math.abs(df)+' kg week over week.')}}
     if(/mornings or evenings/.test(t)){
