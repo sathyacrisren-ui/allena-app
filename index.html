@@ -195,6 +195,11 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
    every page sat under the bar. Caught in the browser, not in a test. */
 body:has(.tabbar) #app{padding-bottom:calc(92px + env(safe-area-inset-bottom))}
 body:has(.tabbar) #app:has(.sessfix),body:has(.tabbar) #app:has(.pinpage){padding-bottom:0}
+/* the neighbouring page during a swipe: a real render of the room you
+   are dragging toward, sitting under the tab bar and above the page */
+.pgpeek{position:fixed;inset:0;z-index:5;overflow:hidden;background:var(--bg);
+  will-change:transform;contain:layout paint}
+.pgpeek>.view{height:100%;overflow:hidden}
 .tabbar{position:fixed;left:0;right:0;bottom:calc(10px + env(safe-area-inset-bottom));
   z-index:60;display:flex;justify-content:center;pointer-events:none}
 .tabbar>nav{pointer-events:auto;display:flex;align-items:stretch;gap:2px;
@@ -223,7 +228,31 @@ body:has(.tabbar) #app:has(.sessfix),body:has(.tabbar) #app:has(.pinpage){paddin
   border-radius:var(--r-full);background:var(--red);color:#fff;font-size:var(--t-caption2);
   font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 4px;
   border:2px solid var(--surface)}
-@media (prefers-reduced-motion:reduce){.tabbar button svg{transition:none}}
+/* ── THE CENTRE IS A DIFFERENT OBJECT (16 Sep 2026) ────────────────
+   Not a bigger version of the other four. It sits proud of the bar in
+   its own ring, carries no label, and is the only tab that lights.
+   That is the whole reason a centre slot exists: the tree is the one
+   thing in this app that is not comparable between two people, and it
+   earns the position the way a compose button does. */
+.tabbar button.tmid{flex:0 0 auto;padding:0 2px;gap:0;background:none;overflow:visible}
+.tabbar button.tmid .tmidr{display:flex;align-items:center;justify-content:center;
+  width:50px;height:50px;border-radius:var(--r-full);flex:none;
+  margin-top:-16px;color:var(--dim);
+  background:var(--raised);border:1px solid var(--line);box-shadow:var(--e-2);
+  transition:transform .3s var(--ease-spring),border-color .22s var(--ease-out),
+    color .22s var(--ease-out),box-shadow .3s var(--ease-out)}
+.tabbar button.tmid svg{width:25px;height:25px}
+.tabbar button.tmid.on .tmidr{color:var(--text);border-color:color-mix(in srgb,var(--text) 55%,transparent);transform:translateY(-1px)}
+/* lit means something was FOUND and not looked at — gold, the rarity
+   ladder's top, and the only place gold appears in the chrome */
+.tabbar button.tmid.lit .tmidr{color:var(--text);
+  border-color:color-mix(in srgb,var(--gold) 70%,transparent);
+  box-shadow:var(--e-2),0 0 16px -2px color-mix(in srgb,var(--gold) 55%,transparent)}
+.tabbar button.tmid:active .tmidr{transform:scale(.92)}
+.tabbar button.tmid:active svg{transform:none}
+.tabbar button.tmid .tdot{top:-12px;margin-left:8px}
+@media (prefers-reduced-motion:reduce){.tabbar button svg{transition:none}
+  .tabbar button.tmid .tmidr{transition:none}}
 .sessfix{height:100dvh;display:flex;flex-direction:column;overflow:hidden}
 .sessbody{flex:1;min-height:0;overflow-y:auto;padding-top:8px;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;
   /* ══ THE SET SCREEN IS AN INSTRUMENT, SO IT IS COMPOSED LIKE ONE
@@ -533,12 +562,23 @@ body:not(:has(.tabbar)) .txpop{bottom:calc(env(safe-area-inset-bottom, 10px) + 1
   animation:fbBreathe 7.5s ease-in-out infinite}
 @keyframes fbBreathe{0%,100%{transform:translate(-50%,-50%) scale(.92);opacity:.55}
   50%{transform:translate(-50%,-50%) scale(1.06);opacity:.95}}
-/* motes: each on its own clock, drifting up and across */
-.fb-mote{position:absolute;width:3px;height:3px;border-radius:3px;opacity:0;pointer-events:none;
-  animation:fbMote 5s ease-in-out infinite}
-@keyframes fbMote{0%{opacity:0;transform:translate(0,6px) scale(.6)}
-  25%{opacity:.75}60%{opacity:.5;transform:translate(6px,-18px) scale(1)}
-  100%{opacity:0;transform:translate(-4px,-40px) scale(.5)}}
+/* ── THE DUST POURS OFF THE CARD (owner, 16 Sep 2026: "dust animation
+   pouring out and down, subtle and professional") ──────────────────
+   It used to rise — up and across, like embers. Rising reads as
+   energy leaving; a card that has just LANDED should shed, the way
+   dust comes off something set down. So it falls: out of the card's
+   edges, down past it, fading as it goes.
+   SUBTLE IS THE WHOLE BRIEF. Slow clocks (7-11s), small travel, peak
+   opacity under a half, and every mote on its own phase so the field
+   never pulses together — a synchronised shimmer reads as a loading
+   state. Transform and opacity only, so it composites. */
+.fb-mote{position:absolute;width:2.5px;height:2.5px;border-radius:3px;opacity:0;pointer-events:none;
+  animation:fbDust 9s cubic-bezier(.33,0,.5,1) infinite}
+@keyframes fbDust{
+  0%{opacity:0;transform:translate(0,-10px) scale(.45)}
+  14%{opacity:.42}
+  55%{opacity:.26;transform:translate(var(--dx,4px),34px) scale(1)}
+  100%{opacity:0;transform:translate(calc(var(--dx,4px) * 1.7),82px) scale(.6)}}
 /* THE CARD GOES BACK WHERE IT CAME FROM (owner, 15 Sep: "when you close a
    card it should animate back into its position nicely"). The card it was
    opened from is measured on the tap, and the overlay card is flown from
@@ -1383,7 +1423,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='42ad36';  // stamped by tools/build.py with the content hash
+const BUILD_ID='0b4f9a';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -22516,12 +22556,27 @@ function findBigHtml(){
        slow. They drift on their own clocks and from their own radii, so
        the field never reads as a loop, and the ground behind them
        breathes. Reduced motion stills all of it. */
+    /* THE DUST COMES OFF THE EDGES AND FALLS (owner, 16 Sep 2026).
+       These used to sit on a ring around the card's centre and drift
+       upward, which reads as embers — energy leaving. A card that has
+       just been set down should SHED: the motes start along its left
+       and right edges, spill outward and fall past it.
+       Positions are golden-ratio distributed rather than evenly
+       spaced, so the two columns never read as a pattern, and every
+       mote carries its own duration, delay and lateral drift so the
+       field never pulses in time. A synchronised shimmer reads as a
+       loading spinner, which is the one thing it must not be. */
     const motes=[6,10,16,22][c.rank];
     const dust=Array.from({length:motes},(_,i)=>{
-      const a=i*0.618*6.283,rr=22+((i*37)%88);
-      return '<span class="fb-mote" style="left:calc(50% + '+Math.round(Math.cos(a)*rr)+'px);top:calc(46% + '+
-        Math.round(Math.sin(a)*rr*0.85)+'px);background:'+r[1]+
-        ';animation-delay:'+(i*210)+'ms;animation-duration:'+(4.2+((i*7)%5)*0.6).toFixed(1)+'s"></span>'}).join('');
+      const g=(i*0.6180339887)%1;                 /* even without a pattern */
+      const side=i%2?1:-1;                        /* alternate the edges */
+      const x=side*(150+Math.round(g*46));        /* just off the card's sides */
+      const y=18+Math.round(g*46);                /* down its height, in % */
+      const dx=side*(3+Math.round(g*9));          /* drifts further out as it falls */
+      return '<span class="fb-mote" style="left:calc(50% + '+x+'px);top:'+y+'%;'+
+        '--dx:'+dx+'px;background:'+r[1]+
+        ';animation-delay:'+Math.round(g*5200)+'ms'+
+        ';animation-duration:'+(7+g*4).toFixed(1)+'s"></span>'}).join('');
     /* CEREMONY IS FOR AN ARRIVAL, NOT FOR BROWSING (16 Sep 2026).
        A card opened from the binder was MEASURED on the tap and flies
        from its own rectangle — it is the same object being picked up,
@@ -31558,13 +31613,28 @@ function render(){
      the same fact — this repo has caught two readouts of one fact five
      times and the sixth would have been a bar whose neighbours were not
      the rooms you land on. */
+  /* THE TREE TAKES THE CENTRE (owner, 16 Sep 2026: "don't you think the
+     tree icon should be in the centre of the bottom menu bar?").
+     It should, and the reason is in this file's own notes: the tree is
+     the one thing in the app that is not comparable between two people,
+     and it is the emotional centre. A centre slot, raised off the bar,
+     is what that position is for.
+     RUNNING MOVES TO THE DRAWER on the owner's call. Five slots is the
+     ceiling on a 375px phone — a sixth drops each to about 58px and the
+     labels start breaking, and with six the tree is not actually
+     centred. Running is the one that leaves; it keeps its red count in
+     the drawer and the daily brief still puts the run line on Today.
+     The tree is NOT in tabBarRooms: the swipe moves along a row of
+     scrollable pages, and the tree page owns its own canvas with pinch
+     and pan. Swiping out of it would fight the gesture it already has.
+     So the bar shows five and four of them swipe. */
   tabBarTabs=function(){
-    const T=[['today','Today',ICONS.today],['home','Program',ICONS.home]];
-    if(hasRun)T.push(['run','Running',ICONS.run]);
-    T.push(['social','Social',ICONS.social]);
-    T.push(['progress','Progress',ICONS.progress]);
-    return T};
-  tabBarRooms=function(){try{return tabBarTabs().map(t=>t[0])}catch(e){oops('tabRooms',e);return []}};
+    return [['today','Today',ICONS.today],
+            ['home','Program',ICONS.home],
+            ['tree','Your tree',null],
+            ['social','Social',ICONS.social],
+            ['progress','Progress',ICONS.progress]]};
+  tabBarRooms=function(){try{return tabBarTabs().map(t=>t[0]).filter(v=>v!=='tree')}catch(e){oops('tabRooms',e);return []}};
 
   const tabBarHtml=()=>{
     if(S.sess&&S.view==='session')return '';
@@ -31578,7 +31648,27 @@ function render(){
        Social earns the tab for the opposite reason: nothing pulls you
        back to it, so it has to be visible or it is not used at all. */
     const T9=tabBarTabs();
-    const btn=t=>'<button data-a="drawerNav" data-v="'+t[0]+'" class="'+(isOn(t[0])?'on':'')+'"'+
+    /* the centre one is a different object, not a bigger version of the
+       same one: it is raised off the bar, carries no label, and lights
+       gold when something has been found and not looked at */
+    const treeBtn=()=>{
+      const n9=(typeof treeXNewN==='function')?treeXNewN():0;
+      const lit=n9>0;
+      const gold='var(--gold)';   /* the token, so light mode repaints with it */
+      return '<button data-a="treeOpen" class="tmid'+(isOn('tree')?' on':'')+(lit?' lit':'')+'"'+
+        ' aria-label="Your tree"'+(isOn('tree')?' aria-current="page"':'')+'>'+
+        '<span class="tmidr">'+
+        '<svg viewBox="0 0 24 24" aria-hidden="true">'+
+        '<path d="M12 21V11" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" fill="none"/>'+
+        '<path d="M12 15l-4-3M12 12l4-3M12 17l3-2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" fill="none" opacity=".8"/>'+
+        '<circle cx="8" cy="12" r="1.8" fill="'+(lit?gold:'currentColor')+'"/>'+
+        '<circle cx="16" cy="9" r="1.8" fill="'+(lit?gold:'currentColor')+'" opacity=".9"/>'+
+        '<circle cx="15" cy="15" r="1.5" fill="currentColor" opacity=".7"/>'+
+        '<circle cx="12" cy="7" r="1.6" fill="'+(lit?gold:'currentColor')+'" opacity=".85"/>'+
+        '</svg></span>'+
+        (n9?'<span class="tdot">'+n9+'</span>':'')+'</button>'};
+    const btn=t=>t[0]==='tree'?treeBtn():
+      '<button data-a="drawerNav" data-v="'+t[0]+'" class="'+(isOn(t[0])?'on':'')+'"'+
       ' aria-label="'+esc(t[1])+'"'+(isOn(t[0])?' aria-current="page"':'')+'>'+
       '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">'+t[2]+'</svg>'+
       '<span>'+esc(t[1])+'</span>'+
@@ -32168,22 +32258,84 @@ tickEvery(function(){try{
   document.addEventListener('touchend',()=>{x0=null},{passive:true});
 })();
 
-/* ══ SWIPE BETWEEN TABS (16 Sep 2026, owner: "make it swipeable") ═════
-   The bar shows five rooms side by side, which promises they are laid out
-   in a row — so the gesture that moves along a row has to work, or the
-   layout is lying about itself.
-   WHAT IT DEFERS TO, and each one is a real conflict: the left EDGE
-   belongs to the drawer (26px, handled above, and this refuses to start
-   there); a horizontal drag inside a [data-scrub] chart is a scrub; the
-   tree explorer owns its own canvas; a session, a sheet, the drawer and
-   the chat are off-limits entirely. Vertical wins ties, because the
-   common gesture on every one of these pages is scrolling.
-   It reads tabBarRooms(), which the bar itself renders from, so the swipe
-   order and the visible order are the same fact and cannot drift. */
-(function(){let x0=null,y0=null,live=false;
+/* ══ SWIPE BETWEEN TABS — THE PAGE FOLLOWS YOUR FINGER ═════════════
+   (owner, 16 Sep 2026: "make the swipe transition between pages more
+   like iOS homescreen swiping".)
+
+   The first version was a threshold jump: drag 64px and it snapped to
+   the next room. Nothing moved under the finger, so there was no
+   relationship between the gesture and the result — you performed a
+   command and a different screen appeared. That is what reads as
+   cheap. On a homescreen the page IS the finger: it tracks 1:1, the
+   next page is already visible coming in, it rubber-bands when there
+   is nothing there, and it settles with a spring.
+
+   All four are here.
+
+   THE NEIGHBOUR IS REAL, not a snapshot. It is the next room's actual
+   markup, rendered once into a fixed layer the moment the direction
+   locks, so what slides in is what you land on. Views are pure string
+   functions in this codebase, which is the only reason that is safe;
+   if one ever throws, this falls back to the old jump rather than
+   leaving a half-dragged screen.
+
+   THE BAR DOES NOT MOVE. Only #app is translated — the tab bar, the
+   toast and the capsule live in #extra and stay put, the way the iOS
+   dock stays put while the pages travel over it.
+
+   RUBBER-BAND AT THE ENDS at 0.32, which is roughly UIScrollView's
+   own resistance. It is the thing that tells you there is nothing
+   there without a message saying so.
+
+   WHAT IT DEFERS TO, each a real conflict: the left EDGE belongs to
+   the drawer; a horizontal drag inside a [data-scrub] chart is a
+   scrub; the tree explorer owns its canvas; a session, sheet, drawer
+   or chat is off-limits. Vertical wins ties, because scrolling is the
+   common gesture on every one of these pages.
+
+   Reduced motion keeps the jump — the point of that setting is not to
+   watch things travel. */
+(function(){
+  let x0=null,y0=null,live=false,dir=0,W=0,layer=null,target=null,dx=0,t0=0,settling=false;
   const rooms=()=>{try{return (typeof tabBarRooms==='function')?tabBarRooms():[]}catch(e){oops('swipeRooms',e);return []}};
+  const reduced=()=>{try{return !!(window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches)}catch(e){return false}};
+  /* the room -> view map. Function declarations hoist across the whole
+     concatenated script, so these are safe to name here even though
+     their modules are loaded after this one. */
+  const VIEWFN={today:viewToday,home:viewHome,run:viewRun,social:viewSocial,progress:viewProgress};
+
+  function clear(){
+    try{const app=document.getElementById('app');
+      if(app){app.style.transition='';app.style.transform=''}}catch(e){oops('swipeClear',e)}
+    try{if(layer)layer.remove()}catch(e){oops('swipeLayer',e)}
+    layer=null;x0=null;live=false;dir=0;target=null;dx=0;settling=false}
+
+  function build(d){
+    /* the neighbour, rendered once, into a fixed layer beside the page */
+    const R=rooms(),i=R.indexOf(S.view),j=i+d;
+    if(i<0||j<0||j>=R.length)return null;
+    const fn=VIEWFN[R[j]];
+    if(typeof fn!=='function')return null;
+    let html='';
+    try{html=fn()}
+    catch(e){oops('swipePeek',e);return null}
+    if(!html||typeof html!=='string')return null;
+    const el=document.createElement('div');
+    el.className='pgpeek';
+    el.style.transform='translate3d('+(d>0?W:-W)+'px,0,0)';
+    el.innerHTML=html;
+    document.body.appendChild(el);
+    target=R[j];
+    return el}
+
+  function put(v){
+    const app=document.getElementById('app');
+    if(app)app.style.transform='translate3d('+v+'px,0,0)';
+    if(layer)layer.style.transform='translate3d('+(v+(dir>0?W:-W))+'px,0,0)'}
+
   document.addEventListener('touchstart',e=>{
-    x0=null;live=false;
+    if(settling)return;
+    clear();
     if(S.drawerOpen||S.sheet||S.boot)return;
     if(S.view==='session'||S.view==='coach'||S.view==='setup')return;
     if(document.querySelector('.sessfix'))return;
@@ -32192,23 +32344,61 @@ tickEvery(function(){try{
     if(t.clientX<=30)return;                       /* the drawer's edge */
     if(e.target.closest&&e.target.closest('[data-scrub],[data-draglist],input,textarea,select,.scroller'))return;
     if(rooms().indexOf(S.view)<0)return;           /* only between tabs */
-    x0=t.clientX;y0=t.clientY},{passive:true});
+    x0=t.clientX;y0=t.clientY;t0=Date.now();
+    W=window.innerWidth||375},{passive:true});
+
   document.addEventListener('touchmove',e=>{
-    if(x0==null)return;
-    const t=e.touches[0],dx=t.clientX-x0,dy=t.clientY-y0;
+    if(x0==null||settling)return;
+    const t=e.touches[0],ddx=t.clientX-x0,ddy=t.clientY-y0;
     if(!live){
-      if(Math.abs(dy)>Math.abs(dx)||Math.abs(dy)>16){x0=null;return}  /* a scroll */
-      if(Math.abs(dx)<18)return;
-      live=true}
-    if(Math.abs(dx)>64){
-      const R=rooms(),i=R.indexOf(S.view);
-      const j=i+(dx<0?1:-1);
-      x0=null;live=false;
-      if(i<0||j<0||j>=R.length)return;
-      try{vib(8)}catch(e2){oops('swipeVib',e2)}
-      runAction('drawerNav',R[j])}},{passive:true});
-  document.addEventListener('touchend',()=>{x0=null;live=false},{passive:true});
-  document.addEventListener('touchcancel',()=>{x0=null;live=false},{passive:true});
+      if(Math.abs(ddy)>Math.abs(ddx)||Math.abs(ddy)>16){x0=null;return}  /* a scroll */
+      if(Math.abs(ddx)<18)return;
+      live=true;dir=ddx<0?1:-1;
+      if(reduced())return;                          /* jump on release instead */
+      layer=build(dir);
+      const app=document.getElementById('app');
+      if(app)app.style.transition='none';
+      if(!layer)target=null}
+    if(reduced())return;
+    dx=ddx;
+    /* nothing that way: resist rather than travel */
+    if(!layer)dx=ddx*0.32;
+    put(dx)},{passive:true});
+
+  function end(){
+    if(x0==null&&!live){clear();return}
+    if(reduced()){
+      const R=rooms(),i=R.indexOf(S.view),j=i+dir;
+      const go=(live&&Math.abs(dx||0)>=0&&j>=0&&j<R.length)?R[j]:null;
+      clear();
+      if(go&&live){try{vib(8)}catch(e){oops('swipeVib',e)}runAction('drawerNav',go)}
+      return}
+    if(!live||!layer||!target){clear();return}
+    const dt=Math.max(1,Date.now()-t0);
+    const v=Math.abs(dx)/dt;                        /* px per ms */
+    const commit=Math.abs(dx)>W*0.30||v>0.45;
+    const app=document.getElementById('app');
+    const to=commit?(dir>0?-W:W):0;
+    settling=true;
+    /* Apple's own spring for something that moved under a finger, and
+       a duration that scales with the distance left to travel */
+    const ms=Math.max(180,Math.min(420,Math.round(Math.abs(to-dx)*0.75)));
+    const ease='cubic-bezier(.32,.72,0,1)';
+    if(app){app.style.transition='transform '+ms+'ms '+ease}
+    if(layer){layer.style.transition='transform '+ms+'ms '+ease}
+    requestAnimationFrame(()=>{dx=to;put(to)});
+    const go=commit?target:null;
+    setTimeout(()=>{
+      clear();
+      if(go){try{vib(8)}catch(e){oops('swipeVib',e)}runAction('drawerNav',go)}
+    },ms+20)}
+
+  document.addEventListener('touchend',end,{passive:true});
+  /* iOS takes the gesture away mid-drag (a notification, a system
+     edge swipe). Settle honestly rather than leaving the page parked
+     half off-screen. */
+  document.addEventListener('touchcancel',()=>{
+    if(live&&layer&&!settling)end();else clear()},{passive:true});
 })();
 
 /* drag any bottom sheet down to close it (owner call, Sep 2026):
