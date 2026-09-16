@@ -198,8 +198,21 @@ body:has(.tabbar) #app:has(.sessfix),body:has(.tabbar) #app:has(.pinpage){paddin
 /* the neighbouring page during a swipe: a real render of the room you
    are dragging toward, sitting under the tab bar and above the page */
 .pgpeek{position:fixed;inset:0;z-index:5;overflow:hidden;background:var(--bg);
-  will-change:transform;contain:layout paint}
-.pgpeek>.view{height:100%;overflow:hidden}
+  will-change:transform;contain:strict}
+.pgpeek>.view{height:100%;overflow:hidden;contain:layout paint}
+/* ── NOTHING ELSE MOVES WHILE A PAGE IS MOVING ─────────────────────
+   Five things animate forever on a typical screen (glows, a pulse,
+   the dust). During a swipe there are already two full-page layers
+   travelling, and every one of those adds compositor work to the one
+   moment the app must not drop a frame. They stop for the length of
+   the gesture and carry on afterwards; nobody is looking at a slow
+   glow while a page is under their thumb. */
+body.swiping [style*="animation"],
+body.swiping .an-glow,body.swiping .pts-glow,body.swiping .deep-ready,
+body.swiping .fb-mote,body.swiping .tx-new,body.swiping .tx-shim,
+body.swiping .an-breathe,body.swiping .find-dust{animation-play-state:paused!important}
+/* and the page itself must not try to scroll under the finger */
+body.swiping{overflow:hidden;touch-action:none}
 .tabbar{position:fixed;left:0;right:0;bottom:calc(10px + env(safe-area-inset-bottom));
   z-index:60;display:flex;justify-content:center;pointer-events:none}
 .tabbar>nav{pointer-events:auto;display:flex;align-items:stretch;gap:2px;
@@ -1455,7 +1468,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='e4b625';  // stamped by tools/build.py with the content hash
+const BUILD_ID='8a1ba3';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -32400,8 +32413,10 @@ tickEvery(function(){try{
   const VIEWFN={today:viewToday,home:viewHome,run:viewRun,social:viewSocial,progress:viewProgress};
 
   function clear(){
+    try{if(pending){cancelAnimationFrame(pending);pending=0}}catch(e){oops('swipeRaf',e)}
+    try{document.body.classList.remove('swiping')}catch(e){oops('swipeClsOff',e)}
     try{const app=document.getElementById('app');
-      if(app){app.style.transition='';app.style.transform=''}}catch(e){oops('swipeClear',e)}
+      if(app){app.style.transition='';app.style.transform='';app.style.willChange=''}}catch(e){oops('swipeClear',e)}
     try{if(layer)layer.remove()}catch(e){oops('swipeLayer',e)}
     layer=null;x0=null;live=false;dir=0;target=null;dx=0;settling=false}
 
@@ -32442,6 +32457,33 @@ tickEvery(function(){try{
     x0=t.clientX;y0=t.clientY;t0=Date.now();
     W=window.innerWidth||375},{passive:true});
 
+  /* ── THE PAGE WAS SCROLLING WHILE IT WAS SWIPING ────────────────
+     (owner, 16 Sep 2026: "screen stutters and drops when you swipe
+     through the pages".) The listener was passive, which means it
+     cannot preventDefault — so once a drag went horizontal the
+     browser carried on treating the same finger as a vertical scroll
+     as well. Two gestures ran on one touch: the page translated under
+     my transform AND scrolled under the browser's, every frame. That
+     is what drops, and no amount of tuning the transform would have
+     fixed it.
+     A second, NON-passive listener does nothing but preventDefault,
+     and only once the gesture has already committed to horizontal.
+     The passive one keeps doing the work, so ordinary scrolling never
+     touches the expensive path. */
+  document.addEventListener('touchmove',e=>{
+    if(live&&!reduced()&&e.cancelable)e.preventDefault()},{passive:false});
+
+  /* ── ONE WRITE PER FRAME ─────────────────────────────────────────
+     touchmove fires faster than the display refreshes — up to 120Hz
+     on a ProMotion phone, and more than once per frame under load.
+     Writing style.transform on every event asks for style work the
+     compositor throws away. The finger's position is recorded on the
+     event and applied once, in a rAF. */
+  let pending=0;
+  function schedule(){
+    if(pending)return;
+    pending=requestAnimationFrame(()=>{pending=0;put(dx)})}
+
   document.addEventListener('touchmove',e=>{
     if(x0==null||settling)return;
     const t=e.touches[0],ddx=t.clientX-x0,ddy=t.clientY-y0;
@@ -32452,13 +32494,17 @@ tickEvery(function(){try{
       if(reduced())return;                          /* jump on release instead */
       layer=build(dir);
       const app=document.getElementById('app');
-      if(app)app.style.transition='none';
+      /* promote the page for the duration: without this the browser
+         repaints a 1,700px element every frame instead of moving a
+         layer it already has */
+      if(app){app.style.transition='none';app.style.willChange='transform'}
+      try{document.body.classList.add('swiping')}catch(e9){oops('swipeCls',e9)}
       if(!layer)target=null}
     if(reduced())return;
     dx=ddx;
     /* nothing that way: resist rather than travel */
     if(!layer)dx=ddx*0.32;
-    put(dx)},{passive:true});
+    schedule()},{passive:true});
 
   function end(){
     if(x0==null&&!live){clear();return}
