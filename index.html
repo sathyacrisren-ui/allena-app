@@ -1517,7 +1517,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='e173d9';  // stamped by tools/build.py with the content hash
+const BUILD_ID='013e61';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -3450,6 +3450,27 @@ async function acctVerify(code){
     else flash(d.msg||d.error_description||'That code did not work — codes expire quickly, send a fresh one.')
   }catch(e){flash('No connection.')}
   render()}
+/* ── THE SCORE CARD'S OWN BOUNDS (audit finding 4, 16 Sep 2026) ────
+   supabase/social8.sql puts CHECK constraints on these columns, for
+   the reason set out there: the server holds no training data, so it
+   cannot verify a score — it can only refuse an absurd one.
+   This is the client half, and it exists so an honest user NEVER meets
+   that constraint. A rejected constraint fails the whole upsert, which
+   would silently stop a real person's sync; bounding here means the
+   row still goes, and anything that had to be bounded is a bug in this
+   app's own accounting rather than a cheat, so it is reported instead
+   of swallowed.
+   The ceilings are deliberately generous — a hard week of two-a-days
+   with cardio lands near 700, and these are roughly triple that. They
+   catch nonsense, never a real week. If an honest account ever meets
+   one, raise it; do not clip somebody's real training. */
+const SNAP_MAX={week_live:2000,week_sessions:50};
+function snapBound(name,v,max){
+  const n=Math.max(0,Math.round(+v||0));
+  if(n<=max)return n;
+  /* loud on purpose: this is the app mis-counting, not the server */
+  try{oops('snapBound',new Error(name+' computed '+n+', above the plausible ceiling of '+max))}catch(e){}
+  return max}
 function snapshotData(){
   const d=dataPoints(),t=dpTier(d.total),tr=treeData(),st=bankStats();
   // quest deliberately NOT synced: its title names an exercise, which is
@@ -3498,9 +3519,10 @@ function snapshotData(){
      sessions inside the first tracked week, computed on-device. */
   if(!S._snapLegacy){
     if(!S._snapNoPrev){
-      out.prev_week_live=d.prevWeekLive||0;
-      try{out.prev_week_key=dayKey(new Date(new Date(questWeekKey()+'T12:00').getTime()-7*864e5))}catch(e){}}
-    out.week_live=d.weekLive||0;out.week_sessions=d.weekSessions||0;
+      out.prev_week_live=snapBound('prev_week_live',d.prevWeekLive||0,SNAP_MAX.week_live);
+      try{out.prev_week_key=dayKey(new Date(new Date(questWeekKey()+'T12:00').getTime()-7*864e5))}catch(e){oops('snapPrevKey',e)}}
+    out.week_live=snapBound('week_live',d.weekLive||0,SNAP_MAX.week_live);
+    out.week_sessions=snapBound('week_sessions',d.weekSessions||0,SNAP_MAX.week_sessions);
     /* PODS (14 Sep): the stage bracket and the yes/no exemption ride
        the score card — a bracket the opt-in sheet says out loud will
        be visible, and a flag. Nothing else about the knee travels. */
@@ -20990,12 +21012,32 @@ function restPool(){
     H.forEach(h=>h.log.forEach(l=>{if(!l.w||!l.r)return;const e=e1rm(l.w,l.r,l.rpe);
       if(!top||e>top.e)top={e:e,ex:gBase(l.ex),w:l.w,r:l.r,d:hKey(h)}}));
     if(top)add('Your best set ever is still '+uwNum(top.w)+' '+uwUnit()+' × '+top.r+' on '+top.ex+', from '+fmtDate(top.d+'T12:00')+'. It is waiting.','nav','progress')}catch(e){}
-  try{ // readiness week vs baseline
+  /* ── "THIS WEEK" IS SEVEN DAYS, NOT SEVEN READINGS (audit, 16 Sep
+     2026; AUDIT.md ban 9) ─────────────────────────────────────────
+     This took the last seven days that HAPPEN TO CARRY a readiness
+     value and called the average "this week". Somebody who logs
+     readiness three mornings a week got a fortnight of data presented
+     as a week — and then a verdict on it: "the work is currently
+     ahead of the recovery."
+     The correct pattern was already ten lines below, in the
+     bodyweight block: cut by DATE and take whatever falls inside.
+     It also has to say the count. An average of two mornings and an
+     average of seven are not the same claim, and R2 says the window
+     and the count belong in the sentence that makes the claim. */
+  try{
     if(S.gar&&S.gar.on){const days=S.gar.days||{},ks=Object.keys(days).filter(k=>days[k].am!=null).sort();
-      if(ks.length>=10){const last7=ks.slice(-7).map(k=>days[k].am),rest=ks.slice(0,-7).map(k=>days[k].am);
-        const a7=Math.round(last7.reduce((a,b)=>a+b,0)/last7.length);
-        const ab=Math.round(rest.reduce((a,b)=>a+b,0)/rest.length);
-        add('Readiness averaged '+a7+' this week against your usual '+ab+'. '+(a7>=ab?'Recovery is keeping up with the work.':'The work is currently ahead of the recovery.'),'sigOpen')}}}catch(e){}
+      const cut7=dayKey(new Date(Date.now()-7*864e5));
+      const wk=ks.filter(k=>k>cut7).map(k=>days[k].am);
+      const base=ks.filter(k=>k<=cut7).map(k=>days[k].am);
+      /* three mornings inside the week is the floor for an average to
+         mean anything, and ten before it for a baseline to */
+      if(wk.length>=3&&base.length>=10){
+        const a7=Math.round(wk.reduce((a,b)=>a+b,0)/wk.length);
+        const ab=Math.round(base.reduce((a,b)=>a+b,0)/base.length);
+        add('Readiness averaged '+a7+' across '+wk.length+' morning'+(wk.length===1?'':'s')+
+          ' this week, against your usual '+ab+'. '+
+          (a7>=ab?'Recovery is keeping up with the work.':'The work is currently ahead of the recovery.'),'sigOpen')}}}
+  catch(e){oops('restReadiness',e)}
   try{ // bodyweight fortnight
     const dd=(S.daily&&S.daily.days)||{},ks=Object.keys(dd).filter(k=>dd[k].bw!=null).sort();
     if(ks.length>=8){const cut=dayKey(new Date(Date.now()-14*864e5));
@@ -28206,9 +28248,18 @@ function chartFindings(kind,ex){
   if(kind==='bb'){
     const ks=Object.keys(S.gar.days||{}).sort();
     const morn=ks.map(k=>S.gar.days[k]).filter(d=>d.am!=null).map(d=>+d.am);
-    if(morn.length>=3){const avg=morn.reduce((a,b)=>a+b,0)/morn.length;
-      const rec=morn.slice(-7),rAvg=rec.reduce((a,b)=>a+b,0)/rec.length;
-      add('Recent mornings average '+Math.round(rAvg),
+    /* SEVEN READINGS IS NOT A FORTNIGHT (audit, 16 Sep 2026, ban 9).
+       `morn.slice(-7)` took the last seven READINGS and called them
+       "recent", then compared them against the all-time average and
+       delivered a verdict — "something is costing you recovery". On a
+       watch worn a few days a week those seven could be a month old,
+       and the verdict was about a month nobody named. Cut by date, and
+       say how many mornings are actually in it. */
+    const cut14=dayKey(new Date(Date.now()-14*864e5));
+    const recKs=ks.filter(k=>k>cut14&&S.gar.days[k]&&S.gar.days[k].am!=null);
+    if(morn.length>=3&&recKs.length>=3){const avg=morn.reduce((a,b)=>a+b,0)/morn.length;
+      const rec=recKs.map(k=>+S.gar.days[k].am),rAvg=rec.reduce((a,b)=>a+b,0)/rec.length;
+      add('Last fortnight averages '+Math.round(rAvg)+' across '+rec.length+' mornings',
         rAvg<avg-8?'That is '+Math.round(avg-rAvg)+' below your overall average of '+Math.round(avg)+' — something is costing you recovery.'
           :rAvg>avg+8?'Running above your average of '+Math.round(avg)+'. Good window to push.'
           :'In line with your average of '+Math.round(avg)+'.',
