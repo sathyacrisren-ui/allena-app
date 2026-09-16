@@ -358,8 +358,23 @@ body:has(.tabbar) #app:has(.sessfix),body:has(.tabbar) #app:has(.pinpage){paddin
 .tx-epic{animation-duration:2.3s}
 @keyframes txShim{0%,100%{transform:scale(1);opacity:.10}50%{transform:scale(1.4);opacity:.3}}
 @media (prefers-reduced-motion:reduce){.tx-shim{animation:none;opacity:.14}}
-.txpop{position:fixed;top:calc(env(safe-area-inset-top, 10px) + 54px);left:0;right:0;display:flex;justify-content:center;z-index:94;pointer-events:none;transform:translateZ(0)}
-.txpop>div{pointer-events:auto;display:flex;align-items:center;gap:8px;background:color-mix(in srgb, var(--raised) 94%, #000);border:1px solid color-mix(in srgb, var(--text) 30%, transparent);border-radius:16px;box-shadow:var(--e-3);padding:10px 12px 10px 14px;max-width:400px;width:calc(100% - 28px);margin:0 14px;animation:capDrop .42s cubic-bezier(.32,1.3,.5,1)}
+/* THE CAPSULE SAT ON THE HEADER (16 Sep 2026, seen on screen). At
+   top + 54px it spanned 54-104px while .phead occupies 24-68px — a
+   14px overlap, and with z-index 94 it won, so it covered the bottom
+   of the page title and hid the greeting line underneath entirely.
+   The 54px was chosen to clear the TOAST, which is the thing it was
+   being measured against; nobody measured it against the page.
+   It belongs at the bottom regardless. The toast is transient and
+   announces something that just happened, so the top is right for it.
+   This one is persistent for the day and asks to be tapped — so it
+   sits above the tab bar, near the thumb, where it cannot collide
+   with either the header or the toast. It rises instead of dropping,
+   because a thing that arrives from the bottom should come from the
+   bottom. */
+.txpop{position:fixed;bottom:calc(env(safe-area-inset-bottom, 10px) + 78px);left:0;right:0;display:flex;justify-content:center;z-index:94;pointer-events:none;transform:translateZ(0)}
+body:not(:has(.tabbar)) .txpop{bottom:calc(env(safe-area-inset-bottom, 10px) + 16px)}
+@keyframes capRise{from{transform:translateY(26px);opacity:0}to{transform:translateY(0);opacity:1}}
+.txpop>div{pointer-events:auto;display:flex;align-items:center;gap:8px;background:color-mix(in srgb, var(--raised) 94%, #000);border:1px solid color-mix(in srgb, var(--text) 30%, transparent);border-radius:16px;box-shadow:var(--e-3);padding:10px 12px 10px 14px;max-width:400px;width:calc(100% - 28px);margin:0 14px;animation:capRise .42s cubic-bezier(.32,1.3,.5,1)}
 @media (prefers-reduced-motion:reduce){.txpop>div{animation:none}.tx-guide{animation:none}}
 @media (prefers-reduced-motion:reduce){.tx-new{animation:none;opacity:.8}}
 /* the points pill (owner ask, 13 Sep): the one number that is all real,
@@ -1368,7 +1383,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='c8e690';  // stamped by tools/build.py with the content hash
+const BUILD_ID='f24fff';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -3879,7 +3894,7 @@ function overtakeCard(){
    '@keyframes ovr9{0%,40%{transform:scale(1)}52%{transform:scale(.92)}66%,100%{transform:scale(.92)}}'+
    '@media (prefers-reduced-motion: reduce){.ovme9,.ovtr9,.ovrv9{animation:none!important}}</style>'+
    '<p class="mono" style="font-size:11px;letter-spacing:.14em;color:var(--green)">✦ THE OVERTAKE</p>'+
-   '<h3 class="disp" style="font-size:21px;font-weight:650;margin-top:4px">You passed '+esc(o.name)+'</h3>'+
+   '<h3 class="disp" style="font-size:20px;font-weight:650;margin-top:4px">You passed '+esc(o.name)+'</h3>'+
    '<p class="mono" style="font-size:13px;margin-top:3px;color:var(--dim)"><b style="color:var(--green);font-size:17px">'+(+o.mine||0)+'</b> – '+(+o.theirs||0)+' · witnessed points, this week</p>'+
    '<div style="position:relative;height:76px;margin-top:16px">'+
     '<div style="position:absolute;left:1%;right:1%;top:50%;height:1px;background:var(--line)"></div>'+
@@ -4167,11 +4182,11 @@ function friendsSection(){
       Object.keys(h9).filter(k=>/^\d{4}-/.test(k)).sort().reverse()
         .some(k=>{if(h9[k]==='w'){reignP++;return false}return true})}catch(e9){}
     const profCard='<div class="card mt2" style="padding:15px 16px;display:flex;align-items:center;gap:12px">'+
-      '<button data-a="avOpen" style="width:52px;height:52px;border-radius:52px;background:var(--raised);border:2.5px solid '+avRing((acct()||{}).av,'var(--green)')+';display:flex;align-items:center;justify-content:center;font-size:21px;font-weight:700;flex:none;padding:0">'+avInner((acct()||{}).av,myInitP,'var(--text)')+'</button>'+
+      '<button data-a="avOpen" style="width:52px;height:52px;border-radius:52px;background:var(--raised);border:2.5px solid '+avRing((acct()||{}).av,'var(--green)')+';display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:700;flex:none;padding:0">'+avInner((acct()||{}).av,myInitP,'var(--text)')+'</button>'+
       '<div style="flex:1;min-width:0"><p style="font-size:15px;font-weight:600">'+esc(myFirstP||'You')+'</p>'+
       (reignP>=1?'<p class="mono" style="font-size:9px;letter-spacing:.1em;color:var(--gold);margin-top:2px">CROWN HELD '+reignP+' WEEK'+(reignP===1?'':'S')+'</p>'
         :'<p class="mono" style="font-size:9px;color:var(--faint);letter-spacing:.05em;margin-top:2px">THE WEEKLY RACE</p>')+'</div>'+
-      '<button data-a="raceMineOpen" style="text-align:right;flex:none;padding:0"><p class="disp" data-cu="me" style="font-size:22px;font-weight:700;color:'+(mine>0?'var(--green)':'var(--text)')+'">'+mine+'</p>'+
+      '<button data-a="raceMineOpen" style="text-align:right;flex:none;padding:0"><p class="disp" data-cu="me" style="font-size:24px;font-weight:700;color:'+(mine>0?'var(--green)':'var(--text)')+'">'+mine+'</p>'+
       '<p class="mono" style="font-size:9px;color:var(--faint);letter-spacing:.06em">THIS WEEK \u203a</p></button></div>';
     return profCard+'<p class="eyebrow mt2">The weekly race</p>'+
       '<p style="color:var(--faint);font-size:11px;line-height:1.55;margin-top:4px">Live points only — sessions your phone or watch actually witnessed — fresh every Monday. Typed-in history never scores.'+iBtn('racelaw')+'</p>'+
@@ -4721,13 +4736,13 @@ function podCard(){
        symptom. */
     const ring=r=>r.sess>0?'var(--green)':'var(--line)';
     const col=r=>'<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;min-width:0">'+
-      '<div style="width:50px;height:50px;border-radius:50px;background:var(--raised);border:2.5px solid '+ring(r)+';display:flex;align-items:center;justify-content:center;font-size:19px;font-weight:700'+(r.sess>0?';box-shadow:0 0 14px 0 color-mix(in srgb, var(--green) 35%, transparent)':'')+'">'+
+      '<div style="width:50px;height:50px;border-radius:50px;background:var(--raised);border:2.5px solid '+ring(r)+';display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:700'+(r.sess>0?';box-shadow:0 0 14px 0 color-mix(in srgb, var(--green) 35%, transparent)':'')+'">'+
       ((typeof avInner==='function')?avInner(r.av,r.init,r.sess>0?'var(--green)':'var(--text)'):esc(r.init))+'</div>'+
       '<span style="font-size:11px;font-weight:600;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(r.me?'You':r.name)+'</span></div>';
     return '<div data-a="nav" data-v="social" class="card mt" style="width:100%;text-align:center;padding:15px 16px;display:block;cursor:pointer">'+
       '<p class="mono" style="font-size:9px;letter-spacing:.12em;color:var(--faint)">YOUR POD · WEEK '+P.weekN+' OF 4 · '+esc(String(POD_BRACKETS[P.bracket]||'').toUpperCase())+'</p>'+
       '<div style="display:flex;align-items:flex-end;gap:8px;margin-top:12px;padding:0 2px">'+P.rows.map(col).join('')+'</div>'+
-      '<p class="disp" style="font-size:30px;font-weight:700;line-height:1;margin-top:12px;color:'+(P.score>0?'var(--green)':'var(--text)')+'">'+P.score+'</p>'+
+      '<p class="disp" style="font-size:28px;font-weight:700;line-height:1;margin-top:12px;color:'+(P.score>0?'var(--green)':'var(--text)')+'">'+P.score+'</p>'+
       '<p class="mono" style="font-size:9px;letter-spacing:.1em;color:var(--faint);margin-top:3px">THE POD’S NUMBER · EVERY WITNESSED SESSION, ADDED UP</p>'+
       '<p style="color:var(--dim);font-size:11px;line-height:1.5;margin-top:8px">'+esc(podLine(P))+'</p>'+
       '</div>'}
@@ -5596,8 +5611,8 @@ function viewSetup(){
       return '<div class="view pad stg pinpage" style="padding-top:36px">'+
         '<div style="display:flex;align-items:center;gap:8px">'+
         '<img class="mk" src="'+MARK+'" alt="" style="width:22px;height:22px;object-fit:contain">'+
-        '<h1 class="disp brand" style="font-size:21px;font-weight:600;margin:0">Allena</h1></div>'+
-        '<h2 class="disp gradhead" style="font-size:27px;font-weight:650;line-height:1.12;margin-top:16px">Your training has patterns you can\u2019t see.</h2>'+
+        '<h1 class="disp brand" style="font-size:20px;font-weight:600;margin:0">Allena</h1></div>'+
+        '<h2 class="disp gradhead" style="font-size:28px;font-weight:650;line-height:1.12;margin-top:16px">Your training has patterns you can\u2019t see.</h2>'+
         '<p style="color:var(--dim);font-size:13px;line-height:1.55;margin-top:8px">Your watch knows your heart. Your gym app knows your bar. <b style="color:var(--text)">Nothing reads them together \u2014 Allena does.</b> And it moulds to you: every set, night and run reshapes the model, until yours knows things nobody else\u2019s could.</p>'+
         '<div class="pinbody" style="display:flex;flex-direction:column;justify-content:center;gap:8px;padding:10px 0">'+
         '<p class="mono" style="font-size:9px;letter-spacing:.14em;color:var(--amber)">\u2726 THE KIND OF THING IT FINDS</p>'+
@@ -5615,7 +5630,7 @@ function viewSetup(){
     const wpage=(title,body,foot)=>'<div class="view pad stg pinpage" style="padding-top:22px">'+
       '<button data-a="wBack" style="width:38px;height:38px;border-radius:38px;background:var(--surface);border:1px solid var(--line);color:var(--dim);display:flex;align-items:center;justify-content:center;font-size:15px;margin-bottom:16px">\u2039</button>'+
       '<p class="mono" style="color:var(--amber);font-size:11px;letter-spacing:.14em">EARLY ACCESS</p>'+
-      '<h1 class="disp" style="font-size:26px;font-weight:600;margin-top:8px;line-height:1.15">'+title+'</h1>'+
+      '<h1 class="disp" style="font-size:28px;font-weight:600;margin-top:8px;line-height:1.15">'+title+'</h1>'+
       '<div class="pinbody">'+body+'</div>'+
       '<div class="pinfoot"><div style="display:flex;flex-direction:column;gap:12px">'+foot+'</div>'+
       (steps>1?'<p class="mono" style="color:var(--faint);font-size:9px;letter-spacing:.1em;margin-top:16px;text-align:center">'+Math.min(shown,steps)+' OF '+steps+'</p>':'')+'</div></div>';
@@ -5651,7 +5666,7 @@ function viewSetup(){
        doors spread through the screen's height instead of stacking
        under the title with a void below */
     return '<div class="view pad stg pinpage" style="padding-top:56px">'+
-      '<h1 class="disp brand" style="font-size:30px;font-weight:600">Allena</h1>'+
+      '<h1 class="disp brand" style="font-size:28px;font-weight:600">Allena</h1>'+
       (fg9?'<div class="card" style="padding:12px 15px;margin-top:16px;border-color:var(--greensoft)">'+
         '<p class="mono" style="font-size:9px;color:var(--green);letter-spacing:.06em">RACE LINKED</p>'+
         '<p style="color:var(--dim);font-size:13px;line-height:1.5;margin-top:4px">'+esc(fg9.n)+'’s best week ('+fg9.s+' sessions) is waiting to race yours — pick a door and it starts.</p></div>':'')+
@@ -6531,7 +6546,7 @@ function viewCoach(){
   let h='<div class="chatwrap">';
   h+='<div class="chathead"><div style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 18px">'+
    '<div style="min-width:0;display:flex;align-items:center;gap:8px"><img class="mk" src="'+MARK+'" alt="" style="width:22px;height:22px;object-fit:contain">'+
-   '<span class="disp brand" style="font-size:19px;font-weight:600">Allena</span>'+
+   '<span class="disp brand" style="font-size:20px;font-weight:600">Allena</span>'+
    '<span class="mono" style="color:var(--faint);font-size:9px;letter-spacing:.06em;text-transform:uppercase">'+(aiReady()?((S.ai.proxy||'').trim()?'Allena cloud':(S.ai.model.indexOf('haiku')>=0?'Haiku':'Sonnet')):'Claude app')+'</span></div>'+
    '<div style="display:flex;gap:8px;flex:none">'+
    (th.length?'<button data-a="coachClear" class="chatbtn">New</button>':'')+
@@ -9766,7 +9781,7 @@ function openDoorsCard(){
       MUSCLE_RULES.some(r=>r[1].test(g.ex)));
     let h='<div class="card mt" style="padding:16px;border-radius:20px">'+
       '<p class="eyebrow" style="color:var(--green)">The open doors</p>'+
-      '<p class="disp" style="font-size:19px;font-weight:600;margin-top:8px">Still yours</p>'+
+      '<p class="disp" style="font-size:20px;font-weight:600;margin-top:8px">Still yours</p>'+
       '<p style="color:var(--dim);font-size:13px;line-height:1.6;margin-top:4px">The knee closes some doors for a while. It never touched these \u2014 chest, back, shoulders, arms, core'+
       (names.length?': '+names.length+' of your own lifts, fully open.':'.')+'</p>';
     if(movers.length)h+=movers.slice(0,2).map(m=>
@@ -10004,7 +10019,7 @@ function aclTrackCard(){
       '<div style="display:flex;justify-content:space-between;align-items:baseline">'+
       '<p class="eyebrow" style="margin:0">Where you are</p>'+
       '<span class="mono" style="color:var(--faint);font-size:11px">'+T.weeks+' WEEK'+(T.weeks===1?'':'S')+' IN \u203a</span></div>'+
-      '<p class="disp" style="font-size:25px;font-weight:600;line-height:1.15;margin-top:8px">'+
+      '<p class="disp" style="font-size:24px;font-weight:600;line-height:1.15;margin-top:8px">'+
         T.cleared+' of '+T.total+' <span style="color:var(--faint);font-size:15px;font-weight:500">gates cleared</span></p></button>'+
       '<svg viewBox="0 0 '+W+' '+H+'" width="100%" style="display:block;margin-top:12px;overflow:visible" aria-hidden="true">'+
       bands+
@@ -10240,7 +10255,7 @@ function viewReport(){
   const R=reportData();
   let h='<div class="view pad stg phpad">'+
    '<button data-a="nav" data-v="'+(S.repFrom||'acl')+'" class="btn" style="width:auto;padding:8px 14px;color:var(--dim);font-size:13px;margin-bottom:14px">‹ '+(S.repFrom==='diary'?'Diary':'Rehab')+'</button>'+
-   '<h1 class="disp" style="font-size:25px;font-weight:600;line-height:1.15">Physio report</h1>'+
+   '<h1 class="disp" style="font-size:24px;font-weight:600;line-height:1.15">Physio report</h1>'+
    '<p class="mono" style="color:var(--faint);font-size:11px;letter-spacing:.06em;text-transform:uppercase;margin-top:8px">'+esc(fmtDate(new Date().toISOString()))+
    (S.prof&&S.prof.name?' · '+esc(S.prof.name):'')+'</p>'+
    '<p style="color:var(--dim);font-size:13px;line-height:1.6;margin-top:12px">Everything a physio asks in the first five minutes, already answered.</p>';
@@ -10484,7 +10499,7 @@ function runDetail(kind){
     h+='<h1 class="disp" style="font-size:24px;font-weight:600">Easy pace</h1>'+
       '<p style="color:var(--dim);font-size:13px;line-height:1.65;margin-top:12px">Your pace on easy and long runs. Getting quicker at the same effort is the clearest sign aerobic fitness is improving — quicker on hard days can just be a good day.</p>';
     if(f)h+='<div class="card mt2" style="padding:18px;text-align:center">'+
-      '<p class="mono disp" style="font-size:30px;font-weight:600">'+paceStr(f.early*10,10)+' → '+paceStr(f.late*10,10)+'</p>'+
+      '<p class="mono disp" style="font-size:28px;font-weight:600">'+paceStr(f.early*10,10)+' → '+paceStr(f.late*10,10)+'</p>'+
       '<p class="mono" style="color:'+(f.early-f.late>0.05?'var(--green)':f.late-f.early>0.05?'var(--amber)':'var(--faint)')+';font-size:11px;margin-top:8px">'+
       (f.early-f.late>0.05?'improving':f.late-f.early>0.05?'slipping':'holding steady')+' · '+f.n+' runs</p></div>';
     if(easy.length)h+='<p class="eyebrow mt2">Every easy and long run</p><div class="card mt" style="padding:4px 16px">'+
@@ -11258,7 +11273,7 @@ function weeksRacedCard(){
     if(!n)return '';   /* silent until it is true — never a zero to stare at */
     return '<div class="card mt" style="padding:16px">'+
       '<div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap">'+
-      '<span class="disp" style="font-size:26px;font-weight:700">'+n+'</span>'+
+      '<span class="disp" style="font-size:28px;font-weight:700">'+n+'</span>'+
       '<span style="font-size:15px;font-weight:600">'+(n===1?'week raced':'weeks raced')+'</span></div>'+
       '<p style="color:var(--dim);font-size:13px;line-height:1.6;margin-top:8px">'+
       'Weeks you showed up with work the clock witnessed. It only ever goes up — '+
@@ -11286,7 +11301,7 @@ function viewPoints(){
    '<p class="disp" style="font-size:17px;font-weight:600;margin-top:8px">'+esc(stg[0])+'</p>'+
    '<p style="color:var(--dim);font-size:13px;line-height:1.55;margin-top:4px">'+esc(stg[1])+'</p>'+
    '<div style="height:1px;background:var(--line);margin:16px 0"></div>'+
-   '<p class="mono disp an-pop grad" style="font-size:42px;font-weight:800;line-height:1">'+d.total.toLocaleString()+'</p>'+
+   '<p class="mono disp an-pop grad" style="font-size:44px;font-weight:800;line-height:1">'+d.total.toLocaleString()+'</p>'+
    '<p class="mono" style="color:var(--faint);font-size:11px;letter-spacing:.06em;margin-top:8px">DATA POINTS</p>'+
    '<p style="color:var(--faint);font-size:11px;margin-top:3px">for what you log \u2014 what Allena finds pays discovery points, in the collection</p>'+
    (function(){const lt=liveTier(d.live),ln=liveNext(d.live);
@@ -11548,7 +11563,7 @@ function viewAcl(){
     '<button data-a="aclView" data-v="'+a.phase+'" style="color:var(--amber);font-size:11px;margin-left:6px">back to mine ›</button></p>';
   h+='<div class="card mt" style="padding:16px;border-color:'+(isNow?'var(--amber)':'var(--line)')+'">'+
     '<p class="eyebrow" style="color:'+(isNow?'var(--amber)':'var(--faint)')+'">Phase '+ph+' of 5'+(isNow?'':' · preview')+'</p>'+
-    '<p class="disp" style="font-size:19px;font-weight:600;margin-top:3px">'+esc(P.name)+'</p>'+
+    '<p class="disp" style="font-size:20px;font-weight:600;margin-top:3px">'+esc(P.name)+'</p>'+
     '<p style="color:var(--dim);font-size:13px;line-height:1.55;margin-top:8px">'+esc(P.aim)+'</p>'+
     /* ═══ THE HURDLE BEFORE THE TESTING (review, 15 Sep 2026) ═══════════
        The guide's phase-3 criteria — "the following hurdle criteria must
@@ -12700,7 +12715,7 @@ function viewRide(){
     '<div class="row mt2" style="gap:12px">'+
     [[udNum(Math.round(km*10)/10),udUnit().toUpperCase()+' THIS WEEK'],[wk.length,'RIDES'],[Math.round(mins),'MINUTES']].map(x=>
       '<div class="card" style="flex:1;padding:13px 10px;text-align:center">'+
-      '<p class="mono disp" style="font-size:19px;font-weight:700">'+x[0]+'</p>'+
+      '<p class="mono disp" style="font-size:20px;font-weight:700">'+x[0]+'</p>'+
       '<p class="mono" style="color:var(--faint);font-size:9px;letter-spacing:.06em;margin-top:3px">'+x[1]+'</p></div>').join('')+'</div>';
   if(effPts.length>=3)h+='<div class="card mt" style="padding:15px 16px">'+
     '<div style="display:flex;justify-content:space-between;align-items:baseline">'+
@@ -12884,12 +12899,12 @@ function arrivalDue(){
 function viewArrival(){
   const c=arrivalCounts();
   const row=(n,label,sub)=>n?'<div class="card" style="padding:11px 15px;display:flex;align-items:baseline;gap:12px">'+
-    '<span class="mono disp" style="font-size:21px;font-weight:700;color:var(--text);flex:none;min-width:44px;text-align:right">'+n.toLocaleString()+'</span>'+
+    '<span class="mono disp" style="font-size:20px;font-weight:700;color:var(--text);flex:none;min-width:44px;text-align:right">'+n.toLocaleString()+'</span>'+
     '<span style="flex:1;min-width:0"><span style="display:block;font-size:13px;font-weight:600">'+label+'</span>'+
     '<span style="color:var(--faint);font-size:11px">'+sub+'</span></span></div>':'';
   return '<div class="view pad stg pinpage" style="padding-top:40px">'+
     '<p class="mono" style="color:var(--green);font-size:11px;letter-spacing:.14em">\u2726 YOUR DATA ARRIVED</p>'+
-    '<h1 class="disp gradhead" style="font-size:26px;font-weight:650;line-height:1.15;margin-top:8px">Health has been talking.</h1>'+
+    '<h1 class="disp gradhead" style="font-size:28px;font-weight:650;line-height:1.15;margin-top:8px">Health has been talking.</h1>'+
     '<p style="color:var(--dim);font-size:13px;line-height:1.6;margin-top:8px">While you were setting up, Apple Health handed over your history \u2014 so Today already knows you. This is where it all came from:</p>'+
     '<div class="pinbody" style="display:flex;flex-direction:column;justify-content:center;gap:8px;padding:10px 0">'+
     row(c.runs,'Runs & cardio','From your watch, via Apple Health')+
@@ -12916,7 +12931,7 @@ function healthConnectCard(){
       '<div style="display:flex;align-items:center;gap:8px">'+
       '<span style="font-size:17px">\u2764\ufe0f</span>'+
       '<p class="mono" style="flex:1;font-size:9px;color:var(--amber);letter-spacing:.06em">CONNECT APPLE HEALTH</p></div>'+
-      '<p class="disp gradhead" style="font-size:22px;line-height:1.15;margin-top:8px">Allena is a different app once your data flows in</p>'+
+      '<p class="disp gradhead" style="font-size:24px;line-height:1.15;margin-top:8px">Allena is a different app once your data flows in</p>'+
       '<p style="color:var(--dim);font-size:13px;line-height:1.6;margin-top:8px">Your runs, sleep, heart rate and steps turn on the finds nothing else can make \u2014 how your sleep moves your lifts, what your heart says about recovery. If your Garmin, Apple Watch, Strava or MyFitnessPal already sync to Apple Health, Allena reads it all. Two taps.</p>'+
       (S.hcChecking
         ?'<div class="big disp mt" style="background:var(--raised);color:var(--dim);font-size:15px;display:flex;align-items:center;justify-content:center;gap:8px">'+
@@ -15481,7 +15496,7 @@ function bootHtml(step){
     '<circle class="boot-ring" cx="48" cy="48" r="27" fill="none" stroke="var(--amber)" stroke-width="1.5" stroke-linecap="round"/>'+
     '<circle class="an-ring" cx="48" cy="48" r="38" fill="none" stroke="var(--amber)" stroke-width="1" stroke-linecap="round" stroke-dasharray="24 216" opacity=".45"/></svg>'+
     '<img class="mk" src="'+MARK+'" alt="" class="mk an-mark" style="position:absolute;inset:0;margin:auto;width:30px;height:30px;object-fit:contain"></div>'+
-    '<h1 class="disp brand" style="font-size:30px;font-weight:600;margin-top:20px">Allena</h1>'+
+    '<h1 class="disp brand" style="font-size:28px;font-weight:600;margin-top:20px">Allena</h1>'+
     '<div style="position:relative;height:2px;width:150px;border-radius:2px;background:var(--line);overflow:hidden;margin-top:16px">'+
     '<div class="boot-sweep"></div></div>'+
     '<div id="bootlines" style="margin-top:20px;min-height:42px">'+bootLineHtml(i)+'</div>'+
@@ -15980,7 +15995,7 @@ function viewSigDetail(){
   return '<div class="view pad modalrise" style="padding-top:20px">'+
     '<div style="display:flex;align-items:center;gap:12px;margin-bottom:6px">'+
     '<button data-a="back" style="width:44px;height:44px;border-radius:42px;background:var(--surface);border:1px solid var(--line);color:var(--dim);display:flex;align-items:center;justify-content:center;flex:none;font-size:17px">\u2039</button>'+
-    '<h1 class="disp" style="font-size:19px;font-weight:600;flex:1;text-align:center;margin:0">'+kind.k+'</h1>'+
+    '<h1 class="disp" style="font-size:20px;font-weight:600;flex:1;text-align:center;margin:0">'+kind.k+'</h1>'+
     '<span style="width:42px;flex:none"></span></div>'+
     '<p style="color:var(--dim);font-size:13px;line-height:1.65;margin-top:8px">'+(SIG_WHY[kind.k]||'')+'</p>'+
     (pts.length>=2?'<div class="card mt2" style="padding:14px 16px">'+
@@ -16925,7 +16940,7 @@ function signalRevealHtml(){
     '</svg>'+
     '<div style="position:relative;margin-top:34vh">'+
     '<p class="mono sig-eyebrow" style="font-size:11px;letter-spacing:.24em;color:'+(sg.c||'var(--green)')+'">'+(sg.e||'\u2726 AN INSIGHT')+'</p>'+
-    '<p class="disp sig-title" style="font-size:27px;line-height:1.2;font-weight:700;margin-top:12px;max-width:15ch;background:none;-webkit-text-fill-color:#F0EEE6;color:#F0EEE6">'+esc(sg.t)+'</p>'+
+    '<p class="disp sig-title" style="font-size:28px;line-height:1.2;font-weight:700;margin-top:12px;max-width:15ch;background:none;-webkit-text-fill-color:#F0EEE6;color:#F0EEE6">'+esc(sg.t)+'</p>'+
     '<p class="sig-body" style="color:#B9B5AA;font-size:13px;line-height:1.6;margin-top:12px;max-width:34ch">'+esc(sg.d)+'</p>'+
     '<p class="mono sig-tap" style="color:#8E8A80;font-size:11px;letter-spacing:.06em;margin-top:24px">TAP TO KEEP IT</p>'+
     '</div></div>'}
@@ -20548,7 +20563,7 @@ function viewTree(){
     let h='<div class="view" style="padding:16px 0 0;overflow:hidden">'+
       '<div style="display:flex;align-items:center;gap:12px;padding:0 14px">'+
       '<button data-a="back" class="btn" style="width:auto;padding:8px 14px;color:var(--dim);font-size:13px">‹ Back</button>'+
-      '<h1 class="disp" style="font-size:22px;font-weight:600;flex:1;min-width:0">Your tree</h1>'+
+      '<h1 class="disp" style="font-size:24px;font-weight:600;flex:1;min-width:0">Your tree</h1>'+
       '<button data-a="treeLegendTog" aria-label="What the tree means" style="width:36px;height:36px;border-radius:36px;background:var(--raised);border:1.5px solid var(--line);color:var(--dim);font-size:13px;flex:none">i</button></div>';
     if(!m||m.empty){
       return h+'<div class="card" style="margin:16px 14px;padding:16px"><p style="font-size:15px;font-weight:600">Nothing to draw yet</p>'+
@@ -20755,7 +20770,7 @@ function treeXSheet(){
       const live=(typeof sessionLive==='function')?sessionLive(h):false;
       const stat=(v,l)=>'<div style="flex:1;text-align:center"><p class="disp" style="font-size:17px;font-weight:700">'+v+'</p><p class="mono" style="font-size:9px;color:var(--faint);letter-spacing:.06em;margin-top:2px">'+l+'</p></div>';
       return wrapSheet('A branch · one session',
-        '<p class="disp" style="font-size:19px;font-weight:650;line-height:1.2">'+esc(h.dayTitle||'Session')+'</p>'+
+        '<p class="disp" style="font-size:20px;font-weight:650;line-height:1.2">'+esc(h.dayTitle||'Session')+'</p>'+
         '<p class="mono" style="color:var(--faint);font-size:11px;margin-top:4px">'+esc(fmtDate(hKey(h)+'T12:00'))+(h.minutes?' · '+h.minutes+' MIN':'')+(live?' · WITNESSED':'')+'</p>'+
         '<div class="card mt" style="padding:12px 8px;display:flex">'+stat(sets.length,'SETS')+stat(Object.keys(ex).length,'EXERCISES')+stat(ton>0?tonStr(ton):'—','LIFTED')+stat(rp.length?(Math.round(rp.reduce((a,b)=>a+b,0)/rp.length*10)/10):'—','AVG RPE')+'</div>'+
         '<div style="margin-top:12px">'+Object.keys(ex).map(b=>'<p style="font-size:13px;color:var(--dim);margin-top:4px">'+esc(b)+' <span class="mono" style="color:var(--faint);font-size:11px">'+ex[b]+' set'+(ex[b]===1?'':'s')+'</span></p>').join('')+'</div>'+
@@ -20789,7 +20804,7 @@ function treeXSheet(){
           '<span class="mono">'+(o.q.secs>0?o.q.secs+'s':uwNum(o.q.w)+' × '+o.q.r)+(o.q.rpe!=null?' @'+o.q.rpe:'')+'</span></div>').join('')+
         '</div>'):'';
       return wrapSheet(sameEx.length>1?('A leaf · '+sameEx.length+' sets'):'A leaf · one set',
-        '<p class="disp" style="font-size:19px;font-weight:650;line-height:1.2">'+esc(b)+'</p>'+
+        '<p class="disp" style="font-size:20px;font-weight:650;line-height:1.2">'+esc(b)+'</p>'+
         '<p class="mono" style="color:var(--faint);font-size:11px;margin-top:4px">'+esc(fmtDate(hKey(h)+'T12:00'))+' · SET '+(l.setNo||(+S.sheet.i+1))+(l.pr?' · <span style="color:var(--green)">PR</span>':'')+'</p>'+
         '<p class="disp" style="font-size:28px;font-weight:700;margin-top:12px">'+(l.secs>0?l.secs+'s hold':uwNum(l.w)+' '+uwUnit()+' × '+l.r)+(l.rpe!=null?' <span style="font-size:15px;color:var(--dim)">@ RPE '+l.rpe+'</span>':'')+'</p>'+
         (e?'<p style="color:var(--dim);font-size:13px;line-height:1.6;margin-top:8px">About '+uwNum(e)+' '+uwUnit()+' estimated max'+(rel!=null?' — '+rel+'% of your best ever on this lift'+(bestK?' ('+esc(fmtDate(bestK+'T12:00'))+')':''):'')+'.'+
@@ -20803,7 +20818,7 @@ function treeXSheet(){
       const r=b.run;
       const pace=(r.mins>0&&r.km>0)?paceStr(r.mins,r.km):'';
       return wrapSheet('A branch · one '+(b.dom==='ride'?'ride':b.dom==='walk'?'walk':'run'),
-        '<p class="disp" style="font-size:26px;font-weight:700;line-height:1.1">'+(Math.round(b.km*10)/10)+' km</p>'+
+        '<p class="disp" style="font-size:28px;font-weight:700;line-height:1.1">'+(Math.round(b.km*10)/10)+' km</p>'+
         '<p class="mono" style="color:var(--faint);font-size:11px;margin-top:4px">'+esc(fmtDate(b.k+'T12:00'))+(r.mins?' · '+Math.round(r.mins)+' MIN':'')+(pace?' · '+esc(pace)+(b.dom==='ride'?'':'/KM'):'')+(r.hr?' · HR '+Math.round(r.hr):'')+(r.type?' · '+esc(String(r.type).toUpperCase()):'')+'</p>'+
         '<p style="color:var(--faint);font-size:11px;line-height:1.5;margin-top:12px">Each leaf on this branch is one kilometre. '+(r.hr?'Heart rate was recorded, so it can race.':'No heart rate on it.')+'</p>'+
         (r.id?'<button data-a="txOpenRun" data-v="'+esc(String(r.id))+'" class="btn mt2" style="color:var(--amber)">Open it on the running page</button>':''))}
@@ -21028,7 +21043,7 @@ function wrapCard(){
   if(!pm)return '';
   return '<button data-a="wrapGo" data-v="'+pm+'" class="card an-hero" style="width:100%;text-align:left;padding:17px;border-radius:20px;margin-top:12px;border-color:var(--amber)">'+
     '<p class="mono" style="font-size:9px;color:var(--amber);letter-spacing:.08em">THE WRAP</p>'+
-    '<p class="disp gradhead" style="font-size:30px;line-height:1.1;margin-top:8px">'+esc(String(ymName(pm)).split(' ')[0]).toUpperCase()+'.</p>'+
+    '<p class="disp gradhead" style="font-size:28px;line-height:1.1;margin-top:8px">'+esc(String(ymName(pm)).split(' ')[0]).toUpperCase()+'.</p>'+
     '<p style="color:var(--dim);font-size:13px;line-height:1.55;margin-top:8px">Your month, wrapped — the tonnage, the biggest move, the best find, and the one thing worth fixing.</p>'+
     '<p class="mono" style="color:var(--amber);font-size:11px;margin-top:12px">Open it ›</p></button>'}
 
@@ -21075,7 +21090,7 @@ function recapCard(){
   const r=weekRecapBuild(wk);if(!r)return '';
   return '<button data-a="recapGo" data-v="'+wk+'" class="card" style="width:100%;text-align:left;padding:16px;border-radius:20px;margin-top:12px;border-color:var(--line)">'+
     '<p class="mono" style="font-size:9px;color:var(--amber);letter-spacing:.08em">LAST WEEK</p>'+
-    '<p class="disp gradhead" style="font-size:23px;line-height:1.15;margin-top:8px">'+
+    '<p class="disp gradhead" style="font-size:24px;line-height:1.15;margin-top:8px">'+
     r.n+' session'+(r.n===1?'':'s')+(r.km?' · '+udNum(r.km)+' '+udUnit():'')+(r.ton?' · '+(Math.round(r.ton/100)/10)+' t':'')+'</p>'+
     '<p style="color:var(--dim);font-size:13px;line-height:1.5;margin-top:4px">'+
     (r.quest?'Quest done. ':'')+(r.ghost?'Ghost beaten. ':'')+(r.prs?r.prs+' rep PR'+(r.prs===1?'':'s')+'. ':'')+
@@ -21219,7 +21234,7 @@ function dashTiles(){
   const out=[];
   const tile=(v,l,col,act,av)=>'<button '+(act?'data-a="'+act+'"'+(av!=null?' data-v="'+av+'"':''):'')+
     ' class="card" style="flex:1;min-width:0;padding:13px 10px;text-align:center;display:block">'+
-    '<p class="mono" style="font-size:21px;font-weight:800;line-height:1;color:'+(col||'var(--text)')+'">'+esc(String(v))+'</p>'+
+    '<p class="mono" style="font-size:20px;font-weight:800;line-height:1;color:'+(col||'var(--text)')+'">'+esc(String(v))+'</p>'+
     '<p class="mono" style="color:var(--faint);font-size:9px;letter-spacing:.04em;margin-top:4px">'+esc(l)+'</p></button>';
   /* A COUNT IS A FACT. A PERCENTAGE AGAINST A TARGET IS A VERDICT.
      (16 Sep 2026, from the failure-presentation research.) This tile
@@ -21931,8 +21946,8 @@ function fuseCard(){
     return '<button data-a="fusesOpen" class="card mt an-glow" style="width:100%;text-align:left;padding:18px;border-radius:20px;display:block;border-color:'+(one?'var(--amber)':'color-mix(in srgb, var(--text) 45%, transparent)')+'">'+
       '<p class="mono" style="font-size:11px;letter-spacing:.14em;color:var(--amber)">\u2726 '+(one?'ONE AWAY':'ALMOST THERE')+'</p>'+
       '<div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-top:8px">'+
-      '<p class="disp" style="font-size:21px;font-weight:650;line-height:1.2;flex:1;min-width:0">'+esc(near.t)+'</p>'+
-      '<p class="mono disp grad" style="font-size:32px;font-weight:800;flex:none">'+near.have+'<span style="font-size:17px;color:var(--faint)">/'+near.need+'</span></p></div>'+
+      '<p class="disp" style="font-size:20px;font-weight:650;line-height:1.2;flex:1;min-width:0">'+esc(near.t)+'</p>'+
+      '<p class="mono disp grad" style="font-size:34px;font-weight:800;flex:none">'+near.have+'<span style="font-size:17px;color:var(--faint)">/'+near.need+'</span></p></div>'+
       '<div style="height:8px;border-radius:8px;background:var(--line);overflow:hidden;margin-top:12px">'+
       '<div class="an-bar" style="height:8px;border-radius:8px;width:'+near.pct+'%;background:var(--amber)"></div></div>'+
       '<p style="color:var(--dim);font-size:13px;line-height:1.6;margin-top:12px">'+esc(near.d)+'</p>'+
@@ -22587,7 +22602,7 @@ function findBigHtml(){
              lost: they are banked, they are in the binder, and the
              read they land on holds all of them. */
           (dl.i+1<dl.ids.length
-            ?'<button data-a="deepDealAll" class="btn" style="width:100%;margin-top:14px;border:0;color:var(--faint);font-size:12px">See them all on the read</button>'
+            ?'<button data-a="deepDealAll" class="btn" style="width:100%;margin-top:14px;border:0;color:var(--faint);font-size:13px">See them all on the read</button>'
             :'')+
           '</div>'
         :'<div class="fb-acts">'+
@@ -22673,7 +22688,7 @@ function viewCollection(){
    (function(){const fp=findPoints(),rk=findRank(fp);
      return '<div class="card mt2" style="padding:15px 16px">'+
        '<div style="display:flex;align-items:baseline;justify-content:space-between">'+
-       '<span class="disp gradhead" style="font-size:26px">'+fp.toLocaleString()+'</span>'+
+       '<span class="disp gradhead" style="font-size:28px">'+fp.toLocaleString()+'</span>'+
        '<span class="mono" style="font-size:11px;color:var(--amber);letter-spacing:.06em">'+esc(rk.name.toUpperCase())+'</span></div>'+
        '<p class="mono" style="font-size:9px;color:var(--faint);letter-spacing:.05em;margin-top:2px">DISCOVERY POINTS</p>'+
        '<p style="color:var(--faint);font-size:11px;margin-top:2px">for what Allena finds \u2014 logging itself pays data points, on the tree page</p>'+
@@ -23709,7 +23724,7 @@ function viewReview(){
   const wk=(st.days/7);
   let h='<div class="view pad stg phpad">'+
    '<p class="eyebrow" style="color:var(--amber)">Block complete</p>'+
-   '<h1 class="disp" style="font-size:26px;font-weight:600;margin-top:3px;line-height:1.15">'+esc(p.block)+'</h1>'+
+   '<h1 class="disp" style="font-size:28px;font-weight:600;margin-top:3px;line-height:1.15">'+esc(p.block)+'</h1>'+
    '<p style="color:var(--dim);font-size:13px;line-height:1.6;margin-top:8px">'+
    st.logged+' sessions over '+wk.toFixed(1)+' weeks, '+st.sets+' sets, '+tonStr(st.ton)+' moved'+
    (st.prs?', '+st.prs+' personal best'+(st.prs===1?'':'s'):'')+'. Here is what the numbers say before you decide what comes next.</p>';
@@ -23904,17 +23919,41 @@ function logLines(list,action,sid){return list.map((l,i)=>
   '<button class="logline mono" data-a="'+action+'"'+(sid?' data-sid="'+sid+'"':'')+' data-v="'+i+'">'+
   '<span style="color:var(--dim)">'+esc(l.ex)+' #'+l.setNo+'</span>'+
   '<span>'+esc(entryStr(l))+(l.pr?' <span style="color:var(--amber)">★</span>':'')+' <span style="color:var(--faint)">›</span></span></button>').join('')}
+/* A LIFT WITH NO WRITTEN WEIGHT IS NOT A BODYWEIGHT LIFT (owner-caught
+   mid-session, 16 Sep 2026: "Chest supported row isn't bodyweight?").
+   targetStr read `c.targetW == null` as "this movement uses no load".
+   Those are two different facts. A chest-supported row with no weight
+   in the block is a row nobody wrote a number for — and the screen
+   printed BODYWEIGHT in display type directly above his own reference
+   line, "WEEK 3 · SET 1 · 68 × 15 @7". It told him to do, with no
+   weight on it, a lift he had done at 68 kg the week before.
+   Bodyweight is a property of the MOVEMENT, so the movement decides it.
+   Everything else with no number says so plainly and lets the
+   last-time line underneath answer the question — which is the only
+   thing the prescription law allows anyway: the written programme is
+   the only load this app ever shows, so an empty one must not be
+   filled with a guess. */
+const BW_LOADED=/\b(barbell|dumbbell|db|bb|kettlebell|kb|cable|machine|smith|weighted|banded|band|plate|goblet|landmine|goblet)\b/i;
+const BW_MOVE=/\b(pull[- ]?ups?|chin[- ]?ups?|dips?|push[- ]?ups?|press[- ]?ups?|planks?|sit[- ]?ups?|crunch(es)?|leg raises?|knee raises?|knee tucks?|air squats?|body ?weight|inverted rows?|nordic|back extensions?|hyperextensions?|glute bridges?|bird ?dogs?|dead ?bugs?|supermans?|wall sits?|mountain climbers?|burpees?|hollow|heel slides?|clam ?shells?|step[- ]?ups?|lunges?|bridges?|side[- ]?lying)\b/i;
+function exIsBodyweight(n){
+  try{
+    const s=String(n||'');
+    /* a loaded variant names its load, and the name wins: "weighted
+       pull-up", "dumbbell step-up", "machine back extension" */
+    if(BW_LOADED.test(s))return false;
+    return BW_MOVE.test(s)}
+  catch(e){oops('exIsBodyweight',e);return false}}
 function targetStr(c){
   /* the number is the reason the screen exists (16 Sep 2026) — display
-     scale, tabular figures so it does not jiggle between sets, and a
-     bodyweight lift says BODYWEIGHT rather than an em dash, which read
-     as missing data rather than as "no load". */
+     scale, tabular figures so it does not jiggle between sets. */
   if(c.secs)return '<span class="mono n">'+c.secs+'</span>'+
     '<span class="mono u">sec'+(c.perSide?' / side':'')+'</span>';
-  const bw=c.targetW==null;
-  return '<span class="mono n" style="'+(bw?'font-size:var(--d-3);letter-spacing:0':'')+'">'+(bw?'Bodyweight':uwNum(c.targetW))+'</span>'+
-   (bw?'':'<span class="mono u">'+uwUnit()+'</span>')+
-   '<span class="mono x">\u00d7 '+c.targetReps+(c.perSide?' / side':'')+'</span>'}
+  const none=c.targetW==null;
+  const bw=none&&exIsBodyweight(c.ex);
+  const word=bw?'Bodyweight':'Pick a load';
+  return '<span class="mono n" style="'+(none?'font-size:var(--d-3);letter-spacing:0':'')+'">'+(none?word:uwNum(c.targetW))+'</span>'+
+   (none?'':'<span class="mono u">'+uwUnit()+'</span>')+
+   '<span class="mono x">× '+c.targetReps+(c.perSide?' / side':'')+'</span>'}
 
 /* ══ views ══════════════════════════════════════════════ */
 function weekDone(progId,wk){const set=new Set();
@@ -24560,7 +24599,7 @@ function weekBoardCard(){
     return '<span class="mono" style="'+base+(it.done
       ?'background:var(--text);color:var(--bg);font-weight:700'
       :'border:1px solid var(--line);color:var(--dim)')+'">'+esc(it.l)+'</span>'};
-  const leg=(col,lab)=>'<span style="display:inline-flex;align-items:center;gap:5px"><span style="width:7px;height:7px;border-radius:7px;background:'+col+'"></span><span class="mono" style="font-size:10px;color:var(--faint)">'+lab+'</span></span>';
+  const leg=(col,lab)=>'<span style="display:inline-flex;align-items:center;gap:5px"><span style="width:7px;height:7px;border-radius:7px;background:'+col+'"></span><span class="mono" style="font-size:11px;color:var(--faint)">'+lab+'</span></span>';
   return '<div class="card mt" style="padding:15px 14px 13px">'+
     '<div style="display:flex;align-items:baseline;gap:12px;padding:0 2px">'+
     '<p class="eyebrow" style="flex:1">Your week</p>'+
@@ -24589,9 +24628,18 @@ function weekChip(){
   try{
     if(weekCardBody()==='')return '';
     const c=weekClock();if(!c)return '';
+    /* THE COMMENT ABOVE ALREADY SAID THIS AND THE CODE DID NOT DO IT
+       (16 Sep 2026, seen on screen — a red "7+" chip on a week that was
+       merely full). "over-full (amber) or stacked dangerously (red)"
+       was the stated rule; `alert?red:faint` collapsed both into red.
+       c.over is "more sessions left than days left" and c.expired is
+       "the 7-day clock ran out" — neither is a danger, they are things
+       worth noticing, which is what amber is for. c.hard is dayN>9, a
+       week genuinely stacking up, and that is the one that earns red.
+       Red means stop. A full week is not a stop. */
     const alert=c.hard||c.over||c.expired;
-    const tone=alert?'var(--red)':'var(--faint)';
-    const line=alert?'var(--red)':'var(--line)';
+    const tone=c.hard?'var(--red)':alert?'var(--amber)':'var(--faint)';
+    const line=c.hard?'var(--red)':alert?'var(--amber)':'var(--line)';
     return '<button data-a="weekClockOpen" class="mono" style="flex:none;display:flex;align-items:center;gap:4px;padding:6px 11px;border:1px solid '+line+';border-radius:var(--r-full);color:'+tone+';font-size:11px;font-weight:600">'+
       '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>'+
       (c.day>7?'7+':c.day+'/7')+'</button>'}catch(e){return ''}}
@@ -24979,7 +25027,7 @@ function dayCard(p,d,i,done,daily){
          :locked?'<span class="mono" style="color:var(--faint);font-size:11px">WEEK CLOSED</span>'
          :gated?'<span class="mono" style="color:var(--amber);font-size:11px">W'+(S.week-1)+' STILL OPEN</span>':'')+
     '<span style="flex:1"></span><span class="mono" style="color:var(--faint);font-size:15px">›</span></div>'+
-    '<h2 class="disp" style="font-size:19px;font-weight:600;margin-top:8px;'+(done?'color:var(--dim)':'')+'">'+esc(d.name)+'</h2>'+
+    '<h2 class="disp" style="font-size:20px;font-weight:600;margin-top:8px;'+(done?'color:var(--dim)':'')+'">'+esc(d.name)+'</h2>'+
     muscleRowsHtml(p,i)+
     (offloadFor(p,i).length?'<p class="mono" style="color:var(--amber);font-size:11px;margin-top:8px">+ '+offloadFor(p,i).length+' moved here: '+offloadFor(p,i).map(x=>esc(String(x.ex||'').replace(/ — .*/,''))).join(', ')+'</p>':'')+
     (function(){const ab=((S.addback||{})[offloadKey(p)]||[]).filter(a=>a.day===i);
@@ -25185,7 +25233,7 @@ function viewEvidence(){
   let h='<div class="view pad stg phpad">'+
     '<button data-a="back" class="btn" style="width:auto;padding:8px 14px;color:var(--dim);font-size:13px;margin-bottom:14px">\u2039 Back</button>'+
     '<p class="mono" style="font-size:9px;letter-spacing:.1em;color:var(--green)">THE EVIDENCE</p>'+
-    '<h1 class="disp" style="font-size:23px;font-weight:600;line-height:1.2;margin-top:8px">'+esc(e.t||'A linked find')+'</h1>'+
+    '<h1 class="disp" style="font-size:24px;font-weight:600;line-height:1.2;margin-top:8px">'+esc(e.t||'A linked find')+'</h1>'+
     (e.d?'<p style="color:var(--dim);font-size:13px;line-height:1.65;margin-top:8px">'+esc(e.d)+'</p>':'');
   if(!ev){return h+'<p style="color:var(--faint);font-size:13px;margin-top:16px">The charts behind this one are still assembling.</p></div>'}
   if(ev.corr){
@@ -26312,7 +26360,7 @@ function upgradeSheet(){
   h+='<p class="eyebrow" style="margin-top:20px">Price</p>'+
     '<div class="card" style="padding:14px 16px;margin-top:8px">'+
     '<div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap">'+
-      '<span style="font-size:22px;font-weight:700">'+esc(yr)+'</span>'+
+      '<span style="font-size:24px;font-weight:700">'+esc(yr)+'</span>'+
       '<span style="color:var(--dim);font-size:13px">a year</span></div>'+
     '<p style="color:var(--faint);font-size:11px;margin-top:4px">Works out at '+esc(per)+' a month. Save '+PRICE.saveP+'%.</p>'+
     '<p style="color:var(--dim);font-size:13px;margin-top:12px;line-height:1.6">'+
@@ -26352,7 +26400,7 @@ function viewPlans(){
   h+='<p class="eyebrow" style="margin-top:24px">Premium</p>'+
     '<div class="card" style="padding:14px 16px;margin-top:8px">'+
     '<div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap">'+
-      '<span style="font-size:22px;font-weight:700">'+esc(PRICE.yr[cur])+'</span>'+
+      '<span style="font-size:24px;font-weight:700">'+esc(PRICE.yr[cur])+'</span>'+
       '<span style="color:var(--dim);font-size:13px">a year</span>'+
       (st.on?'<span class="mono" style="margin-left:auto;flex:none;color:var(--green);font-size:11px">CURRENT</span>':'')+'</div>'+
     '<p style="color:var(--faint);font-size:11px;margin-top:4px">'+esc(PRICE.yrPerMo[cur])+' a month. Save '+PRICE.saveP+'%.</p>'+
@@ -26767,7 +26815,7 @@ function viewToday(){
         '<path d="M2.2 12 L1.4 3.6 L6 7.2 L10 1.2 L14 7.2 L18.6 3.6 L17.8 12 Z" fill="var(--gold)"/>'+
         '<circle cx="1.4" cy="3" r="1.2" fill="var(--gold)"/><circle cx="10" cy="1.2" r="1.3" fill="var(--gold)"/><circle cx="18.6" cy="3" r="1.2" fill="var(--gold)"/></svg>';
       const ava=(nm,init,ringCol,glow,crowned)=>'<div style="display:flex;flex-direction:column;align-items:center;gap:8px;flex:1;min-width:0">'+
-        '<div style="position:relative;width:58px;height:58px;border-radius:58px;background:var(--raised);border:2.5px solid '+ringCol+';display:flex;align-items:center;justify-content:center;font-size:23px;font-weight:700'+(glow?';box-shadow:0 0 16px 0 color-mix(in srgb, '+ringCol+' 45%, transparent)':'')+'">'+(crowned?CROWN:'')+esc(init)+'</div>'+
+        '<div style="position:relative;width:58px;height:58px;border-radius:58px;background:var(--raised);border:2.5px solid '+ringCol+';display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:700'+(glow?';box-shadow:0 0 16px 0 color-mix(in srgb, '+ringCol+' 45%, transparent)':'')+'">'+(crowned?CROWN:'')+esc(init)+'</div>'+
         '<span style="font-size:13px;font-weight:600;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(nm)+'</span></div>';
       const endLine=(function(){
         /* ══ THE ONE HARD LIMIT, ON THE SURFACE THAT PUSHES HARDEST
@@ -26917,7 +26965,7 @@ function goalCerHtml(c){
     '</div>'+
     '<p class="mono gcA" style="font-size:11px;letter-spacing:.2em;color:var(--green);animation:gcRise .5s both;position:relative">GOAL HIT</p>'+
     '<p class="disp gradhead gcB" style="font-size:40px;line-height:1.05;font-weight:700;margin-top:16px;animation:gcPop .75s .25s both;position:relative">'+esc(g.ex)+'</p>'+
-    '<p class="disp gcA" style="font-size:27px;font-weight:600;margin-top:8px;color:var(--green);animation:gcRise .6s .6s both;position:relative">'+uwNum(g.w)+' '+uwUnit()+' × '+g.r+'</p>'+
+    '<p class="disp gcA" style="font-size:28px;font-weight:600;margin-top:8px;color:var(--green);animation:gcRise .6s .6s both;position:relative">'+uwNum(g.w)+' '+uwUnit()+' × '+g.r+'</p>'+
     (c.days?'<p class="mono gcA" style="font-size:11px;color:var(--faint);letter-spacing:.06em;margin-top:20px;animation:gcRise .6s .85s both;position:relative">'+c.days+' DAY'+(c.days===1?'':'S')+' FROM THE DAY YOU SET IT</p>':'')+
     ((c.from&&gained>0)?'<p class="gcA" style="color:var(--dim);font-size:13px;line-height:1.6;margin-top:16px;max-width:320px;animation:gcRise .6s 1s both;position:relative">You started this lift at '+uwNum(c.from.w)+' '+uwUnit()+' for '+c.from.r+'. That is '+uwNum(gained)+' '+uwUnit()+' more on the bar, put there one session at a time.</p>':'')+
     '<button data-a="goalCerDone" class="big disp gcA" style="background:var(--green);color:var(--bg);font-size:15px;margin-top:24px;max-width:300px;animation:gcRise .6s 1.25s both;position:relative">Set the next one</button>'+
@@ -27220,12 +27268,12 @@ function viewSession(){
      '<div class="confetti-burst" aria-hidden="true">'+
      Array.from({length:16},(_,i)=>{const cols=['var(--green)','var(--amber)','var(--chart)','var(--gold)'];
        return '<i style="left:'+((i*6.3)%100)+'%;background:'+cols[i%4]+';animation-delay:'+(i%5*60)+'ms"></i>'}).join('')+'</div>'+
-     '<p class="disp gradhead an-rise" style="font-size:30px;line-height:1.05;margin-bottom:12px">'+cg+'</p>'+
+     '<p class="disp gradhead an-rise" style="font-size:28px;line-height:1.05;margin-bottom:12px">'+cg+'</p>'+
      '<div class="an-pop" style="display:flex;align-items:center;gap:12px">'+
      '<svg viewBox="0 0 24 24" style="width:24px;height:24px;flex:none"><circle cx="12" cy="12" r="10.5" fill="none" stroke="var(--green)" stroke-width="1.4" opacity=".35"/>'+
      '<path class="an-tick" d="M7.5 12.4l3.1 3.1 6-6.4" fill="none" stroke="var(--green)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>'+
      '<p class="eyebrow" style="color:var(--green);margin:0">Session complete</p></div>'+
-     '<h1 class="disp" style="font-size:26px;font-weight:600;line-height:1.1;margin-top:8px">'+esc(s.dayName||'')+'</h1>'+
+     '<h1 class="disp" style="font-size:28px;font-weight:600;line-height:1.1;margin-top:8px">'+esc(s.dayName||'')+'</h1>'+
      '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:20px">'+
      [[s.log.length,'sets'],[Math.max(1,Math.round((Date.now()-s.startedAt)/60000)),'minutes'],[vol?volStr(vol):'—',vol?'volume':'']]
       .map((x,i)=>'<div class="card an-pop" style="padding:12px;animation-delay:'+(0.08+i*0.1).toFixed(2)+'s"><p class="mono" style="font-size:20px;font-weight:600">'+x[0]+'</p><p style="color:var(--faint);font-size:11px">'+x[1]+'</p></div>').join('')+'</div>';
@@ -27412,7 +27460,7 @@ function viewSession(){
     if(S.holdWait){
       h+='<div class="view pad" style="padding-top:14px;display:flex;flex-direction:column;align-items:center">'+
        '<p class="eyebrow" style="color:var(--green)">Side 1 done</p>'+
-       '<p class="disp" style="font-size:19px;font-weight:600;margin-top:8px;text-align:center">'+esc(cur.ex)+'</p>'+
+       '<p class="disp" style="font-size:20px;font-weight:600;margin-top:8px;text-align:center">'+esc(cur.ex)+'</p>'+
        '<div style="width:200px;height:200px;margin-top:24px;border-radius:var(--r-full);border:9px solid var(--green);display:flex;align-items:center;justify-content:center">'+
        '<span style="color:var(--green);font-size:60px">✓</span></div>'+
        '<p style="color:var(--dim);font-size:13px;margin-top:24px;text-align:center">Get set on the other side — the timer waits for you.</p>'+
@@ -27423,7 +27471,7 @@ function viewSession(){
     const over=!!S.holdMet&&!cur.perSide;   // past the target, still holding
     h+='<div class="view pad" style="padding-top:14px;display:flex;flex-direction:column;align-items:center">'+
      '<p class="eyebrow" style="color:'+(over?'var(--green)':acc)+'" id="holdLbl">'+(over?'Target met — keep going if you can':(cur.perSide?'Hold — side '+S.holdSide+' of 2':'Hold'))+'</p>'+
-     '<p class="disp" style="font-size:19px;font-weight:600;margin-top:8px;text-align:center">'+esc(cur.ex)+'</p>'+
+     '<p class="disp" style="font-size:20px;font-weight:600;margin-top:8px;text-align:center">'+esc(cur.ex)+'</p>'+
      ringHtml('hold',Math.max(0,left),cur.secs,over?'var(--green)':acc)+
      (over?'<p style="color:var(--dim);font-size:13px;line-height:1.5;margin-top:16px;text-align:center">Every extra second counts — a longer hold becomes your new default.</p>':'')+
      (cur.cue&&!over?'<div class="cue mt2" style="border-left-color:'+acc+'">'+esc(cur.cue)+'</div>':'')+
@@ -28160,7 +28208,7 @@ function viewChart(){
   const pts=chartPoints(c.kind,c.ex);
   let h='<div class="view pad stg phpad">'+
     '<button data-a="chartClose" class="btn" style="width:auto;padding:8px 14px;color:var(--dim);font-size:13px;margin-bottom:14px">‹ Back</button>'+
-    '<h1 class="disp" style="font-size:23px;font-weight:600;line-height:1.2">'+esc(c.title||info.t)+'</h1>';
+    '<h1 class="disp" style="font-size:24px;font-weight:600;line-height:1.2">'+esc(c.title||info.t)+'</h1>';
   {const draw=(function(){
       try{
         if(c.kind==='lift'||c.kind==='goal'){
@@ -28344,7 +28392,7 @@ function viewProgress(){
     const hi=Math.max(50,Math.ceil(Math.max.apply(null,pts.map(p=>p.v))/50)*50);
     return '<div class="card mt" style="padding:16px">'+
       '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px">'+
-      '<span class="disp" style="font-size:19px;font-weight:600">'+esc(F.state)+'</span>'+
+      '<span class="disp" style="font-size:20px;font-weight:600">'+esc(F.state)+'</span>'+
       '<span class="mono" style="font-size:11px;color:'+F.col+';white-space:nowrap">FORM '+(F.tsb>0?'+':'')+F.tsb+'</span></div>'+
       '<p style="color:var(--dim);font-size:13px;line-height:1.6;margin-top:4px">'+esc(F.line)+iBtn('formhow')+'</p>'+
       iBody('formhow','Three numbers from one ledger. FITNESS is a 42-day average of your training load \u2014 each session counts as effort \u00d7 minutes, and lifting, running, riding and rehab all bill it. FATIGUE is the same average over 7 days. FORM is fitness minus fatigue: negative inside a hard block, positive when you back off. Endurance platforms call these CTL, ATL and TSB \u2014 and compute them on cardio alone, zeroing out weight sessions. One model across everything you do is the version they cannot run.')+
@@ -28592,7 +28640,7 @@ function viewData(){
   let h='<div class="view pad modalrise" style="padding-top:20px">'+
    '<div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">'+
    '<button data-a="back" aria-label="Close settings" style="width:44px;height:44px;border-radius:42px;background:var(--surface);border:1px solid var(--line);color:var(--dim);display:flex;align-items:center;justify-content:center;flex:none;font-size:17px">✕</button>'+
-   '<h1 class="disp" style="font-size:19px;font-weight:600;flex:1;text-align:center;margin:0">Settings</h1>'+
+   '<h1 class="disp" style="font-size:20px;font-weight:600;flex:1;text-align:center;margin:0">Settings</h1>'+
    '<span style="width:42px;flex:none"></span></div>';
   /* profile header → the You page (name/age/sex + account) */
   h+='<button data-a="meOpen" class="card mt2" style="width:100%;text-align:left;padding:15px 16px;display:flex;align-items:center;gap:12px">'+
@@ -28901,14 +28949,14 @@ function viewYou(){
   return '<div class="view pad modalrise" style="padding-top:20px">'+
    '<div style="display:flex;align-items:center;gap:12px;margin-bottom:6px">'+
    '<button data-a="back" style="width:44px;height:44px;border-radius:42px;background:var(--surface);border:1px solid var(--line);color:var(--dim);display:flex;align-items:center;justify-content:center;flex:none;font-size:17px">\u2039</button>'+
-   '<h1 class="disp" style="font-size:19px;font-weight:600;flex:1;text-align:center;margin:0">You</h1>'+
+   '<h1 class="disp" style="font-size:20px;font-weight:600;flex:1;text-align:center;margin:0">You</h1>'+
    '<span style="width:42px;flex:none"></span></div>'+
    youPageHtml()+'</div>'}
 function viewAcct(){
   return '<div class="view pad modalrise" style="padding-top:20px">'+
    '<div style="display:flex;align-items:center;gap:12px;margin-bottom:6px">'+
    '<button data-a="back" style="width:44px;height:44px;border-radius:42px;background:var(--surface);border:1px solid var(--line);color:var(--dim);display:flex;align-items:center;justify-content:center;flex:none;font-size:17px">\u2039</button>'+
-   '<h1 class="disp" style="font-size:19px;font-weight:600;flex:1;text-align:center;margin:0">Account &amp; sync</h1>'+
+   '<h1 class="disp" style="font-size:20px;font-weight:600;flex:1;text-align:center;margin:0">Account &amp; sync</h1>'+
    '<span style="width:42px;flex:none"></span></div>'+
    accountSection()+'</div>'}
 function reportPageHtml(){
@@ -29527,7 +29575,7 @@ function sheetHtml(){
     return wrapSheet('Check this entry',
       '<p style="color:var(--dim);font-size:13px;line-height:1.6">A mistyped set distorts your trends for months, so it is worth ten seconds now.</p>'+
       '<div class="card mt" style="padding:16px;text-align:center">'+
-      '<p class="mono" style="font-size:26px;font-weight:600">'+e.w+' <span style="font-size:15px;color:var(--dim)">kg</span> × '+e.r+
+      '<p class="mono" style="font-size:28px;font-weight:600">'+e.w+' <span style="font-size:15px;color:var(--dim)">kg</span> × '+e.r+
         (e.rpe!=null?' <span style="font-size:15px;color:var(--dim)">@'+e.rpe+'</span>':'')+'</p>'+
       '<p class="mono" style="color:var(--faint);font-size:11px;margin-top:4px">'+esc(e.ex)+' · set '+e.setNo+
         (c.targetW!=null?' · target '+uwNum(c.targetW)+' '+uwUnit()+' × '+c.targetReps:'')+'</p></div>'+
@@ -29617,7 +29665,7 @@ function sheetHtml(){
     return wrapSheet('Bodyweight today',
       '<p style="color:var(--dim);font-size:13px;line-height:1.6">Same time of day each time is what makes the trend readable — first thing, before food, is the usual choice.</p>'+
       (last?'<p class="mono" style="color:var(--faint);font-size:11px;margin-top:8px">Last logged '+uwNum(last)+' '+uwUnit()+'</p>':'')+
-      '<input data-in="gform.bw" value="'+esc(f.bw||'')+'" inputmode="decimal" placeholder="'+(last||'kg')+'" style="margin-top:12px;text-align:center;font-size:22px" class="mono">'+
+      '<input data-in="gform.bw" value="'+esc(f.bw||'')+'" inputmode="decimal" placeholder="'+(last||'kg')+'" style="margin-top:12px;text-align:center;font-size:24px" class="mono">'+
       '<button data-a="bwSave" class="big disp mt2" style="background:'+((f.bw||'').trim()?'var(--amber)':'var(--raised)')+';color:'+((f.bw||'').trim()?'var(--bg)':'var(--faint)')+';font-size:15px">Save</button>')}
   if(S.sheet.t==='signal'){
     const sg=signalScore(),lv=signalLevel(sg.pct),st=weekStreak();
@@ -29647,7 +29695,7 @@ function sheetHtml(){
       (function(){const d=dataPoints(),t=dpTier(d.total),nx=dpNext(d.total);
         return '<button data-a="dpOpen" class="card mt2" style="width:100%;text-align:left;padding:15px 16px;display:block;border-color:'+t[2]+'">'+
           '<div style="display:flex;align-items:baseline;gap:12px">'+
-          '<span class="mono disp" style="font-size:26px;font-weight:600;color:'+t[2]+'">'+d.total.toLocaleString()+'</span>'+
+          '<span class="mono disp" style="font-size:28px;font-weight:600;color:'+t[2]+'">'+d.total.toLocaleString()+'</span>'+
           '<span style="flex:1;min-width:0"><span style="display:block;font-size:13px;font-weight:600">data points</span>'+
           '<span style="color:var(--faint);font-size:11px">'+esc(t[1])+'</span></span>'+
           '<span class="mono" style="color:var(--faint);font-size:13px">›</span></div>'+
@@ -29798,7 +29846,7 @@ function sheetHtml(){
   if(S.sheet.t==='fghost'){
     const code=fghostCode(),f=fghost();
     return wrapSheet('Race a mate',
-      '<p class="disp gradhead" style="font-size:22px;line-height:1.2">Two codes. One week.</p>'+
+      '<p class="disp gradhead" style="font-size:24px;line-height:1.2">Two codes. One week.</p>'+
       '<p style="color:var(--dim);font-size:13px;line-height:1.6;margin-top:8px">Keep each other accountable — swap codes and each of you races the other’s best week, all week long. A code carries a first name, a session count and a distance — nothing else leaves your phone.</p>'+
       (code?'<button data-a="fghostCopyRaw" class="card mt2" style="width:100%;text-align:center;padding:14px 16px;border-color:var(--amber)">'+
         '<span class="mono" style="font-size:13px;color:var(--amber);display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(code)+'</span>'+
@@ -29819,7 +29867,7 @@ function sheetHtml(){
     const exN=esc(String(d.ex).replace(/ — .*/,''));
     return wrapSheet('The forecast',
       '<p class="mono" style="font-size:11px;color:var(--amber);letter-spacing:.06em">'+esc(String(d.day||'').toUpperCase())+'</p>'+
-      '<p class="disp gradhead" style="font-size:26px;line-height:1.2;margin-top:8px">'+exN+' '+uwStr(d.predW)+'×'+d.predR+'</p>'+
+      '<p class="disp gradhead" style="font-size:28px;line-height:1.2;margin-top:8px">'+exN+' '+uwStr(d.predW)+'×'+d.predR+'</p>'+
       '<p style="color:var(--dim);font-size:13px;line-height:1.6;margin-top:8px">'+esc(d.why||'')+'</p>'+
       (d.readyLo!=null?'<div class="card mt" style="padding:12px 15px"><p class="mono" style="font-size:9px;color:var(--faint);letter-spacing:.06em">MORNING READINESS</p>'+
         '<p style="color:var(--dim);font-size:13px;line-height:1.55;margin-top:4px">Expected between <b style="color:var(--text)">'+d.readyLo+'</b> and <b style="color:var(--text)">'+d.readyHi+'</b> — '+esc(d.readyWhy||'')+'.'+
@@ -30035,7 +30083,7 @@ function sheetHtml(){
     if(S.dfExtra){const x=S.dfExtra,r=rarityOf(x.rar);
       return wrapSheet('Allena found another',
         '<p class="mono" style="font-size:9px;color:'+r[1]+';letter-spacing:.08em">\u2726 '+esc(r[2].toUpperCase())+' \u00b7 SURFACED JUST NOW</p>'+
-        '<p class="disp" style="font-size:21px;font-weight:600;line-height:1.25;margin-top:8px">'+esc(x.t)+'</p>'+
+        '<p class="disp" style="font-size:20px;font-weight:600;line-height:1.25;margin-top:8px">'+esc(x.t)+'</p>'+
         '<p style="color:var(--dim);font-size:13px;line-height:1.6;margin-top:8px">'+esc(x.d)+'</p>'+
         '<p style="color:var(--faint);font-size:11px;line-height:1.55;margin-top:16px">Banked in the collection. The day keeps looking \u2014 up to five of these when the data genuinely produces them.</p>')}
     const pr=todayProgress(),n=noticedToday(),t=todayState();
@@ -30044,7 +30092,7 @@ function sheetHtml(){
     if(t.revealed&&n)
       return wrapSheet('Allena found something',
         '<p class="mono" style="font-size:9px;color:var(--amber);letter-spacing:.08em">✦ TODAY’S FIND</p>'+
-        '<p class="disp" style="font-size:21px;font-weight:600;line-height:1.25;margin-top:8px">'+esc(n.t)+'</p>'+
+        '<p class="disp" style="font-size:20px;font-weight:600;line-height:1.25;margin-top:8px">'+esc(n.t)+'</p>'+
         '<p style="color:var(--dim);font-size:13px;line-height:1.6;margin-top:8px">'+esc(n.d)+'</p>'+
         '<p style="color:var(--faint);font-size:11px;line-height:1.55;margin-top:16px">It stays on your Today card until tomorrow, when there will be a different one.</p>');
     if(!pr.complete){
@@ -30053,7 +30101,7 @@ function sheetHtml(){
       return wrapSheet('Allena found something',
         '<div style="display:flex;align-items:center;gap:8px">'+
         '<span class="mono" style="display:inline-flex;align-items:center;gap:8px;color:var(--amber);font-size:9px;letter-spacing:.08em;border:1px solid color-mix(in srgb, var(--text) 50%, transparent);padding:4px 10px;border-radius:var(--r-full)">'+lockIcon(10)+'LOCKED</span></div>'+
-        '<p class="disp" style="font-size:21px;font-weight:600;line-height:1.25;margin-top:12px">Something new about you is ready</p>'+
+        '<p class="disp" style="font-size:20px;font-weight:600;line-height:1.25;margin-top:12px">Something new about you is ready</p>'+
         '<p style="color:var(--dim);font-size:13px;line-height:1.6;margin-top:8px">Found in your numbers overnight. It unlocks when today’s loop is done — '+
           left+' check-in'+(left===1?'':'s')+' left, each one earns points.</p>'+
         '<div style="display:flex;gap:4px;margin-top:12px">'+
@@ -30062,7 +30110,7 @@ function sheetHtml(){
         '<button data-a="sheetClose" class="btn mt" style="color:var(--dim)">Later</button>');}
     return wrapSheet('Allena found something',
       '<p class="mono" style="font-size:9px;color:var(--green);letter-spacing:.08em">UNLOCKED · TODAY’S LOOP DONE</p>'+
-      '<p class="disp" style="font-size:21px;font-weight:600;line-height:1.25;margin-top:8px">Allena has something on you</p>'+
+      '<p class="disp" style="font-size:20px;font-weight:600;line-height:1.25;margin-top:8px">Allena has something on you</p>'+
       '<p style="color:var(--dim);font-size:13px;line-height:1.6;margin-top:8px">One observation, from your own numbers, different tomorrow.</p>'+
       '<button data-a="dfReveal" class="big disp mt2" style="background:var(--amber);color:var(--bg)">Reveal it</button>');}
   if(S.sheet.t==='wrap'){
@@ -30153,7 +30201,7 @@ function sheetHtml(){
     return wrapSheet(q.title||'Add a friend',
       '<p style="color:var(--dim);font-size:13px;line-height:1.6;margin-top:4px">'+esc(q.sub||'')+'</p>'+
       (q.link?'<div style="display:flex;justify-content:center;margin-top:16px">'+qrSvg(q.link,224)+'</div>':'<p style="color:var(--faint);font-size:13px;margin-top:16px">Making your code\u2026</p>')+
-      (q.code?'<p class="mono" style="text-align:center;font-size:19px;letter-spacing:.28em;font-weight:700;margin-top:12px">'+esc(q.code)+'</p>':'')+
+      (q.code?'<p class="mono" style="text-align:center;font-size:20px;letter-spacing:.28em;font-weight:700;margin-top:12px">'+esc(q.code)+'</p>':'')+
       '<p style="color:var(--faint);font-size:11px;line-height:1.6;text-align:center;margin-top:8px">Point an iPhone camera at the square \u2014 it opens the link. Or share it:</p>'+
       '<button data-a="'+(q.kind==='crew'?'crewShare':'frShareGo')+'" data-v="'+esc(q.code||'')+'" class="big disp mt" style="background:var(--amber);color:var(--bg);font-size:15px">Share the link</button>'+
       (q.kind==='crew'?'':'<p class="eyebrow" style="margin-top:16px">Got a code from them instead?</p>'+
@@ -30198,7 +30246,7 @@ function sheetHtml(){
     const KP=[['dist','A distance'],['time','A time'],['week','A week']];
     return wrapSheet(cur?'Your running goal':'A running goal',
       cur?(function(){const p=rgProgress(cur)||{};
-        return '<p class="disp" style="font-size:19px;font-weight:600;line-height:1.25">'+esc(rgLabel(cur))+'</p>'+
+        return '<p class="disp" style="font-size:20px;font-weight:600;line-height:1.25">'+esc(rgLabel(cur))+'</p>'+
           '<p class="mono" style="color:var(--faint);font-size:11px;margin-top:8px">'+esc(p.label||'')+'</p>'+
           '<div style="height:6px;border-radius:3px;background:var(--line);overflow:hidden;margin-top:12px">'+
           '<div class="an-bar" style="height:6px;width:'+(p.pct||0)+'%;background:var(--chart)"></div></div>'+
@@ -30253,7 +30301,7 @@ function sheetHtml(){
     return wrapSheet(e9.reps.length+' squat'+(e9.reps.length===1?'':'s'),
       '<p class="mono" style="color:var(--faint);font-size:11px">'+esc(fmtDate(when.toISOString()))+' \u00b7 '+
         esc(when.toTimeString().slice(0,5))+'</p>'+
-      (s9.kept?'<p class="disp" style="font-size:22px;font-weight:600;line-height:1.2;margin-top:12px">'+
+      (s9.kept?'<p class="disp" style="font-size:24px;font-weight:600;line-height:1.2;margin-top:12px">'+
         (s9.even?'Hips centred':s9.pct+'% toward your '+s9.toward)+'</p>'+
         '<p style="color:var(--dim);font-size:13px;line-height:1.6;margin-top:8px">Averaged over '+s9.kept+
         (s9.kept===s9.total?' squat'+(s9.kept===1?'':'s'):' of '+s9.total)+
@@ -30352,7 +30400,7 @@ function sheetHtml(){
         '<p class="mono" style="font-size:9px;letter-spacing:'+rc.track+';font-weight:'+rc.weight+
           ';color:'+r[1]+'">'+esc(r[2].toUpperCase())+'</p></div>'+
       '<p class="mono" style="font-size:9px;letter-spacing:.06em;color:var(--faint);margin-top:8px">FOUND '+esc(fmtDate(String(e.found||today())+'T12:00'))+'</p>'+
-      '<p class="disp" style="font-size:21px;font-weight:650;line-height:1.2;margin-top:8px">'+esc(e.t)+'</p>'+
+      '<p class="disp" style="font-size:20px;font-weight:650;line-height:1.2;margin-top:8px">'+esc(e.t)+'</p>'+
       '<p style="color:var(--dim);font-size:13px;line-height:1.65;margin-top:12px">'+esc(e.d||'')+'</p></div></div>'+
       /* IN PLAIN WORDS comes FIRST, before the method (16 Sep 2026). A
          reader who does not know what HRV is cannot use a paragraph
@@ -30455,7 +30503,7 @@ function sheetHtml(){
     if(S.hkRes){const hr=S.hkRes;
       return wrapSheet('Apple Health import',
         '<p class="eyebrow" style="color:var(--green)">Done</p>'+
-        '<p class="disp gradhead" style="font-size:22px;margin-top:8px">'+hr.added+' workout'+(hr.added===1?'':'s')+' in</p>'+
+        '<p class="disp gradhead" style="font-size:24px;margin-top:8px">'+hr.added+' workout'+(hr.added===1?'':'s')+' in</p>'+
         '<p style="color:var(--dim);font-size:13px;line-height:1.6;margin-top:8px">'+
         Object.keys(hr.byType).map(k=>hr.byType[k]+' '+cardioLabel(k).toLowerCase()+(hr.byType[k]===1?'':'s')).join(' · ')+
         (hr.dup?' · '+hr.dup+' already here (skipped)':'')+
@@ -30905,7 +30953,7 @@ function sheetHtml(){
     const f=S.frProf||{};const id=S.sheet.id;
     const local=((acct()||{}).frNames||{})[id];
     const nm=local||f.display||'Your mate';
-    const stat=(v,l)=>'<div style="flex:1;text-align:center"><p class="disp" style="font-size:19px;font-weight:700">'+v+'</p><p class="mono" style="font-size:9px;color:var(--faint);letter-spacing:.06em;margin-top:2px">'+l+'</p></div>';
+    const stat=(v,l)=>'<div style="flex:1;text-align:center"><p class="disp" style="font-size:20px;font-weight:700">'+v+'</p><p class="mono" style="font-size:9px;color:var(--faint);letter-spacing:.06em;margin-top:2px">'+l+'</p></div>';
     const tr=f.tree||{};
     let inner='<div style="display:flex;align-items:center;gap:12px">'+
       ((typeof avHtml==='function')?avHtml(f.av,String(nm).slice(0,1).toUpperCase(),46,'var(--line)',19):'')+
@@ -30943,7 +30991,7 @@ function sheetHtml(){
       '<span class="mono" style="flex:none;font-size:15px;font-weight:700;color:'+(i.live?'var(--green)':'var(--faint)')+'">'+(i.live?'+'+i.show:'0')+'</span></div>';
     let inner='<div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px">'+
       '<p class="eyebrow" style="margin:0">Your week</p>'+
-      '<span class="disp" style="font-size:26px;font-weight:700;color:var(--green)">'+R.tot+'</span></div>'+
+      '<span class="disp" style="font-size:28px;font-weight:700;color:var(--green)">'+R.tot+'</span></div>'+
       '<p style="color:var(--faint);font-size:11px;line-height:1.55;margin-top:4px">'+
       (R.sess?R.sess+' witnessed session'+(R.sess===1?'':'s')+' so far. Everything resets Monday.':'Nothing witnessed yet this week. Everything resets Monday.')+'</p>';
     if(R.items.length)inner+='<div class="mt2">'+R.items.map(row).join('')+'</div>';
@@ -31097,7 +31145,7 @@ function sheetHtml(){
     const prog=S.lib.programs.find(p=>p.id===s2.progId),cur_adj=adjOf(prog,cur.ex);
     let inner='<p style="color:var(--dim);font-size:13px;line-height:1.55">Change the load for <b style="color:var(--text)">'+esc(cur.ex)+'</b>. This updates the remaining sets today and the programmed weight from now on.</p>'+
       '<div class="card mt" style="padding:16px;text-align:center">'+
-      '<p class="mono" style="font-size:30px;font-weight:600">'+cur.targetW+' <span style="font-size:15px;color:var(--dim)">kg</span></p>'+
+      '<p class="mono" style="font-size:28px;font-weight:600">'+cur.targetW+' <span style="font-size:15px;color:var(--dim)">kg</span></p>'+
       (cur_adj?'<p class="mono" style="color:var(--amber);font-size:11px;margin-top:4px">'+(cur_adj>0?'+':'')+uwNum(cur_adj)+' '+uwUnit()+' vs the written program</p>':'')+'</div>'+
       '<div class="row mt">'+[-5,-2.5,2.5,5].map(d=>'<button data-a="tuneBy" data-v="'+d+'" class="pill" style="flex:1;font-size:15px;padding:14px 0">'+(d>0?'+':'')+d+'</button>').join('')+'</div>';
     if(cur_adj)inner+='<button data-a="tuneReset" class="btn mt">Reset to the written program ('+uwNum(cur.targetW-cur_adj)+' '+uwUnit()+')</button>';
@@ -31164,7 +31212,7 @@ function sheetHtml(){
     m.sets.forEach(st=>{if(st.warmup||seen9[st.ex])return;seen9[st.ex]=1;
       byEx.push({ex:st.ex,n:m.sets.filter(x=>x.ex===st.ex&&!x.warmup).length})});
     return wrapSheet('The week closer',
-      '<p class="disp gradhead" style="font-size:21px;line-height:1.2">'+esc(m.names[0])+' + '+esc(m.names[1])+'</p>'+
+      '<p class="disp gradhead" style="font-size:20px;line-height:1.2">'+esc(m.names[0])+' + '+esc(m.names[1])+'</p>'+
       '<p style="color:var(--dim);font-size:13px;line-height:1.6;margin-top:8px">Merged at the diminishing-returns line: about 9 hard sets per muscle is where a single session stops paying. Everything below made the cut on value; everything cut is named.</p>'+
       '<div class="row mt" style="gap:12px">'+
       [[m.work,'SETS'],[m.nEx,'EXERCISES'],['~'+m.mins,'MIN']].map(x=>'<div class="card" style="flex:1;padding:11px 8px;text-align:center">'+
@@ -31302,7 +31350,7 @@ function viewGuide(){
   const g=G[src],i=Math.min(S.impgStep||0,g.steps.length-1),last=i===g.steps.length-1;
   const panel=(st,d)=>'<div style="flex:0 0 100%;min-width:0;padding:0 2px">'+
     '<p class="mono" style="color:var(--faint);font-size:11px;letter-spacing:.08em">STEP '+(d+1)+' OF '+g.steps.length+'</p>'+
-    '<p class="disp" style="font-size:22px;font-weight:600;line-height:1.25;margin-top:8px">'+st[0]+'</p>'+
+    '<p class="disp" style="font-size:24px;font-weight:600;line-height:1.25;margin-top:8px">'+st[0]+'</p>'+
     '<p style="color:var(--dim);font-size:15px;line-height:1.65;margin-top:12px">'+st[1]+'</p>'+
     (st[2]?'<div class="card mt" style="padding:11px 14px;border-color:var(--amber)"><p style="color:var(--dim);font-size:13px;line-height:1.55">'+st[2]+'</p></div>':'')+
     (d===0&&g.addr?'<button data-a="impgCopy" data-v="https://'+g.addr+'" class="card mt" style="width:100%;text-align:left;padding:11px 15px;display:flex;align-items:center;gap:12px">'+
@@ -31312,7 +31360,7 @@ function viewGuide(){
   return '<div class="view pad modalrise pinpage" style="padding-top:20px">'+
     '<div style="display:flex;align-items:center;gap:12px;margin-bottom:14px">'+
     '<button data-a="impGuideBack" style="width:44px;height:44px;border-radius:42px;background:var(--surface);border:1px solid var(--line);color:var(--dim);display:flex;align-items:center;justify-content:center;flex:none;font-size:17px">\u2039</button>'+
-    '<h1 class="disp" style="font-size:19px;font-weight:600;flex:1;text-align:center;margin:0">'+(health?'Auto-sync to Health':'Getting your file')+'</h1>'+
+    '<h1 class="disp" style="font-size:20px;font-weight:600;flex:1;text-align:center;margin:0">'+(health?'Auto-sync to Health':'Getting your file')+'</h1>'+
     '<span style="width:42px;flex:none"></span></div>'+
     '<div style="display:flex;gap:8px">'+(health?['garmin','watch','strava','food']:['garmin','strava','health']).map(k=>
       '<button data-a="impgSrc" data-v="'+k+'" class="pill'+(src===k?' on':'')+'" style="flex:1;text-align:center;font-size:13px">'+G[k].name+'</button>').join('')+'</div>'+
@@ -31603,7 +31651,7 @@ function render(){
     return '<div id="drawer"><div class="scrim" data-a="drawerClose"></div>'+
       '<div class="panel">'+
       '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0 4px 18px">'+
-      '<h1 class="disp brand" style="font-size:26px;margin:0;flex:none">Allena</h1>'+pointsChip()+'</div>'+
+      '<h1 class="disp brand" style="font-size:28px;margin:0;flex:none">Allena</h1>'+pointsChip()+'</div>'+
       '<div style="flex:1;min-width:0">'+rows+'</div>'+
       '<div style="display:flex;align-items:center;gap:12px;margin-top:16px;flex:none">'+
       '<button data-a="drawerNav" data-v="data" style="width:40px;height:40px;border-radius:40px;background:var(--raised);border:1.5px solid '+liveTier(dataPoints().live)[2]+';color:var(--dim);font-size:15px;font-weight:600;flex:none">'+
@@ -31637,7 +31685,7 @@ function render(){
     return '<div style="position:fixed;inset:0;z-index:120;background:color-mix(in srgb, var(--bg) 82%, black);display:flex;align-items:center;justify-content:center;padding:26px">'+
       '<div class="card" style="max-width:400px;width:100%;padding:24px 22px;border-radius:20px">'+
       '<p class="mono" style="color:var(--amber);font-size:9px;letter-spacing:.12em">THE 60-SECOND TOUR \u00b7 '+(S.tour.i+1)+' OF '+STEPS.length+'</p>'+
-      '<p class="disp" style="font-size:22px;font-weight:650;line-height:1.15;margin-top:8px">'+st[0]+'</p>'+
+      '<p class="disp" style="font-size:24px;font-weight:650;line-height:1.15;margin-top:8px">'+st[0]+'</p>'+
       '<p style="color:var(--dim);font-size:13px;line-height:1.65;margin-top:12px">'+st[1]+'</p>'+
       '<p class="mono" style="color:var(--faint);font-size:11px;letter-spacing:.2em;margin-top:16px">'+STEPS.map((_,j)=>j===S.tour.i?'\u25cf':'\u25cb').join(' ')+'</p>'+
       '<div class="row" style="gap:12px;margin-top:16px">'+
