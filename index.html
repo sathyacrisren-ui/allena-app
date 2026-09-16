@@ -1510,14 +1510,36 @@ const WEEKMAP=(function(){const m=lget(K_WEEKS,null);
   const out={},hist=lget(K_H,[]);
   hist.forEach(h=>{if(h.complete&&h.week)out[h.progId]=Math.max(out[h.progId]||1,h.week)});
   lset(K_WEEKS,out);return out})();
-const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap:WEEKMAP,lib:LIB,history:lget(K_H,[]),sess:lget(K_A,null),
+/* EVERY READER OF A SESSION ASSUMES IT HAS SETS (17 Sep 2026, found by
+   rendering every view against a deliberately malformed account).
+   137 places across 24 modules read h.log.forEach / .reduce / .length
+   with no guard, and not one of them is wrong to: every writer in this
+   codebase supplies a log, including the watch-only row that supplies
+   an empty one. The hole is the way IN from outside — doRestore takes
+   whatever JSON it is handed, and its generic fallback deliberately
+   keeps keys it does not recognise, which is the behaviour that saved
+   the ACL record on migration and is worth keeping.
+   So a row with no log array reaches S.history only from a hand-edited
+   or truncated backup file — and then Progress, Points and the workout
+   log all throw. render()'s guard contains it to an error card rather
+   than a dead app, but three of the app's main pages going dark is not
+   a thing to leave to a guard, and it lands on somebody who is already
+   restoring because something went wrong.
+   Guarding 137 call sites would be 137 chances to miss one. The shape
+   is normalised ONCE, where history enters the app. */
+function histNorm(rows){
+  if(!Array.isArray(rows))return[];
+  return rows.filter(h=>h&&typeof h==='object').map(h=>{
+    if(!Array.isArray(h.log))h.log=[];
+    return h})}
+const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap:WEEKMAP,lib:LIB,history:histNorm(lget(K_H,[])),sess:lget(K_A,null),
   restEnd:null,holdEnd:null,holdSide:1,holdWait:false,setStart:null,
   draft:{w:'',r:'',secs:'',rpe:null},note:{sleep:'',fatigue:'',knee:''},
   sheet:null,toast:null,open:null,openSec:{},progTab:'train',histTab:'sessions',anState:'idle',anStep:0,chart:null,secInit:false,sanity:null,moveq:null,own:null,ownDay:0,patCache:null,newPattern:null,errs:[],paste:'',progFilter:null,bar:lget(K_BAR,20)||20,prof:lget(K_PROF,null),setup:null,goals:lget(K_GOALS,[]),gform:null,imp:null,aclView:null,coachTopic:'program',swapAsk:null,swapSkip:false,adate:null,agate:null,reorder:null,supp:lget(K_SUPP,{on:false,days:{}}),daily:lget(K_DAILY,{on:false,days:{}}),axf:null,lay:(function(){const l=lget(K_LAY,{order:['stats','program','sessions','goals','habits','support'],hide:{},checklist:true,plates:true});if(l.plates===undefined)l.plates=true;if(!l.porder)l.porder=['patterns','goals','trends','tonnage','lifetime','bb','scan','recovery','bw','bests'];if(l.porder.indexOf('running')>=0)l.porder=l.porder.filter(x=>x!=='running');if(l.porder.indexOf('balance')<0)l.porder.splice(l.porder.indexOf('recovery')>=0?l.porder.indexOf('recovery'):l.porder.length,0,'balance');
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='cca813';  // stamped by tools/build.py with the content hash
+const BUILD_ID='ffd70f';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -5374,10 +5396,10 @@ function mergeById(cur,inc){const ids=new Set(cur.map(x=>x.id));
 function doRestore(txt){try{const o=JSON.parse(txt);
   const K=o.keys||null;
   const get=(key,legacy)=>K?K[key]:legacy;
-  const inc=get(K_H,Array.isArray(o)?o:o.history);
-  if(!Array.isArray(inc)&&!K)return flash('No history found in that file.');
+  const incRaw=get(K_H,Array.isArray(o)?o:o.history);
+  if(!Array.isArray(incRaw)&&!K)return flash('No history found in that file.');
   let added=0;
-  if(Array.isArray(inc)){const before=S.history.length;
+  if(Array.isArray(incRaw)){const before=S.history.length,inc=histNorm(incRaw);
     S.history=mergeById(S.history,inc).sort((a,b)=>a.date.localeCompare(b.date));
     added=S.history.length-before;saveHistory()}
   const lib=get(K_LIB,o.library);
@@ -16807,15 +16829,86 @@ function corrIdentity(c){
     if(hit)return hit;
     return 'corr:'+fam+':'+c.out+':'+c.lag}
   catch(e){return 'corr:'+corrFamily(c.sig)+':'+c.out+':'+c.lag}}
+/* ═══ THE GRID MUST NOT BLOCK THE FIRST PAINT (17 Sep 2026, measured in
+   a real browser on an account with two years of health data) ═══════
+   `correlations()` was memoized on S._corrMemo and its own comment said
+   "cheap once a day, not every render". Both halves of that were true
+   and the conclusion was not: S is rebuilt on every page load, so the
+   memo starts empty every time the app cold-launches, and the grid is
+   paid in full before a single pixel can be drawn.
+   Measured: a full cold render costs 1,248 ms on 730 health days,
+   1,143 ms of it here (84 days costs 186 ms — it scales with HEALTH
+   DAYS, not with sessions, so it arrives for anyone who has worn a
+   watch for a year regardless of how much they train). A phone is
+   slower again. And bootStart() then render() run in the SAME tick, so
+   the boot animation cannot cover the wait — the render that DRAWS the
+   overlay is the same 1,248 ms one. The user meets a blank screen.
+
+   Two changes, and the order matters.
+   (a) THE MEMO IS WRITTEN DOWN, so "once a day" is true across page
+       loads instead of only within one.
+   (b) A COLD LAUNCH WHOSE DATA HAS MOVED PAINTS FROM THE SAVED ANSWER
+       and recomputes straight after, off the critical path.
+
+   (b) is safe for one specific reason, and it would not be safe without
+   it: the value handed back is the LAST ONE THIS APP COMPUTED, which is
+   the state every consumer is already in. `correlationDiscoveries()`
+   detects state changes by comparing today's list against the stored
+   `training-corrstate-v1`, and that store was written from this very
+   list — so the comparison is a no-op rather than a wrong answer.
+   Banking is idempotent for the same reason. Returning an EMPTY list
+   would not be safe: every live link would read as faded. So when there
+   is no saved answer to paint from, the grid runs synchronously, and
+   the very first launch on a device pays the old cost once. */
+const K_CORRC='training-corrcache-v1';
+function corrStamp(){
+  return today()+':'+(S.history||[]).length+':'+(S.runs||[]).length+':'+
+    (function(){try{return Object.keys(hkDailyStore().days).length}catch(e){return 0}})()}
+function corrCache(){
+  if(S._corrDisk===undefined){try{S._corrDisk=lget(K_CORRC,null)}catch(e){S._corrDisk=null}}
+  return S._corrDisk}
+function corrCacheSave(stamp,v){
+  const c={stamp:stamp,v:v};S._corrDisk=c;
+  try{lset(K_CORRC,c)}catch(e){oops('corrCacheSave',e)}}
+/* the recompute that (b) schedules. Guarded so the deferred pass can
+   never defer again, and so two paints cannot queue two grids. */
+function corrWarm(){
+  if(S._corrWarming)return;
+  S._corrWarming=1;
+  setTimeout(function(){
+    try{S._corrBusy=1;correlations()}catch(e){oops('corrWarm',e)}
+    finally{S._corrBusy=0;S._corrWarming=0}
+    try{if(typeof render==='function')render()}catch(e){oops('corrWarmRender',e)}
+  },0)}
 function correlations(){
   const found=[];
   try{
-    /* memoized: the mass grid is cheap once a day, not every render */
-    const stamp=today()+':'+(S.history||[]).length+':'+(S.runs||[]).length+':'+(function(){try{return Object.keys(hkDailyStore().days).length}catch(e){return 0}})();
+    const stamp=corrStamp();
     if(S._corrMemo&&S._corrMemo.stamp===stamp)return S._corrMemo.v;
+    const disk=corrCache();
+    if(disk&&disk.stamp===stamp&&Array.isArray(disk.v)){
+      S._corrMemo={stamp:stamp,v:disk.v};return disk.v}
+    /* The data has moved. Paint from the saved answer and recompute
+       behind it — but ONLY during the FIRST PAINT of a page load, which
+       is the cold open this exists for and the only moment anybody is
+       waiting on a blank screen. render() sets the flag when it
+       finishes, so every call after that first paint gets the truth,
+       computed now.
+       It is the first PAINT and not the first CALL because render()
+       asks more than once: scoped to the call, the second question in
+       the same paint paid the full 1.1 s and the whole exercise bought
+       nothing (measured — the cold open stayed at 743 ms). Scoping it
+       to the paint also means one paint cannot show two different
+       answers to the same question.
+       Scoping it this tightly is what makes it honest: a surface that
+       asks the engine a question after the app is up is answered by the
+       engine, not by a recording of it. The deferred pass below lands
+       within a tick and re-renders, so the first paint is behind by one
+       frame and nothing else ever is. */
+    if(S._corrFirst===undefined&&!S._corrBusy&&disk&&Array.isArray(disk.v)){corrWarm();return disk.v}
     const days=corrDayData();
     const keys=Object.keys(days).sort();
-    if(keys.length<12){S._corrMemo={stamp:stamp,v:found};return found}
+    if(keys.length<12){S._corrMemo={stamp:stamp,v:found};corrCacheSave(stamp,found);return found}
     const idxByDate={};keys.forEach((k,i)=>idxByDate[k]=i);
     const dateAt=lag=>k=>{const d=new Date(k+'T12:00');d.setDate(d.getDate()+lag);return dayKey(d)};
     const M=corrMaps(days);S._corrMaps=M;
@@ -16911,6 +17004,7 @@ function correlations(){
     const seen={};
     const v=distinct.filter(f=>{const n9=(seen[f.out]||0);if(n9>=3)return false;seen[f.out]=n9+1;return true}).slice(0,32);
     S._corrMemo={stamp:stamp,v:v};
+    corrCacheSave(stamp,v);
     return v;
   }catch(e){return[]}}
 /* the common-sense layer (beta-caught by Angus, 3 Sep: 'your incline
@@ -17756,11 +17850,26 @@ function setAsideWindows(){
     const st=hkDailyStore().days||{};
     const keys=Object.keys(st).sort();
     const out=[];
+    /* first index whose key is >= v, over the sorted day keys */
+    const lb=v=>{let lo=0,hi=keys.length;
+      while(lo<hi){const m=(lo+hi)>>1;if(keys[m]<v)lo=m+1;else hi=m}return lo};
     const base=(f,k,need,mult)=>{
-      /* the 28-day median of f before day k; null under `need` values */
-      const v=[];keys.forEach(x=>{if(x>=k)return;
-        const age=Math.round((new Date(k+'T12:00')-new Date(x+'T12:00'))/864e5);
-        if(age>28)return;const y=st[x][f];if(y!=null&&isFinite(y))v.push(y)});
+      /* the 28-day median of f before day k; null under `need` values.
+         THE WINDOW IS STILL COUNTED IN DAYS, NOT IN READINGS (ban 9) —
+         `from` is a calendar subtraction and the slice is bounded by it,
+         so a sparse wearer gets the same answer they always did.
+         What changed is only how the slice is found. This used to walk
+         EVERY day in the account and build TWO Date objects per day to
+         compute an age it then threw away, for every field on every day:
+         on two years of health data that is millions of Date
+         constructions, and it measured at 743 ms inside corrDayData —
+         the single largest cost on a cold app open. ISO day keys sort
+         chronologically as strings, so the window is a contiguous range
+         and a binary search finds its start. */
+      const from=libDayAdd(k,-28);
+      const v=[];
+      for(let i=lb(from),n=keys.length;i<n&&keys[i]<k;i++){
+        const y=st[keys[i]][f];if(y!=null&&isFinite(y))v.push(y)}
       return v.length>=need?libMed(v):null};
     /* cycle day, for the wrist-temperature suppression (days 24-28 run
        warm on their own) */
@@ -32251,6 +32360,15 @@ function render(){
      guard below used to exist only to paper over that. The CSS
      transition has no such failure mode, so apply() simply runs. */
   apply();
+  /* THE COLD PAINT IS OVER (17 Sep 2026). While this is undefined,
+     correlations() may paint from the answer it saved to disk last time
+     rather than spending 1.1 s rebuilding the grid before the screen can
+     show anything — see 13c. Setting it here, at the end of the first
+     render, is what makes that a single frame of the cold open instead
+     of a mode the app sits in: every question asked after this point is
+     answered by the engine. It is also why one paint cannot show two
+     different answers to the same question. */
+  S._corrFirst=1;
 }
 
 /* ══ input plumbing ═════════════════════════════════════ */
