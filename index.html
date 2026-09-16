@@ -498,6 +498,21 @@ body:not(:has(.tabbar)) .txpop{bottom:calc(env(safe-area-inset-bottom, 10px) + 1
 #findBig .fb-wrap{position:relative;width:100%;max-width:380px;margin:auto}
 #findBig .fb-card{padding:0;overflow:hidden;border-radius:20px;position:relative}
 #findBig .fb-acts{margin-top:20px}
+/* ── THE SHELF IS A DECK (16 Sep 2026) ─────────────────────────────
+   Counter and two arrows, because a deck you can only swipe is a deck
+   with no affordance — the arrows say it is a deck before anyone
+   tries, and they are also the accessible way through it. */
+#findBig .fb-deck{display:flex;align-items:center;justify-content:center;gap:18px}
+#findBig .fb-arw{width:44px;height:44px;border-radius:var(--r-full);flex:none;
+  display:flex;align-items:center;justify-content:center;
+  background:var(--raised);border:1px solid var(--line);color:var(--dim);
+  transition:transform .2s var(--ease-spring),color .2s var(--ease-out),opacity .2s var(--ease-out)}
+#findBig .fb-arw svg{width:19px;height:19px}
+#findBig .fb-arw:active{transform:scale(.9)}
+#findBig .fb-arw[disabled]{opacity:.28;pointer-events:none}
+/* the card tracks the finger sideways, then hands over */
+#findBig .fb-wrap.decking{transition:none}
+#findBig .fb-wrap.deckgo{transition:transform .22s cubic-bezier(.4,0,.9,.3),opacity .22s ease}
 /* ── THE UNKNOWN BEAT, THE BACKLIGHT, AND THE FLASH ────────────────
    Taken off real Clash Royale chest openings frame by frame (16 Sep
    2026, owner: "look up gameplay... take things from there that you
@@ -1477,7 +1492,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='044792';  // stamped by tools/build.py with the content hash
+const BUILD_ID='1acdbc';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -22620,7 +22635,9 @@ function findBigHtml(){
        mote carries its own duration, delay and lateral drift so the
        field never pulses in time. A synchronised shimmer reads as a
        loading spinner, which is the one thing it must not be. */
-    const motes=[6,10,16,22][c.rank];
+    /* MORE DUST (owner, 16 Sep 2026). Roughly doubled per tier — a
+       Noticed still arrives quietly, a Big one now genuinely pours. */
+    const motes=[12,20,30,40][c.rank];
     const dust=Array.from({length:motes},(_,i)=>{
       const g=(i*0.6180339887)%1;                 /* even without a pattern */
       const side=i%2?1:-1;                        /* alternate the edges */
@@ -22640,6 +22657,7 @@ function findBigHtml(){
        the one that gets the unknown beat. A Noticed never gets it at
        any door, because a plain arrival is what the bottom of the
        rarity ladder MEANS. */
+    const deck=(S.findDeck&&S.findDeck.ids&&S.findDeck.ids.length>1&&S.findDeck.ids[S.findDeck.i]===id)?S.findDeck:null;
     const seal=!S._fbFrom&&c.rank>=1;
     /* every beat is a multiple of the payoff floor, so the constant is
        load-bearing rather than a number in a comment: the shortest is
@@ -22690,7 +22708,22 @@ function findBigHtml(){
       /* DEALT, the footer is the deck: which card this is, and one way
          forward. Nothing else, because a card being dealt is not a card
          being browsed. */
-      (dl
+      (deck&&!dl
+        ?'<div class="fb-acts">'+
+          '<div class="fb-deck">'+
+          '<button data-a="findDeckGo" data-v="prev" class="fb-arw"'+(deck.i<=0?' disabled':'')+' aria-label="Previous card">'+
+            '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></button>'+
+          '<span class="mono" style="color:var(--faint);font-size:11px;letter-spacing:.12em">'+(deck.i+1)+' OF '+deck.ids.length+'</span>'+
+          '<button data-a="findDeckGo" data-v="next" class="fb-arw"'+(deck.i>=deck.ids.length-1?' disabled':'')+' aria-label="Next card">'+
+            '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg></button>'+
+          '</div>'+
+          '<div class="row" style="gap:8px;margin-top:12px">'+
+          '<button data-a="findShare" data-v="'+esc(id)+'" class="btn" style="flex:1;border-color:'+r[1]+';color:'+r[1]+';font-size:13px">Share this card</button>'+
+          (hasEv?'<button data-a="evidenceOpen" data-v="'+esc(id)+'" class="btn" style="flex:1;font-size:13px">See the evidence</button>':'')+
+          '</div>'+
+          '<button data-a="findBigClose" class="btn" style="width:100%;margin-top:8px;border:0;color:var(--faint);font-size:13px">Close</button>'+
+          '</div>'
+      :dl
         ?'<div class="fb-acts">'+
           '<p class="mono" style="text-align:center;color:var(--faint);font-size:11px;letter-spacing:.14em">'+
             (dl.i+1)+' OF '+dl.ids.length+'</p>'+
@@ -33178,6 +33211,76 @@ try{
     clear();
   },{passive:true});
 })();
+
+/* ══ SWIPE THROUGH THE COLLECTION LIKE A DECK ══════════════════════
+   (owner, 16 Sep 2026: "I want to be able to swipe through them like a
+   deck of cards".)
+   The full-page card already opens from the binder; this makes the
+   shelf behind it traversable without going back for each one. The
+   card tracks the finger, resists at the two ends the way the page
+   swipe does, and hands over past a quarter of the width.
+   It is deliberately INERT while the deep read is dealing: a card
+   coming off the top of a deck is not a card being browsed, and
+   swiping sideways through a reveal would undo the one-at-a-time rule
+   that whole ceremony exists for. */
+(function(){
+  let x0=null,y0=null,live=false,wrap=null,W=0,dx=0,busy=false;
+  const deck=()=>{try{const d=S.findDeck;
+    return (S.findBig&&!S.deepDeal&&d&&d.ids&&d.ids.length>1&&d.ids[d.i]===S.findBig)?d:null}
+    catch(e){oops('deckRead',e);return null}};
+  const reduced=()=>{try{return !!(window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches)}
+    catch(e){return false}};
+  function done(){
+    try{if(wrap){wrap.classList.remove('decking','deckgo');wrap.style.transform='';wrap.style.opacity=''}}
+    catch(e){oops('deckDone',e)}
+    wrap=null;x0=null;live=false;dx=0}
+  document.addEventListener('touchstart',e=>{
+    if(busy)return;done();
+    if(!deck())return;
+    const host=document.getElementById('findBig');if(!host)return;
+    if(e.target.closest&&e.target.closest('button,a,input,textarea,select'))return;
+    wrap=host.querySelector('.fb-wrap');if(!wrap)return;
+    const t=e.touches[0];x0=t.clientX;y0=t.clientY;W=window.innerWidth||375},{passive:true});
+  document.addEventListener('touchmove',e=>{
+    if(x0==null||busy)return;
+    const t=e.touches[0],ddx=t.clientX-x0,ddy=t.clientY-y0;
+    if(!live){
+      if(Math.abs(ddy)>Math.abs(ddx)||Math.abs(ddy)>16){x0=null;return}
+      if(Math.abs(ddx)<16)return;
+      live=true;
+      if(!reduced())wrap.classList.add('decking')}
+    if(reduced())return;
+    const d=deck();if(!d)return;
+    /* no card that way: resist rather than travel */
+    const atEnd=(ddx<0&&d.i>=d.ids.length-1)||(ddx>0&&d.i<=0);
+    dx=atEnd?ddx*0.3:ddx;
+    wrap.style.transform='translate3d('+dx+'px,0,0)';
+    wrap.style.opacity=String(Math.max(.35,1-Math.abs(dx)/W*0.9))},{passive:true});
+  document.addEventListener('touchmove',e=>{
+    if(live&&!reduced()&&e.cancelable)e.preventDefault()},{passive:false});
+  function end(){
+    if(!live||!wrap){done();return}
+    const d=deck();
+    const go=d&&Math.abs(dx)>W*0.25?(dx<0?'next':'prev'):null;
+    const j=go?d.i+(go==='next'?1:-1):-1;
+    const ok9=go&&j>=0&&j<d.ids.length;
+    if(!ok9||reduced()){
+      wrap.classList.remove('decking');wrap.classList.add('deckgo');
+      wrap.style.transform='';wrap.style.opacity='';
+      const w9=wrap;busy=true;
+      setTimeout(function(){busy=false;try{w9.classList.remove('deckgo')}catch(e){oops('deckBack',e)}},240);
+      x0=null;live=false;dx=0;wrap=null;return}
+    /* see it off the edge it was heading for, then hand over */
+    busy=true;
+    wrap.classList.remove('decking');wrap.classList.add('deckgo');
+    wrap.style.transform='translate3d('+(dx<0?-W:W)+'px,0,0)';
+    wrap.style.opacity='0';
+    x0=null;live=false;
+    setTimeout(function(){busy=false;done();
+      try{runAction('findDeckGo',go)}catch(e){oops('deckHand',e)}},200)}
+  document.addEventListener('touchend',end,{passive:true});
+  document.addEventListener('touchcancel',end,{passive:true});
+})();
 function sheetScrollBack(){
   /* returning to the preview sheet should land where you were —
      render() may run inside a view transition, so restore on a
@@ -34545,7 +34648,39 @@ function runAction(a,v,t,e){
       try{const b=t&&t.getBoundingClientRect&&t.getBoundingClientRect();
         S._fbFrom=(b&&b.width>20&&b.height>20)?{x:b.left,y:b.top,w:b.width,h:b.height}:null}
       catch(e9){S._fbFrom=null}
+      /* ── THE SHELF IS A DECK (owner, 16 Sep 2026: "I want to be able
+         to swipe through them like a deck of cards") ───────────────
+         The order is already on the screen, so it is read off the
+         screen: every findOpen control in document order IS the shelf
+         as the user is looking at it, whichever way they have sorted
+         it — by category, by rarity or by newest. Deriving it from the
+         bank instead would give a different order from the one they
+         can see, which is the kind of drift this repo keeps catching.
+         Deliberately NOT set when the deal is running: a card being
+         dealt off the top of a deck is not a card being browsed, and
+         swiping sideways through a reveal would undo the one-at-a-time
+         rule the deal exists for. */
+      try{
+        if(!S.deepDeal){
+          const ids=[].slice.call(document.querySelectorAll('[data-a="findOpen"][data-v]'))
+            .map(function(el){return el.getAttribute('data-v')})
+            .filter(function(x,i,a){return x&&a.indexOf(x)===i});
+          const at=ids.indexOf(v);
+          S.findDeck=(ids.length>1&&at>=0)?{ids:ids,i:at}:null}
+        else S.findDeck=null}
+      catch(e9){oops('findDeck',e9);S.findDeck=null}
       S.findBig=v;render();break}
+    /* one card along, either way. The index moves, the overlay remounts
+       from S.findBig like any other open — no special case downstream. */
+    case 'findDeckGo':{
+      try{const d=S.findDeck;if(!d)break;
+        const j=d.i+(v==='next'?1:-1);
+        if(j<0||j>=d.ids.length)break;
+        d.i=j;S._fbFrom=null;S.findBig=d.ids[j];
+        try{if(typeof feelTier==='function'){const b9=discBank()[d.ids[j]];feelTier(b9&&b9.rar)}}catch(e8){oops('deckFeel',e8)}
+        render()}
+      catch(e9){oops('findDeckGo',e9)}
+      break}
     /* the close plays backwards before the state changes — clearing it
        first would remove the element that is meant to be animating */
     /* one card off the top of the deck at a time; the last one lands on
