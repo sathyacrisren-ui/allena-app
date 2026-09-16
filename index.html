@@ -211,8 +211,17 @@ body.swiping [style*="animation"],
 body.swiping .an-glow,body.swiping .pts-glow,body.swiping .deep-ready,
 body.swiping .fb-mote,body.swiping .tx-new,body.swiping .tx-shim,
 body.swiping .an-breathe,body.swiping .find-dust{animation-play-state:paused!important}
-/* and the page itself must not try to scroll under the finger */
-body.swiping{overflow:hidden;touch-action:none}
+/* THE PAGE MUST NOT SCROLL UNDER THE FINGER — BUT NOT LIKE THIS.
+   This was `overflow:hidden` on the body, and setting that on a body
+   that is already scrolled CLAMPS ITS SCROLL TO ZERO. The page jumped
+   to the top the instant a swipe locked, and stayed there when the
+   class came off: owner-reported as "stuttering, page drops down when
+   you scroll through", and his recording shows two seconds apart with
+   the page not having moved at all.
+   The non-passive preventDefault already stops the browser scrolling,
+   which is the correct mechanism and the only one needed. This class
+   now only pauses the ambient animations. */
+body.swiping{touch-action:none}
 .tabbar{position:fixed;left:0;right:0;bottom:calc(10px + env(safe-area-inset-bottom));
   z-index:60;display:flex;justify-content:center;pointer-events:none}
 .tabbar>nav{pointer-events:auto;display:flex;align-items:stretch;gap:2px;
@@ -1492,7 +1501,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='1acdbc';  // stamped by tools/build.py with the content hash
+const BUILD_ID='a3ec53';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -22696,7 +22705,27 @@ function findBigHtml(){
           '</div>'+
         '<p class="disp" style="font-size:24px;font-weight:'+(c.rank>=3?700:650)+';line-height:1.2;margin-top:16px;'+
           'background:none;-webkit-text-fill-color:var(--text);color:var(--text)">'+esc(e.t)+'</p>'+
-        (e.d?'<p style="color:var(--dim);font-size:13px;line-height:1.65;margin-top:12px">'+esc(e.d)+'</p>':'')+
+        /* ── A LONG CARD SHOWS A LITTLE, WITH A WAY TO THE REST ──────
+           (owner, 16 Sep 2026, off his own recording: "if card is long
+           only show a small amount with the option for more info".)
+           A finding's body can run to a paragraph, and on a full-page
+           card that produced a slab tall enough to push the counter
+           and the buttons off the screen — and it made the arrival
+           flash a full-height white rectangle, which is most of why
+           the reveal read as broken rather than as a reveal.
+           Clamped to four lines with More. Nothing is withheld: the
+           rest is one tap away and never leaves the card. Same
+           treatment the Today hero already got on 14 Sep, for the
+           same reason — a More link that opens something holding the
+           identical paragraph is not More, it is a detour. */
+        (e.d?(function(){
+          const lng=String(e.d).length>190;
+          const open9=!!S._fbMore;
+          return '<p id="fbBody" style="color:var(--dim);font-size:13px;line-height:1.65;margin-top:12px'+
+            ((lng&&!open9)?';display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden':'')+
+            '">'+esc(e.d)+'</p>'+
+            (lng?'<button data-a="fbMore" class="mono" style="margin-top:8px;padding:6px 0;background:none;border:0;'+
+              'color:'+r[1]+';font-size:11px;letter-spacing:.08em;text-align:left">'+(open9?'LESS':'MORE')+'</button>':'')})():'')+
         (basis?'<p class="mono" style="color:'+r[1]+';font-size:11px;letter-spacing:.06em;margin-top:16px">FROM '+esc(basis.toUpperCase())+' OF YOUR OWN DATA</p>':'')+
         ((typeof findMeaningHtml==='function')?findMeaningHtml(e):'')+
         (e.x?'<p style="color:var(--faint);font-size:var(--t-foot);line-height:1.55;margin-top:16px;padding-top:12px;border-top:1px solid var(--line)">'+esc(e.x)+'</p>':'')+
@@ -32530,7 +32559,12 @@ tickEvery(function(){try{
     if(x0==null||settling)return;
     const t=e.touches[0],ddx=t.clientX-x0,ddy=t.clientY-y0;
     if(!live){
-      if(Math.abs(ddy)>Math.abs(ddx)||Math.abs(ddy)>16){x0=null;return}  /* a scroll */
+      /* A SCROLL WINS TIES AND NEAR-TIES. Requiring only dx>dy let a
+         fast vertical flick with a little drift register as a swipe,
+         and the cost of getting that wrong is the whole page locking
+         up under the thumb. The horizontal component has to be half
+         again the vertical one before this takes the gesture. */
+      if(Math.abs(ddy)>16||Math.abs(ddx)<Math.abs(ddy)*1.5){x0=null;return}
       if(Math.abs(ddx)<18)return;
       live=true;dir=ddx<0?1:-1;
       if(reduced())return;                          /* jump on release instead */
@@ -34669,14 +34703,16 @@ function runAction(a,v,t,e){
           S.findDeck=(ids.length>1&&at>=0)?{ids:ids,i:at}:null}
         else S.findDeck=null}
       catch(e9){oops('findDeck',e9);S.findDeck=null}
-      S.findBig=v;render();break}
+      S._fbMore=false;S.findBig=v;render();break}
     /* one card along, either way. The index moves, the overlay remounts
        from S.findBig like any other open — no special case downstream. */
+    /* expands in place — the rest of the body is never somewhere else */
+    case 'fbMore':{S._fbMore=!S._fbMore;S._fbFrom=null;render();break}
     case 'findDeckGo':{
       try{const d=S.findDeck;if(!d)break;
         const j=d.i+(v==='next'?1:-1);
         if(j<0||j>=d.ids.length)break;
-        d.i=j;S._fbFrom=null;S.findBig=d.ids[j];
+        d.i=j;S._fbFrom=null;S._fbMore=false;S.findBig=d.ids[j];
         try{if(typeof feelTier==='function'){const b9=discBank()[d.ids[j]];feelTier(b9&&b9.rar)}}catch(e8){oops('deckFeel',e8)}
         render()}
       catch(e9){oops('findDeckGo',e9)}
