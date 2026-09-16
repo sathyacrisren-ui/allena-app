@@ -1368,7 +1368,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='32fd38';  // stamped by tools/build.py with the content hash
+const BUILD_ID='c8e690';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -24532,31 +24532,50 @@ function weekBoard(){
       hasRuns:!!rp,hasRehab:rehabT>0}}catch(e){return null}}
 function weekBoardCard(){
   const B=weekBoard();if(!B)return '';
-  /* readable at arm's length (owner-caught, 8 Sep: 'small and not
-     really readable') — bigger type, taller chips, a real legend,
-     today's column lifted on its own ground */
+  /* ── SEVEN ROWS, NOT SEVEN COLUMNS (16 Sep 2026, design pass) ────
+     This was a seven-column grid, which on a 375px phone gives each
+     day about 44 pixels. No layout trick fits the word "landing" into
+     44 pixels, and the history of this card is three attempts to
+     prove otherwise: first the labels were ellipsed ("rec…", "tech…")
+     and the owner said a board you cannot read is not a board; then
+     they were wrapped, which produced "land-ing" with a hyphen in the
+     middle of a word; and the type had already been pushed down to
+     9px to buy the room.
+     The column layout was the problem. A week has seven days and a
+     phone has one narrow axis — so the days go DOWN, where there are
+     seven slots and no width limit, and each day gets the full card
+     width for its sessions. Every label fits on one line at a size
+     you can read at arm's length, which is what was being asked for
+     in all three of those rounds.
+     It also reads like what it is: a schedule. */
   const chip=it=>{
-    /* WRAP, DO NOT TRUNCATE (owner-caught, 11 Sep: "all writing still cut
-       off"). Seven columns on a phone cannot hold a word on one line, so
-       the labels were ellipsed into "rec…" and "tech…" — a board you
-       cannot read is not a board. Two short lines fit where one long one
-       never could. */
-    const base='display:block;width:100%;box-sizing:border-box;text-align:center;border-radius:8px;padding:5px 2px;font-size:9px;line-height:1.15;letter-spacing:0;margin-top:4px;overflow:hidden;overflow-wrap:anywhere;word-break:break-word;hyphens:auto;';
-    if(it.k==='run')return '<span class="mono" style="'+base+(it.done?'background:var(--chart);color:var(--bg);font-weight:700':'border:1.5px solid var(--chart)66;color:var(--chart)'+(it.long?';font-weight:700':''))+'">'+esc(it.l)+'</span>';
-    if(it.k==='rehab')return '<span class="mono" style="'+base+(it.done?'background:var(--green);color:var(--bg);font-weight:700':'border:1.5px solid var(--greensoft);color:var(--green)')+'">'+esc(it.l)+'</span>';
-    return '<span class="mono" style="'+base+(it.done?'background:var(--text);color:var(--bg);font-weight:700':'border:1.5px solid var(--line);color:var(--dim)')+'">'+esc(it.l)+'</span>'};
-  const leg=(col,lab)=>'<span style="display:inline-flex;align-items:center;gap:4px"><span style="width:8px;height:8px;border-radius:8px;background:'+col+'"></span><span class="mono" style="font-size:9px;color:var(--faint)">'+lab+'</span></span>';
+    const base='display:inline-flex;align-items:center;white-space:nowrap;border-radius:var(--r-2);'+
+      'padding:4px 9px;font-size:11px;line-height:1.25;letter-spacing:.01em;';
+    if(it.k==='run')return '<span class="mono" style="'+base+(it.done
+      ?'background:var(--chart);color:var(--bg);font-weight:700'
+      :'border:1px solid color-mix(in srgb,var(--chart) 45%,transparent);color:var(--chart)'+(it.long?';font-weight:700':''))+'">'+esc(it.l)+'</span>';
+    if(it.k==='rehab')return '<span class="mono" style="'+base+(it.done
+      ?'background:var(--green);color:var(--bg);font-weight:700'
+      :'border:1px solid var(--greensoft);color:var(--green)')+'">'+esc(it.l)+'</span>';
+    return '<span class="mono" style="'+base+(it.done
+      ?'background:var(--text);color:var(--bg);font-weight:700'
+      :'border:1px solid var(--line);color:var(--dim)')+'">'+esc(it.l)+'</span>'};
+  const leg=(col,lab)=>'<span style="display:inline-flex;align-items:center;gap:5px"><span style="width:7px;height:7px;border-radius:7px;background:'+col+'"></span><span class="mono" style="font-size:10px;color:var(--faint)">'+lab+'</span></span>';
   return '<div class="card mt" style="padding:15px 14px 13px">'+
     '<div style="display:flex;align-items:baseline;gap:12px;padding:0 2px">'+
     '<p class="eyebrow" style="flex:1">Your week</p>'+
-    '<span style="display:inline-flex;gap:12px">'+leg('var(--text)','Lift')+(B.hasRuns?leg('var(--chart)','Run'):'')+(B.hasRehab?leg('var(--green)','Rehab'):'')+'</span></div>'+
-    '<div style="display:flex;gap:4px;margin-top:12px;align-items:stretch">'+
+    '<span style="display:inline-flex;gap:11px">'+leg('var(--text)','Lift')+(B.hasRuns?leg('var(--chart)','Run'):'')+(B.hasRehab?leg('var(--green)','Rehab'):'')+'</span></div>'+
+    '<div style="margin-top:10px">'+
     B.days.map(d=>{
       const isToday=d.key===B.todayKey,past=d.key<B.todayKey;
-      return '<div style="flex:1;min-width:0;padding:4px 2px 6px;border-radius:12px'+(isToday?';background:var(--raised);border:1px solid var(--line)':'')+'">'+
-        '<p class="mono" style="text-align:center;font-size:11px;letter-spacing:.04em;'+(isToday?'color:var(--amber);font-weight:700':'color:var(--faint)')+'">'+d.n.slice(0,2).toUpperCase()+'</p>'+
-        (d.items.length?d.items.map(chip).join('')
-          :'<p style="text-align:center;color:'+(past?'var(--line)':'var(--faint)')+';font-size:13px;margin-top:8px">\u00b7</p>')+
+      return '<div style="display:flex;align-items:center;gap:10px;min-height:32px;padding:3px 6px;border-radius:var(--r-3)'+
+        (isToday?';background:var(--raised)':'')+'">'+
+        '<span class="mono" style="flex:none;width:30px;font-size:11px;letter-spacing:.06em;'+
+          (isToday?'color:var(--amber);font-weight:700':past?'color:var(--line)':'color:var(--faint)')+'">'+
+          esc(d.n.slice(0,3).toUpperCase())+'</span>'+
+        (d.items.length
+          ?'<span style="display:flex;flex-wrap:wrap;gap:5px;min-width:0">'+d.items.map(chip).join('')+'</span>'
+          :'<span style="flex:1;height:1px;background:'+(past?'var(--line)':'color-mix(in srgb,var(--line) 55%,transparent)')+';opacity:.7"></span>')+
         '</div>'}).join('')+'</div>'+
     (B.reason?'<p style="color:'+(B.conflict?'var(--amber)':'var(--dim)')+';font-size:13px;line-height:1.55;margin-top:12px">'+esc(B.reason)+'</p>':'')+
     '<p style="color:var(--faint);font-size:11px;line-height:1.5;margin-top:8px">Filled means done. Outlined is the suggested shape — nothing is locked to a day.</p>'+
