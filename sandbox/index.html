@@ -1368,7 +1368,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='1fc683';  // stamped by tools/build.py with the content hash
+const BUILD_ID='32fd38';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -27671,6 +27671,7 @@ function trendSlope(pts){const win=pts.filter(p=>p.t>=Date.now()-120*864e5);
      decline structurally invisible to anything reading the slope. */
   return Math.abs(sl*7*864e5)<=0.05?0:sl}
 function fmtShort(t){return new Date(t).toLocaleDateString(undefined,{day:'numeric',month:'short'})}
+let CHART_N=0;
 function liftChart(ex,goal){
   const pts=liftPts(ex);
   if(pts.length<2)return null;
@@ -27696,8 +27697,55 @@ function liftChart(ex,goal){
       const above=Y(target)>26;
       const y=above?(Y(target)-6):(Y(target)+13);
       return '<text x="'+x+'" y="'+y.toFixed(1)+'" text-anchor="'+anchor+'" class="mono" style="fill:var(--amber);font-size:11px">'+uwNum(Math.round(target))+' '+uwUnit()+' goal</text>'})();
-  g+='<path d="'+pts.map((p,i)=>(i?'L':'M')+X(p.t).toFixed(1)+','+Y(p.v).toFixed(1)).join(' ')+'" stroke-linejoin="round" style="fill:none;stroke:var(--chart);stroke-width:2.4"/>';
-  pts.forEach(p=>{g+='<circle cx="'+X(p.t).toFixed(1)+'" cy="'+Y(p.v).toFixed(1)+'" r="3" style="fill:var(--chart)"/>'});
+  /* ── THE CHART IS A CONCLUSION WITH ITS EVIDENCE UNDER IT ──────
+     (owner, 16 Sep 2026: "make it look polished and professional
+     like it wasn't vibe coded", with 6c lifted for this pass.)
+     This drew a hard-cornered polyline through EVERY session with a
+     filled dot on every point. On an estimated 1RM — which moves a
+     few kilos with sleep, the time of day and which set you took to
+     failure — forty-three of those is a seismograph. It is the most
+     amateur-looking thing in the app, and it is also the thing R20
+     warns about: a reader handed a jagged line judges the jitter,
+     not the direction. 37 postgraduates trained in single-case
+     analysis false-alarmed 16% to 84% on exactly this shape of data.
+     So: the smoothed trend is the HERO, drawn bold over a soft fill;
+     the raw sessions stay visible underneath as thin quiet evidence,
+     because hiding them would be the other dishonesty; and only the
+     latest point keeps a dot, since forty dots mark nothing. The
+     window scales with the point count so a six-session chart is
+     barely smoothed and a sixty-session one reads as a line. */
+  const sm=(function(){
+    const w=Math.max(0,Math.min(4,Math.floor(pts.length/9)));
+    if(!w)return pts.map(p=>({t:p.t,v:p.v}));
+    return pts.map((p,i)=>{
+      let a=0,n2=0;
+      for(let j=Math.max(0,i-w);j<=Math.min(pts.length-1,i+w);j++){a+=pts[j].v;n2++}
+      return{t:p.t,v:a/n2}})})();
+  /* a Catmull-Rom through the smoothed points, emitted as cubics — a
+     polyline with rounded JOINS still shows every corner, and the
+     corners are the noise */
+  const curve=(function(A){
+    if(A.length<3)return A.map((p,i)=>(i?'L':'M')+X(p.t).toFixed(1)+','+Y(p.v).toFixed(1)).join(' ');
+    let d='M'+X(A[0].t).toFixed(1)+','+Y(A[0].v).toFixed(1);
+    for(let i=0;i<A.length-1;i++){
+      const p0=A[i?i-1:0],p1=A[i],p2=A[i+1],p3=A[i+2]||p2;
+      const c1x=X(p1.t)+(X(p2.t)-X(p0.t))/6, c1y=Y(p1.v)+(Y(p2.v)-Y(p0.v))/6;
+      const c2x=X(p2.t)-(X(p3.t)-X(p1.t))/6, c2y=Y(p2.v)-(Y(p3.v)-Y(p1.v))/6;
+      d+='C'+c1x.toFixed(1)+','+c1y.toFixed(1)+' '+c2x.toFixed(1)+','+c2y.toFixed(1)+' '+X(p2.t).toFixed(1)+','+Y(p2.v).toFixed(1)}
+    return d})(sm);
+  const gid='lc'+(CHART_N++);
+  g+='<defs><linearGradient id="'+gid+'" x1="0" y1="0" x2="0" y2="1">'+
+     '<stop offset="0" stop-color="var(--chart)" stop-opacity=".22"/>'+
+     '<stop offset="1" stop-color="var(--chart)" stop-opacity="0"/></linearGradient></defs>';
+  g+='<path d="'+curve+' L'+X(sm[sm.length-1].t).toFixed(1)+','+(H-P)+' L'+X(sm[0].t).toFixed(1)+','+(H-P)+' Z" style="fill:url(#'+gid+');stroke:none"/>';
+  /* the evidence: every real session, thin and quiet */
+  g+='<path d="'+pts.map((p,i)=>(i?'L':'M')+X(p.t).toFixed(1)+','+Y(p.v).toFixed(1)).join(' ')+
+     '" stroke-linejoin="round" stroke-linecap="round" style="fill:none;stroke:var(--chart);stroke-width:1;opacity:.28"/>';
+  /* the conclusion */
+  g+='<path d="'+curve+'" stroke-linejoin="round" stroke-linecap="round" style="fill:none;stroke:var(--chart);stroke-width:2.4"/>';
+  /* one dot, on today, where the eye should finish */
+  g+='<circle cx="'+X(last.t).toFixed(1)+'" cy="'+Y(last.v).toFixed(1)+'" r="3.6" style="fill:var(--chart)"/>'+
+     '<circle cx="'+X(last.t).toFixed(1)+'" cy="'+Y(last.v).toFixed(1)+'" r="6.5" style="fill:none;stroke:var(--chart);stroke-width:1;opacity:.35"/>';
   if(projT){g+='<line x1="'+X(last.t).toFixed(1)+'" y1="'+Y(last.v).toFixed(1)+'" x2="'+X(projT).toFixed(1)+'" y2="'+Y(target).toFixed(1)+'" stroke-linecap="round" style="stroke:var(--dim);stroke-width:2;stroke-dasharray:2 6"/>'+
     '<circle cx="'+X(projT).toFixed(1)+'" cy="'+Y(target).toFixed(1)+'" r="4.5" style="fill:none;stroke:var(--amber);stroke-width:2"/>'+
     '<text x="'+(W-P)+'" y="'+Math.min(H-4,Y(target)+18).toFixed(1)+'" text-anchor="end" class="mono" style="fill:var(--amber);font-size:11px">projected \u2248 '+fmtShort(projT)+'</text>'}
