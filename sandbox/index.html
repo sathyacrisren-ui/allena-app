@@ -1622,7 +1622,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='1392e0';  // stamped by tools/build.py with the content hash
+const BUILD_ID='542a2b';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -3551,7 +3551,8 @@ async function acctVerify(code){
         refresh:d.refresh_token,exp:Date.now()+((+d.expires_in||3600)-60)*1000,lastSync:null});
       S.acctPending=false;S.acctCode='';
       flash('Signed in.');render();
-      try{acctSyncSoon()}catch(e){}}
+      try{acctSyncSoon()}catch(e){}
+      try{cloudBkOffer()}catch(e){}}
     else flash(d.msg||d.error_description||'That code did not work — codes expire quickly, send a fresh one.')
   }catch(e){flash('No connection.')}
   render()}
@@ -4763,7 +4764,77 @@ return '<div class="view pad stg phpad">'+
 let acctSyncT=null;
 function acctSyncSoon(){
   if(!acctReady()||!acct())return;
-  clearTimeout(acctSyncT);acctSyncT=setTimeout(function(){acctSync(false)},1500)}
+  clearTimeout(acctSyncT);acctSyncT=setTimeout(function(){acctSync(false)},1500);
+  cloudBkSoon()}
+/* ══ THE CLOUD BACKUP (owner ruling, 17 Sep 2026: "we have to make a
+   server to back up users' data") ═══════════════════════════════════════
+   supabase/backup.sql holds one row per user: the app's own export bundle
+   (backupObj — every training-* key, credentials never), pushed after
+   every change that already syncs the score card, and read back on a new
+   phone. Self-detecting: until the table exists every call no-ops and no
+   UI claims a backup that was never made. */
+function cloudBkPayload(){
+  const o=backupObj();
+  const blob=JSON.stringify(o);
+  /* the hash is over the DATA, not the bundle: exportedAt changes on
+     every call and would make every sync re-send an unchanged record */
+  const body=JSON.stringify(o.keys||{});
+  let h=5381;for(let i=0;i<body.length;i++)h=((h*33)^body.charCodeAt(i))>>>0;
+  const sessions=(o.keys&&Array.isArray(o.keys[K_H]))?o.keys[K_H].length:0;
+  return{blob:blob,bytes:blob.length,sessions:sessions,hash:String(h)}}
+let cloudBkT=null;
+function cloudBkSoon(){
+  if(!acctReady()||!acct()||S._bkCap===false)return;
+  clearTimeout(cloudBkT);cloudBkT=setTimeout(function(){cloudBkPush(false)},4000)}
+async function cloudBkPush(loud){
+  if(!acctReady())return false;
+  if(loud){S.bkBusy=true;render()}
+  const done=ok9=>{if(loud){S.bkBusy=false;render()}return ok9};
+  try{
+    const tok=await acctToken();if(!tok){if(loud)flash('Sign in first.');return done(false)}
+    const c=acctClaims(tok);if(!c||!c.sub)return done(false);
+    const pay=cloudBkPayload();
+    const a=acct()||{};
+    if(!loud&&a.bkHash===pay.hash)return done(true);   // nothing changed since the last push
+    const r=await fetch(CLOUD.url+'/rest/v1/backups?on_conflict=user_id',{method:'POST',
+      headers:{'content-type':'application/json',apikey:CLOUD.anon,
+        Authorization:'Bearer '+tok,Prefer:'resolution=merge-duplicates,return=minimal'},
+      body:JSON.stringify([{user_id:c.sub,blob:pay.blob,bytes:pay.bytes,sessions:pay.sessions,updated_at:new Date().toISOString()}])});
+    if(r.ok){S._bkCap=true;
+      lset(K_ACCT,Object.assign({},acct(),{bkAt:new Date().toISOString(),bkHash:pay.hash,bkBytes:pay.bytes,bkSessions:pay.sessions}));
+      /* a backup is a backup: the never-backed-up warning stands down */
+      lset(K_BK,Date.now());
+      if(loud){flash('Backed up to your account.');try{haptic('success')}catch(e9){}}
+      return done(true)}
+    if(r.status===404||r.status===400){S._bkCap=false;if(loud)flash('The backup table is not live on the server yet.');return done(false)}
+    if(loud)flash('Backup failed ('+r.status+').');return done(false)}
+  catch(e){oops('cloudBkPush',e);if(loud)flash('No connection.');return done(false)}}
+async function cloudBkPull(){
+  /* the row for this account, or null: {blob,updated_at,sessions,bytes} */
+  try{
+    if(!acctReady())return null;
+    const tok=await acctToken();if(!tok)return null;
+    const c=acctClaims(tok);if(!c||!c.sub)return null;
+    const r=await fetch(CLOUD.url+'/rest/v1/backups?select=blob,updated_at,sessions,bytes&user_id=eq.'+encodeURIComponent(c.sub),
+      {headers:{apikey:CLOUD.anon,Authorization:'Bearer '+tok}});
+    if(!r.ok){if(r.status===404||r.status===400)S._bkCap=false;return null}
+    S._bkCap=true;
+    const rows=await r.json();
+    return (Array.isArray(rows)&&rows[0]&&rows[0].blob)?rows[0]:null}
+  catch(e){oops('cloudBkPull',e);return null}}
+async function cloudBkOffer(){
+  /* A NEW PHONE ASKS ONCE (17 Sep 2026): signed in on a device with an
+     empty record while the account holds a backup — offer to restore it.
+     A device that already has sessions is never overwritten unasked. */
+  try{
+    if((S.history||[]).some(h=>!h.demo))return;
+    const row=await cloudBkPull();if(!row)return;
+    S.cloudRow=row;
+    S.confirm={t:'Restore from your account?',
+      d:(row.sessions||0)+' session'+(row.sessions===1?'':'s')+' backed up '+esc(fmtDate(row.updated_at))+'. Restoring merges that record into this phone; nothing here is deleted.',
+      go:'cloudRestoreGo',v:'',soft:true,ok:'Restore it',no:'Not now'};
+    S.sheet={t:'confirm'};render()}
+  catch(e){oops('cloudBkOffer',e)}}
 function accountSection(){
   if(!acctReady())return '<p style="color:var(--dim);font-size:13px;line-height:1.55;margin-top:8px">'+
     'Cloud sign-in is not switched on in this build yet. When it is, signing in adds the no-key coach chat and backs up your score card — and only your score card. Sets, weights, body and rehab data never leave this phone.</p>';
@@ -4771,7 +4842,14 @@ function accountSection(){
   if(a&&a.refresh)return '<p style="color:var(--dim);font-size:13px;line-height:1.55;margin-top:8px">'+
       'Signed in as <b style="color:var(--text)">'+esc(a.email||'you')+'</b>.'+
       (a.lastSync?' Score card last synced '+esc(a.lastSync)+'.':' Not synced yet.')+
-      ' Syncing sends points, tier, tree numbers and counts — the server has no columns for anything else.</p>'+
+      /* THE SERVER HOLDS A BACKUP NOW (owner, 17 Sep 2026) */
+      (S._bkCap===false?' Cloud backup is not live on the server yet.'
+        :a.bkAt?' Your training record was backed up to your account '+esc(fmtDate(a.bkAt))+' ('+(a.bkSessions||0)+' session'+(a.bkSessions===1?'':'s')+').'
+        :' Your training record backs up to your account after every change.')+'</p>'+
+    (S.bkBusy
+      ?'<button class="btn mt" style="color:var(--dim)" disabled>Backing up\u2026</button>'
+      :'<div class="row mt" style="gap:8px"><button data-a="cloudBkNow" class="btn" style="flex:1;color:var(--amber)">Back up now</button>'+
+       '<button data-a="cloudRestoreAsk" class="btn" style="flex:1;color:var(--dim)">Restore from the cloud</button></div>')+
     (S.acctBusy
       ?'<button class="btn mt" style="color:var(--dim);display:flex;align-items:center;justify-content:center;gap:8px" disabled>'+
        '<span style="width:14px;height:14px;border-radius:16px;border:2px solid var(--line);border-top-color:var(--amber);display:inline-block;animation:spin .7s linear infinite"></span>Syncing\u2026</button>'
@@ -4790,7 +4868,7 @@ function accountSection(){
       :'<button data-a="acctSend2" class="btn mt" style="color:var(--dim)">Send a fresh code</button>')+
     '<button data-a="acctReset" class="btn mt" style="color:var(--faint);font-size:11px">Different email</button>';
   return '<p style="color:var(--dim);font-size:13px;line-height:1.55;margin-top:8px">'+
-      'Sign in with just your email — an emailed code, no password. It unlocks the coach chat without any API key, and backs up your score card (points, tier, tree, counts). Training data itself never leaves this phone.</p>'+
+      'Sign in with just your email — an emailed code, no password. It unlocks the coach chat without any API key, backs up your score card for the race, and backs up your whole training record to your account so a new phone can restore it. The backup is your row alone on the server; nobody else can read it.</p>'+
     '<input data-in="acctEmail" value="'+esc(S.acctEmail||'')+'" placeholder="you@email.com" autocomplete="email" inputmode="email" class="mono" style="width:100%;margin-top:12px;background:var(--surface);border:1px solid var(--line);border-radius:12px;color:var(--text);padding:12px;font-size:13px;outline:none">'+
     '<button data-a="acctSend" class="btn mt" style="color:var(--amber)">Email me a sign-in code</button>'}
 /* ══ PODS — a race that does not need your friends (14 Sep 2026) ═══
@@ -6565,7 +6643,14 @@ function muscleFresh(){
  /* running is leg load — the one-model promise. A half marathon the
     day before must show in the legs, whatever the lifting log says. */
  const RUN_M={'Quads':1,'Calves':1,'Hamstrings':0.8,'Glutes':0.6};
+ /* A WALK IS NOT A RUN (owner report, 17 Sep 2026: "people haven't hit
+    legs in 5 days and were told not to do legs today"). Every Health
+    walk and hike landed in runs() with kilometres on it and was billed
+    to the legs as a run — a Garmin wearer's daily walks kept the quads
+    at 30% with no leg day in sight. Only run types bill here; an entry
+    with no type is a hand-logged run from before types existed. */
  (typeof runs==='function'?runs():[]).forEach(r2=>{
+  if(r2.type&&typeof isRunType==='function'&&!isRunType(r2.type))return;
   const hrs=(now-new Date(r2.date+(r2.date.length<=10?'T12:00':'')).getTime())/36e5;
   if(hrs>168||hrs<-2||!(r2.km>0))return;
   const hard=(r2.rpe||5)>=8||r2.type==='race'||r2.type==='interval';
@@ -21922,81 +22007,8 @@ function todayVerdict(){
     d:(rd&&rd.level==='high')?'Readiness is good this morning. This is the day to push if any day is.'
       :'Next in the week. Nothing in your data says to change it.',
     cta:{a:'prevOpen',v:p.id+':'+pick.i,label:'Start '+pick.name}}}
-function dashTiles(){
-  const p=activeProgSafe();
-  const out=[];
-  /* THE TILE FROM THE DESIGN SYSTEM (17 Sep 2026): the figure at 22 in
-     Clash, a micro label, and a footer that is the tile's own data — a
-     sparkline, bars, or one short fact. Pain, when held, is the green
-     tile; nothing else on the row is coloured. */
-  const tile=(v,l,col,act,av,foot,tint)=>'<button '+(act?'data-a="'+act+'"'+(av!=null?' data-v="'+av+'"':''):'')+
-    ' class="tile" style="flex:1'+(tint?';background:linear-gradient(180deg,rgba(48,209,88,.12),rgba(255,255,255,.03));border-color:rgba(48,209,88,.22)':'')+'">'+
-    '<span class="tn" style="color:'+(col||'var(--text)')+'">'+esc(String(v))+'</span>'+
-    '<span class="tl">'+esc(l)+'</span>'+
-    (foot||'')+'</button>';
-  const spark=vals=>{if(!vals||vals.length<2)return '';
-    const mn=Math.min.apply(null,vals),mx=Math.max.apply(null,vals),sp=Math.max(1,mx-mn);
-    const pts=vals.map((x,i)=>(2+i/(vals.length-1)*72).toFixed(1)+','+(20-((x-mn)/sp)*16).toFixed(1)).join(' ');
-    return '<svg viewBox="0 0 76 22" width="100%" height="18" fill="none" style="margin-top:auto" aria-hidden="true"><polyline points="'+pts+'" stroke="var(--blue)" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>'};
-  const bars=(done,plan)=>'<span class="tf" style="display:flex;gap:3px">'+Array.from({length:Math.max(1,Math.min(7,plan))},(_,i)=>'<span style="flex:1;height:4px;border-radius:4px;background:'+(i<done?'var(--text)':'rgba(255,255,255,.14)')+'"></span>').join('')+'</span>';
-  /* A COUNT IS A FACT. A PERCENTAGE AGAINST A TARGET IS A VERDICT.
-     (16 Sep 2026, from the failure-presentation research.) This tile
-     showed weekAdherence's pct — sets done against sets planned for
-     the WHOLE week — on the dashboard, every day, coloured by
-     adhTone, which paints anything under 75 in --dim. On a Tuesday
-     morning that is arithmetically guaranteed to be low: a fortnight
-     of Mondays reading "12%" in grey, about a week nobody has had a
-     chance to finish yet.
-     Celeste counts every death from the first one and shows the
-     number NOWHERE — not during play, and not on the
-     chapter-complete screen; the chapter-select counter is gated on
-     `Completed` for the A-side, so the tally of your losses appears
-     only once you have won, and then it is a statistic you own. The
-     number is not deleted or softened. It is DEFERRED past the
-     moment where it would read as a verdict.
-     So the dashboard carries the count, which is a thing you did,
-     and the percentage lives one tap away in the adherence sheet,
-     which is where you go when you want to be judged. The tone can
-     only be neutral or green: a week in progress is never behind,
-     because it is not over. */
-  if(p&&!p.acl){const a=weekAdherence(p,S.week);
-    if(a&&a.setsPlanned){
-      const done=a.sessions||0,plan=a.sessionsPlanned||0;
-      out.push(tile(plan?done+'/'+plan:String(done),'Sessions',
-        (plan&&done>=plan)?'var(--green)':'var(--text)','adhOpen',null,bars(done,plan)))}}
-  {const k=today(),g=(S.gar&&S.gar.days||{})[k]||{};
-   /* logged → the trend graph; unlogged → the prompt (owner ask:
-      'where is the body battery trend graph?' — here.) */
-   if(S.gar&&S.gar.on){
-     const last7=(function(){try{const dd=S.gar.days||{};return Object.keys(dd).sort().slice(-7).map(k9=>+dd[k9].am).filter(x=>x>0)}catch(e){return []}})();
-     out.push(g.am!=null
-     ?tile(g.am+'%','Ready'+(g.auto?' · watch':''),
-       g.am>=70?'var(--green)':g.am>=50?'var(--amber)':'var(--red)','chartOpen','bb:',spark(last7))
-     :tile('?','Ready','var(--amber)','sigBb',null,'<span class="tf">tap to log</span>'))}}
-  /* A GLANCE NUMBER IS A NUMBER (17 Sep 2026, owner: the app "doesn't
-     seem polished at all"). Two of the three tiles printed an EM DASH on
-     an ordinary morning — RUN LOAD before four run-days exist, PAIN TODAY
-     before the day's check-in — so the row whose whole job is to say this
-     app knows things said nothing, in punctuation, above the fold. It was
-     the first thing anyone saw and it read as missing data, not as an
-     invitation.
-     A tile with no value is DROPPED now and a real number takes the slot.
-     Nothing is lost: every door those tiles carried still exists — the
-     check-in is a brief row, a card at the top of the Rehab hub and a task
-     in the today sheet; run load is the Running tab.
-     The unlogged READINESS "?" deliberately STAYS. It is amber, which in
-     this app means attention rather than absence, and it is the documented
-     always-visible fallback for a morning prompt that has failed in
-     production twice. A question mark is a prompt. An em dash is a hole. */
-  if(S.runOn){const a=acwr();
-    if(a!=null)out.push(tile(a+'×','Run load',a>1.5?'var(--red)':a>1.3?'var(--amber)':'var(--text)','nav','run',null,'<span class="tf">'+(a>1.3?'above the band':'in the band')+'</span>'))}
-  if(S.acl&&S.acl.on){const c=checkToday();
-    if(c){const held=(function(){try{const st9=(typeof rehabStreakInfo==='function')?rehabStreakInfo():null;return st9&&st9.n>1?'held '+st9.n+' d':''}catch(e){return ''}})();
-      out.push(tile(c.pain+'/10','Pain',c.pain<=2?'var(--green)':c.pain<=4?'var(--amber)':'var(--red)','checkOpen',null,held?'<span class="tf" style="color:var(--green)">'+esc(held)+'</span>':'',c.pain<=2))}}
-  if(out.length<3){const st=weekStreak();
-    if(st&&st.weeks)out.push(tile(st.weeks,'Week streak','var(--text)','sigOpen',null,'<span class="tf">weeks running</span>'))}
-  return out.slice(0,4).join('')}
-
+/* dashTiles() — the Ready · Run load · Pain glance row — was deleted 17 Sep
+   2026 (owner: "get rid of these"). */
 /* ══ the weekly quest ═══════════════════════════════════════
    One challenge a week, generated Monday from the user's own
    numbers. Never invented: every target is anchored to a thing
@@ -22355,7 +22367,7 @@ function briefRows(){
     '<span class="mono" style="color:var(--faint);font-size:11px;flex:none">\u203a</span></button>')}
 function verdictCard(){
   /* the Today hero: the daily loop and what it unlocks. The session
-     moved to its own pill below (sessionCard) — owner call, Aug 2026. */
+     moved off Today altogether (owner, 17 Sep 2026); it lives on Train. */
   const pr=todayProgress(),st=dayStreak();
   const n=noticedToday(),t=todayState();
   /* the empty account gets a front door, not a hollow loop (owner
@@ -22437,10 +22449,9 @@ function verdictCard(){
        anything else gets no button at all. */
     let cta=null;
     if(next&&next.go)cta={a:next.go,v:'',label:'Do it now'};
-    else if(next&&next.k==='session'){
-      try{const v9=todayVerdict();
-        if(v9&&v9.cta)cta={a:v9.cta.a,v:v9.cta.v,label:'Start the session'}}catch(e){}
-      if(!cta)cta={a:'nav',v:'home',label:'To the program'}}
+    /* the session task sends you to Train (owner, 17 Sep 2026: nothing on
+       Today refers to the training session) — one door per room */
+    else if(next&&next.k==='session')cta={a:'nav',v:'home',label:'Open Train'};
     inner+='<p class="hero36" style="margin-top:12px">'+esc(next?next.n:'Today')+'</p>'+
       (next?'<p style="color:var(--dim);font-size:15px;line-height:1.45;margin-top:6px">'+esc(next.sub)+'</p>':'')+
       (cta?'<button data-a="'+cta.a+'"'+(cta.v?' data-v="'+esc(String(cta.v))+'"':'')+' class="big disp mt" style="background:var(--amber);color:var(--bg);font-size:15px">'+esc(cta.label)+'</button>':'')+
@@ -22664,37 +22675,8 @@ function predSessionVerdict(){
       '<p class="mono" style="font-size:var(--t-caption);color:'+(d.outcome!=='under'?'var(--green)':'var(--faint)')+';letter-spacing:.06em">THE FORECAST · '+exN.toUpperCase()+'</p>'+
       '<p style="color:var(--dim);font-size:13px;line-height:1.55;margin-top:4px">'+line+'</p></div>'
   }catch(e){return ''}}
-function sessionCard(){
-  /* the session, as its own pill under the hero. An empty program has
-     no week to complete — zero planned sessions is not "all logged"
-     (owner-caught vacuous truth, Sep 2026). */
-  const p0=activeProgSafe();
-  if((!p0||p0.empty)&&!(S.history||[]).some(h=>h.complete))return '';
-  const v=todayVerdict();
-  const col=v.tone==='good'?'var(--green)':v.tone==='warn'?'var(--amber)':'var(--text)';
-  /* the session card from the design system (17 Sep 2026): a micro
-     eyebrow with the day count, the title at 23, and the readiness ring
-     on the right — the manual morning number, blue, or an amber ? until
-     it is logged */
-  const ring=(function(){try{const g=(S.gar&&S.gar.days||{})[today()]||{};const on=!!(S.gar&&S.gar.on);if(!on)return '';
-    const v9=g.am!=null?+g.am:null;const C=2*Math.PI*28;
-    return '<div style="position:relative;width:66px;height:66px;flex:none">'+
-      '<svg width="66" height="66" viewBox="0 0 66 66" fill="none" aria-hidden="true"><circle cx="33" cy="33" r="28" stroke="rgba(255,255,255,.12)" stroke-width="4"/>'+
-      (v9!=null?'<circle cx="33" cy="33" r="28" stroke="var(--blue)" stroke-width="4" stroke-linecap="round" stroke-dasharray="'+C.toFixed(0)+'" stroke-dashoffset="'+(C*(1-Math.min(100,v9)/100)).toFixed(0)+'" transform="rotate(-90 33 33)"/>':'')+'</svg>'+
-      '<div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1">'+
-      '<span class="disp mono" style="font-size:17px;font-weight:600;color:'+(v9!=null?'var(--text)':'var(--amber)')+'">'+(v9!=null?v9+'%':'?')+'</span>'+
-      '<span style="font-size:11px;color:var(--faint);margin-top:2px">ready</span></div></div>'}catch(e){return ''}})();
-  const dayN=(function(){try{const p9=activeProgSafe();if(!p9||p9.empty||!p9.days||!p9.days.length)return '';const ws9=weekState(p9,S.week);
-    return ws9?'Day '+Math.min(ws9.total||p9.days.length,(ws9.n||0)+1)+' of '+(ws9.total||p9.days.length)+' \u203a':''}catch(e){return ''}})();
-  return '<div class="card mt" style="padding:18px;border-color:'+
-      (v.tone==='warn'?'color-mix(in srgb, var(--text) 42%, transparent)':v.tone==='good'?'var(--green)':'var(--cardline)')+'">'+
-    '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px"><p class="micro" style="color:'+(v.tone==='good'?'var(--green)':'var(--faint)')+'">The session</p>'+(dayN?'<span style="font-size:13px;color:var(--faint)">'+dayN+'</span>':'')+'</div>'+
-    '<div style="display:flex;align-items:flex-end;gap:14px;margin-top:12px">'+
-    '<div style="flex:1;min-width:0">'+
-    '<p class="t23">'+esc(v.t)+'</p>'+
-    '<p style="color:var(--dim);font-size:15px;line-height:1.45;margin-top:6px">'+esc(v.d)+'</p></div>'+ring+
-    (v.cta?'<button data-a="'+v.cta.a+'" data-v="'+v.cta.v+'" class="disp" style="flex:none;background:var(--amber);color:var(--bg);padding:11px 17px;border-radius:12px;font-size:13px;font-weight:600;letter-spacing:.14em">START</button>':'')+
-    '</div></div>'}
+/* sessionCard() was deleted 17 Sep 2026 (owner: nothing on Today refers
+   to the training session); the session's card is dayCard on Train. */
 function fuseCard(){
   /* THE NEXT UNLOCK, made unmissable (owner ruling, 3 Sep, in caps:
      "make the next cool thing LARGE AND OUTSTANDING"): when an
@@ -25811,8 +25793,10 @@ function secProgram(p,ws){
   const list=mainProgs();
   let h='<div style="display:flex;justify-content:space-between;align-items:baseline;margin-top:24px">'+
     '<p class="eyebrow">Program</p>'+
-    (p.weeks>1?'<span class="mono" style="font-size:11px;color:'+(ws.full?'var(--green)':'var(--faint)')+'">'+
-      (ws.full?'week '+S.week+' complete':ws.n+' of '+ws.total+' days')+'</span>':'')+'</div>';
+    /* the count is the door to the week's adherence sheet (it was the
+       THIS WEEK tile's door until the tiles left Today, 17 Sep 2026) */
+    (p.weeks>1?'<button data-a="adhOpen" class="mono" style="font-size:11px;padding:4px 0;color:'+(ws.full?'var(--green)':'var(--faint)')+'">'+
+      (ws.full?'week '+S.week+' complete':ws.n+' of '+ws.total+' days')+' \u203a</button>':'')+'</div>';
   h+='<div class="card" style="margin-top:12px;padding:16px">';
   /* title + week pills only (owner call, Sep 2026) — the block
      copy moved behind a small ⓘ, opening as a sheet */
@@ -25831,33 +25815,11 @@ function secProgram(p,ws){
       h+='<button class="mono" data-a="week" data-v="'+w+'" style="flex:1 0 12%;padding:9px 0;border-radius:8px;font-weight:600;font-size:13px;'+css+'">'+
         'W'+w+(weekClosed(p,w)&&w!==S.week?' \u2713':st.full&&w!==S.week?' \u2713':'')+'</button>'}
     h+='</div>';
-    h+='<p class="mono" style="color:var(--faint);font-size:var(--t-caption);letter-spacing:.06em;margin-top:8px">THE BLOCK\u2019S WEEKS — YOU ARE IN W'+S.week+'. TAP ONE TO LOOK BACK.</p>';
-    /* the week-1 clock explainer (owner call, 3 Sep, after Angus
-       mislogged a week): a NEW block explains the clock before it
-       starts ticking — and offers to start it now or on first
-       training. One-time, per block. */
-    const clkChosen=!!((S.weekStarts||{})[p.id+':1']||(S.weekStarts||{})[p.id+':ackclk']);
-    const clkLocked=!!((S.weekStarts||{})[p.id+':clkedit'])||(S.history||[]).some(h9=>h9.progId===p.id&&h9.complete);
-    if(clkChosen&&!clkLocked){
-      /* one honest undo (owner call, 3 Sep): the first choice can be
-         a mis-tap — changeable exactly once, and never after real
-         training starts the clock for real */
-      const started=(S.weekStarts||{})[p.id+':1'];
-      h+='<button data-a="clkEdit" style="width:100%;text-align:left;display:flex;align-items:center;gap:8px;padding:10px 0 2px;border-top:1px solid var(--line);margin-top:12px">'+
-        '<span style="flex:1;font-size:11px;color:var(--faint)">Week-1 clock: '+(started?'started '+esc(started):'starts when you first train')+'</span>'+
-        '<span class="mono" style="color:var(--amber);font-size:11px;letter-spacing:.05em;flex:none">CHANGE \u00b7 ONCE</span></button>'}
-    if(!clkChosen)
-      h+='<div style="border-top:1px solid var(--line);margin-top:12px;padding-top:12px">'+
-        '<p class="eyebrow" style="color:var(--amber)">Before week 1 starts</p>'+
-        '<p style="color:var(--dim);font-size:13px;line-height:1.6;margin-top:8px">Each week of this block is a <b style="color:var(--text)">7-day clock</b>. It starts the day of your first session (or right now, your call), counts your sessions against the week\u2019s plan, and when it runs out you close the week and the next one starts clean. The W-pills above are the block\u2019s weeks — train in the one that is lit.</p>'+
-        '<div class="row mt" style="gap:8px">'+
-        '<button data-a="clkNow" class="btn" style="flex:1;border-color:var(--amber);color:var(--amber);font-size:13px">Start the clock today</button>'+
-        '<button data-a="clkFirst" class="btn" style="flex:1;color:var(--dim);font-size:13px">When I first train</button></div></div>';
-    if(lastDateFor(p.id,S.week))h+='<p class="mono" style="font-size:11px;color:var(--faint);margin-top:12px">last trained: '+fmtDate(lastDateFor(p.id,S.week))+'</p>';
-    if(ws.full&&S.week<p.weeks&&!blockDone(p))h+='<button data-a="week" data-v="'+(S.week+1)+'" style="width:100%;text-align:left;padding:12px 0 2px;display:flex;align-items:center;gap:12px;border-top:1px solid var(--line);margin-top:12px">'+
-      '<span style="width:8px;height:8px;border-radius:8px;background:var(--green);flex:none"></span>'+
-      '<span style="font-size:13px;color:var(--dim);flex:1">Week '+S.week+' is fully logged — tap to move to week '+(S.week+1)+'.</span>'+
-      '<span class="mono" style="color:var(--green);font-size:17px">›</span></button>';
+    /* the caption, the week-1 clock explainer, "last trained" and the
+       move-to-next-week row all left this card (owner, 17 Sep 2026:
+       "just the title and W1, W2, etc and that's it"); the clock choice
+       lives in the week-clock sheet (weekClockBody), the next week is
+       its own pill. */
     if(blockDone(p))h+='<div style="border-top:1px solid var(--line);margin-top:12px;padding-top:12px">'+
       '<p style="font-size:13px;color:var(--dim);line-height:1.55">Every week of this block is logged.</p>'+
       '<button data-a="reviewOpen" class="btn mt" style="border-color:var(--amber);color:var(--amber)">See how it went, then decide what is next</button>'+
@@ -25952,7 +25914,30 @@ function secSupport(){
         '<span class="mono" style="color:var(--faint);font-size:15px">›</span></button>'})});
   return h+'</div>'}
 function secGoals(){const g=goalsCard();return g?'<p class="eyebrow" style="margin-top:24px">Goals</p>'+g:''}
-function secHabits(){const c=creatineCard(),d=dailyCard();return (c||d)?'<p class="eyebrow" style="margin-top:24px">Daily</p>'+c+d:''}
+/* secHabits() — the Daily section on Train — was deleted 17 Sep 2026
+   (owner: "get rid of daily check-in pill in train"). */
+function weekClockBody(){
+  /* THE WEEK-1 CLOCK, in the week-clock sheet (moved off the program
+     card 17 Sep 2026). A NEW block explains the clock before it starts
+     ticking and offers to start it now or on first training; the first
+     choice is changeable exactly once, never after real training. */
+  try{const p=activeProgSafe();if(!p||p.empty||!(p.weeks>1))return '';
+    const clkChosen=!!((S.weekStarts||{})[p.id+':1']||(S.weekStarts||{})[p.id+':ackclk']);
+    const clkLocked=!!((S.weekStarts||{})[p.id+':clkedit'])||(S.history||[]).some(h9=>h9.progId===p.id&&h9.complete);
+    let h='';
+    if(clkChosen&&!clkLocked){const started=(S.weekStarts||{})[p.id+':1'];
+      h+='<button data-a="clkEdit" style="width:100%;text-align:left;display:flex;align-items:center;gap:8px;padding:12px 0 2px;border-top:1px solid var(--line);margin-top:16px">'+
+        '<span style="flex:1;font-size:13px;color:var(--faint)">Week-1 clock: '+(started?'started '+esc(started):'starts when you first train')+'</span>'+
+        '<span class="mono" style="color:var(--amber);font-size:11px;letter-spacing:.05em;flex:none">CHANGE \u00b7 ONCE</span></button>'}
+    if(!clkChosen)h+='<div style="border-top:1px solid var(--line);margin-top:16px;padding-top:12px">'+
+        '<p class="eyebrow" style="color:var(--amber)">Before week 1 starts</p>'+
+        '<p style="color:var(--dim);font-size:13px;line-height:1.6;margin-top:8px">Each week of this block is a <b style="color:var(--text)">7-day clock</b>. It starts the day of your first session (or right now, your call), counts your sessions against the week\u2019s plan, and when it runs out you close the week and the next one starts clean.</p>'+
+        '<div class="row mt" style="gap:8px">'+
+        '<button data-a="clkNow" class="btn" style="flex:1;border-color:var(--amber);color:var(--amber);font-size:13px">Start the clock today</button>'+
+        '<button data-a="clkFirst" class="btn" style="flex:1;color:var(--dim);font-size:13px">When I first train</button></div></div>';
+    if(lastDateFor(p.id,S.week))h+='<p class="mono" style="font-size:11px;color:var(--faint);margin-top:12px">last trained: '+fmtDate(lastDateFor(p.id,S.week))+'</p>';
+    return h}
+  catch(e){oops('weekClockBody',e);return ''}}
 
 /* ══ the Today tab ══════════════════════════════════════════
    Owner call, Aug 2026: the verdict, tiles, daily loop and the
@@ -27471,17 +27456,8 @@ function ghostCard(){
       '<span class="mono" style="color:var(--amber);font-size:13px;flex:none">›</span></button>';
     else h+='<button data-a="fghostOpen" class="mono" style="display:block;width:100%;text-align:left;color:var(--faint);font-size:11px;margin-top:8px">Ghost codes ›</button>';
     return h+'</div>'}catch(e){return ''}}
-function resumeCard(){
-  if(S.sess)return '<button data-a="resume" class="card" style="width:100%;text-align:left;padding:16px;border-color:var(--amber);background:var(--raised);margin-top:20px">'+
-    '<p class="eyebrow" style="color:var(--amber)">Session in progress</p>'+
-    '<p class="disp" style="font-size:17px;font-weight:600;margin-top:4px">'+esc(S.sess.dayName)+'</p>'+
-    '<p class="mono" style="color:var(--dim);font-size:13px;margin-top:4px">'+S.sess.log.length+' of '+S.sess.sets.length+' sets logged \u00b7 tap to resume</p></button>';
-  const unf=(S.history||[]).filter(x=>!x.complete&&!x.run&&(x.log||[]).length&&(Date.now()-new Date(x.date).getTime())<36e5*20).slice(-1)[0];
-  if(unf)return '<button data-a="resumeHist" data-v="'+unf.id+'" class="card" style="width:100%;text-align:left;padding:16px;border-color:var(--line);background:var(--raised);margin-top:20px">'+
-    '<p class="eyebrow">Unfinished session</p>'+
-    '<p class="disp" style="font-size:17px;font-weight:600;margin-top:4px">'+esc(unf.dayTitle||'Session')+'</p>'+
-    '<p class="mono" style="color:var(--dim);font-size:13px;margin-top:4px">'+unf.log.length+' sets saved \u00b7 tap to pick it back up</p></button>';
-  return ''}
+/* resumeCard() was deleted 17 Sep 2026 (owner): the LIVE pill is the one
+   door back into a running session; nothing on Today or Train repeats it. */
 function todayOrder(){
   /* ONE STORY AT A TIME (8 Sep, from the simplicity research: the
      praised apps allow a hero, glance numbers, and ONE story slot —
@@ -27495,7 +27471,10 @@ function todayOrder(){
   const out=[];
 
   // ── functional: owed actions, always shown, all self-limiting
-  out.push(resumeCard());
+  /* NOTHING ON TODAY REFERS TO THE TRAINING SESSION (owner, 17 Sep 2026:
+     "get rid of anything that refers to the training session that lives
+     in the today page"). The resume card and the session card both left;
+     the session lives on Train, where resumeCard still sits. */
   try{out.push(typeof deepPill==='function'?deepPill():'')}catch(e){oops('deepPill',e)}
   try{out.push(typeof notifAskCard==='function'?notifAskCard():'')}catch(e){}
   out.push(apptCard());
@@ -27511,10 +27490,8 @@ function todayOrder(){
      cost a block of the screen. Nothing is lost — the sheet it
      duplicated is still what every remaining door opens. */
   // ── the glance numbers
-  /* the row is skipped entirely when there is nothing true to put in it,
-     rather than drawn empty — see the tile comment in dashTiles */
-  {const tiles=dashTiles();
-   if(tiles)out.push('<div class="row" style="gap:8px;margin-top:12px">'+tiles+'</div>');}
+  /* the glance tiles (Ready · Run load · Pain) left Today (owner, 17 Sep
+     2026: "get rid of these"); the morning number is the hero's task */
 
   /* A DATA-LOSS WARNING IS NOT A WELCOME (17 Sep 2026). This sat third on
      Today, above the numbers, so the third thing a new user read — and the
@@ -27560,7 +27537,6 @@ function todayOrder(){
      Today exists to answer — what am I training — about 1,100px down
      the page behind a find nobody asked for. SIMPLICITY.md rule 6: one
      primary action per screen, and the story is not it. */
-  out.push(sessionCard());
   if(cand.length)out.push(cand[0].h);
   try{if(typeof ghostData==='function'){const g=ghostData();
     if(g&&g.now>g.best&&g.best>=2)try{ghostBank(g)}catch(e9){}}}catch(e){}
@@ -28004,7 +27980,12 @@ function viewHome(){
     const d=new Date();const iso=(function(){const t=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()));const dn=t.getUTCDay()||7;t.setUTCDate(t.getUTCDate()+4-dn);const y0=new Date(Date.UTC(t.getUTCFullYear(),0,1));return Math.ceil((((t-y0)/864e5)+1)/7)})();
     return 'Week '+iso+(p.block?' \u00b7 '+String(p.block):'')+(p.weeks>1?' \u00b7 W'+S.week:'')}catch(e){return ''}})();
   h+=pageHead('Train','',{sub:sub9,subA:(sub9&&p.weeks>1)?'weekClockOpen':null});
-  try{h+=(typeof resumeCard==='function'?resumeCard():'')}catch(e){}
+  /* TRAIN IS THE PROGRAM (owner, 17 Sep 2026: "get rid of session in
+     progress in the train page, get rid of running's pill, get rid of your
+     week pill, program pill should just be the title and W1, W2, etc and
+     that's it, get rid of daily check-in pill"). The LIVE pill resumes a
+     session; Running and Cycling are drawer rooms; the week board and the
+     week-1 clock live in the week-clock sheet behind the subtitle. */
   try{h+=(typeof mergeCard==='function'?mergeCard():'')}catch(e){}
   if(p.empty){
     return h+'<div class="card mt2" style="padding:22px 18px">'+
@@ -28022,27 +28003,15 @@ function viewHome(){
      its special states (week complete, already trained, the week closer)
      — only the plain suggestion moved. */
   h+=recCard(true);
-  /* RUNNING AND CYCLING LIVE HERE (17 Sep 2026, T2): they are kinds of
-     training, not separate places. Rows, in the settings-row language,
-     shown only when the account has them — a door to nothing is a dead
-     button. Their red counts ride on the row and on the Train tab. */
-  try{const rr=[];
-    if(S.runOn)rr.push(navRow(SET_ICONS.run,'Running',(typeof unseenRun==='function'&&unseenRun())?unseenRun()+' new':'plan, runs and load','nav','run'));
-    if(typeof rides==='function'&&rides().length>=1)rr.push(navRow('<circle cx="6.5" cy="16.5" r="3.5"/><circle cx="17.5" cy="16.5" r="3.5"/><path d="M6.5 16.5L10 9h5M17.5 16.5L14 9M10 9L8 6h3"/>','Cycling','rides and efficiency','nav','ride'));
-    if(rr.length)h+='<div class="card mt" style="padding:0;overflow:hidden">'+rr.join('').replace('border-top:1px solid var(--line)','border-top:none')+'</div>'}catch(e){oops('trainRows',e)}
-  try{const wb=(typeof weekBoardCard==='function')?weekBoardCard():'';
-    /* the board only exists with an active program; the lock only
-       shows when there IS something to lock (never a dead tease) */
-    if(wb)h+=(typeof isPremium==='function'&&!isPremium())?lockCard('board'):wb}catch(e){oops('boardLock',e)}
   /* the learned-adjustments ledger (8 Sep, after Dafydd's backup
      showed +12.5 on a skullcrusher and −5 on his key bench): what
      regulation has moved is VISIBLE and reversible in one place —
      never a mystery a user has to reverse-engineer from set screens */
   const render1={stats:()=>secStats(),program:()=>secProgram(p,ws),sessions:()=>secSessions(p,ws)+catchRow(p)+adjRow(p),
-    goals:()=>secGoals(),habits:()=>secHabits(),support:()=>secSupport()};
+    goals:()=>secGoals(),support:()=>secSupport()};
   /* program, then the week's sessions (owner call, 11 Sep) — saved
      layouts keep whatever the user chose */
-  (S.lay.order||['program','sessions','stats','goals','habits','support']).forEach(k=>{
+  (S.lay.order||['program','sessions','stats','goals','support']).filter(k=>k!=='habits').forEach(k=>{
     if(S.lay.hide&&S.lay.hide[k])return;const f=render1[k];if(f)h+=f()});
   h+='<button data-a="layoutOpen" style="width:100%;margin-top:24px;padding:12px;color:var(--faint);font-size:11px;letter-spacing:.04em">Rearrange this screen</button>';
   return h+'</div>'}
@@ -28296,102 +28265,27 @@ function viewSession(){
        '<button data-a="discard" style="width:100%;padding:14px;color:var(--red);font-size:13px;margin-top:8px">Discard this session</button></div>';
     return h}
 
-  const doneCount=s.sets.filter(st=>s.log.some(l=>l.ex===st.ex&&l.setNo===st.setNo)||(s.skipped&&s.skipped.indexOf(st.exNo)>=0)).length;
-  const pct=s.sets.length?Math.round(doneCount/s.sets.length*100):0;
-  /* THE SESSION HEAD FROM THE DESIGN SYSTEM (17 Sep 2026): the leave
-     chevron, the day and "exercise x of y" centred, notes and the coach on
-     the right, and the progress as one segment per exercise — lit when
-     done, half-lit for the one in play. The same three doors as before;
-     only the clothes changed. */
+  /* ═══ THE SESSION SCREEN (owner, 17 Sep 2026, from his own reference:
+     "this is what session should look like") ═══════════════════════════
+     One screen, three things: the exercise card with ONE action, the rest
+     card (ticking during rest, quiet otherwise), and one footer line.
+     Everything else — the cue, the warm-up, notes, the coach, Modify,
+     Plan, the done-so-far list, Save & exit, Discard — lives behind the ≡
+     menu (the sessmenu sheet). Holds keep their own screen. */
   const plan0=A.exPlan();
   const exI=Math.max(0,plan0.findIndex(e=>e.exNo===cur.exNo));
+  const setsDone=s.log.filter(l=>l.w!=null||l.secs).length;
+  const ib='width:44px;height:44px;border-radius:var(--r-full);background:none;border:0;color:var(--text);display:flex;align-items:center;justify-content:center;padding:0;flex:none';
   let h='<div class="stickyhead" data-sessbar="1"><div style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 20px 8px">'+
-   (function(){const noted=!!((s.exNotes||{})[gBase(s.sets[Math.min(s.idx,s.sets.length-1)].ex)]);
-   const ib='width:44px;height:44px;border-radius:var(--r-full);background:none;border:0;color:var(--dim);display:flex;align-items:center;justify-content:center;padding:0;position:relative;flex:none';
-   return '<button data-a="sessMin" aria-label="Minimise session" style="'+ib+';margin-left:-10px">'+
-     '<svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true"><path d="M4 7l5 5 5-5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></button>'+
+   '<button data-a="sessMin" aria-label="Minimise session" style="'+ib+';margin-left:-10px"><svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true"><path d="M4 4l10 10M14 4L4 14" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg></button>'+
    '<div style="min-width:0;flex:1;display:flex;flex-direction:column;align-items:center;gap:1px">'+
    '<p class="micro" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%">'+esc(s.dayName)+'</p>'+
    '<p style="font-size:15px">exercise '+(exI+1)+' of '+plan0.length+'</p></div>'+
-   '<div style="display:flex;flex:none;align-items:center;margin-right:-10px">'+
-   '<button data-a="exNoteOpen" aria-label="Exercise notes" style="'+ib+'">'+
-   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" style="width:20px;height:20px"><path d="M7 3h7l4 4v14H7z"/><path d="M14 3v4h4"/><path d="M10 12h5M10 16h5"/></svg>'+
-   (noted?'<span style="position:absolute;top:7px;right:7px;width:6px;height:6px;border-radius:var(--r-full);background:var(--green)"></span>':'')+'</button>'+
-   '<button data-a="coachOpen" aria-label="Ask Allena" style="'+ib+'"><img class="mk" src="'+MARK+'" alt="Allena" style="width:26px;height:26px;object-fit:contain"></button></div>'})()+
+   '<button data-a="sessMenuOpen" aria-label="Session menu" style="'+ib+';margin-right:-10px"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h10"/></svg></button>'+
    '</div>'+
    '<div style="display:flex;gap:4px;padding:0 20px 10px">'+
    plan0.map((e,i)=>'<span style="flex:1;height:3px;border-radius:3px;background:'+(e.done>=e.sets.length?'var(--amber)':i===exI?'rgba(255,255,255,.35)':'rgba(255,255,255,.12)')+'"></span>').join('')+
    '</div></div>';
-  void pct;void doneCount;
-
-  if(s.phase==='resting'){
-    /* ═══ UP NEXT IS THE NEXT UNLOGGED SET (owner, 14 Sep 2026: "says
-       leg extension next when it's complete") ═══════════════════════════
-       A blind idx+1. Every ADVANCE site was taught to use sessAdv when the
-       superset lap was found on 9 Sep — commit, skip rest, the rest tick,
-       the wrist normalise, the wrist convergence — and these DISPLAY sites
-       were missed, so the screen still promised whatever sat one slot
-       along, logged or not. After a superset weave, a deferred exercise or
-       a skip, that is routinely work already done. Same rule, same
-       function: the next set is the next UNLOGGED one. */
-    const nxI=sessAdv(s);
-    const total=S.restTotal||s.sets[s.idx].rest,left=Math.ceil((S.restEnd-Date.now())/1000),nx=nxI>=0?s.sets[nxI]:null;
-    /* THE REST CARD (design system, 17 Sep 2026): the ring at 118px on
-       the left, what was prescribed and the skip beside it, then the
-       next set and the count as one quiet line. The ring keeps its ids
-       so the tick drives it unchanged. */
-    const setsDone=s.log.filter(l=>l.w!=null||l.secs).length;
-    let rb='<div class="card" style="padding:20px;display:flex;align-items:center;gap:20px">'+
-     ringHtml('rest',left,total,left<=10?'var(--amber)':'var(--blue)',{size:118,font:28,width:5,sub:left<=10?'Get ready':'Rest'})+
-     '<div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:10px">'+
-     '<p style="font-size:15px;color:var(--dim)">'+esc(mmss(total).replace(/^0/,''))+' prescribed. The clock runs whether the app is open or not.</p>'+
-     '<button data-a="skipRest" class="btn" style="width:auto;align-self:flex-start;padding:12px 18px;font-size:15px">Skip the rest</button></div></div>'+
-     '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 4px 0;width:100%">'+
-     '<span style="font-size:13px;color:var(--faint);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(nx?'Next \u00b7 '+esc(String(nx.ex).replace(/ \u2014 .*/,'')):'Last set done')+'</span>'+
-     '<span style="font-size:13px;color:var(--faint);flex:none">'+setsDone+' of '+s.sets.length+' sets done</span></div>'+
-     '<div style="display:flex;flex-direction:column;align-items:center;width:100%">';
-    rb+=hintHtml('mt2');
-    /* the rest window is when doubt surfaces (owner ask, 4 Sep):
-       one tap puts the question to Allena, who already holds the
-       live session — and once she speaks, the canned set comments
-       stand down (one voice) */
-    rb+='<button data-a="coachOpen" style="display:flex;align-items:center;gap:8px;margin-top:12px;padding:9px 14px;border-radius:var(--r-full);background:var(--raised);border:1px solid var(--line)">'+
-      '<img class="mk" src="'+MARK+'" alt="" style="width:15px;height:15px;object-fit:contain">'+
-      '<span style="color:var(--dim);font-size:13px">Not sure how that set went? Ask Allena</span></button>';
-    if(nx)rb+='<div style="text-align:center;margin-top:16px"><p class="eyebrow">Up next</p>'+
-      '<p class="disp" style="font-size:17px;font-weight:600;margin-top:4px">'+esc(nx.ex)+'</p>'+
-      '<p class="mono" style="color:var(--dim);font-size:15px;margin-top:4px;padding:0 8px">Set '+nx.setNo+' · '+
-      (nx.secs?nx.secs+'s hold'+(nx.perSide?' / side':''):(nx.targetW!=null?uwNum(nx.targetW)+' '+uwUnit()+' ':'')+'× '+nx.targetReps+(nx.targetRpe!=null?' @ RPE '+nx.targetRpe:''))+'</p>'+
-      /* what you did on this set last time \u2014 the rest is when you
-         decide what to load next (owner ask, 11 Sep) */
-      (()=>{try{const lw=lastFor(nx.ex,nx.setNo);if(!lw)return '';
-        return '<p class="mono" style="color:var(--amber);font-size:11px;margin-top:8px">'+((lw.week&&lw.week!==s.week)?'WEEK '+lw.week:'LAST TIME')+' \u00b7 '+esc(entryStr(lw))+
-          ' <span style="color:var(--faint)">\u00b7 '+esc(fmtDate(lw.date))+'</span></p>'}catch(e9){oops('rest.last',e9);return ''}})()+
-      muscleChips(nx.ex)+'</div>';
-    {const plan=A.exPlan(),curNo=(nx||s.sets[s.idx]).exNo;   // the exercise in play, not one slot along
-     const remain=plan.filter(e=>e.done<e.sets.length);
-     const setsLeft=s.sets.length-s.log.filter(l=>l.w!=null||l.secs).length;
-     rb+='<button data-a="planOpen" class="card mt2" style="width:100%;text-align:left;padding:12px 16px;display:block">'+
-       '<div style="display:flex;align-items:center;gap:12px">'+
-       '<span style="flex:1;min-width:0"><span style="display:block;font-size:13px;font-weight:600">What is left</span>'+
-       '<span class="mono" style="display:block;color:var(--faint);font-size:11px">'+
-         remain.length+' exercise'+(remain.length===1?'':'s')+' · '+setsLeft+' set'+(setsLeft===1?'':'s')+' · about '+
-         estMins(s.sets.slice(s.idx))+' min left</span></span>'+
-       '<span class="mono" style="color:var(--faint);font-size:13px;flex:none">›</span></div>'+
-       '<div style="display:flex;gap:4px;margin-top:12px">'+
-       plan.map(e=>{const col=e.done>=e.sets.length?'var(--green)':(e.exNo===curNo?'var(--amber)':'var(--line)');
-         return '<div style="flex:'+e.sets.length+';height:5px;border-radius:3px;background:'+col+'"></div>'}).join('')+'</div>'+
-       (remain.length>1?'<p class="mono" style="color:var(--faint);font-size:11px;margin-top:8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">then '+
-         esc(remain.filter(e=>e.exNo!==curNo).slice(0,3).map(e=>String(e.sets[0].st.ex).replace(/ — .*/,'')).join(' · '))+'</p>':'')+
-       '</button>'}
-    /* what the session holds so far (owner ask, 3 Sep) — same tap-to-fix
-       rows as the ready screen, so a mislog is caught between sets, not
-       at the end. Sits below the fold; the timer stays the page. */
-    if(s.log.length)rb+='<div class="mt2" style="width:100%"><p class="eyebrow">Done so far — tap to fix</p><div style="margin-top:8px">'+logLines(s.log,'editLive')+'</div></div>';
-    rb+='</div>';
-    return '<div class="view sessfix">'+h+'<div class="sessbody pad" style="padding-top:10px">'+rb+'</div>'+
-      '<div class="sessfoot"><div class="row" style="width:100%"><button data-a="addRest" class="btn disp" style="flex:1">+30 sec</button>'+
-      '<button data-a="skipRest" class="btn disp" style="flex:1;background:var(--text);color:var(--bg);font-weight:600;border:none">Skip rest</button></div></div></div>'}
 
   if(s.phase==='hold'){
     if(S.holdWait){
@@ -28415,154 +28309,93 @@ function viewSession(){
      '<button data-a="finish" class="'+(over?'big disp mt3':'btn disp mt3')+'"'+(over?' style="background:var(--green);color:var(--bg)"':'')+'>'+(over?'Done — log the hold':'End hold early')+'</button></div>';
     return h}
 
-  const last=lastFor(cur.ex,cur.setNo);
-  /* the set screen is a fixed instrument: body scrolls only if it must,
-     the action buttons never move (owner rule, Aug 31). */
-  let body='',foot='';
-  /* ONE PANEL, NOT THREE FRAGMENTS (16 Sep 2026). The set counter and the
-     exercise name used to float above the target card as loose lines, so
-     the screen read as a stack of scraps with a void under it. They are
-     the card's HEADER now — context, then the number — which is what
-     makes it an instrument rather than a list. A session dot-strip sits
-     beside the counter so "set 1 of 22" is something you can see rather
-     than read. */
-  body+=(function(){try{
-    if(s.phase==='logging')return '<p class="eyebrow">Set '+cur.setNo+' of '+cur.of+' · Exercise '+cur.exNo+'</p>';
-    const done=s.log.length,tot=s.sets.length;
-    const dots=(function(){
-      if(tot<2||tot>40)return '';
-      let o='<div style="display:flex;gap:3px;align-items:center;margin-top:9px;flex-wrap:wrap">';
-      for(let i=0;i<tot;i++){
-        const st=i<done?acc:(i===s.idx?'var(--text)':'var(--line)');
-        o+='<span style="flex:1;min-width:2px;height:3px;border-radius:var(--r-full);background:'+st+';'+(i===s.idx?'':'opacity:.85')+'"></span>'}
-      return o+'</div>'})();
-    /* THE EXERCISE CARD (design system, 17 Sep 2026): the name at 32,
-       "Set x of y · last time W × R" under it, the wells below (see the
-       target block) — one pane, opened here and closed after the plates */
-    void done;void tot;void dots;
-    return '<div class="card mt" style="padding:22px 20px">'+
-      '<h1 class="disp" style="font-size:32px;font-weight:600;line-height:1.04;letter-spacing:-.03em">'+esc(cur.ex)+'</h1>'+
-      '<p style="font-size:15px;color:var(--faint);margin-top:4px">Set '+cur.setNo+' of '+cur.of+(last?' \u00b7 last time '+esc(entryStr(last)):' \u00b7 exercise '+cur.exNo)+'</p>'}
-    catch(e9){oops('sessHead',e9);return (s.phase==='logging'?'':'<div class="card mt" style="padding:22px 20px">')+'<p class="eyebrow">Set '+cur.setNo+' of '+cur.of+'</p>'}})()+
-   (cur.origEx?'<p class="mono" style="color:var(--amber);font-size:11px;margin-top:3px">SWAPPED FROM '+esc(cur.origEx.toUpperCase())+(cur.subUnit?' · '+esc(cur.subUnit):'')+'</p>':'')+
-   /* THE CHOICE IS A TOGGLE, AND IT IS ON THE SET SCREEN (owner, 15 Sep
-      2026). The program says "RDL or hip thrust"; the log has to say which
-      one, or every number keyed on the name is an average of two lifts.
-      It shows while the set has not been logged, so switching your mind
-      before the first rep costs one tap and nothing after it lies. */
-   (function(){try{
-     if(s.phase!=='ready')return '';
-     const comp=cur.exOr||cur.ex,opts=exChoices(comp);
-     if(opts.length<2)return '';
-     const onS='background:var(--text);color:var(--bg);border-color:var(--text);font-weight:600';
-     return '<p class="mono" style="color:var(--faint);font-size:var(--t-caption);letter-spacing:.08em;margin-top:8px">WHICH ONE TODAY</p>'+
-       '<div class="row" style="gap:8px;margin-top:4px">'+
-       opts.map(o=>'<button data-a="exPick" data-v="'+esc(o)+'" class="pill" style="flex:1;font-size:13px;padding:8px 6px;'+
-         (cur.ex===o?onS:'color:var(--dim)')+'">'+esc(o)+'</button>').join('')+'</div>'}
-     catch(e){oops('exChoiceUi',e);return ''}})()+
-   (s.phase==='logging'
-     ?'<div class="card mt" style="padding:11px 14px;border-top:3px solid '+acc+'">'
-     :'<div style="margin-top:16px">');
-  if(s.phase==='logging'){
-    // the set is done — the card is a reference strip, not a billboard
-    body+='<p class="mono" style="font-size:13px;color:var(--dim)"><span style="color:var(--faint)">TARGET</span> '+
-      '<span style="color:var(--text);font-weight:600">'+(cur.secs?cur.secs+'s':(cur.targetW!=null?uwStr(cur.targetW):''))+(cur.targetReps?' × '+cur.targetReps:'')+'</span>'+
-      (cur.targetRpe!=null?' · RPE '+cur.targetRpe:'')+'</p>'+
-      (last?'<p class="mono" style="font-size:13px;color:var(--faint);margin-top:4px">'+((last.week&&last.week!==s.week)?'WEEK '+last.week:'LAST')+' '+esc(entryStr(last))+'</p>':'');
-  }else{
-    /* THE WELLS: weight · reps · effort, each a dark well with the number
-       at 40 and its unit or aim beneath (design system, 17 Sep 2026). A
-       timed hold shows seconds; a lift with no written weight shows a
-       dash and says so, never BODYWEIGHT (16 Sep). */
-    const well=(l,v,f)=>'<div class="well"><span class="micro" style="letter-spacing:.14em">'+l+'</span><span class="wn">'+v+'</span><span style="font-size:13px;color:var(--faint);white-space:nowrap">'+f+'</span></div>';
-    const wells=[];
-    if(cur.secs)wells.push(well('Hold',cur.secs,cur.perSide?'s / side':'seconds'));
-    else wells.push(well('Weight',cur.targetW!=null?uwNum(cur.targetW):'\u2014',cur.targetW!=null?uwUnit():'your call'));
-    if(!cur.secs&&cur.targetReps)wells.push(well('Reps',esc(String(cur.targetReps)),cur.perSide?'per side':'target'));
-    if(cur.targetRpe!=null)wells.push(well('RPE',esc(String(cur.targetRpe)),rir(cur.targetRpe)!==null?(rir(cur.targetRpe)===0?'nothing left':rir(cur.targetRpe)+' in reserve'):'aim'));
-    body+='<div style="display:flex;align-items:stretch;gap:10px">'+wells.join('')+'</div>'+
-      (cur.adj?'<p style="color:var(--amber);font-size:13px;margin-top:10px;text-align:center">'+(cur.adj>0?'+':'')+uwNum(cur.adj)+' '+uwUnit()+' adjusted from your logs</p>':'');
-    if(last){const dw=(last.week&&last.week!==s.week)?'WEEK '+last.week:'LAST TIME';
-      let delta='';
-      if(!cur.secs&&last.w&&cur.targetW!=null&&last.w!==cur.targetW){
-        const dk=UNITS.w==='lb'?Math.round((cur.targetW-last.w)*LB_KG*2)/2:Math.round((cur.targetW-last.w)*10)/10;
-        /* say what the number is being compared to (owner-caught, 11 Sep:
-           "-2.5 kg" under an 80 kg log read as Allena cutting the load,
-           when the written program said 77.5 both weeks and the 80 was
-           the lifter's own call). Regulation's moves already explain
-           themselves on the amber line above; an unchanged prescription
-           under a heavier log names the heavier log. */
-        if(!cur.adj&&dk<0)delta=' · you put '+uwNum(-dk)+' '+uwUnit()+' more on than written';
-        else delta=' · '+(dk>0?'+':'')+dk+' '+uwUnit()}
-      body+='<div style="margin-top:8px;padding-top:7px;border-top:1px solid var(--line)">'+
-        '<p class="mono" style="color:var(--amber);font-size:11px">'+dw+' · SET '+last.setNo+'</p>'+
-        '<p class="mono" style="color:var(--dim);font-size:13px;margin-top:2px">'+esc(entryStr(last))+
-        '<span style="color:var(--faint);font-size:11px">'+delta+' · '+fmtDate(last.date)+'</span></p></div>'}
-    if(cur.bar&&cur.targetW!=null&&S.lay.plates!==false)body+='<div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--line)">'+plateHtml(cur.targetW)+'</div>';
-  }
-  body+='</div>';
-  if(s.phase!=='logging')body+='</div>';   // the exercise card opened in the head
-  if(cur.cue&&s.phase==='ready')body+='<div class="cue mt" style="border-left-color:'+acc+'">'+esc(cur.cue)+'</div>';
-  if(s.phase==='ready'){try{
-    const b0=gBase(cur.ex),cut0=Date.now()-35*864e5;
-    const prior=(S.history||[]).slice().reverse().find(h9=>h9.exNotes&&h9.exNotes[b0]&&new Date(h9.date).getTime()>cut0&&/hurt|pain|sharp|numb|swell|tweak|pinch/i.test(h9.exNotes[b0]));
-    if(prior)body+='<div class="cue mt" style="border-left-color:var(--amber)">'+
-      esc('Last time on this you noted \u201c'+prior.exNotes[b0]+'\u201d ('+fmtDate(prior.date)+'). How is it today? If it speaks up again, ease it or swap it out \u2014 recurring pain is form or an injury, and that\u2019s a health professional\u2019s call, not an app\u2019s.')+'</div>'}catch(e){}}
-  if(s.phase==='ready'&&!cur.secs&&!cur.adj){try{
-    const b9=gBase(cur.ex);const gaps9=[];
-    (S.history||[]).forEach(h9=>{if(!h9.complete)return;
-      if(Date.now()-new Date(h9.date).getTime()>28*864e5)return;
-      (h9.log||[]).forEach(l9=>{if(!(l9.w>0&&l9.r>0)||gBase(l9.ex)!==b9)return;
-        const r9=parseFloat(l9.rpe);if(isNaN(r9)||l9.targetRpe==null)return;
-        const t9=rpeHigh(l9.targetRpe);if(t9!=null)gaps9.push(r9-t9)})});
-    if(gaps9.length>=3){
-      const g9=gaps9.reduce((a,b2)=>a+b2,0)/gaps9.length;
-      if(g9<=-1)body+='<div class="cue mt" style="border-left-color:var(--green)">'+
-        esc('Your last '+gaps9.length+' sets here came in about '+(Math.round(-g9*10)/10)+' RPE under their targets. If today asks for effort, there is more in you.')+'</div>'}}catch(e9){}}
-  if(s.phase==='ready')body+=hintHtml('mt');
-  if(s.phase==='ready'){const wu=warmupPlan(s,cur);if(wu)body+=warmupHtml(wu,cur,s)}
-  if(s.phase==='working')body+='<p class="mono" id="elapsed" style="text-align:center;color:var(--faint);font-size:13px;margin-top:20px">'+mmss((Date.now()-(S.setStart||Date.now()))/1000)+' under the bar</p>';
-  if(s.phase==='logging'){
-    const timed=!!cur.secs;
-    const ready=timed?(+S.draft.secs>0):(S.draft.rpe!=null&&S.draft.r);
-    body+='<div class="mt"><p class="eyebrow" style="color:var(--amber)">'+(timed?'How long did you hold?':'What did you actually do?')+'</p>';
-    if(timed)body+='<div style="margin-top:12px">'+stepper('draft.secs','Seconds'+(cur.perSide?' per side':''),S.draft.secs,5,'sec')+'</div>';
-    else body+='<div style="display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,0.8fr);gap:12px;margin-top:12px">'+
-      stepper('draft.w','Weight ('+uwUnit()+')',S.draft.w,(UNITS.w==='lb'?5:2.5),'')+stepper('draft.r','Reps'+(cur.perSide?' / side':''),S.draft.r,1,'')+'</div>'+
-      '<p style="color:var(--dim);font-size:11px;letter-spacing:.1em;text-transform:uppercase;margin:12px 0 7px">RPE</p>'+rpeGrid('draft.rpe',S.draft.rpe);
-    body+='</div>';
-    foot+='<button data-a="commit" class="big disp" style="background:'+(ready?'var(--green)':'var(--raised)')+';color:'+(ready?'var(--bg)':'var(--faint)')+';font-size:17px">'+
-     (s.idx>=s.sets.length-1?'Log and finish':(cur.rest>5?'Log and rest '+mmss(cur.rest):'Log — next'))+'</button>'}
-  /* a load change is a sentence, not a mystery pill: name the exercise,
-     the amount, and hand back the undo (replaces the header "Undo +2.5") */
-  /* the adjustment sentence stays while you are still on that exercise
-     or have just left it; once a set of something else is logged it is
-     old news (owner-caught, 11 Sep: 'adjusted Bench' over Preacher curl) */
+  /* ── the exercise card: during rest it shows the NEXT unlogged set ── */
+  const resting=s.phase==='resting';
+  const nxI=resting?sessAdv(s):-1;
+  const show=resting?(nxI>=0?s.sets[nxI]:null):cur;
+  const lastS=show?lastFor(show.ex,show.setNo):null;
+  const well=(l,v,f)=>'<div class="well"><span class="micro" style="letter-spacing:.14em">'+l+'</span><span class="wn">'+v+'</span><span style="font-size:13px;color:var(--faint);white-space:nowrap">'+f+'</span></div>';
+  let card='<div class="card" style="padding:22px 20px">';
+  if(show){
+    card+=(resting?'<p class="micro" style="margin-bottom:8px">Up next</p>':'')+
+      '<h1 class="disp" style="font-size:32px;font-weight:600;line-height:1.04;letter-spacing:-.03em">'+esc(show.ex)+'</h1>'+
+      '<p style="font-size:15px;color:var(--faint);margin-top:4px">Set '+show.setNo+' of '+show.of+(lastS?' · last time '+esc(entryStr(lastS)):'')+'</p>'+
+      (lastS?(function(){let delta='';
+        /* say what the number is being compared to (owner-caught, 11 Sep):
+           an unchanged prescription under a heavier log names the heavier
+           log; regulation's own moves explain themselves on the adj line */
+        try{if(!show.secs&&lastS.w&&show.targetW!=null&&lastS.w!==show.targetW){
+          const dk=UNITS.w==='lb'?Math.round((show.targetW-lastS.w)*LB_KG*2)/2:Math.round((show.targetW-lastS.w)*10)/10;
+          if(!show.adj&&dk<0)delta=' \u00b7 you put '+uwNum(-dk)+' '+uwUnit()+' more on than written';
+          else delta=' \u00b7 '+(dk>0?'+':'')+dk+' '+uwUnit()}}catch(e){}
+        /* the sub line already says "last time"; this line only earns its
+           place when it adds something — a different week, or a delta */
+        if(!delta&&!(lastS.week&&lastS.week!==s.week))return '';
+        return '<p class="mono" style="color:var(--faint);font-size:11px;margin-top:2px">'+((lastS.week&&lastS.week!==s.week)?'WEEK '+lastS.week:'LAST TIME')+' \u00b7 '+esc(entryStr(lastS))+'<span style="color:var(--faint)">'+delta+' \u00b7 '+esc(fmtDate(lastS.date))+'</span></p>'})():'')+
+      (show.origEx?'<p class="mono" style="color:var(--amber);font-size:11px;margin-top:3px">SWAPPED FROM '+esc(show.origEx.toUpperCase())+(show.subUnit?' · '+esc(show.subUnit):'')+'</p>':'');
+    /* THE CHOICE IS A TOGGLE, AND IT IS ON THE SET SCREEN (owner, 15 Sep
+       2026): "RDL or hip thrust" has to say which, before the first rep */
+    if(s.phase==='ready'){try{
+      const comp=cur.exOr||cur.ex,opts=exChoices(comp);
+      if(opts.length>=2)card+='<p class="micro" style="margin-top:12px">Which one today</p>'+
+        '<div class="row" style="gap:8px;margin-top:6px">'+opts.map(o=>'<button data-a="exPick" data-v="'+esc(o)+'" class="pill" style="flex:1;font-size:13px;padding:8px 6px;'+
+          (cur.ex===o?'background:var(--text);color:var(--bg);border-color:var(--text);font-weight:600':'color:var(--dim)')+'">'+esc(o)+'</button>').join('')+'</div>'}
+      catch(e){oops('exChoiceUi',e)}}
+    if(s.phase==='logging'){
+      const timed=!!cur.secs;
+      const ready=timed?(+S.draft.secs>0):(S.draft.rpe!=null&&S.draft.r);
+      card+='<p class="micro" style="margin-top:16px;color:var(--amber)">'+(timed?'How long did you hold?':'What did you actually do?')+'</p>';
+      if(timed)card+='<div style="margin-top:10px">'+stepper('draft.secs','Seconds'+(cur.perSide?' per side':''),S.draft.secs,5,'sec')+'</div>';
+      else card+='<div style="display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,0.8fr);gap:12px;margin-top:10px">'+
+        stepper('draft.w','Weight ('+uwUnit()+')',S.draft.w,(UNITS.w==='lb'?5:2.5),'')+stepper('draft.r','Reps'+(cur.perSide?' / side':''),S.draft.r,1,'')+'</div>'+
+        '<p class="micro" style="margin:12px 0 7px">RPE</p>'+rpeGrid('draft.rpe',S.draft.rpe);
+      card+='<button data-a="commit" class="big disp mt2" style="min-height:66px;font-size:19px;'+(ready?'background:linear-gradient(180deg,var(--action-top),var(--action-bottom));color:var(--action-ink)':'background:var(--raised);color:var(--faint);box-shadow:none')+'">Log the set</button>'}
+    else{
+      const wells=[];
+      if(show.secs)wells.push(well('Hold',show.secs,show.perSide?'s / side':'seconds'));
+      else wells.push(well('Weight',show.targetW!=null?uwNum(show.targetW):'—',show.targetW!=null?uwUnit():'your call'));
+      if(!show.secs&&show.targetReps)wells.push(well('Reps',esc(String(show.targetReps)),show.perSide?'per side':'target'));
+      if(show.targetRpe!=null)wells.push(well('RPE',esc(String(show.targetRpe)),rir(show.targetRpe)!==null?(rir(show.targetRpe)===0?'nothing left':rir(show.targetRpe)+' in reserve'):'aim'));
+      card+='<div style="display:flex;align-items:stretch;gap:10px;margin-top:16px">'+wells.join('')+'</div>'+
+        (show.adj?'<p style="color:var(--amber);font-size:13px;margin-top:10px;text-align:center">'+(show.adj>0?'+':'')+uwNum(show.adj)+' '+uwUnit()+' adjusted from your logs</p>':'');
+      if(show.bar&&show.targetW!=null&&S.lay.plates!==false)card+='<div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--cardline)">'+plateHtml(show.targetW)+'</div>';
+      if(s.phase==='working')card+='<p class="mono" id="elapsed" style="text-align:center;color:var(--faint);font-size:13px;margin-top:14px">'+mmss((Date.now()-(S.setStart||Date.now()))/1000)+' under the bar</p>';
+      const act=s.phase==='ready'?['begin',show.secs?'Start '+show.secs+'s hold':'Start set '+show.setNo]
+        :s.phase==='working'?['finish','Log the set']
+        :['restGo','Start set '+show.setNo];
+      card+='<button data-a="'+act[0]+'" class="big disp mt2" style="min-height:66px;font-size:19px;background:linear-gradient(180deg,var(--action-top),var(--action-bottom));color:var(--action-ink)">'+esc(act[1])+'</button>'}}
+  else card+='<h1 class="disp" style="font-size:32px;font-weight:600;line-height:1.04;letter-spacing:-.03em">Every set logged</h1>'+
+    '<p style="font-size:15px;color:var(--faint);margin-top:4px">'+setsDone+' of '+s.sets.length+' sets in the record.</p>'+
+    '<button data-a="skipRest" class="big disp mt2" style="min-height:66px;font-size:19px;background:linear-gradient(180deg,var(--action-top),var(--action-bottom));color:var(--action-ink)">Finish the session</button>';
+  card+='</div>';
+
+  /* ── the rest card: the ring ticks during rest, sits quiet otherwise ── */
+  const restTotal=resting?(S.restTotal||s.sets[s.idx].rest||0):((show&&show.rest)||cur.rest||0);
+  const left=resting?Math.max(0,Math.ceil((S.restEnd-Date.now())/1000)):restTotal;
+  const restCard='<div class="card mt" style="padding:20px;display:flex;align-items:center;gap:20px">'+
+    ringHtml('rest',left,Math.max(1,restTotal),resting?(left<=10?'var(--amber)':'var(--text)'):'rgba(255,255,255,.22)',{size:118,font:28,width:5,sub:resting?(left<=10?'Get ready':'Rest'):'Rest'})+
+    '<div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:10px">'+
+    '<p style="font-size:15px;color:var(--dim)">'+(restTotal?esc(mmss(restTotal).replace(/^0/,''))+(resting?' prescribed. The ring runs whether the app is open or not.':' of rest after this set.'):'No rest written for this set.')+'</p>'+
+    (resting?'<div style="display:flex;gap:8px"><button data-a="skipRest" class="btn" style="width:auto;padding:12px 18px;font-size:15px">Skip rest</button>'+
+      '<button data-a="addRest" class="btn" style="width:auto;padding:12px 14px;font-size:15px;color:var(--dim)">+30 s</button></div>':'')+
+    '</div></div>';
+
+  /* ── the one footer line ── */
+  const nextEx=(function(){try{const from=show?show.exNo:cur.exNo;
+    const rest9=plan0.filter(e=>e.exNo!==from&&e.done<e.sets.length);
+    const after=rest9.find(e=>e.exNo>from)||rest9[0];
+    return after?String(after.ex).replace(/ — .*/,''):''}catch(e){return ''}})();
+  const foot='<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 4px 0">'+
+    '<span style="font-size:13px;color:var(--faint);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(nextEx?'Next · '+esc(nextEx):'Last exercise')+'</span>'+
+    '<span style="font-size:13px;color:var(--faint);flex:none">'+setsDone+' of '+s.sets.length+' sets done</span></div>';
+  /* a load change is a sentence with its undo, on the screen, while you
+     are still on that exercise or have just left it (11 Sep laws) */
   const adjLive=(()=>{try{const la=S.lastAdj;if(!la)return false;const ll=s.log[s.log.length-1];
     return cur.ex===la.ex||(ll&&ll.ex===la.ex)}catch(e9){return !!S.lastAdj}})();
-  if(adjLive&&(s.phase==='ready'||s.phase==='resting'))body+='<div class="card mt" style="padding:12px 15px;display:flex;align-items:center;gap:12px">'+
-    '<span style="flex:1;min-width:0;font-size:13px;line-height:1.5;color:var(--dim)">Allena adjusted <b style="color:var(--text)">'+esc(String(S.lastAdj.ex).replace(/ — .*/,''))+'</b> by '+(S.lastAdj.delta>0?'+':'')+uwNum(S.lastAdj.delta)+' '+uwUnit()+' for next time.</span>'+
-    '<button data-a="undoAdj" class="mono" style="color:var(--amber);font-size:11px;flex:none">Undo</button></div>';
-  /* a safety valve is always available and never shouts: red means STOP
-     (6c), and a permanent red slab beside the primary action spends the
-     one colour that has to still mean something when it matters. */
-  if(isRehabSession()&&s.phase==='ready')body+='<button data-a="flagOpen" class="mt" style="width:100%;padding:11px;border-radius:var(--r-3);background:none;border:1px solid var(--line);color:var(--dim);font-size:var(--t-foot)">Flag this for my physio</button>';
-  if(s.log.length&&s.phase==='ready')body+='<div class="mt2"><p class="eyebrow">Done so far — tap to fix</p><div style="margin-top:8px">'+logLines(s.log,'editLive')+'</div></div>';
-  if(s.phase==='ready')foot+='<button data-a="begin" class="big disp" style="background:linear-gradient(180deg,var(--action-top),var(--action-bottom));color:var(--action-ink);min-height:66px;font-size:19px">'+
-    (cur.secs?'Start '+cur.secs+'s hold':'Start set '+cur.setNo)+'</button>'+
-    /* forgot to start the clock and the set is already done? Log it
-       straight — a zero set time is honest here (owner call, 6 Sep).
-       Liveness is unhurt: the watch witness and the session clock
-       judge the SESSION, never one set's timer. */
-    '<button data-a="lateLog" style="width:100%;padding:6px;color:var(--faint);font-size:11px;margin-top:2px">Already did this set? Log it</button>';
-  if(s.phase==='working')foot+='<button data-a="finish" class="big disp" style="background:var(--text);color:var(--bg)">Finish set</button>';
-  if(s.phase!=='logging')foot+='<div class="subrow">'+
-    '<button data-a="modifyOpen" style="color:var(--amber)">Modify</button>'+
-    '<button data-a="planOpen">Plan</button>'+
-    '<button data-a="saveExit">Save &amp; exit</button></div>';
-  foot+='<button data-a="discard" style="width:100%;padding:5px;color:var(--faint);font-size:11px;margin-top:2px">Discard this session</button>';
-  return '<div class="view sessfix">'+h+'<div class="sessbody pad'+(s.phase==='logging'?'':' mid')+'"><div class="sessin">'+body+'</div></div>'+
-     '<div class="sessfoot">'+foot+'</div></div>'}
+  const adjLine=(adjLive&&s.phase!=='logging')?'<div style="display:flex;align-items:center;gap:12px;padding:12px 4px 0">'+
+    '<span style="flex:1;min-width:0;font-size:13px;line-height:1.5;color:var(--dim)">Allena adjusted <b style="color:var(--text)">'+esc(String(S.lastAdj.ex).replace(/ \u2014 .*/,''))+'</b> by '+(S.lastAdj.delta>0?'+':'')+uwNum(S.lastAdj.delta)+' '+uwUnit()+' for next time.</span>'+
+    '<button data-a="undoAdj" class="mono" style="color:var(--amber);font-size:11px;flex:none">Undo</button></div>':'';
+  return '<div class="view sessfix">'+h+'<div class="sessbody pad" style="padding-top:10px">'+card+restCard+foot+adjLine+hintHtml('mt')+'</div></div>'}
 
 function viewHistory(){
   const back='<button data-a="back" class="btn" style="width:auto;padding:8px 14px;color:var(--dim);font-size:13px;margin-bottom:14px">‹ Back</button>';
@@ -30534,7 +30367,7 @@ function sheetHtml(){
        listing invisible ones read as broken (owner-caught: habits and
        support in the sheet, nowhere on the page) */
     const live9=k=>{try{
-      if(k==='habits')return !!secHabits();
+      if(k==='habits')return false;
       if(k==='support')return !!secSupport();
       if(k==='goals')return !!secGoals();
       if(k==='stats')return !!secStats();
@@ -30904,7 +30737,10 @@ function sheetHtml(){
         (x.skipped?'<span class="mono" style="color:var(--faint);font-size:var(--t-caption);flex:none">skipped</span>'
           :(x.optional&&!x.done?'<span class="mono" style="color:var(--faint);font-size:var(--t-caption);flex:none">optional</span>':''))+
         (!x.done&&x.skip?'<button data-a="'+x.skip+'" class="mono" style="color:var(--faint);font-size:11px;flex:none;padding-left:4px">Not today</button>':'')+
-        '</div>').join('')+'</div>')}
+        '</div>').join('')+'</div>'+
+      /* the daily inputs and the creatine tick moved here from Train
+         (owner, 17 Sep 2026: "get rid of daily check-in pill in train") */
+      (function(){try{return creatineCard()+dailyCard()}catch(e){oops('todayDaily',e);return ''}})())}
   if(S.sheet.t==='quest'){
     const Q=questCurrent();if(!Q||!Q.q)return '';
     questCheck();
@@ -31570,7 +31406,11 @@ function sheetHtml(){
           '<span class="mono" style="color:'+o[1]+';font-size:var(--t-caption);letter-spacing:.06em;flex:none">'+o[0]+'</span></div>'}).join('')+'</div>':'')+
       (st.n?'<p style="color:var(--faint);font-size:11px;line-height:1.5;margin-top:12px">A miss usually means the day surprised the model \u2014 sleep, stress, a hard commute. It recalibrates from every one.</p>':''))}
   if(S.sheet.t==='wkclock'){
-    const body=weekCardBody();
+    /* the sheet behind the Train subtitle carries the week board and the
+       week-1 clock now (17 Sep 2026), so the page itself is the programme */
+    const body=weekCardBody()+((typeof weekClockBody==='function')?weekClockBody():'')+
+      (function(){try{const wb=weekBoardCard();if(!wb)return '';
+        return (typeof isPremium==='function'&&!isPremium())?lockCard('board'):wb}catch(e){oops('wkBoard',e);return ''}})();
     /* the clock is correctable (owner ask, 6 Sep): tap the day the week
        is actually on; the edit outranks the derived start, and one tap
        returns it to automatic */
@@ -32305,6 +32145,36 @@ function sheetHtml(){
     if(cur_adj)inner+='<button data-a="tuneReset" class="btn mt">Reset to the written program ('+uwNum(cur.targetW-cur_adj)+' '+uwUnit()+')</button>';
     inner+='<p style="color:var(--faint);font-size:11px;line-height:1.5;margin-top:12px">Allena adjusts this automatically too: all sets at the top of the range at RPE 8 or less adds 2.5 kg; missing the target on two or more sets takes weight off.</p>';
     return wrapSheet('Tune load',inner)}
+  if(S.sheet.t==='sessmenu'){
+    /* THE SESSION MENU (17 Sep 2026): everything the set screen used to
+       carry around its one action — the cue, the warm-up, notes, the
+       coach, Modify, Plan, the done-so-far list, Save & exit, Discard */
+    const s2=S.sess;if(!s2)return '';
+    const c2=s2.sets[Math.min(s2.idx,s2.sets.length-1)];
+    let inner='';
+    if(c2.cue)inner+='<div class="cue" style="border-left-color:var(--amber)">'+esc(c2.cue)+'</div>';
+    try{inner+='<div class="mt">'+muscleChips(c2.ex)+'</div>'}catch(e){oops('menuChips',e)}
+    try{const b0=gBase(c2.ex),cut0=Date.now()-35*864e5;
+      const prior=(S.history||[]).slice().reverse().find(h9=>h9.exNotes&&h9.exNotes[b0]&&new Date(h9.date).getTime()>cut0&&/hurt|pain|sharp|numb|swell|tweak|pinch/i.test(h9.exNotes[b0]));
+      if(prior)inner+='<div class="cue mt" style="border-left-color:var(--amber)">'+esc('Last time on this you noted \u201c'+prior.exNotes[b0]+'\u201d ('+fmtDate(prior.date)+'). How is it today? If it speaks up again, ease it or swap it out.')+'</div>'}catch(e){}
+    if(s2.phase==='ready'){try{const wu=warmupPlan(s2,c2);if(wu)inner+='<div class="mt">'+warmupHtml(wu,c2,s2)+'</div>'}catch(e){oops('menuWarm',e)}}
+    const row=(a,v,label,sub,col)=>'<button data-a="'+a+'"'+(v?' data-v="'+esc(v)+'"':'')+' style="width:100%;text-align:left;display:flex;align-items:center;gap:12px;min-height:56px;padding:12px 0;border-bottom:1px solid var(--cardline)">'+
+      '<span style="flex:1;min-width:0"><span style="display:block;font-size:17px;'+(col?'color:'+col:'')+'">'+label+'</span>'+(sub?'<span style="display:block;font-size:13px;color:var(--faint);margin-top:2px">'+sub+'</span>':'')+'</span>'+
+      '<span style="color:var(--faint);flex:none">\u203a</span></button>';
+    const noted=!!((s2.exNotes||{})[gBase(c2.ex)]);
+    const plan=A.exPlan(),remain=plan.filter(e=>e.done<e.sets.length),setsLeft=s2.sets.length-s2.log.filter(l=>l.w!=null||l.secs).length;
+    inner+='<div class="card mt2" style="padding:0 18px">'+
+      row('exNoteOpen','','Exercise notes',noted?'you have a note on this one':'a cue for next time')+
+      row('sessMenuGo','coachOpen','Ask Allena','she has the live session in front of her')+
+      row('modifyOpen','','Modify','tune the load, swap, skip, superset')+
+      row('planOpen','','What is left',remain.length+' exercise'+(remain.length===1?'':'s')+' \u00b7 '+setsLeft+' set'+(setsLeft===1?'':'s')+' \u00b7 about '+estMins(s2.sets.slice(s2.idx))+' min')+
+      (s2.phase==='ready'?row('sessMenuGo','lateLog','Already did this set? Log it','a zero set time is honest here'):'')+
+      (isRehabSession()?row('flagOpen','','Flag this for my physio','pain, swelling or instability'):'')+
+      row('sessMenuGo','saveExit','Save and exit','every set so far is already saved')+
+      row('discard','','Discard this session','',
+        'var(--red)').replace('border-bottom:1px solid var(--cardline)','')+'</div>';
+    if(s2.log.length)inner+='<p class="eyebrow mt2">Done so far \u2014 tap to fix</p><div style="margin-top:8px">'+logLines(s2.log,'editLive')+'</div>';
+    return wrapSheet(String(c2.ex).replace(/ \u2014 .*/,''),inner)}
   if(S.sheet.t==='plan'){
     const s2=S.sess;if(!s2)return '';
     const plan=A.exPlan();
@@ -34448,6 +34318,11 @@ function runAction(a,v,t,e){
     case 'skipSet':S.sheet=null;A.skipSet();break;
     case 'skipEx':S.sheet=null;A.skipEx();break;
     case 'skipRest':A.skipRest();break;
+    /* the set card's one button during rest: end the rest and start the
+       set it is showing (17 Sep 2026) */
+    case 'restGo':{A.skipRest();if(S.sess&&S.sess.phase==='ready')runAction('begin');break}
+    case 'sessMenuOpen':{if(S.sess)S.sheet={t:'sessmenu'};render();break}
+    case 'sessMenuGo':{S.sheet=null;runAction(v);break}
     case 'addRest':A.addRest();break;
     case 'saveExit':{const s9=S.sess;
       /* leaving with work logged and sets remaining asks the honest
@@ -35815,6 +35690,10 @@ function runAction(a,v,t,e){
          none, and used to bank a junk 'undefined' entry (caught 7 Sep) */
       if(sg&&sg.id!=null){
         const seen=lget('training-revealseen-v1',{})||{};seen[sg.id]=1;lset('training-revealseen-v1',seen);
+        /* a reveal that comes back every open means this mark did not
+           stick (Angus, 17 Sep 2026) — read it back and say so in
+           Diagnostics rather than let the next open answer the question */
+        try{const chk=lget('training-revealseen-v1',{})||{};if(!chk[sg.id])oops('revealSeenFail',new Error('seen mark did not persist for '+sg.id))}catch(e9){}
         const bank=discBank();
         /* it was just announced, full screen, so it is stamped as
            announced — otherwise annEvent falls back to `found`, the find
@@ -36714,6 +36593,18 @@ function runAction(a,v,t,e){
       go:'acctDelGo',v:'',ok:'Delete it',no:'Keep my account'};
       S.sheet={t:'confirm'};render();break}
     case 'acctDelGo':{S.sheet=null;render();acctDelete();break}
+    case 'cloudBkNow':cloudBkPush(true);break;
+    case 'cloudRestoreAsk':{(async function(){
+        const row=await cloudBkPull();
+        if(!row){flash(S._bkCap===false?'The backup table is not live on the server yet.':'No backup on your account yet.');return}
+        S.cloudRow=row;
+        S.confirm={t:'Restore from your account?',
+          d:(row.sessions||0)+' session'+(row.sessions===1?'':'s')+' backed up '+fmtDate(row.updated_at)+'. Restoring merges that record into this phone; nothing here is deleted.',
+          go:'cloudRestoreGo',v:'',soft:true,ok:'Restore it',no:'Not now'};
+        S.sheet={t:'confirm'};render()})();break}
+    case 'cloudRestoreGo':{const row=S.cloudRow;S.cloudRow=null;S.sheet=null;
+      if(row&&row.blob){try{doRestore(row.blob)}catch(e){oops('cloudRestore',e);flash('That backup could not be read.')}}
+      render();break}
     case 'acctOut':lset(K_ACCT,null);S.acctPending=false;render();
       flash('Signed out. Your training data never left this phone anyway.');break;
 
