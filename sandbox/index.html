@@ -1539,7 +1539,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='d96cdb';  // stamped by tools/build.py with the content hash
+const BUILD_ID='399e0a';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -14675,8 +14675,15 @@ function sorceryOnArrival(kind){
       else if(isRunType(r.type)&&r.km>3&&r.mins>0){
         const paces=(S.runs||[]).filter(x=>isRunType(x.type)&&x.km>3&&x.mins>0).map(x=>x.mins/x.km).sort((a,b)=>a-b);
         const p9=r.mins/r.km,rank=paces.indexOf(p9)+1;
+        /* paceStr takes MINUTES and KILOMETRES, not a pace. Called with
+           one argument its own `if(!min||!km)return ''` fired every
+           time, so this notification has always read "That run: /km.
+           Your fastest yet." — a sentence with the number missing.
+           The hardcoded '/km' went with it: paceStr appends the
+           reader's OWN unit, so somebody on miles was being told their
+           pace per km as well. */
         if(rank>0&&rank<=3&&paces.length>=6)sorceryQueue('workout',
-          'That run: '+paceStr(p9)+'/km. '+(rank===1?'Your fastest yet':'Top three all-time')+'.')}
+          'That run: '+paceStr(r.mins,r.km)+'. '+(rank===1?'Your fastest yet':'Top three all-time')+'.')}
       return}
     if(kind==='steps'){
       /* today's PARTIAL steps already beat 90% of complete days */
@@ -16805,7 +16812,67 @@ function corrMaps(days){
         if(both>=8&&same===both){delete outs[f];return true}
         return false})})}
   catch(e){oops('corrMaps.twins',e)}
+  /* ═══ ONE FAMILY IS ONE FINDING — THE OUTCOME HALF (17 Sep 2026) ═══
+     The 14 Sep work built family collapse for SIGNALS: sleep, sleep2 and
+     sleep3 are one fact, the strongest speaks and the rest ride under it
+     as "also seen as". The outcome side never got it. All it had was the
+     block above, which compares three named lifts against `ex:` twins.
+     Measured on the demo account — the one we film on — `pace` and
+     `beatkm` (heartbeats per kilometre) have IDENTICAL RANKINGS on all
+     42 days, so three of its fourteen findings were the same finding
+     said twice:
+         sleep -> pace    rho -0.747 n42   "Easy-run pace runs faster…"
+         sleep -> beatkm  rho -0.747 n42   "Heartbeats per km runs easier…"
+     and the same for readiness and resting heart rate.
+     THE RULE IS THE ENGINE'S OWN MATHS, not a threshold anybody picked.
+     spearman() is RANK-based, so two outcomes with identical rankings
+     return a byte-identical rho against every signal, at every lag,
+     forever — they cannot ever disagree, so a second card can carry no
+     second fact. Nothing is thrown away that could have been said.
+     DECIDED ON THE DATA, exactly like the block above: pace and beatkm
+     are only the same series while heart rate holds steady, which is
+     true of easy running and not true in general. An account where they
+     come apart keeps both, correctly. */
+  try{
+    const ks2=Object.keys(days);
+    const rankOf=f=>{
+      const p=ks2.filter(k=>days[k][f]!=null).map(k=>[k,days[k][f]]);
+      if(p.length<12)return null;
+      /* a flat series has every rank tied and would match anything —
+         measured: effort, fade and adher are constant on the demo */
+      const d={};p.forEach(x=>{d[x[1]]=1});
+      if(Object.keys(d).length<5)return null;
+      p.sort((a,b)=>a[1]-b[1]);
+      const o={};p.forEach((x,i)=>{o[x[0]]=i});return o};
+    const of=Object.keys(outs),R={};
+    of.forEach(f=>{R[f]=rankOf(f)});
+    const map=S._corrOutMap={};
+    for(let i=0;i<of.length;i++)for(let j=i+1;j<of.length;j++){
+      const a=of[i],b=of[j];
+      if(!outs[a]||!outs[b])continue;
+      const ra=R[a],rb=R[b];if(!ra||!rb)continue;
+      const ka=Object.keys(ra);
+      if(ka.length!==Object.keys(rb).length)continue;
+      if(!ka.every(k=>rb[k]===ra[k]))continue;
+      const keep=corrOutCanon(a,b),drop=keep===a?b:a;
+      delete outs[drop];map[drop]=keep}}
+  catch(e){oops('corrMaps.outTwins',e)}
   return{sigs:sigs,outs:outs}}
+/* Which member of a rank-identical pair carries the finding. The choice
+   must be DETERMINISTIC or the banked id flips between two names and the
+   collection grows a second card for one fact — the exact failure this
+   whole collapse exists to stop. A fixed preference gives the better
+   sentence ("Easy-run pace runs faster" reads to a human; "heartbeats
+   per km" is the same fact in instrument language); anything unlisted
+   falls back to alphabetical, which is arbitrary but never moves. */
+const CORR_OUT_PREF=['pace','topset','tonnage','benchtop','squattop','deadtop',
+  'hrvo','rhro','readyo','sleepo','effort','adher'];
+function corrOutCanon(a,b){
+  const ia=CORR_OUT_PREF.indexOf(a),ib=CORR_OUT_PREF.indexOf(b);
+  if(ia>=0&&ib>=0)return ia<ib?a:b;
+  if(ia>=0)return a;
+  if(ib>=0)return b;
+  return a<b?a:b}
 const CORR_FAMILY={sleep2:'sleep',sleep3:'sleep',sleepvar:'sleep',sldeep:'sleep',slrem:'sleep',
   hrvswing:'hrv',rhr3:'rhr',bwtrend:'bw',steps3:'steps',msteps:'steps',kcal3:'kcal',
   carb3:'carb',ecarb:'carb',protein3:'protein',eprot:'protein',fat3:'fat',
@@ -16823,9 +16890,16 @@ function corrIdentity(c){
     const fam=corrFamily(c.sig);
     const bank=discBank();
     const members=Object.keys(CORR_FAMILY).filter(k=>CORR_FAMILY[k]===fam).concat([fam]);
+    /* an entry filed under the OTHER member of a rank-identical outcome
+       pair is this same finding: before the outcome collapse a reader
+       could have banked `corr:sleep:beatkm:0`, and without this the fix
+       would orphan that card and bank `corr:sleep:pace:0` beside it —
+       the duplicate arriving through the door marked "remove duplicates". */
+    const om=S._corrOutMap||{};
+    const sameOut=o=>o===c.out||om[o]===c.out;
     const hit=Object.keys(bank).find(id=>{
       const m=/^corr:([a-z0-9]+):(.+):(\d)$/.exec(id);
-      return m&&m[2]===c.out&&members.indexOf(m[1])>=0});
+      return m&&sameOut(m[2])&&members.indexOf(m[1])>=0});
     if(hit)return hit;
     return 'corr:'+fam+':'+c.out+':'+c.lag}
   catch(e){return 'corr:'+corrFamily(c.sig)+':'+c.out+':'+c.lag}}
@@ -16868,7 +16942,13 @@ function corrCache(){
   if(S._corrDisk===undefined){try{S._corrDisk=lget(K_CORRC,null)}catch(e){S._corrDisk=null}}
   return S._corrDisk}
 function corrCacheSave(stamp,v){
-  const c={stamp:stamp,v:v};S._corrDisk=c;
+  /* the outcome-twin map rides with the answer. It is built inside
+     corrMaps, which only runs on a FULL compute — so on a launch served
+     from this cache it would otherwise be empty, and corrIdentity could
+     fail to recognise a card already filed under a collapsed twin and
+     bank a second one beside it. Saving it keeps the migration lookup
+     available on every launch, not only the ones that recompute. */
+  const c={stamp:stamp,v:v,om:S._corrOutMap||{}};S._corrDisk=c;
   try{lset(K_CORRC,c)}catch(e){oops('corrCacheSave',e)}}
 /* the recompute that (b) schedules. Guarded so the deferred pass can
    never defer again, and so two paints cannot queue two grids. */
@@ -16886,6 +16966,7 @@ function correlations(){
     const stamp=corrStamp();
     if(S._corrMemo&&S._corrMemo.stamp===stamp)return S._corrMemo.v;
     const disk=corrCache();
+    if(disk&&disk.om&&!S._corrOutMap)S._corrOutMap=disk.om;
     if(disk&&disk.stamp===stamp&&Array.isArray(disk.v)){
       S._corrMemo={stamp:stamp,v:disk.v};return disk.v}
     /* The data has moved. Paint from the saved answer and recompute
