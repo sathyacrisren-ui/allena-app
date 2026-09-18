@@ -1423,7 +1423,16 @@ function lget(k,f){try{const v=localStorage.getItem(k);return v?JSON.parse(v):f}
    was not saved. It still returns the flag; now the failure is at
    least visible, once per key, without spamming a live session. */
 const LSFAIL={};
-function lset(k,v){try{localStorage.setItem(k,JSON.stringify(v));return true}
+/* THE BACKUP IS AUTOMATIC (owner, 18 Sep 2026): every write to a
+   training key schedules a cloud push, so nothing waits on a tap. The
+   keys below are device state or caches, not the record: writing them
+   never counts as a change worth sending. */
+const BK_SKIP={'training-account-v1':1,'training-lastbackup-v1':1,'training-lastopen-v1':1,
+  'training-corrcache-v1':1,'training-aicache-v1':1,'training-strava-v1':1,'training-sandbox-v1':1,
+  'training-active-v2':1,'training-autobk-v1':1};
+function lset(k,v){try{localStorage.setItem(k,JSON.stringify(v));
+    if(k.indexOf('training-')===0&&!BK_SKIP[k]){try{if(typeof cloudBkSoon==='function')cloudBkSoon()}catch(e9){oops('lset:bk',e9)}}
+    return true}
   catch(e){oops('lset:'+k,e);
     if(!LSFAIL[k]){LSFAIL[k]=1;
       try{flash('This phone couldn\u2019t save that \u2014 free up some space, then back up from Settings.')}catch(_){}}
@@ -1622,7 +1631,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='d6db49';  // stamped by tools/build.py with the content hash
+const BUILD_ID='68d586';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -3552,7 +3561,7 @@ async function acctVerify(code){
       S.acctPending=false;S.acctCode='';
       flash('Signed in.');render();
       try{acctSyncSoon()}catch(e){}
-      try{cloudBkOffer()}catch(e){}}
+      try{cloudBkRecover()}catch(e){}}
     else flash(d.msg||d.error_description||'That code did not work — codes expire quickly, send a fresh one.')
   }catch(e){flash('No connection.')}
   render()}
@@ -4782,14 +4791,30 @@ function cloudBkPayload(){
   let h=5381;for(let i=0;i<body.length;i++)h=((h*33)^body.charCodeAt(i))>>>0;
   const sessions=(o.keys&&Array.isArray(o.keys[K_H]))?o.keys[K_H].length:0;
   return{blob:blob,bytes:blob.length,sessions:sessions,hash:String(h)}}
-let cloudBkT=null;
+let cloudBkT=null,cloudBkLast=0,cloudBkBusy=false;
 function cloudBkSoon(){
+  /* four quiet seconds after the last write, and never more than one
+     push every 45 s while someone is logging set after set — the hash
+     check in cloudBkPush makes an unchanged record free either way */
   if(!acctReady()||!acct()||S._bkCap===false)return;
-  clearTimeout(cloudBkT);cloudBkT=setTimeout(function(){cloudBkPush(false)},4000)}
-async function cloudBkPush(loud){
+  clearTimeout(cloudBkT);
+  const wait=Math.max(4000,45000-(Date.now()-cloudBkLast));
+  cloudBkT=setTimeout(function(){cloudBkT=null;cloudBkPush(false)},wait)}
+function cloudBkFlush(){
+  /* the app is going to the background (or away): send what is pending
+     NOW rather than after the wait. iOS gives a hidden page seconds, not
+     minutes, and a crash gives it nothing. */
+  if(!cloudBkT)return;
+  clearTimeout(cloudBkT);cloudBkT=null;
+  try{cloudBkPush(false,true)}catch(e){oops('cloudBkFlush',e)}}
+try{document.addEventListener('visibilitychange',function(){if(document.visibilityState==='hidden')cloudBkFlush()});
+  window.addEventListener('pagehide',cloudBkFlush)}catch(e){oops('cloudBkHooks',e)}
+async function cloudBkPush(loud,urgent){
   if(!acctReady())return false;
+  if(cloudBkBusy){cloudBkSoon();return false}   // one in flight: the next one queues behind it
+  cloudBkBusy=true;
   if(loud){S.bkBusy=true;render()}
-  const done=ok9=>{if(loud){S.bkBusy=false;render()}return ok9};
+  const done=ok9=>{cloudBkBusy=false;if(loud){S.bkBusy=false;render()}return ok9};
   try{
     const tok=await acctToken();if(!tok){if(loud)flash('Sign in first.');return done(false)}
     const c=acctClaims(tok);if(!c||!c.sub)return done(false);
@@ -4799,7 +4824,11 @@ async function cloudBkPush(loud){
     const r=await fetch(CLOUD.url+'/rest/v1/backups?on_conflict=user_id',{method:'POST',
       headers:{'content-type':'application/json',apikey:CLOUD.anon,
         Authorization:'Bearer '+tok,Prefer:'resolution=merge-duplicates,return=minimal'},
+      /* keepalive lets a request outlive the page, but browsers cap a
+         keepalive body at 64 KB — a bigger record goes the ordinary way */
+      keepalive:!!(urgent&&pay.bytes<60000),
       body:JSON.stringify([{user_id:c.sub,blob:pay.blob,bytes:pay.bytes,sessions:pay.sessions,updated_at:new Date().toISOString()}])});
+    cloudBkLast=Date.now();
     if(r.ok){S._bkCap=true;
       lset(K_ACCT,Object.assign({},acct(),{bkAt:new Date().toISOString(),bkHash:pay.hash,bkBytes:pay.bytes,bkSessions:pay.sessions}));
       /* a backup is a backup: the never-backed-up warning stands down */
@@ -4822,19 +4851,25 @@ async function cloudBkPull(){
     const rows=await r.json();
     return (Array.isArray(rows)&&rows[0]&&rows[0].blob)?rows[0]:null}
   catch(e){oops('cloudBkPull',e);return null}}
-async function cloudBkOffer(){
-  /* A NEW PHONE ASKS ONCE (17 Sep 2026): signed in on a device with an
-     empty record while the account holds a backup — offer to restore it.
-     A device that already has sessions is never overwritten unasked. */
+async function cloudBkRecover(){
+  /* AN EMPTY PHONE RESTORES ITSELF (owner, 18 Sep 2026: "automatic,
+     without any need for user intervention"): signed in on a device with
+     no sessions while the account holds a backup — the record comes back
+     on its own and says so. There is nothing on an empty phone to lose.
+     A device that already has sessions is never touched unasked; that
+     merge stays behind Restore from the cloud on Account. */
   try{
     if((S.history||[]).some(h=>!h.demo))return;
-    const row=await cloudBkPull();if(!row)return;
-    S.cloudRow=row;
-    S.confirm={t:'Restore from your account?',
-      d:(row.sessions||0)+' session'+(row.sessions===1?'':'s')+' backed up '+esc(fmtDate(row.updated_at))+'. Restoring merges that record into this phone; nothing here is deleted.',
-      go:'cloudRestoreGo',v:'',soft:true,ok:'Restore it',no:'Not now'};
-    S.sheet={t:'confirm'};render()}
-  catch(e){oops('cloudBkOffer',e)}}
+    if(!acct()||!acct().refresh)return;
+    const row=await cloudBkPull();if(!row||!row.blob)return;
+    doRestore(row.blob);
+    lset(K_ACCT,Object.assign({},acct()||{},{bkAt:row.updated_at,bkSessions:row.sessions||0}));
+    lset(K_BK,Date.now())}
+  catch(e){oops('cloudBkRecover',e)}}
+/* THE COLD OPEN CATCHES UP: anything a crash or a dead connection left
+   unsent goes on the next open (free when the hash matches), and a
+   phone that came back empty pulls its record without being asked. */
+setTimeout(function(){try{cloudBkSoon();cloudBkRecover()}catch(e){oops('cloudBkBoot',e)}},1500);
 function accountSection(){
   if(!acctReady())return '<p style="color:var(--dim);font-size:13px;line-height:1.55;margin-top:8px">'+
     'Cloud sign-in is not switched on in this build yet. When it is, signing in adds the no-key coach chat and backs up your score card — and only your score card. Sets, weights, body and rehab data never leave this phone.</p>';
@@ -4845,7 +4880,7 @@ function accountSection(){
       /* THE SERVER HOLDS A BACKUP NOW (owner, 17 Sep 2026) */
       (S._bkCap===false?' Cloud backup is not live on the server yet.'
         :a.bkAt?' Your training record was backed up to your account '+esc(fmtDate(a.bkAt))+' ('+(a.bkSessions||0)+' session'+(a.bkSessions===1?'':'s')+').'
-        :' Your training record backs up to your account after every change.')+'</p>'+
+        :' Your training record backs up to your account on its own after every change.')+'</p>'+
     (S.bkBusy
       ?'<button class="btn mt" style="color:var(--dim)" disabled>Backing up\u2026</button>'
       :'<div class="row mt" style="gap:8px"><button data-a="cloudBkNow" class="btn" style="flex:1;color:var(--amber)">Back up now</button>'+
@@ -4868,7 +4903,7 @@ function accountSection(){
       :'<button data-a="acctSend2" class="btn mt" style="color:var(--dim)">Send a fresh code</button>')+
     '<button data-a="acctReset" class="btn mt" style="color:var(--faint);font-size:11px">Different email</button>';
   return '<p style="color:var(--dim);font-size:13px;line-height:1.55;margin-top:8px">'+
-      'Sign in with just your email — an emailed code, no password. It unlocks the coach chat without any API key, backs up your score card for the race, and backs up your whole training record to your account so a new phone can restore it. The backup is your row alone on the server; nobody else can read it.</p>'+
+      'Sign in with just your email — an emailed code, no password. It unlocks the coach chat without any API key, backs up your score card for the race, and backs up your whole training record to your account on its own after every change, so a new phone or a reinstall gets everything back. The backup is your row alone on the server; nobody else can read it.</p>'+
     '<input data-in="acctEmail" value="'+esc(S.acctEmail||'')+'" placeholder="you@email.com" autocomplete="email" inputmode="email" class="mono" style="width:100%;margin-top:12px;background:var(--surface);border:1px solid var(--line);border-radius:12px;color:var(--text);padding:12px;font-size:13px;outline:none">'+
     '<button data-a="acctSend" class="btn mt" style="color:var(--amber)">Email me a sign-in code</button>'}
 /* ══ PODS — a race that does not need your friends (14 Sep 2026) ═══
@@ -27502,7 +27537,9 @@ function todayOrder(){
   if(backupDue()&&backupDays()===null)
     out.push('<button data-a="nav" data-v="data" class="card" style="width:100%;text-align:left;padding:12px 16px;margin-top:16px;display:flex;align-items:center;gap:12px;border-color:var(--amber)">'+
       '<span style="width:8px;height:8px;border-radius:8px;background:var(--amber);flex:none"></span>'+
-      '<span style="font-size:13px;color:var(--dim)">Never backed up. Deleting the app would wipe everything \u2014 tap to save a file.</span></button>');
+      '<span style="font-size:13px;color:var(--dim)">'+((typeof acctReady==='function'&&acctReady()&&!(acct()&&acct().refresh))
+        ?'Never backed up. Sign in once and Allena backs everything up on its own after every change.'
+        :'Never backed up. Deleting the app would wipe everything \u2014 tap to save a file.')+'</span></button>');
 
   // ── THE SLOT: stories compete, the best one shows
   const cand=[];
