@@ -1629,7 +1629,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='b4cd33';  // stamped by tools/build.py with the content hash
+const BUILD_ID='a5bc4d';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -1894,109 +1894,6 @@ function flameF(av,size){
 function iBtn(k){return '<button data-a="iTog" data-v="'+esc(k)+'" aria-label="More info" style="width:17px;height:17px;border-radius:16px;border:1px solid var(--line);background:none;color:var(--faint);font-size:11px;font-style:italic;font-family:Georgia,serif;line-height:1;display:inline-flex;align-items:center;justify-content:center;vertical-align:-2px;margin-left:7px;padding:0;flex:none">i</button>'}
 function iOn(k){return !!S.openSec['i:'+k]}
 function iBody(k,txt){return iOn(k)?'<p class="irev" style="color:var(--dim);font-size:11px;line-height:1.6;margin-top:8px">'+txt+'</p>':''}
-/* ── the QR encoder ─────────────────────────────────────────────
-   Hand-rolled, dependency-free (the one-file law): byte mode, EC
-   level L, versions 1-5 (single RS block), fixed mask 0 — enough for
-   an invite link, verified against Apple's Vision decoder. The
-   add-a-friend sheet draws it; the iPhone camera does the scanning. */
-function qrMatrix(text){
-  const bytes=[];for(let i=0;i<text.length;i++){const c=text.charCodeAt(i);
-    if(c>127)throw new Error('ascii only');bytes.push(c)}
-  // version table (EC level L, single block): [dataCodewords, ecCodewords, alignCenter]
-  const V=[[19,7,0],[34,10,18],[55,15,22],[80,20,26],[108,26,30]];
-  let ver=0;while(ver<5&&V[ver][0]<bytes.length+2)ver++;
-  if(ver>=5&&V[4][0]<bytes.length+2)throw new Error('too long');
-  const [dataCw,ecCw,alignC]=V[ver];ver+=1;
-  const size=17+4*ver;
-  // ── bit stream: mode 0100 · count(8) · bytes · terminator · pads
-  const bits=[];
-  const push=(v,n)=>{for(let i=n-1;i>=0;i--)bits.push((v>>i)&1)};
-  push(4,4);push(bytes.length,8);
-  bytes.forEach(b=>push(b,8));
-  const cap=dataCw*8;
-  push(0,Math.min(4,cap-bits.length));
-  while(bits.length%8)bits.push(0);
-  const pads=[0xEC,0x11];let pi=0;
-  while(bits.length<cap){push(pads[pi%2],8);pi++}
-  const data=[];for(let i=0;i<dataCw;i++){let b=0;for(let j=0;j<8;j++)b=(b<<1)|bits[i*8+j];data.push(b)}
-  // ── Reed-Solomon over GF(256), poly 0x11d
-  const EXP=new Array(512),LOG=new Array(256);
-  {let x=1;for(let i=0;i<255;i++){EXP[i]=x;LOG[x]=i;x<<=1;if(x&0x100)x^=0x11d}
-   for(let i=255;i<512;i++)EXP[i]=EXP[i-255]}
-  const gmul=(a,b)=>(a===0||b===0)?0:EXP[LOG[a]+LOG[b]];
-  let gen=[1];
-  for(let i=0;i<ecCw;i++){
-    const ng=new Array(gen.length+1).fill(0);
-    for(let j=0;j<gen.length;j++){ng[j]^=gen[j];ng[j+1]^=gmul(gen[j],EXP[i])}
-    gen=ng}
-  const ec=new Array(ecCw).fill(0);
-  data.forEach(d=>{
-    const f=d^ec[0];
-    for(let j=0;j<ecCw-1;j++)ec[j]=ec[j+1]^gmul(gen[j+1],f);
-    ec[ecCw-1]=gmul(gen[ecCw],f)});
-  const all=data.concat(ec);
-  // ── the matrix: null = unset data cell, 0/1 set, fn map marks function modules
-  const m=Array.from({length:size},()=>new Array(size).fill(null));
-  const fn=Array.from({length:size},()=>new Array(size).fill(false));
-  const set=(r,c,v)=>{m[r][c]=v?1:0;fn[r][c]=true};
-  const finder=(r,c)=>{for(let dr=-1;dr<=7;dr++)for(let dc=-1;dc<=7;dc++){
-    const rr=r+dr,cc=c+dc;if(rr<0||cc<0||rr>=size||cc>=size)continue;
-    const inF=dr>=0&&dr<=6&&dc>=0&&dc<=6;
-    const dark=inF&&(dr===0||dr===6||dc===0||dc===6||(dr>=2&&dr<=4&&dc>=2&&dc<=4));
-    set(rr,cc,dark)}};
-  finder(0,0);finder(0,size-7);finder(size-7,0);
-  for(let i=8;i<size-8;i++){if(!fn[6][i])set(6,i,i%2===0);if(!fn[i][6])set(i,6,i%2===0)}
-  if(alignC){const cs=[6,alignC];
-    cs.forEach(r=>cs.forEach(c=>{
-      if(fn[r][c])return; // overlaps a finder
-      for(let dr=-2;dr<=2;dr++)for(let dc=-2;dc<=2;dc++){
-        const dark=Math.max(Math.abs(dr),Math.abs(dc))!==1;
-        set(r+dr,c+dc,dark)}}))}
-  set(size-8,8,1); // the dark module
-  // format info areas reserved (filled after)
-  for(let i=0;i<9;i++){if(!fn[8][i])set(8,i,0);if(!fn[i][8])set(i,8,0)}
-  /* copy 2 areas: 8 cells in the right of row 8, 7 above the dark
-     module in column 8 (the spec reserves both full strips) */
-  for(let i=0;i<8;i++){if(!fn[8][size-1-i])set(8,size-1-i,0);if(!fn[size-1-i][8])set(size-1-i,8,0)}
-  // ── zigzag placement, mask 0 ((r+c)%2===0); direction toggles per pair
-  let bi=0;const total=all.length*8;let up=true;
-  const bitAt=k=>(all[k>>3]>>(7-(k&7)))&1;
-  for(let col=size-1;col>0;col-=2){
-    if(col===6)col--;
-    for(let i=0;i<size;i++){
-      const r=up?size-1-i:i;
-      for(let dc=0;dc<2;dc++){
-        const c=col-dc;
-        if(fn[r][c])continue;
-        let v=bi<total?bitAt(bi):0;bi++;
-        if((r+c)%2===0)v^=1;
-        m[r][c]=v}}
-    up=!up}
-  // ── format info: EC L (01), mask 0 → BCH(15,5), XOR 0x5412, LSB-first
-  let fmt=(0b01<<3)|0;
-  let rem=fmt<<10;
-  for(let i=14;i>=10;i--)if((rem>>i)&1)rem^=0b10100110111<<(i-10);
-  fmt=((fmt<<10)|rem)^0b101010000010010;
-  const bit=i=>(fmt>>i)&1;
-  /* layout solved empirically against CoreImage's own output:
-     copy 1 runs MSB-first from (8,0); copy 2 = b14..b8 up column 8
-     from the bottom, b7 at (8,size-8), b6..b0 along the top-right
-     row. The dark module keeps (size-8,8). */
-  const pos1=[[8,0],[8,1],[8,2],[8,3],[8,4],[8,5],[8,7],[8,8],[7,8],[5,8],[4,8],[3,8],[2,8],[1,8],[0,8]];
-  pos1.forEach((p,i)=>{m[p[0]][p[1]]=bit(14-i)});
-  for(let i=0;i<7;i++)m[size-1-i][8]=bit(14-i);
-  m[8][size-8]=bit(7);
-  for(let i=0;i<7;i++)m[8][size-7+i]=bit(6-i);
-  m[size-8][8]=1;
-  return m}
-function qrSvg(text,px){
-  /* quiet zone included; crisp squares; ink follows the theme */
-  try{
-    const m=qrMatrix(text);const n=m.length;const q=4;const s=px||236;
-    let d='';
-    for(let r=0;r<n;r++)for(let c=0;c<n;c++)if(m[r][c])d+='M'+(c+q)+' '+(r+q)+'h1v1h-1z';
-    return '<svg viewBox="0 0 '+(n+2*q)+' '+(n+2*q)+'" width="'+s+'" height="'+s+'" shape-rendering="crispEdges" style="display:block;background:#fff;border-radius:12px">'+
-      '<path d="'+d+'" fill="#111"/></svg>'}catch(e){return ''}}
 /* ══════════════════════════════════════════════════════════════════
    FEEL — the engagement layer, and the switch that kills it
                                                     (16 Sep 2026)
@@ -3950,6 +3847,28 @@ async function frJoin(code){
       const rows=r.ok?await r.json():[];
       if(rows.length){acctSync(false);frLoad(true);return}}
     flash('That code doesn\u2019t match an open invite.')}catch(e){flash('No connection.')}}
+/* ADD BY USERNAME (18 Sep 2026, owner ruling: three ways in, not one).
+   The RPC is security-definer (supabase/social9.sql) so it never opens
+   a general "read anyone's row" hole \u2014 it returns nothing but the id
+   needed to link, and links mutually right away, the same trust level
+   the code-swap flow already has. Self-detecting: a database without
+   social9.sql pasted 404s and says so plainly, never a raw error. */
+async function frFindByUsername(name){
+  try{
+    name=String(name||'').trim();
+    if(name.length<2){flash('Type the name they use in Allena.');return}
+    const h=await frHeaders();if(!h||!S.frMe){flash('Sign in first.');return}
+    const r=await fetch(CLOUD.url+'/rest/v1/rpc/add_friend_by_username',
+      {method:'POST',headers:Object.assign({'content-type':'application/json'},h),
+       body:JSON.stringify({uname:name})});
+    if(r.status===404){flash('Username search is not switched on yet.');return}
+    if(!r.ok){flash('Could not reach the server.');return}
+    const out=await r.json();
+    if(!out){flash('Nobody in Allena uses that name.');return}
+    if(out==='already'){flash('You already race '+name+'.');return}
+    S.frUserIn='';acctSync(false);frLoad(true);
+    flash(name+' is in \u2014 you race from Monday.')
+  }catch(e){flash('No connection.')}}
 /* IN-APP ACCOUNT DELETION (audit S1, 10 Sep 2026). App Store guideline
    5.1.1(v): an app that lets you create an account must let you delete
    it from inside the app — a "email us" line is an explicit rejection.
@@ -3989,13 +3908,20 @@ async function frRemove(code){
   try{const h=await frHeaders();if(!h)return;
     await fetch(CLOUD.url+'/rest/v1/friends?code=eq.'+encodeURIComponent(code),{method:'DELETE',headers:h});
     frLoad(true)}catch(e){}}
-function raceField(){
+function raceField(groupCode){
   /* everyone you race: pairwise links plus crewmates, deduped —
-     the leaderboard and the duel card both read this */
+     the leaderboard and the duel card both read this. MULTIPLE
+     WEEKLY RACES (18 Sep 2026): a groupCode narrows the board to one
+     group's own members only — nothing else on the app calls this
+     with an argument, so every other reader keeps the merged-everyone
+     view it always had. */
   try{frHydrate()}catch(e){oops('raceField.hydrate',e)}
   const seen={};const out=[];
-  try{frLinked().forEach(f=>{if(!seen[f.id]){seen[f.id]=1;out.push(f)}})}catch(e){}
-  try{(S.crewRows||[]).forEach(m=>{const id=m.user_id;
+  if(!groupCode)
+    try{frLinked().forEach(f=>{if(!seen[f.id]){seen[f.id]=1;out.push(f)}})}catch(e){}
+  try{(S.crewRows||[]).forEach(m=>{
+    if(groupCode&&m.crew_code!==groupCode)return;
+    const id=m.user_id;
     if(!id||id===S.frMe||seen[id])return;seen[id]=1;
     const sn=(S.frSnaps||[]).find(s9=>s9.user_id===id)||{};
     const local=((acct()||{}).frNames||{})[id];
@@ -4005,18 +3931,25 @@ function raceField(){
       tree:sn.tree||null,finds:sn.collection_count||0,pts:sn.points||0,cards:sn.finds||null})})}catch(e){}
   return out}
 async function crewMake(nm){
+  /* MULTIPLE WEEKLY RACES (18 Sep 2026, owner ask): starting a second
+     group used to just re-share the first one — crew_members has no
+     unique constraint on user_id alone, so the database already lets
+     someone belong to several groups; only this shortcut stopped it.
+     A soft cap (5, same shape as frInvite's cap of 3 open codes)
+     guards against spam without needing a new table. */
   {const c9=nameClean(nm);
    if(c9===null){flash('Pick a group name your gran could read.');return}
    nm=c9||nm}
   try{const h=await frHeaders();if(!h||!S.frMe){flash('Sign in first.');return}
-    const mine9=(S.crewRows||[]).find(x=>x.user_id===S.frMe);
-    if(mine9)return crewShare(mine9.crew_code);
+    const mine9=(S.crewRows||[]).filter(x=>x.user_id===S.frMe);
+    if(mine9.length>=5){flash('Five groups is plenty for one week — leave one first.');return}
     const code='G'+Math.random().toString(36).slice(2).replace(/[^a-z0-9]/g,'').slice(0,5).toUpperCase();
     const r=await fetch(CLOUD.url+'/rest/v1/crews',{method:'POST',headers:h,
       body:JSON.stringify([{code:code,owner_id:S.frMe,name:String(nm||'').trim().slice(0,20)||null}])});
     if(!r.ok){flash('Could not start a group ('+r.status+').');return}
     await fetch(CLOUD.url+'/rest/v1/crew_members',{method:'POST',headers:h,
       body:JSON.stringify([{crew_code:code,user_id:S.frMe}])});
+    S.raceGroup=code;
     await crewShare(code);frLoad(true)}catch(e){flash('No connection.')}}
 async function crewShare(code){
   const link=(CLOUD.site||'https://sathyacrisren-ui.github.io/allena-app/')+'?crew='+encodeURIComponent(code);
@@ -4034,11 +3967,15 @@ async function crewJoin(code){
     if(r.ok||r.status===409){flash('You\u2019re in — the group races together.');
       acctSync(false);frLoad(true)}
     else flash('That group link did not match ('+r.status+').')}catch(e){flash('No connection.')}}
-async function crewLeave(){
+async function crewLeave(code){
+  /* takes the group you are looking at, not just "the" group — there
+     can be several now */
   try{const h=await frHeaders();if(!h||!S.frMe)return;
-    const mine9=(S.crewRows||[]).find(x=>x.user_id===S.frMe);if(!mine9)return;
-    await fetch(CLOUD.url+'/rest/v1/crew_members?crew_code=eq.'+encodeURIComponent(mine9.crew_code)+'&user_id=eq.'+encodeURIComponent(S.frMe),
+    const cc=code||S.raceGroup||((S.crewRows||[]).find(x=>x.user_id===S.frMe)||{}).crew_code;
+    if(!cc)return;
+    await fetch(CLOUD.url+'/rest/v1/crew_members?crew_code=eq.'+encodeURIComponent(cc)+'&user_id=eq.'+encodeURIComponent(S.frMe),
       {method:'DELETE',headers:h});
+    if(S.raceGroup===cc)S.raceGroup=null;
     flash('Left the group.');frLoad(true)}catch(e){}}
 /* A RIVAL'S SCORE CARD IS AS OF THEIR LAST OPEN (owner-caught, Monday
    14 Sep, 7:22am: "new week, Daf's score hasn't gone back to zero").
@@ -4499,7 +4436,17 @@ function friendsSection(){
     if(S._frCap===false)return '';
     const dp0=dataPoints();
     const mine=Math.round((dp0.weekLive)||0);
-    const L=raceField();
+    /* MULTIPLE WEEKLY RACES (18 Sep 2026): a pill per group you belong
+       to, plus "Everyone" (the old merged board). S.raceGroup is a
+       view choice, not data — it resets to Everyone on reload. */
+    const myCrewCodes=(S.crewRows||[]).filter(x=>x.user_id===S.frMe).map(x=>x.crew_code);
+    if(S.raceGroup&&myCrewCodes.indexOf(S.raceGroup)===-1)S.raceGroup=null;
+    const L=raceField(S.raceGroup||null);
+    const groupPills=myCrewCodes.length?'<div style="display:flex;gap:8px;margin-top:14px;overflow-x:auto">'+
+      '<button data-a="raceGroupSel" data-v="" class="pill'+(!S.raceGroup?' on':'')+'" style="flex:none">Everyone</button>'+
+      myCrewCodes.map(cc=>{const nm=((S.crews||[]).find(c=>c.code===cc)||{}).name||'Group';
+        return '<button data-a="raceGroupSel" data-v="'+esc(cc)+'" class="pill'+(S.raceGroup===cc?' on':'')+'" style="flex:none">'+esc(nm)+'</button>'}).join('')+
+      '</div>':'';
     const open=(S.frRows||[]).filter(x=>!x.linked_at&&x.owner_id===S.frMe);
     /* the profile card — who you are on the board */
     const myFirstP=String((S.prof&&S.prof.name)||'').split(' ')[0];
@@ -4530,7 +4477,7 @@ function friendsSection(){
       '<p class="micro" style="letter-spacing:.12em">this week \u203a</p></button></div>';
     /* weeks raced lives here now (owner, 17 Sep 2026) — a race fact,
        beside the race; silent until it is true */
-    return profCard+floorHtml('rank')+floorHtml('week')+
+    return profCard+groupPills+floorHtml('rank')+floorHtml('week')+
       iBody('racelaw','Every honest number in a witnessed session earns — each set\u2019s weight, reps and effort, plus one for finishing — capped per day. Witnessed means your watch overlapped the session at working heart rate, or the phone ran the clock and the sets spread like real training. Imported, typed-later and demo sessions earn regular points but never race. Your score uploads when your app opens; you see theirs as of their last open. A group link races everyone who joins it on one board, and the weekly crown settles across everyone on it \u2014 friends and group alike. A mate who has not opened the app since Monday shows 0 until they do; their last week still counts.')+
       (L.length?(function(){
         const myFirst=String((S.prof&&S.prof.name)||'').split(' ')[0];
@@ -4650,14 +4597,27 @@ function friendsSection(){
           '<p style="font-size:15px;color:var(--dim);line-height:1.45;margin-top:10px">Live points only. Sessions your phone or watch actually witnessed. Typed-in history never scores, and a run and a session on the same day both count.</p>'+
           '<p style="font-size:15px;color:var(--dim);line-height:1.45;margin-top:10px">Nobody drops a tier. The ladder only counts up, and Monday\u2019s reset takes nothing back.</p></button>';
         return h9})():'')+
-      (S.crewCap===true&&!(S.crewRows||[]).some(x=>x.user_id===S.frMe)
+      /* MULTIPLE WEEKLY RACES (18 Sep 2026): "Start a group" stays on
+         offer whenever you're looking at Everyone, whether or not you
+         already race in one — it never asks you to leave the current
+         group, it just adds another. Joining an existing one still
+         goes through the same paste-a-code box the add-friend sheet
+         already has ("Got a code from them instead?" — a G-code links
+         a group, anything else links a friend). */
+      (S.crewCap===true&&!S.raceGroup
         ?'<button data-a="crewNameOpen" class="card mt" style="width:100%;text-align:left;padding:13px 15px;display:flex;align-items:center;gap:12px;border-style:dashed">'+
           '<span style="flex:1;min-width:0"><span style="font-size:13px;font-weight:600;display:block">Start a group</span>'+
           '<span style="color:var(--faint);font-size:11px">One link — everyone who opens it races on this board</span></span>'+
           '<span class="mono" style="color:var(--amber);font-size:13px;flex:none">\u203a</span></button>':'')+
       (function(){try{
-        const mine9=(S.crewRows||[]).find(x=>x.user_id===S.frMe);
-        if(!mine9||S.crewCap!==true)return '';
+        if(S.crewCap!==true)return '';
+        /* a single group still shows itself with no pill tapped —
+           the pill row only exists to disambiguate once there is more
+           than one, so someone in exactly one group never loses the
+           summary card they always had. */
+        const mineAll=(S.crewRows||[]).filter(x=>x.user_id===S.frMe);
+        const mine9=S.raceGroup?mineAll.find(x=>x.crew_code===S.raceGroup):(mineAll.length===1?mineAll[0]:null);
+        if(!mine9)return '';
         const crew=(S.crews||[]).find(x=>x.code===mine9.crew_code)||{};
         const nMem=(S.crewRows||[]).filter(x=>x.crew_code===mine9.crew_code).length;
         return '<div class="card mt" style="padding:13px 15px">'+
@@ -4666,8 +4626,7 @@ function friendsSection(){
           '<span class="mono" style="color:var(--faint);font-size:11px">'+nMem+' RACING</span></div>'+
           '<div class="row mt" style="gap:8px">'+
           '<button data-a="crewShare" data-v="'+esc(mine9.crew_code)+'" class="btn" style="flex:2;font-size:13px">Share the link</button>'+
-          '<button data-a="qrOpen" data-v="crew" class="btn" style="flex:1;font-size:13px">QR</button>'+
-          '<button data-a="crewLeave" class="btn" style="flex:1;font-size:13px;color:var(--faint)">Leave</button>'+
+          '<button data-a="crewLeave" data-v="'+esc(mine9.crew_code)+'" class="btn" style="flex:1;font-size:13px;color:var(--faint)">Leave</button>'+
           '</div></div>'}catch(e9){return ''}})()+
 
       ''}catch(e){return ''}}
@@ -4771,6 +4730,25 @@ function duelVerdict(){
       S.signalReveal={e:'\u2726 THE WEEK, WON',c:'var(--gold)',id:id,kind:'epic',
         t:'You took the week',d:mine+' on top of '+(named.length===1?named[0].nm+' ('+top.v+')':named.length+' rivals — '+field)+'. The new week starts level.'};
       try{hapticRun('finish')}catch(e9){}}}catch(e){}}
+/* EMPTY STATE SHOWS EXAMPLES (18 Sep 2026, onboarding redesign): named
+   example racers whose points tick up once the card mounts — movement,
+   not a static picture, and labelled Example on the surface itself so
+   nobody mistakes it for a real board. */
+function raceExampleBoard(){
+  try{if(!S._obRaceT){S._obRaceT=1;setTimeout(function(){S._obRaceReady=1;render()},350)}}catch(e){}
+  const R=S._obRaceReady;
+  const NAMES=[{n:'Jess',p:210,c:'var(--green)'},{n:'Marco',p:184,c:(typeof rarityOf==='function'?rarityOf('uncommon')[1]:'#6E7FE8')},
+    {n:'Priya',p:151,c:(typeof rarityOf==='function'?rarityOf('rare')[1]:'#C46BFF')},{n:'You',p:0,c:'var(--faint)'}];
+  return '<div class="card mt2" style="padding:16px">'+
+    '<p class="mono" style="font-size:11px;letter-spacing:.14em;color:var(--faint)">EXAMPLE · THE WEEK’S RACE</p>'+
+    '<div style="display:flex;flex-direction:column;gap:8px;margin-top:10px">'+
+    NAMES.map((x,i)=>'<div style="display:flex;align-items:center;gap:10px">'+
+      '<span class="mono" style="width:18px;font-size:13px;color:var(--faint)">'+(i+1)+'</span>'+
+      '<span style="flex:1;font-size:13px;font-weight:600">'+esc(x.n)+'</span>'+
+      '<span class="mono" data-cu="obrace'+i+'" style="font-size:15px;font-weight:700;color:'+x.c+'">'+(R?x.p:0)+'</span></div>').join('')+
+    '</div>'+
+    '<p style="color:var(--dim);font-size:13px;line-height:1.5;margin-top:10px">Jess trained four days this week. You have not logged one yet.</p>'+
+    '<button data-a="addFriendOpen" class="big disp mt2" style="background:var(--amber);color:var(--bg);font-size:15px">Join a race with friends</button></div>'}
 function viewSocial(){
   /* Social gets its own room (owner call, 7 Sep): the duel, the
      friends list, invites — everything head-to-head lives here. */
@@ -4779,12 +4757,17 @@ function viewSocial(){
     inner='<div class="card mt2" style="padding:16px">'+
       '<p style="font-size:15px;font-weight:600">Sign in to race</p>'+
       '<p style="color:var(--dim);font-size:13px;line-height:1.6;margin-top:4px">An email and a code — then swap invite codes with a friend and race the week on live points. Fresh every Monday; showing up is the whole game.</p>'+
-      '<button data-a="nav" data-v="acct" class="big disp mt" style="background:var(--amber);color:var(--bg);font-size:15px">Sign in</button></div>'}
+      '<button data-a="nav" data-v="acct" class="big disp mt" style="background:var(--amber);color:var(--bg);font-size:15px">Sign in</button></div>'+
+      raceExampleBoard()}
   else inner=(S.socTab==='friends')
     ?(typeof friendsPanel==='function'?friendsPanel():'')
     :(S.socTab==='pod')
     ?(typeof podPanel==='function'?podPanel():'')
     :(typeof friendsSection==='function'?friendsSection():'');
+  /* EMPTY STATE SHOWS EXAMPLES (18 Sep 2026, onboarding redesign):
+     signed in with nobody to race yet gets the same moving example
+     board, on the race tab only — friends/pod have their own doors. */
+  try{if(acctReady()&&acct()&&(S.socTab||'race')==='race'&&!raceField().length)inner+=raceExampleBoard()}catch(e9){oops('raceExampleBoard',e9)}
   try{const pend=(S.crewIn||S.frIn);
     if(pend&&S._joinArr&&!(typeof inWrapper==='function'&&inWrapper()))
       inner='<div class="card mt2" style="padding:13px 15px;border-color:var(--amber)">'+
@@ -6117,7 +6100,15 @@ function viewSetup(){
   /* gate:true here too — the cold-load path (00-core: no profile, no
      history → view='setup') lands without startSetup, and an erased
      phone was skipping the front door (owner-caught, Sep 2026) */
-  const st=S.setup||(S.setup={step:0,name:'',sex:null,age:30,exp:null,years:1,days:3,mins:60,eq:'full',eqx:{},goal:null,focus:{},style:'mixed',weeks:6,restr:{},notes:'',gate:true});
+  const st=S.setup||(S.setup={step:0,name:'',sex:null,age:30,exp:null,years:1,days:3,mins:60,eq:'full',eqx:{},goal:null,focus:{},style:'mixed',weeks:6,restr:{},notes:'',gate:true,
+    /* ONE DOOR, FIRST OPEN ONLY (18 Sep 2026, onboarding redesign): this
+       object literal is only ever built here — the cold-boot path
+       (00-core) sets S.view='setup' directly without calling startSetup,
+       so this is the unique signature of a genuinely fresh install.
+       startSetup() (called from Train's "+ BUILD A PROGRAM" pill) always
+       creates its own S.setup and never sets `ob`, so the two entry
+       points can show different content on the same `gate` flag. */
+    ob:true});
   /* ── the welcome track (owner call, 3 Sep): before the front door,
      a beta user meets four pages — why they're in early, the
      notification ask, the Health link, and the account — in that
@@ -6181,30 +6172,35 @@ function viewSetup(){
       '<p style="color:var(--dim);font-size:15px;line-height:1.7;margin-top:12px">Link it once and Allena ingests it automatically, forever: every workout lands moments after you finish, and the finds no single-purpose app can make switch on.</p>',
       '<button data-a="wHealth" class="big disp" style="background:var(--amber);color:var(--bg);font-size:17px">Link Health</button>'+
       '<button data-a="wNext" class="btn" style="color:var(--dim)">Later</button>')}
+  if(st.gate&&st.ob)return obGateHtml();
+  if(st.gate&&st.tplPick)return obTemplateHtml();
   if(st.gate){
     const door=(a,label,sub,primary)=>'<button data-a="'+a+'" class="card" style="width:100%;text-align:left;padding:17px 18px'+(primary?';border-color:var(--amber)':'')+'">'+
       '<span style="display:flex;align-items:center;gap:12px"><span style="flex:1;min-width:0">'+
       '<span style="display:block;font-size:15px;font-weight:600'+(primary?';color:var(--amber)':'')+'">'+label+'</span>'+
       (sub?'<span style="color:var(--dim);font-size:13px;line-height:1.5;display:block;margin-top:3px">'+sub+'</span>':'')+
-      '</span><span class="mono" style="color:'+(primary?'var(--amber)':'var(--faint)')+';font-size:15px;flex:none">\u203a</span></span></button>';
-    const fg9=(typeof fghost==='function')?fghost():null;
-    /* the front door breathes (owner call, 3 Sep — 'congested'): the
-       doors spread through the screen's height instead of stacking
-       under the title with a void below */
+      '</span><span class="mono" style="color:'+(primary?'var(--amber)':'var(--faint)')+';font-size:15px;flex:none">›</span></span></button>';
+    /* SMART DEFAULTS, NO DECISIONS (18 Sep 2026, onboarding redesign,
+       Smart Gym reference: "+" opens a three-row sheet — build from
+       scratch / trust us / personalise). "Build it for me" is the
+       primary door and generates instantly from the profile (or
+       sensible defaults when the profile is empty) with nothing
+       further to answer. The old five-door screen's other paths
+       survive as secondary rows and small links — reachable, never
+       required. */
     return '<div class="view pad stg pinpage" style="padding-top:56px">'+
-      '<h1 class="disp brand" style="font-size:28px;font-weight:600">Allena</h1>'+
-      (fg9?'<div class="card" style="padding:12px 15px;margin-top:16px;border-color:var(--greensoft)">'+
-        '<p class="mono" style="font-size:var(--t-caption);color:var(--green);letter-spacing:.06em">RACE LINKED</p>'+
-        '<p style="color:var(--dim);font-size:13px;line-height:1.5;margin-top:4px">'+esc(fg9.n)+'’s best week ('+fg9.s+' sessions) is waiting to race yours — pick a door and it starts.</p></div>':'')+
-      '<p style="color:var(--dim);font-size:15px;line-height:1.6;margin-top:8px">How do you want to start?</p>'+
+      '<h1 class="disp brand" style="font-size:28px;font-weight:600">Build a program</h1>'+
+      '<p style="color:var(--dim);font-size:15px;line-height:1.6;margin-top:8px">Allena can build one right now, no questions asked.</p>'+
       '<div class="pinbody" style="display:flex;flex-direction:column;justify-content:center;gap:12px;padding:18px 0">'+
-      door('suGateGo','Let Allena build it with you','Eight quick questions, a block shaped around you',true)+
-      door('setupImport','I already have training history','Hevy, Strong, Garmin, a spreadsheet \u2014 Allena reads the evidence')+
-      door('suOwn','I\u2019ll write my own block','Type it in \u2014 Allena reviews it and runs it')+
-      door('suRestore','I have an Allena backup','Restore everything from the file')+
-      door('suSkip','Just let me look around','Straight to Today \u2014 set up whenever')+
+      door('obBuildForMe','Build it for me','Uses your profile, or sensible defaults if you have not set one',true)+
+      door('obTplOpen','Choose a starting point','Pick a goal — strength, muscle, general fitness, return from injury, running')+
+      door('suGateGo','Answer a few questions','Eight quick questions, a block shaped around you')+
+      door('suOwn','Write my own','Type it in — Allena reviews it and runs it')+
       '</div>'+
-      '<p class="pinfoot" style="color:var(--faint);font-size:11px;text-align:center">Everything stays on this phone.</p>'+
+      '<div class="row" style="gap:16px;justify-content:center">'+
+      '<button data-a="setupImport" class="mono" style="color:var(--faint);font-size:11px;letter-spacing:.06em">Import training history</button>'+
+      '<button data-a="suRestore" class="mono" style="color:var(--faint);font-size:11px;letter-spacing:.06em">Restore a backup</button>'+
+      '</div>'+
       '</div>'}
   const T=['About you','Experience','Schedule','Equipment','Your goal','Emphasis','Health','Review'];
   const ded=st._deduced?'<div class="card" style="padding:11px 14px;margin-top:12px;border-color:var(--greensoft)">'+
@@ -6624,6 +6620,133 @@ function viewSignup(){
     '<div class="pinfoot">'+
     '<button data-a="signupSkip" class="btn" style="color:var(--dim);width:100%">Skip for now</button>'+
     '<p style="color:var(--faint);font-size:11px;text-align:center;margin-top:8px">You can sign in later from Data → Account.</p></div></div>'}
+
+/* ══ ONBOARDING REDESIGN (18 Sep 2026) ═══════════════════════════════
+   Owner brief: "zero friction, zero writing, zero decision-making for
+   new users; a grand screen of correlations within 2-3 taps; every
+   empty state shows examples and nudges toward action." Sequence for a
+   fresh install: one button (Link Health / Import) → a loading screen
+   naming what it is doing → the reveal (every correlation found, or an
+   honest count of what is still needed) → the guided tour → Today →
+   the sign-in card (never a wall). The old 8-question wizard no longer
+   sits in this path at all — it lives on Train, behind "Build it for
+   me" (zero questions) with the wizard and template gallery as
+   secondary, optional doors. */
+const OB_LINE1='A correlation is two things in your data moving together, like sleep and squat.';
+function obGateHtml(){
+  const wrapOn=(typeof inWrapper==='function')&&inWrapper();
+  return '<div class="view pad stg pinpage" style="padding-top:56px">'+
+    '<h1 class="disp brand" style="font-size:28px;font-weight:600">Allena</h1>'+
+    '<p style="color:var(--dim);font-size:15px;line-height:1.6;margin-top:16px">'+esc(OB_LINE1)+' It reads your lifting, running and recovery together, so it can show you things a single-purpose app never sees.</p>'+
+    '<div class="pinbody" style="display:flex;flex-direction:column;justify-content:center;gap:14px;padding:18px 0">'+
+    '<button data-a="obImportGo" class="big disp" style="background:var(--amber);color:var(--bg);font-size:17px">'+(wrapOn?'Link Apple Health':'Import your data')+'</button>'+
+    '</div>'+
+    '<div class="pinfoot">'+
+    '<button data-a="suSkip" class="btn" style="color:var(--faint);font-size:13px;width:100%">Skip for now</button>'+
+    '<p style="color:var(--faint);font-size:11px;text-align:center;margin-top:12px">Everything stays on this phone.</p></div></div>'}
+/* the goal templates (3e): a body-map card each, built from the SAME
+   muscle silhouette the rest of the app draws (groundSvg), never a
+   hand-plotted icon. Picking one generates immediately — no typing,
+   at most one more tap than "Build it for me". */
+const OB_TEMPLATES=[
+  {id:'strength',t:'Strength',d:'Heavy compound lifts, low reps, long rests.',goal:'strength',style:'heavy',m:['Quads','Hamstrings','Glutes','Chest','Lats']},
+  {id:'muscle',t:'Muscle',d:'Higher volume across every major muscle.',goal:'muscle',style:'pump',m:['Chest','Lats','Quads','Hamstrings','Side delts','Biceps','Triceps']},
+  {id:'fitness',t:'General fitness',d:'A balanced mix at a moderate, sustainable effort.',goal:'muscle',style:'mixed',m:['Quads','Core','Upper back','Chest']},
+  {id:'injury',t:'Return from injury',d:'Lighter loads and easier exercises while you rebuild.',goal:'muscle',style:'mixed',restr:{machines:1},m:['Quads','Hamstrings','Glutes']},
+  {id:'run',t:'Running base',d:'Two questions, then an eight-week walk-run plan.',run:true,m:['Quads','Hamstrings','Calves','Glutes']}];
+function obTplMap(m){const st={};(m||[]).forEach(x=>st[x]={s:'held'});return st}
+function obTemplateHtml(){
+  return '<div class="view pad stg pinpage" style="padding-top:40px">'+
+    '<button data-a="obTplBack" style="width:38px;height:38px;border-radius:38px;background:var(--surface);border:1px solid var(--line);color:var(--dim);display:flex;align-items:center;justify-content:center;font-size:15px;margin-bottom:16px">‹</button>'+
+    '<h1 class="disp" style="font-size:24px;font-weight:600">Choose a starting point</h1>'+
+    '<p style="color:var(--dim);font-size:13px;line-height:1.55;margin-top:6px">Pick one — Allena builds it immediately, and you can change anything afterwards.</p>'+
+    '<div class="stg" style="display:flex;flex-direction:column;gap:10px;margin-top:16px">'+
+    OB_TEMPLATES.map(x=>'<button data-a="obTplPick" data-v="'+x.id+'" class="card" style="width:100%;text-align:left;padding:12px 14px;display:flex;align-items:center;gap:12px">'+
+      '<span style="width:46px;height:46px;flex:none;overflow:hidden;border-radius:12px;background:var(--surface);display:flex;align-items:center;justify-content:center">'+
+      groundSvg(obTplMap(x.m),false,{hit:false,attr:'style="width:70px;height:auto;margin-top:8px"'})+'</span>'+
+      '<span style="flex:1;min-width:0"><span style="display:block;font-size:15px;font-weight:600">'+esc(x.t)+'</span>'+
+      '<span style="color:var(--faint);font-size:11px;line-height:1.4;display:block;margin-top:2px">'+esc(x.d)+'</span></span>'+
+      '<span class="mono" style="color:var(--faint);font-size:15px;flex:none">›</span></button>').join('')+
+    '</div></div>'}
+function obDefaultProf(){
+  /* sensible defaults when there is nothing to read yet; profDeduce()
+     fills in the real evidence when there is (see startSetup) */
+  const d=(function(){try{return profDeduce()}catch(e){return null}})();
+  const base={name:(S.prof&&S.prof.name)||'',sex:(S.prof&&S.prof.sex)||null,age:(S.prof&&S.prof.age)||30,
+    exp:'new',years:1,days:3,mins:60,eq:'full',eqx:{},goal:'muscle',goals:{muscle:1},
+    focus:{},style:'mixed',weeks:6,restr:{},notes:''};
+  if(d)Object.assign(base,{days:d.days,style:d.style,exp:d.exp,years:d.years,
+    goals:d.goals&&Object.keys(d.goals).length?d.goals:base.goals,
+    goal:Object.keys(d.goals||{})[0]||base.goal});
+  return base}
+function obGenerate(overrides){
+  const prof=Object.assign(obDefaultProf(),overrides||{});
+  if(overrides&&overrides.goal)prof.goals={[overrides.goal]:1};
+  try{demoWipe()}catch(e){}
+  S.prof=prof;lset(K_PROF,prof);
+  const pg=genProgram(prof);S.lib.programs.push(pg);S.lib.activeId=pg.id;
+  saveLib();setWeek(1,pg.id);
+  S.setup=null;S.view='home';render();
+  flash('Built from '+(overrides&&overrides.t?overrides.t.toLowerCase():'sensible defaults')+' — change anything from Modify.')}
+/* THE RUNNING RESTRICTION (3e): the walk-run planner (runPlanScratch)
+   never needed a running history — the two questions ARE the history
+   substitute — but the Running tab itself only appears once S.runOn is
+   true, and S.runOn only flips true from an import or a manual toggle.
+   A zero-run account could never find the door. The template below sets
+   S.runOn itself, so choosing it is the door — no history required. */
+function obRunTemplate(){
+  S.runOn=true;lset('training-runon-v1',true);
+  S.setup=null;S.rscr={freq:3,comfort:'2'};S.sheet={t:'runscratch'};S.view='today';render()}
+function obDataPointsN(){
+  try{
+    let n=0;
+    (S.history||[]).forEach(h=>{n+=(h.log||[]).filter(l=>l.w||l.r||l.secs).length});
+    n+=(typeof runs==='function'?runs():[]).length;
+    n+=Object.keys((S.daily&&S.daily.days)||{}).length;
+    try{n+=Object.keys(hkDailyStore().days||{}).length}catch(e9){oops('obDataPointsN.hk',e9)}
+    return n}
+  catch(e){return (S.history||[]).length}}
+function obWaitLines(){
+  const dp=obDataPointsN();
+  return ['Reading '+dp+' logged data point'+(dp===1?'':'s')+'.',
+    'Lining up mornings against sessions.',
+    'Looking for what moves together.']}
+function viewObWait(){
+  return '<div class="view pad pinpage" style="min-height:70vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center">'+
+    '<div style="width:34px;height:34px;border-radius:34px;border:2.5px solid var(--line);border-top-color:var(--amber);animation:spin .9s linear infinite"></div>'+
+    '<div class="stg" style="margin-top:22px;display:flex;flex-direction:column;gap:8px;max-width:260px">'+
+    obWaitLines().map(l=>'<p style="color:var(--dim);font-size:13px;line-height:1.5">'+esc(l)+'</p>').join('')+
+    '</div></div>'}
+function obStartWait(){
+  S.setup=null;S.sheet=null;S._obFlow=1;
+  S.view='obwait';render();
+  setTimeout(function(){try{obGoReveal()}catch(e){oops('obGoReveal',e)}},1900)}
+function obGoReveal(){
+  if(S.view!=='obwait')return;
+  try{bankDiscoveries()}catch(e){oops('obBank',e)}
+  S._obFlow=0;S._obDpReady=0;
+  S.view='obreveal';render();
+  setTimeout(function(){S._obDpReady=1;render()},260)}
+function obReadyDays(){try{return Object.keys(corrDayData()).length}catch(e){return 0}}
+function viewObReveal(){
+  const list=(function(){try{return correlationDiscoveries()}catch(e){return[]}})();
+  const dp=obDataPointsN(),shown=S._obDpReady?dp:0;
+  const have=obReadyDays(),need=Math.max(0,12-have);
+  const cards=list.map(d=>{
+    const rc=rarChrome(d.rar,false),r=rarityOf(d.rar);
+    return '<button data-a="findOpen" data-v="'+esc(d.id)+'" class="card" style="width:100%;text-align:left;padding:15px 16px;border-color:'+rc.border+';border-width:'+rc.width+';background:'+rc.fill+'">'+
+      '<p class="mono" style="font-size:var(--t-caption);letter-spacing:'+rc.track+';font-weight:'+rc.weight+';color:'+r[1]+'">'+esc(r[2].toUpperCase())+'</p>'+
+      '<p class="disp" style="font-size:17px;font-weight:650;margin-top:6px;line-height:1.25">'+esc(d.t)+'</p>'+
+      '<p style="color:var(--dim);font-size:13px;line-height:1.5;margin-top:6px">'+esc(d.d)+'</p></button>'}).join('');
+  return '<div class="view pad pinpage" style="padding-top:40px">'+
+    '<p class="mono" style="color:var(--amber);font-size:11px;letter-spacing:.14em">YOUR DATA, READ TOGETHER</p>'+
+    '<h1 class="disp gradhead" style="font-size:28px;font-weight:650;margin-top:8px;line-height:1.15">'+
+    (list.length?('Allena found '+list.length+' thing'+(list.length===1?'':'s')+' in your data.'):'Nothing to show yet.')+'</h1>'+
+    (list.length
+      ?('<p class="mono" style="color:var(--faint);font-size:11px;letter-spacing:.06em;margin-top:10px">READ FROM <span data-cu="obdp">'+shown+'</span> LOGGED DATA POINTS</p>'+
+        '<div class="stg" style="margin-top:20px;display:flex;flex-direction:column;gap:10px">'+cards+'</div>')
+      :('<p style="color:var(--dim);font-size:13px;line-height:1.6;margin-top:10px">The engine needs at least 12 days that carry both a logged session and a morning check-in. You have '+have+' so far'+(need?', '+need+' more to go':'')+'.</p>'))+
+    '<div class="pinfoot"><button data-a="obRevealGo" class="big disp" style="background:var(--amber);color:var(--bg);font-size:17px">Take me in</button></div></div>'}
 const MUSCLE_RULES=[
  ['Chest',/bench press|chest press|chest-supported press|push[\s-]?up|weighted dip|chest dip|(?<!rear delt )(?<!rear-delt )(?<!reverse )\bfly\b|(?<!rear delt )(?<!rear-delt )(?<!reverse )flye|pec deck|crossover|incline (db |dumbbell |barbell |machine |smith )?press|machine incline|high press|neutral-?grip db press|decline press|svend|\bbp\b(?![\s\S]*dip)|\bbench\b(?![\s-]?dip)/i,40],
  ['Front delts',/shoulder press|overhead press|military press|landmine press|push press|arnold|wall slide|front raise|half-kneeling db press|seated dumbbell press|standing barbell press|smith machine press|overhead carry|\bohp\b/i,40],
@@ -10980,8 +11103,16 @@ function markRunSeen(){try{const a=acwr();S.runSeen=S.runSeen||{};
   if(a!=null)S.runSeen['acwr'+Math.round(a*10)]=1;lset(K_RUNSEEN,S.runSeen)}catch(e){}}
 function viewRun(){
   const R=runs(),wk=weeklyKm(8),a=acwr(),sp=intensitySplit(28),f=runFitness();
+  /* THE RACE DATE PILL (18 Sep 2026): the header used to carry no
+     subtitle at all when a plan had no race date — nothing wrong to
+     look at, but also nothing said. Now it either states the count or
+     stays quiet; it never shows an empty pill. */
+  const rpSub=(function(){try{const rp=S.runplan;
+    if(!(rp&&rp.raceDate))return null;
+    const dd=Math.max(0,Math.round((new Date(rp.raceDate+'T12:00').getTime()-Date.now())/864e5));
+    return 'Race in '+dd+' day'+(dd===1?'':'s')+' · '+fmtDate(rp.raceDate+'T12:00')}catch(e){return null}})();
   let h='<div class="view pad stg phpad">'+
-    pageHead('Running');
+    pageHead('Running','',rpSub?{sub:rpSub}:null);
   /* RUNNING GOALS sit where the lifting goals sit — at the top of their
      own room (owner ask, 11 Sep: "make running goals a pill in the
      running tab, same thing") */
@@ -16656,7 +16787,11 @@ function viewSignals(){
   let h='<div class="view pad modalrise" style="padding-top:20px">'+
     '<button data-a="back" class="btn" style="width:auto;padding:8px 14px;color:var(--dim);font-size:13px;margin-bottom:14px">\u2039 Back</button>'+
     '<h1 class="disp vh1">Health data</h1>'+
-    '<p style="color:var(--dim);font-size:13px;line-height:1.6;margin-top:8px">Everything Health feeds the engine \u2014 scrub any chart.'+iBtn('sigintro')+'</p>'+iBody('sigintro','Sleep, heart, engine size, fuel \u2014 ninety days of each, exactly as the correlation engine sees them. These are the raw ingredients behind every insight and find.');
+    '<p style="color:var(--dim);font-size:13px;line-height:1.6;margin-top:8px">Everything Health feeds the engine \u2014 scrub any chart.'+iBtn('sigintro')+'</p>'+iBody('sigintro','Sleep, heart, engine size, fuel \u2014 ninety days of each, exactly as the correlation engine sees them. These are the raw ingredients behind every insight and find.')+
+    /* THE REVEAL, REACHABLE AGAIN (18 Sep 2026, onboarding redesign):
+       the grand correlations screen fires once on a fresh install, but
+       the same list is worth seeing any time it grows. */
+    '<button data-a="nav" data-v="obreveal" class="btn mt" style="color:var(--amber);border-color:var(--amber)">See every correlation found</button>';
   const dry=[];let any=false;
   SIG_KINDS.forEach(kind=>{
     const pts=sigSeries(kind,{partial:true});
@@ -18259,7 +18394,7 @@ function standBestLifts(){
         const m2=STAND_MATCH[k];
         if(!m2.re.test(b)||m2.not.test(b))return;
         const e=e1rm(l.w,l.r,l.rpe);
-        if(!best[k]||e>best[k].e1)best[k]={e1:e,w:l.w,r:l.r,date:h.date}})})});
+        if(!best[k]||e>best[k].e1)best[k]={e1:e,w:l.w,r:l.r,date:h.date,dk:hKey(h)}})})});
   return best}
 function standBest5k(){
   const cut=Date.now()-365*864e5;let best=null;
@@ -18285,7 +18420,7 @@ function standingData(){
     const medMult=(function(){
       if(sex==='male'||sex==='female')return standLiftAnchors(x[0],sex,bw,age).p50;
       return (standLiftAnchors(x[0],'male',bw,age).p50+standLiftAnchors(x[0],'female',bw,age).p50)/2})();
-    out.rows.push({k:x[0],label:x[1],e1:b.e1,set:b,mult:mult,pct:pct,medKg:medMult*bw})});
+    out.rows.push({k:x[0],label:x[1],e1:b.e1,set:b,mult:mult,pct:pct,medKg:medMult*bw,dk:b.dk})});
   const r5=standBest5k();
   if(r5)out.run={t5:r5.t5,pct:Math.max(0.5,Math.min(99.5,standRunPct(r5.t5,age))),
     approx:Math.abs(r5.km-5)>0.3,km:r5.km,date:r5.date};
@@ -18340,7 +18475,14 @@ function standingCard(){
   return h+'</div>'}catch(e){return ''}}
 function standingDiscoveries(){
   const D=[];
-  const add=(rar,t,d2,tag)=>D.push({rar:rar,t:t,d:d2,tag:tag||'ratio',id:t});
+  /* EVERY GENERATOR NAMES THE DAY OF ITS EVENT (13-discoveries.js, 14
+     Sep 2026 law) — this one never did, so a percentile crossing always
+     banked as found:today() regardless of when the lift that earned it
+     actually happened. On a normal account that only meant "found a
+     little late"; on a restore it meant every percentile the fuller
+     history now supports lands in the same spot on the tree, the day of
+     the restore, however old the lift really was. */
+  const add=(rar,t,d2,tag,k)=>D.push({rar:rar,t:t,d:d2,tag:tag||'ratio',id:t,k:k||null});
   try{
     const d=standingData();
     if(!d)return D;
@@ -18348,22 +18490,23 @@ function standingDiscoveries(){
       // stable titles (id = title): thresholds, never live numbers
       if(r.pct>=90)add('epic','Meet-floor strength: '+r.label.toLowerCase(),
         'Your '+r.label.toLowerCase()+' e1RM stands above 90% of tested competition lifters at your bodyweight — not gym-goers, meet lifters. '+
-        Math.round(r.e1)+' kg at '+Math.round(d.bw)+' kg bodyweight.');
+        Math.round(r.e1)+' kg at '+Math.round(d.bw)+' kg bodyweight.',null,r.dk);
       else if(r.pct>=75)add('rare',r.label+' in the top quarter',
-        'Your '+r.label.toLowerCase()+' e1RM beats 75% of tested competition lifters at your bodyweight ('+Math.round(r.e1)+' kg at '+Math.round(d.bw)+' kg).');
+        'Your '+r.label.toLowerCase()+' e1RM beats 75% of tested competition lifters at your bodyweight ('+Math.round(r.e1)+' kg at '+Math.round(d.bw)+' kg).',null,r.dk);
       else if(r.pct>=50)add('uncommon',r.label+' past the competition median',
-        'Your '+r.label.toLowerCase()+' e1RM is past the median of tested competition lifters at your bodyweight — walk into a meet and you are in the top half.')});
+        'Your '+r.label.toLowerCase()+' e1RM is past the median of tested competition lifters at your bodyweight — walk into a meet and you are in the top half.',null,r.dk)});
     if(d.run&&d.run.pct>=75)add('rare','A top-quarter 5K',
-      'Your best 5K'+(d.run.approx?'-equivalent':'')+' this year ('+standMmss(d.run.t5)+') beats 75% of parkrun-scale finishers.');
+      'Your best 5K'+(d.run.approx?'-equivalent':'')+' this year ('+standMmss(d.run.t5)+') beats 75% of parkrun-scale finishers.',null,String(d.run.date||'').slice(0,10));
     if(d.rows.length&&d.run){
       const top=d.rows.slice().sort((a,b)=>b.pct-a.pct)[0];
+      const xk=[top.dk,String(d.run.date||'').slice(0,10)].filter(Boolean).sort().slice(-1)[0]||null;
       if(Math.abs(top.pct-d.run.pct)<=8&&top.pct>=40)add('rare','The hybrid',
         'Your '+top.label.toLowerCase()+' and your 5K sit at almost the same rarity in their own worlds ('+
-        Math.round(top.pct)+' vs '+Math.round(d.run.pct)+'). Most people pick a side — you did not.','cross');
+        Math.round(top.pct)+' vs '+Math.round(d.run.pct)+'). Most people pick a side — you did not.','cross',xk);
       else if(top.pct-d.run.pct>=30)add('uncommon','Rarer lifter than runner',
-        'Your '+top.label.toLowerCase()+' outranks your running by '+Math.round(top.pct-d.run.pct)+' percentile points. One easy run a week starts closing it — the lifting will not go anywhere.','cross');
+        'Your '+top.label.toLowerCase()+' outranks your running by '+Math.round(top.pct-d.run.pct)+' percentile points. One easy run a week starts closing it — the lifting will not go anywhere.','cross',xk);
       else if(d.run.pct-top.pct>=30)add('uncommon','Rarer runner than lifter',
-        'Your 5K outranks your best lift by '+Math.round(d.run.pct-top.pct)+' percentile points. The bar is the cheap half — two focused sessions a week move it.','cross')}
+        'Your 5K outranks your best lift by '+Math.round(d.run.pct-top.pct)+' percentile points. The bar is the cheap half — two focused sessions a week move it.','cross',xk)}
   }catch(e){}
   return D}
 
@@ -18643,12 +18786,13 @@ function libB2(){
     if(!libSplitAgrees(rows,gapF))return null;
     const medN=libMed(nm.map(x=>x.r));
     const above=sh.filter(x=>x.r>medN).length;
-    const first=rows.slice().sort((a,b)=>a.k.localeCompare(b.k))[0].k;
+    const sortedK=rows.slice().sort((a,b)=>a.k.localeCompare(b.k));
+    const first=sortedK[0].k,last=sortedK[sortedK.length-1].k;
     const n=rows.length;
     const body=n>=30
       ?'Short nights push your resting heart rate up about '+Math.round(diff)+' beat'+(Math.round(diff)===1?'':'s')+' — '+Math.round(mN)+' on a normal night, '+Math.round(mS)+' after less than 6 hours. '+sh.length+' short nights, '+nm.length+' others, since '+libDateShort(first)+'. Last night, this morning. Lined up in your own mornings, not a cause.'
       :'Your resting heart rate was above its usual on '+above+' of the '+sh.length+' mornings after a short night (under 6 hours), against '+nm.length+' other mornings since '+libDateShort(first)+'. Direction only until 30 nights are in. Last night, this morning.';
-    return{rar:'rare',t:'Short nights show in your resting heart rate',d:body,tag:'signal',id:'lib:b2',
+    return{rar:'rare',t:'Short nights show in your resting heart rate',d:body,tag:'signal',id:'lib:b2',k:last,
       x:'Resting heart rate is the best-measured overnight number the watch makes, with about 3 bpm of normal wobble, and the lag is clean. Illness-shaped days and disrupted stretches were set aside before this was measured. Under 30 nights the sentence gives direction and count, never a size.',
       ev:{sigs:['sleep','rhr'],lag:0,n:n,how:'Every morning with a known night behind it, split at six hours of sleep. The short mornings’ resting heart rate against the rest, checked on both halves of the calendar.'}}}
   catch(e){oops('libB2',e);return null}}
@@ -18709,7 +18853,7 @@ function libB3(){
     const body=sk.length>=30
       ?'On sets after a short night you rate the same weight about '+(Math.round(gap*10)/10)+' RPE harder'+(best?' — '+(Math.round(best.mS*10)/10)+' versus '+(Math.round(best.mN*10)/10)+' on '+ex9:'')+'. '+shortN+' short-night sessions against '+(sk.length-shortN)+', '+rows.length+' repeated loads, since '+libDateShort(first)+'. The night before, the session after.'
       :'The same weight felt harder after a short night on '+harder+' of the '+rows.length+' loads you repeated ('+shortN+' short-night sessions, '+(sk.length-shortN)+' others since '+libDateShort(first)+'). Direction only until 30 sessions are in. The night before, the session after.';
-    return{rar:'epic',t:'Same weight, harder night',d:body,tag:'signal',id:'lib:b3',
+    return{rar:'epic',t:'Same weight, harder night',d:body,tag:'signal',id:'lib:b3',k:sorted[sorted.length-1],
       x:'Effort is the earliest thing a short night moves — before heart rate, before the bar speed. Only loads you actually repeated are compared, so the weight is held equal by construction. Sessions the day after another session, sessions where the regulator had already cut load, and set-aside days are left out. This is a sentence no single-domain app can write: it needs the watch’s night and the gym’s effort on one table.',
       ev:{sigs:['sleep'],lag:1,n:sk.length,how:'Sets repeated at the same exercise, weight and reps, split by whether the night before was under six hours. The RPE gap is weighted by how often each load was repeated, then checked on both halves of the calendar.'}}}
   catch(e){oops('libB3',e);return null}}
@@ -18762,7 +18906,8 @@ function libD1(){
     const body=n>=30
       ?'Your HRV runs about '+Math.round(Math.abs(echo))+' ms lower the morning after your heaviest days'+(recovered?', and is back inside your band a day later':(back!=null?', and only part of the way back a day later':''))+'. '+lower+' of '+hard.length+' heavy days since '+libDateShort(cut)+', against '+easy.length+' easy ones. That’s the session showing up, not a warning.'
       :'Your HRV was lower than your easy-day median the morning after '+lower+' of your '+hard.length+' heaviest days since '+libDateShort(cut)+' ('+easy.length+' easy days for comparison). Direction only until 30 days are in. That’s the session showing up, not a warning.';
-    return{rar:'rare',t:'The hard-day echo in your HRV',d:body,tag:'signal',id:'lib:d1',
+    const lastK9=rows.map(r=>r.k).sort().slice(-1)[0];
+    return{rar:'rare',t:'The hard-day echo in your HRV',d:body,tag:'signal',id:'lib:d1',k:lastK9,
       x:'Heavy days are the top quarter of your own effort-times-minutes ledger across lifting, running, riding and rehab. The dip the morning after had to be stronger than any dip the morning BEFORE — if the morning predicted the day, the pair is confounded and both are refused. Set-aside days are out.',
       ev:{sigs:['hrv'],lag:1,n:n,how:'Every day in the last 60 scored by effort × minutes across every kind of training. The next morning’s HRV after the heaviest quarter of days against the lightest quarter, and the morning after that to see it recover.'}}}
   catch(e){oops('libD1',e);return null}}
@@ -18908,7 +19053,7 @@ function libF11(){
     const wLine=(a.w!=null&&b.w!=null)?' Weight '+(Math.abs(+b.w-+a.w)<1?'agrees ('+uwNum(+a.w)+' \u2192 '+uwNum(+b.w)+' '+uwUnit()+').':'moved '+uwNum(Math.round(Math.abs(+b.w-+a.w)*10)/10)+' '+uwUnit()+', which the scan does not explain.'):'';
     return{rar:'common',t:'The scan says nothing changed',
       d:'Body fat '+a.bf+' \u2192 '+b.bf+'% and skeletal muscle '+uwNum(+a.smm)+' \u2192 '+uwNum(+b.smm)+' '+uwUnit()+' between '+fmtDate(a.date+'T12:00')+' and '+fmtDate(b.date+'T12:00')+'. Both inside the machine\u2019s own wobble (about half a point of body fat, about a kilo of lean), so call it unchanged.'+wLine,
-      tag:'body',id:'lib:f11:'+String(b.date).slice(0,10),   // auditcheck-allow: utc-day-key — a scan row stores a local YYYY-MM-DD
+      tag:'body',id:'lib:f11:'+String(b.date).slice(0,10),k:String(b.date).slice(0,10),   // auditcheck-allow: utc-day-key — a scan row stores a local YYYY-MM-DD
       x:'Consumer body-composition machines drift by about half a point of body fat between two scans of the same person, and glycogen and water move the lean number on every one of them. There is no published validation of the Evolt against a reference method. A change smaller than the machine\u2019s own wobble is not a change, and saying so is the honest read.',
       ev:{sigs:['bw'],lag:0,n:2,how:'The two latest scans, side by side, against the published same-machine wobble.'}}}
   catch(e){oops('libF11',e);return null}}
@@ -19749,12 +19894,17 @@ function treeTimeData(opts){
     R9.forEach(r=>put(String(r.date).slice(0,10),Math.max(1,(+r.km||0)/2)));
     const peak=Math.max.apply(null,load.concat([1]));
 
-    /* blossoms: rare and epic finds, at the day they were banked.
-       The found-date contract (AUDIT.md, test-enforced) guarantees
-       that date is never rewritten, so a blossom never moves. */
+    /* blossoms: rare and epic finds, at the day the EVENT happened
+       (`when`), not the day it was found — same rule the explorer
+       page uses (14c-tree-explorer.js). This card used `found` alone,
+       so a discovery banked long after its event (a big restore, a
+       first-ever run of a signal engine against older data) drew at
+       the tip instead of where it actually happened. `found` itself
+       is still never rewritten — only the blossom's position reads
+       `when` first. */
     let blossom=[];
-    try{blossom=bankList().filter(x=>(x.rar==='rare'||x.rar==='epic')&&x.found)
-      .map(x=>({f:frac(x.found),k:x.found,epic:x.rar==='epic'}))}catch(e){oops('treeBloom',e)}
+    try{blossom=bankList().filter(x=>(x.rar==='rare'||x.rar==='epic')&&(x.when||x.found))
+      .map(x=>{const bk=x.when||x.found;return{f:frac(bk),k:bk,epic:x.rar==='epic'}})}catch(e){oops('treeBloom',e)}
 
     /* the scar: surgery or injury date, and the phases cleared above it */
     let scar=null,phases=[];
@@ -21606,7 +21756,7 @@ function treePopFinds(){
   catch(e){oops('treePopFinds',e);return []}}
 function treePopHtml(){
   try{
-    if(S.view==='tree'||S.view==='session'||S.view==='setup'||S.view==='signup'||S.view==='evidence')return '';
+    if(S.view==='tree'||S.view==='session'||S.view==='setup'||S.view==='signup'||S.view==='evidence'||S.view==='obwait'||S.view==='obreveal')return '';
     if(S.sess&&S.sess.phase!=='done')return '';
     if(S.signalReveal||S.tour||S.boot!=null)return '';
     if(S._txPopHide===today())return '';
@@ -26434,10 +26584,10 @@ function viewFindings(){
         '<span class="mono" style="color:var(--faint);font-size:var(--t-caption);letter-spacing:.08em;flex:none;min-width:44px">'+r[0]+'</span>'+
         '<span style="flex:1;min-width:0;color:var(--dim);font-size:13px;line-height:1.5">'+r[1]+'</span></div>').join('')+
       '</div>')+
+    (typeof corrSellCard==='function'?corrSellCard():'')+
     wrapF(LENS.h,LENS.f,LENS.n)+
     findPills()+
     lensWord('disc')+
-    (typeof corrSellCard==='function'?corrSellCard():'')+
     '<button data-a="deepGo" class="btn mt2" style="color:'+(deepRdy?'var(--amber)':'var(--dim)')+';font-size:13px">'+
       (deepRdy?'This week\u2019s read is ready \u203a':'This week\u2019s read \u2014 what the model makes of it \u203a')+'</button>'+
     '</div>'}
@@ -27195,20 +27345,20 @@ const PRICE={
    STRUCTURALLY CANNOT show the thing being sold. */
 
 const PREM_FEATURES=[
-  {k:'insights',n:'Insights',
-   d:'The engine tests every signal against every outcome instead of the short list, so it finds links a smaller search never reaches.'},
-  {k:'history',n:'All-time history',
-   d:'Past the last twelve weeks. Every session you have ever logged, charted.'},
-  {k:'form',n:'The form model',
-   d:'Fitness, fatigue and form across lifting, running and rehab on one ledger.'},
-  {k:'board',n:'The week board',
-   d:'All three placed against each other, with legs held clear of the long run.'},
-  {k:'raceplan',n:'Race plans',
-   d:'Built backwards from your date, at paces taken from your own runs.'},
-  {k:'imports',n:'Unlimited imports',
-   d:'Every spreadsheet, export and watch file, as often as you like.'},
-  {k:'read',n:'A read every week',
-   d:'Your numbers written up each Monday instead of once a month.'}];
+  {k:'insights',n:'Insights',free:'Your strongest few',
+   d:'Every signal, every outcome'},
+  {k:'history',n:'History',free:'Last 12 weeks',
+   d:'All-time'},
+  {k:'form',n:'The form model',free:'\u2014',
+   d:'Fitness, fatigue & form, one ledger'},
+  {k:'board',n:'The week board',free:'\u2014',
+   d:'Lifting + running + rehab, one view'},
+  {k:'raceplan',n:'Race plans',free:'\u2014',
+   d:'Built backwards from your date'},
+  {k:'imports',n:'Imports',free:'\u2014',
+   d:'Unlimited'},
+  {k:'read',n:'The read',free:'Once a month',
+   d:'Every Monday'}]
 
 /* TWO THINGS DELIBERATELY NOT GATED, and the reasons are load-bearing.
 
@@ -27418,51 +27568,60 @@ function viewPlans(){
   let h='<div class="view pad stg phpad">'+
    '<button data-a="back" class="btn" style="width:auto;padding:8px 14px;color:var(--dim);font-size:13px;margin-bottom:14px">\u2039 Back</button>'+
    '<h1 class="disp vh1">Plans</h1>'+
-   '<p style="color:var(--dim);font-size:13px;line-height:1.65;margin-top:4px">'+
-   'The loop is free forever. Premium is depth: everything the engine works out about you, and the whole record rather than the last twelve weeks.</p>';
+   '<p style="color:var(--dim);font-size:13px;margin-top:4px">Free forever for the loop. Premium goes deeper.</p>';
 
-  h+='<p class="eyebrow" style="margin-top:24px">Free</p>'+
-    '<div class="card" style="padding:14px 16px;margin-top:8px">'+
-    '<div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap">'+
-      '<span style="font-size:20px;font-weight:700">Free</span>'+
-      '<span style="color:var(--dim);font-size:13px">forever, not a trial</span>'+
-      (!st.on?'<span class="mono" style="margin-left:auto;flex:none;color:var(--green);font-size:11px">CURRENT</span>':'')+'</div>'+
-    '<div style="margin-top:12px">'+FREE_FEATURES.map(x=>
-      '<div style="display:flex;gap:8px;padding:4px 0;align-items:baseline">'+
-      '<span class="mono" style="color:var(--green);font-size:11px;flex:none">✓</span>'+
-      '<span style="color:var(--dim);font-size:13px;line-height:1.5;min-width:0;flex:1">'+esc(x)+'</span></div>').join('')+'</div></div>';
+  h+='<div class="card" style="padding:16px;margin-top:16px;border-color:var(--amber);border-width:1.5px">'+
+    (st.on?'<p class="mono" style="color:var(--green);font-size:11px">CURRENT PLAN</p>':
+      '<p class="mono" style="color:var(--amber);font-size:11px;letter-spacing:.06em">PREMIUM</p>')+
+    '<div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;margin-top:4px">'+
+      '<span style="font-size:28px;font-weight:700">'+esc(PRICE.yr[cur])+'</span>'+
+      '<span style="color:var(--dim);font-size:13px">a year \u00b7 '+esc(PRICE.yrPerMo[cur])+'/mo \u00b7 save '+PRICE.saveP+'%</span></div>'+
+    '<p style="color:var(--dim);font-size:11px;margin-top:2px">Or '+esc(PRICE.mo[cur])+' a month.</p>';
 
-  h+='<p class="eyebrow" style="margin-top:24px">Premium</p>'+
-    '<div class="card" style="padding:14px 16px;margin-top:8px">'+
-    '<div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap">'+
-      '<span style="font-size:24px;font-weight:700">'+esc(PRICE.yr[cur])+'</span>'+
-      '<span style="color:var(--dim);font-size:13px">a year</span>'+
-      (st.on?'<span class="mono" style="margin-left:auto;flex:none;color:var(--green);font-size:11px">CURRENT</span>':'')+'</div>'+
-    '<p style="color:var(--faint);font-size:11px;margin-top:4px">'+esc(PRICE.yrPerMo[cur])+' a month. Save '+PRICE.saveP+'%.</p>'+
-    '<p style="color:var(--dim);font-size:13px;margin-top:8px">Or '+esc(PRICE.mo[cur])+' a month, billed monthly.</p>'+
-    '<div style="margin-top:12px">'+PREM_FEATURES.map(x=>
-      '<div style="display:flex;gap:8px;padding:5px 0;align-items:baseline">'+
-      '<span class="mono" style="color:var(--green);font-size:11px;flex:none">+</span>'+
-      '<span style="min-width:0"><span style="display:block;font-size:13px;font-weight:600">'+esc(x.n)+'</span>'+
-      '<span style="display:block;color:var(--faint);font-size:11px;line-height:1.5;margin-top:1px">'+esc(x.d)+'</span></span></div>').join('')+'</div>'+
-    '<p style="color:var(--dim);font-size:13px;margin-top:12px;line-height:1.6">'+
-      PRICE.trialDays+' days free on the yearly plan, then '+esc(PRICE.yr[cur])+'. Cancel any time.</p>'+
-    '</div>';
+  h+=premContrastHtml();
 
-  h+='<div class="card" style="padding:14px 16px;margin-top:16px;background:var(--surface)">'+
-    '<p style="font-size:13px;font-weight:600">Payment isn\u2019t connected yet</p>'+
-    '<p style="color:var(--dim);font-size:13px;line-height:1.6;margin-top:4px">'+
-    'Nothing on this screen can charge you. The prices are set and the App Store side is not built.</p></div>';
+  if(!st.on)h+='<button data-a="trialStart" class="big disp mt" style="background:var(--amber);color:var(--bg);font-size:15px">Start your '+PRICE.trialDays+'-day free trial</button>'+
+    '<p style="color:var(--faint);font-size:11px;text-align:center;margin-top:8px">Then '+esc(PRICE.yr[cur])+' a year. Cancel any time \u2014 nothing charges you today.</p>';
+  h+='</div>';
+
+  h+='<p style="color:var(--faint);font-size:11px;margin-top:16px">Free forever, not a trial: '+esc(FREE_FEATURES.join(' \u00b7 '))+'</p>';
+
+  h+='<p style="color:var(--faint);font-size:11px;margin-top:16px">Payment isn\u2019t connected yet \u2014 nothing here can charge you.</p>';
 
   h+='<button data-a="myPlanOpen" class="btn" style="margin-top:16px;width:100%">Your plan</button>';
   h+='</div>';
   return h}
+function premContrastHtml(){
+  return '<div style="margin-top:14px;border-top:1px solid var(--line)">'+
+    PREM_FEATURES.map(x=>
+      '<div style="display:flex;align-items:baseline;gap:10px;padding:9px 0;border-bottom:1px solid var(--line)">'+
+      '<span style="flex:1;min-width:0;font-size:13px;font-weight:600">'+esc(x.n)+'</span>'+
+      '<span style="flex:1;min-width:0;color:var(--faint);font-size:11px;text-align:right">'+esc(x.free)+'</span>'+
+      '<span style="width:14px;flex:none;text-align:center;color:var(--faint);font-size:11px">\u2192</span>'+
+      '<span style="flex:1;min-width:0;color:var(--amber);font-size:11px;font-weight:600">'+esc(x.d)+'</span></div>').join('')+
+    '</div>'}
 
-/* ══ subscription management ═══════════════════════════════════
-   Cancel is ONE TAP from here and it tells the truth about where
-   Apple keeps it. On iOS the developer cannot cancel for you — the
-   honest thing is to say so and hand over the real route, not to
-   bury it or pretend. */
+function viewObPaywall(){
+  const cur=priceCur();
+  let h='<div class="view pad stg phpad" style="padding-top:40px">'+
+   '<p class="mono" style="color:var(--amber);font-size:11px;letter-spacing:.06em;text-align:center">BEFORE YOU START</p>'+
+   '<h1 class="disp vh1" style="text-align:center;margin-top:6px">Your program is ready.<br>Premium sees deeper.</h1>'+
+   '<p style="color:var(--dim);font-size:13px;text-align:center;margin-top:8px">Free forever for the loop. Premium runs the full search on your data.</p>';
+
+  h+='<div class="card" style="padding:16px;margin-top:20px;border-color:var(--amber);border-width:1.5px">'+
+    '<div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap">'+
+      '<span style="font-size:28px;font-weight:700">'+esc(PRICE.yr[cur])+'</span>'+
+      '<span style="color:var(--dim);font-size:13px">a year \u00b7 '+esc(PRICE.yrPerMo[cur])+'/mo \u00b7 save '+PRICE.saveP+'%</span></div>';
+  h+=premContrastHtml();
+  h+='<button data-a="obPwTrial" class="big disp mt" style="background:var(--amber);color:var(--bg);font-size:15px">Start your '+PRICE.trialDays+'-day free trial</button>'+
+    '<p style="color:var(--faint);font-size:11px;text-align:center;margin-top:8px">Free today. We\u2019ll remind you before day '+PRICE.trialDays+'. Then '+esc(PRICE.yr[cur])+' a year unless you cancel \u2014 nothing charges you now.</p>';
+  h+='</div>';
+
+  h+='<button data-a="obPwSkip" class="big disp mt2" style="width:100%">Continue free</button>';
+  h+='<p style="color:var(--faint);font-size:11px;text-align:center;margin-top:16px">Payment isn\u2019t connected yet \u2014 nothing here can charge you.</p>';
+  h+='</div>';
+  return h}
+
 function viewSub(){
   const st=subState(),s=subStore();
   const cur=priceCur();
@@ -27832,6 +27991,15 @@ function viewToday(){
   /* the date is the header's subtitle now (design system, 17 Sep 2026);
      the greeting line said the same date again and went */
   h+=pageHead('Today','',{noBtns:1,sub:dateLine});
+  /* EMPTY STATES SHOW EXAMPLES, NEVER A BLANK (18 Sep 2026, onboarding
+     redesign): a brand-new account gets the two-sentence explainer (the
+     same first line the guided tour opens on) and three labelled
+     example correlations instead of nothing. Both fall away the moment
+     real data exists — the tour's own step 1 then targets whatever
+     Today is actually showing. */
+  try{if(obEmptyAccount()){
+    h+='<p style="color:var(--dim);font-size:13px;line-height:1.6;margin-top:14px">'+esc(OB_LINE1)+' It reads your lifting, running and recovery together, so it can show you things a single-purpose app never sees.</p>';
+    h+=obExampleCorrPills()}}catch(e){oops('obEmptyToday',e)}
   /* demo pills live in Settings now (owner, 10 Sep: 'i dont want to see that on today') */
   try{if(!S.signalReveal&&!S.signalShownFor){const sg=(typeof revealDue==='function'?revealDue():signalDue());
     if(sg){S.signalShownFor=sg.id;S.signalReveal=sg;setTimeout(function(){render()},400)}}}catch(e){}
@@ -28066,6 +28234,26 @@ function goalCerBank(g){
       d:'The target you wrote down, cleared. Most goals are never written down, let alone met.',
       rar:'epic',tag:'goal',found:today()};
     bankSave()}catch(e){oops('goalCerBank',e)}}
+
+/* EMPTY STATES SHOW EXAMPLES (18 Sep 2026 onboarding redesign) */
+function obEmptyAccount(){
+  try{return !S.history.length&&!(typeof runs==='function'&&runs().length)}catch(e){return !S.history.length}}
+function obExampleCorrPills(){
+  const EX=[
+    {t:'Sleep and squat',d:'More sleep, heavier top sets.',c:(typeof rarityOf==='function'?rarityOf('common')[1]:'#3C6FB8')},
+    {t:'Carbs and bench',d:'Higher carbs the day before, a better bench session.',c:(typeof rarityOf==='function'?rarityOf('uncommon')[1]:'#6E7FE8')},
+    {t:'Rest days and running',d:'A rest day before a run, a faster easy pace.',c:(typeof rarityOf==='function'?rarityOf('rare')[1]:'#C46BFF')}];
+  const n=(typeof obDataPointsN==='function')?obDataPointsN():0;
+  return '<div id="obcorrpills" class="card mt" style="padding:14px 16px">'+
+    '<p class="eyebrow">What Allena looks for</p>'+
+    '<div class="stg" style="display:flex;flex-direction:column;gap:8px;margin-top:10px">'+
+    EX.map(x=>'<div class="card an-glow" style="padding:10px 13px;border-radius:14px">'+
+      '<p class="mono" style="font-size:11px;letter-spacing:.1em;color:var(--faint)">EXAMPLE</p>'+
+      '<p style="font-size:13px;font-weight:600;margin-top:2px;color:'+x.c+'">'+esc(x.t)+'</p>'+
+      '<p style="color:var(--dim);font-size:13px;line-height:1.4;margin-top:2px">'+esc(x.d)+'</p></div>').join('')+
+    '</div>'+
+    '<p class="mono" style="color:var(--faint);font-size:11px;letter-spacing:.08em;margin-top:10px"><span data-cu="obtodaypts">'+n+'</span> DATA POINTS LOGGED SO FAR</p>'+
+    '<button data-a="intakeOpen" class="btn mt" style="width:100%;color:var(--amber);border-color:var(--amber)">Import your data to see your own</button></div>'}
 function catchUpPlan(p){
   /* an imported plan's weights can be STALE while the user's logs
      marched on (beta-caught via Dafydd's sheet, 9 Sep: his 'PLAN
@@ -28188,12 +28376,17 @@ function viewHome(){
   if(p.empty){
     return h+'<div class="card mt2" style="padding:22px 18px">'+
       '<p class="disp" style="font-size:17px;font-weight:600">No program yet</p>'+
-      '<p style="color:var(--dim);font-size:13px;line-height:1.6;margin-top:8px">Three doors, all honest work: answer a few questions and Allena builds a block around your goal; bring a program or history you already have; or write your own from scratch.</p>'+
+      '<p style="color:var(--dim);font-size:13px;line-height:1.6;margin-top:8px">Answer a few questions and Allena builds a block around your goal, write your own from scratch, or bring a program or history you already have from the menu’s Import row.</p>'+
       '<button data-a="setupOpen" class="big disp mt2" style="background:var(--amber);color:var(--bg);font-size:15px">Build one with Allena</button>'+
-      '<div class="row" style="gap:8px;margin-top:8px">'+
-      '<button data-a="intakeOpen" class="btn" style="flex:1">Import your data</button>'+
-      '<button data-a="suOwn" class="btn" style="flex:1">Write your own</button>'+
-      '</div></div></div>'}
+      '<button data-a="suOwn" class="btn mt" style="width:100%">Write your own</button>'+
+      '</div></div>'}
+  /* BUILD A PROGRAM STAYS ON OFFER (18 Sep 2026, owner ruling): the
+     wizard used to be reachable only from the empty state or the
+     onboarding flow — with an active block already running, there was
+     nowhere on Train to start over or hand Allena a fresh block. One
+     quiet line, not a card, so it does not compete with the week's
+     actual work above the fold. */
+  h+='<button data-a="setupOpen" class="mono" style="color:var(--amber);font-size:11px;letter-spacing:.08em;padding:4px 0;margin-top:4px">+ BUILD A PROGRAM</button>';
   /* THE SUGGESTION MOVED ONTO THE SESSION (owner call, 11 Sep): a pill at
      the top of the page saying "Allena suggests today" was a second place
      to look. The glow now sits on the actual session pill under
@@ -29345,9 +29538,23 @@ function collapser(key,title,sub,inner){
     (on?'<div style="margin-top:4px;min-width:0;max-width:100%;overflow-x:hidden">'+inner+'</div>':'')}
 var SECREF={};
 function viewProgress(){
-  if(!S.history.length)return '<div class="view pad stg phpad">'+
-    pageHead('Progress')+
-    '<p style="color:var(--dim);font-size:15px;margin-top:12px">Log a few sessions and your trends show up here.</p></div>';
+  if(!S.history.length){
+    /* EMPTY STATE SHOWS EXAMPLES (18 Sep 2026, onboarding redesign):
+       three labelled trend pills in the real rarity colours, plus the
+       import door at the top since there is data to bring in. */
+    const EX=[
+      {t:'Bench up 12 kg over 8 weeks',c:(typeof rarityOf==='function'?rarityOf('common')[1]:'#3C6FB8')},
+      {t:'Sleep up 40 minutes since June',c:(typeof rarityOf==='function'?rarityOf('uncommon')[1]:'#6E7FE8')},
+      {t:'Squat 1RM up 9% this block',c:(typeof rarityOf==='function'?rarityOf('rare')[1]:'#C46BFF')}];
+    return '<div class="view pad stg phpad">'+
+      pageHead('Progress')+
+      '<button data-a="intakeOpen" class="pill on mt2" style="width:100%;text-align:center">See your lift trends</button>'+
+      '<div class="stg" style="display:flex;flex-direction:column;gap:8px;margin-top:16px">'+
+      EX.map(x=>'<div class="card an-glow" style="padding:12px 14px;border-radius:14px">'+
+        '<p class="mono" style="font-size:11px;letter-spacing:.1em;color:var(--faint)">EXAMPLE</p>'+
+        '<p style="font-size:15px;font-weight:600;margin-top:2px;color:'+x.c+'">'+esc(x.t)+'</p></div>').join('')+
+      '</div>'+
+      '<p style="color:var(--dim);font-size:13px;line-height:1.6;margin-top:14px">Import your data to see your own.</p></div>'}
   const bests={},weekVol={};
   S.history.forEach(h=>h.log.forEach(l=>{
     if(l.w&&l.r){const wk=isoWeek(h.date);weekVol[wk]=(weekVol[wk]||0)+l.w*l.r;
@@ -29726,7 +29933,6 @@ function viewData(){
       'Allena — AI coach')]);
   h+='<button data-a="tourOpen" class="btn mt" style="font-size:13px;color:var(--dim)">Show me around \u2014 the 60-second tour</button>';
   h+=setGroup('Your data',[
-    navRow(I.load,'Import your data',null,'intakeOpen',null,{sub:'Spreadsheets, Health exports, scan and blood photos'}),
     setRow(I.save,'Export a backup',backupDue()?'due':'','Export'),
     setRow(I.back,'Restore from backup','','Restore'),
     setRow(I.back,'Start fresh','','Start fresh'),
@@ -31377,18 +31583,26 @@ function sheetHtml(){
       '<div class="row" style="gap:8px;margin-top:16px">'+
       '<button data-a="findingsGo" class="btn" style="flex:1;font-size:13px">The two lenses</button>'+
       '<button data-a="collOpen" class="btn" style="flex:1;font-size:13px">The collection</button></div>')}
-  if(S.sheet.t==='qr'){
+  if(S.sheet.t==='addfr'){
+    /* THREE WAYS IN, TOGETHER (18 Sep 2026, owner ruling: no QR code
+       \u2014 paste a code, type a username, or the link they sent you
+       lands you here automatically on open, no UI needed for it). */
     const q=S.sheet.q||{};
     return wrapSheet(q.title||'Add a friend',
       '<p style="color:var(--dim);font-size:13px;line-height:1.6;margin-top:4px">'+esc(q.sub||'')+'</p>'+
-      (q.link?'<div style="display:flex;justify-content:center;margin-top:16px">'+qrSvg(q.link,224)+'</div>':'<p style="color:var(--faint);font-size:13px;margin-top:16px">Making your code\u2026</p>')+
-      (q.code?'<p class="mono" style="text-align:center;font-size:20px;letter-spacing:.28em;font-weight:700;margin-top:12px">'+esc(q.code)+'</p>':'')+
-      '<p style="color:var(--faint);font-size:11px;line-height:1.6;text-align:center;margin-top:8px">Point an iPhone camera at the square \u2014 it opens the link. Or share it:</p>'+
-      '<button data-a="'+(q.kind==='crew'?'crewShare':'frShareGo')+'" data-v="'+esc(q.code||'')+'" class="big disp mt" style="background:var(--amber);color:var(--bg);font-size:15px">Share the link</button>'+
-      (q.kind==='crew'?'':'<p class="eyebrow" style="margin-top:16px">Got a code from them instead?</p>'+
-        '<div class="row" style="gap:8px;margin-top:8px">'+
-        '<input data-in="frIn" placeholder="Their code" value="'+esc(S.frIn||'')+'" style="flex:2;min-height:44px;text-transform:uppercase">'+
-        '<button data-a="frJoinGo" class="btn" style="flex:1;font-size:13px">Link up</button></div>'))}
+      (q.code?'<p class="mono" style="text-align:center;font-size:20px;letter-spacing:.28em;font-weight:700;margin-top:16px">'+esc(q.code)+'</p>'
+        :'<p style="color:var(--faint);font-size:13px;margin-top:16px">Making your code\u2026</p>')+
+      '<p style="color:var(--faint);font-size:11px;line-height:1.6;text-align:center;margin-top:8px">Share your code or link so they can add you:</p>'+
+      '<button data-a="frShareGo" data-v="'+esc(q.code||'')+'" class="big disp mt" style="background:var(--amber);color:var(--bg);font-size:15px">Share the link</button>'+
+      '<p class="eyebrow" style="margin-top:20px">Have their username?</p>'+
+      '<div class="row" style="gap:8px;margin-top:8px">'+
+      '<input data-in="frUserIn" placeholder="Their username" value="'+esc(S.frUserIn||'')+'" style="flex:2;min-height:44px">'+
+      '<button data-a="frUserGo" class="btn" style="flex:1;font-size:13px">Add</button></div>'+
+      '<p class="eyebrow" style="margin-top:16px">Got a code from them instead?</p>'+
+      '<div class="row" style="gap:8px;margin-top:8px">'+
+      '<input data-in="frIn" placeholder="Their code" value="'+esc(S.frIn||'')+'" style="flex:2;min-height:44px;text-transform:uppercase">'+
+      '<button data-a="frJoinGo" class="btn" style="flex:1;font-size:13px">Link up</button></div>'+
+      '<p style="color:var(--faint);font-size:11px;line-height:1.6;margin-top:16px">Or open the link they sent you \u2014 that links you up on its own, no code needed. A group link (starts with G) joins their weekly race the same way.</p>')}
   if(S.sheet.t==='crewname'){
     return wrapSheet('Name the group',
       '<p style="color:var(--dim);font-size:13px;line-height:1.6;margin-top:4px">What the crew sees at the top of the board. You can leave it blank.</p>'+
@@ -32620,6 +32834,48 @@ function viewGuide(){
    gesture in 29-scrub, which is a different module. An implicit global
    would work and would also be invisible to the exists gate. */
 var tabBarTabs=function(){return []},tabBarRooms=function(){return []};
+/* THE GUIDED TOUR (18 Sep 2026, onboarding redesign): a spotlight on
+   one real element per step, in Smart Gym's order — what a correlation
+   is, then the race, then progress, then the menu. Every selector is a
+   list so a step can fall back when its first-choice element is not on
+   the page (an empty account shows the example pills; an account with
+   real data may not). */
+const TOUR_STEPS=[
+  {sel:['#obcorrpills','.tmid'],t:'A correlation is two things in your data moving together, like sleep and squat.'},
+  {sel:['[data-a="drawerNav"][data-v="social"]'],t:'The race. Join one here to train against friends each week.'},
+  {sel:['[data-a="drawerNav"][data-v="progress"]'],t:'Progress. Your trends, goals and how far you have come.'},
+  {sel:['[data-a="drawerOpen"]'],t:'The menu. Settings and your data live here.'}];
+function tourTargetRect(sels){
+  try{for(let i=0;i<sels.length;i++){
+    const el=document.querySelector(sels[i]);
+    if(el){const r=el.getBoundingClientRect();if(r.width>2&&r.height>2)return r}}
+  }catch(e){oops('tourTargetRect',e)}
+  return null}
+function tourPosition(){
+  /* layout read on a plain render tick, never in touchmove/scroll */
+  try{
+    if(!S.tour)return;
+    const st=TOUR_STEPS[Math.min(S.tour.i,TOUR_STEPS.length-1)];
+    const r=tourTargetRect(st.sel);
+    const ring=document.getElementById('tourRing'),bub=document.getElementById('tourBubble');
+    if(!ring||!bub)return;
+    const W=window.innerWidth,H=window.innerHeight;
+    if(!r){
+      ring.style.opacity='0';
+      bub.style.left='20px';bub.style.width='calc(100% - 40px)';bub.style.right='';
+      bub.style.top='';bub.style.bottom='max(24px, env(safe-area-inset-bottom))';
+      return}
+    ring.style.opacity='1';
+    const pad=8;
+    const x0=Math.max(4,r.left-pad),y0=Math.max(4,r.top-pad);
+    const x1=Math.min(W-4,r.right+pad),y1=Math.min(H-4,r.bottom+pad);
+    ring.style.left=x0+'px';ring.style.top=y0+'px';
+    ring.style.width=(x1-x0)+'px';ring.style.height=(y1-y0)+'px';
+    bub.style.width='260px';bub.style.right='';
+    bub.style.left=Math.max(16,Math.min(W-16-260,x0))+'px';
+    if(H-y1>140){bub.style.top=(y1+14)+'px';bub.style.bottom=''}
+    else{bub.style.bottom=(H-y0+14)+'px';bub.style.top=''}
+  }catch(e){oops('tourPosition',e)}}
 function cuSweep(){
   /* honest ceremony for real points: a [data-cu] number that CHANGED
      between renders counts up (ease-out, ~1s) with a green pulse.
@@ -32688,12 +32944,15 @@ function render(){
   else if(S.view==='territory')body=viewTerritory();
   else if(S.view==='plans')body=viewPlans();
   else if(S.view==='sub')body=viewSub();
+  else if(S.view==='obpaywall')body=viewObPaywall();
   else if(S.view==='home')body=viewHome();
   else if(S.view==='session')body=S.sess?viewSession():viewHome();
   else if(S.view==='history')body=viewHistory();
   else if(S.view==='progress')body=viewProgress();
   else if(S.view==='data')body=viewData();
   else if(S.view==='setup')body=viewSetup();
+  else if(S.view==='obwait')body=viewObWait();
+  else if(S.view==='obreveal')body=viewObReveal();
   else if(S.view==='day0')body=viewDay0();
   else if(S.view==='signup')body=viewSignup();
   else if(S.view==='quick')body=viewQuick();
@@ -32870,7 +33129,7 @@ function render(){
 
   const tabBarHtml=()=>{
     if(S.sess&&S.view==='session')return '';
-    if(S.boot||S.view==='setup'||S.view==='welcome'||S.view==='day0'||S.view==='signup')return '';
+    if(S.boot||S.view==='setup'||S.view==='welcome'||S.view==='day0'||S.view==='signup'||S.view==='obwait'||S.view==='obreveal')return '';
     /* SOCIAL IS A TAB, REHAB IS A DRAWER ROOM (owner, 16 Sep 2026).
        Worth recording the trade, because it cuts against the wedge: the
        injured athlete is who this app is FOR, and their room is now one
@@ -32934,7 +33193,13 @@ function render(){
        not a duplicate, and its row is simply absent for the same reason
        it always was. */
     const onBar={today:1,home:1,social:1,progress:1,acl:0,run:0};
-    let rows=(hasRehab?drow('acl','Rehab',ICONS.acl):'')+
+    /* IMPORT AND SETTINGS ARE THEIR OWN ROWS (owner ruling, 18 Sep 2026:
+       "not buried in settings" — import used to be a single line inside
+       Settings, two taps deep). Both are single-purpose doors, not views,
+       so isOn() never lights them. */
+    let rows=drow('importdata','Import your data',I2.load,'intakeOpen')+
+      drow('data','Settings',I2.gear)+
+      (hasRehab?drow('acl','Rehab',ICONS.acl):'')+
       (rides&&typeof rides==='function'&&rides().length>=1?drow('ride','Cycling','<circle cx=\"6.5\" cy=\"16.5\" r=\"3.5\"/><circle cx=\"17.5\" cy=\"16.5\" r=\"3.5\"/><path d=\"M6.5 16.5L10 9h5M17.5 16.5L14 9M10 9L8 6h3\"/>'):'')+
       /* a room the bar is NOT carrying keeps its row, so nothing is ever
          unreachable — during a session, on the setup wizard or under the
@@ -32999,22 +33264,23 @@ function render(){
       '<span class="mono" id="spTime" data-end="'+(resting?S.restEnd:'')+'" style="font-size:13px;font-weight:700;letter-spacing:.04em;color:'+(resting?'var(--chart)':'var(--green)')+';flex:none">'+(resting?mmss(left):'LIVE')+'</span></button>'};
   const tourHtml=()=>{
     if(!S.tour)return '';
-    const STEPS=[
-      ['One answer, every day','The big card on Today is the verdict — what today should be, and why. Everything else on this page supports it. The four dots underneath are today\u2019s small check-ins; finish them and Allena tells you what it noticed in your data.'],
-      ['The menu is the map','The \u2630 button, top left, holds every page. It starts small on purpose — new pages appear as your data earns them, so nothing here is ever an empty room.'],
-      ['Program is the plan','Your sessions live under Program. Tap a day to start it — Allena adjusts future loads from how your sets actually felt, one honest rep at a time.'],
-      ['Findings is where Allena thinks','The network icon on Today opens two lenses — your discoveries and patterns, and the weekly read. A red dot means something genuinely new; no dot, nothing new. It fills as you train.'],
-      ['Everything explains itself','Any \u24d8 opens the why behind a number in plain words. If something confuses you and has no \u24d8, that\u2019s a bug — tell us from Settings \u2192 Report a problem.']];
-    const st=STEPS[Math.min(S.tour.i,STEPS.length-1)];
-    return '<div style="position:fixed;inset:0;z-index:120;background:color-mix(in srgb, var(--bg) 82%, black);display:flex;align-items:center;justify-content:center;padding:26px">'+
-      '<div class="card" style="max-width:400px;width:100%;padding:24px 22px;border-radius:20px">'+
-      '<p class="mono" style="color:var(--amber);font-size:var(--t-caption);letter-spacing:.12em">THE 60-SECOND TOUR \u00b7 '+(S.tour.i+1)+' OF '+STEPS.length+'</p>'+
-      '<p class="disp" style="font-size:24px;font-weight:650;line-height:1.15;margin-top:8px">'+st[0]+'</p>'+
-      '<p style="color:var(--dim);font-size:13px;line-height:1.65;margin-top:12px">'+st[1]+'</p>'+
-      '<p class="mono" style="color:var(--faint);font-size:11px;letter-spacing:.2em;margin-top:16px">'+STEPS.map((_,j)=>j===S.tour.i?'\u25cf':'\u25cb').join(' ')+'</p>'+
-      '<div class="row" style="gap:12px;margin-top:16px">'+
-      '<button data-a="tourSkip" class="btn" style="flex:1;color:var(--faint);font-size:13px">Skip</button>'+
-      '<button data-a="tourNext" class="big disp" style="flex:2;background:var(--amber);color:var(--bg);font-size:15px">'+(S.tour.i>=STEPS.length-1?'Let\u2019s go':'Next')+'</button>'+
+    const st=TOUR_STEPS[Math.min(S.tour.i,TOUR_STEPS.length-1)];
+    /* SPOTLIGHT TOUR (18 Sep 2026, onboarding redesign, Smart Gym
+       reference: dim everything, cut a hole around one real element,
+       one short line, tap to continue). tourPosition() sizes #tourRing
+       and #tourBubble against the real element's own rect after every
+       render — layout is read here, on a plain render tick, never
+       inside touchmove or scroll. The box-shadow on the ring IS the
+       scrim: a huge spread outside its own border-box, so one element
+       both dims the page and cuts the hole. */
+    return '<div id="tourSpot" style="position:fixed;inset:0;z-index:120;pointer-events:auto">'+
+      '<div id="tourRing" style="position:fixed;border:2px solid var(--amber);border-radius:16px;box-shadow:0 0 0 3000px color-mix(in srgb, var(--bg) 84%, black);pointer-events:none;transition:none;opacity:0"></div>'+
+      '<div id="tourBubble" style="position:fixed;width:260px;background:var(--raised);border:1px solid var(--line);border-radius:16px;padding:14px 16px;box-shadow:0 12px 30px -10px rgba(0,0,0,.6);transition:none">'+
+      '<p class="mono" style="color:var(--amber);font-size:11px;letter-spacing:.14em">'+(S.tour.i+1)+' OF '+TOUR_STEPS.length+'</p>'+
+      '<p style="color:var(--text);font-size:15px;line-height:1.4;font-weight:600;margin-top:6px">'+esc(st.t)+'</p>'+
+      '<div class="row" style="gap:10px;margin-top:12px">'+
+      '<button data-a="tourSkip" class="btn" style="flex:1;color:var(--faint);font-size:13px;padding:8px">Skip</button>'+
+      '<button data-a="tourNext" class="btn" style="flex:1;background:var(--amber);color:var(--bg);font-size:13px;padding:8px;font-weight:700">'+(S.tour.i>=TOUR_STEPS.length-1?'Done':'Next')+'</button>'+
       '</div></div></div>'};
   /* ══ THE FURNITURE IS GUARDED TOO (audit P4, 13 Sep) ══════════════
      render() has wrapped the VIEW dispatch since Phase D, so a throwing
@@ -33269,10 +33535,18 @@ function render(){
     if(key){const el=document.querySelector('[data-in="'+key+'"]');
       if(el){el.focus();try{if(pos!=null)el.setSelectionRange(pos,pos)}catch(e){}}}
     try{if(!S.tour&&!S._tourChecked&&S.view==='today'&&S.boot==null&&!S.sheet&&!S.sess){
-      S._tourChecked=1;
-      if(!lget('training-tour-v1',null)){S.tour={i:0};setTimeout(function(){try{render()}catch(e9){}},60)}}}catch(e){}
+      /* THE TOUR WAITS FOR TODAY, NOT JUST S.view (18 Sep 2026): the
+         "Your data arrived" screen (viewArrival) also renders while
+         S.view==='today', and its own full-screen moment has nowhere
+         for the tour's fourth spotlight (the menu) to land. _tourChecked
+         is left unset so this re-checks every render until arrival is
+         actually dismissed, rather than giving up on the tour forever. */
+      if(!(typeof arrivalDue==='function'&&arrivalDue())){
+        S._tourChecked=1;
+        if(!lget('training-tour-v1',null)){S.tour={i:0};setTimeout(function(){try{render()}catch(e9){}},60)}}}}catch(e){}
     try{if(typeof watchStatePush==='function')watchStatePush()}catch(e){}
     try{cuSweep()}catch(e){}
+    try{if(S.tour)tourPosition()}catch(e){oops('tourPositionCall',e)}
     try{if(typeof treeXAfterRender==='function')treeXAfterRender()}catch(e){oops('treeXAfterRender',e)}
     if(S.scrollTo)setTimeout(doScroll,30);
     try{const dr=document.getElementById('drawer');
@@ -33654,7 +33928,7 @@ tickEvery(function(){try{
     if(settling)return;
     clear();
     if(S.drawerOpen||S.sheet||S.boot)return;
-    if(S.view==='session'||S.view==='coach'||S.view==='setup'||S.view==='signup')return;
+    if(S.view==='session'||S.view==='coach'||S.view==='setup'||S.view==='signup'||S.view==='obwait'||S.view==='obreveal')return;
     if(document.querySelector('.sessfix'))return;
     if(document.querySelector('#findBig,#txwrap'))return;   /* the collection card deck (class is fb-wrap, not fbwrap — this selector never matched, which is why swiping the deck also dragged the page underneath it) */
     const t=e.touches[0];
@@ -34753,6 +35027,18 @@ function runAction(a,v,t,e){
     case 'upgradeOpen':{S.sheet={t:'upgrade',v:v||null};render();break}
     case 'plansOpen':S._navQuiet=1;{if(S.view!=='plans'){S.backTo=S.view;S.backDrawer=false}S.sheet=null;S.view='plans';render();break}
     case 'myPlanOpen':S._navQuiet=1;{if(S.view!=='sub'){S.backTo=S.view;S.backDrawer=false}S.sheet=null;S.view='sub';render();break}
+    /* THE PLANS PAGE'S REAL CTA (18 Sep 2026). Payment still isn't
+       wired, so this starts the same LOCAL trial state StoreKit will
+       one day start for real — 14 days, annual plan, nothing charged
+       — rather than a button that does nothing when tapped. Whoever
+       wires StoreKit replaces this one call with the real purchase
+       flow; subEntitled()/subState() don't change either way. */
+    case 'trialStart':{
+      if(isPremium()){flash('Already on Premium.');break}
+      const endK=dayKey(new Date(Date.now()+PRICE.trialDays*864e5));
+      subSave({tier:'free',since:today(),trialEnds:endK,plan:'yr',source:'trial'});
+      S.view='sub';render();
+      flash('Trial started — '+PRICE.trialDays+' days, nothing charged.');break}
     /* CANCEL IS ONE TAP AND IT TELLS THE TRUTH. Apple owns the
        subscription, so the honest route is Apple's own screen — never
        a retention flow, never an "are you sure" maze. ROSCA cost
@@ -35156,7 +35442,9 @@ function runAction(a,v,t,e){
       if(!recs.length){flash('Nothing usable in that file.');break}
       const res=histCommit(recs);
       S.histDated=null;S.sheet=null;
-      if(S.setupResume){S.setupResume=false;startSetup();flash('Read '+res.added+' sessions — the questions are filled from your data.');break}
+      if(S.setupResume){S.setupResume=false;
+        if(S._obFlow){obStartWait();break}
+        startSetup();flash('Read '+res.added+' sessions — the questions are filled from your data.');break}
       S.view='today';render();
       flash(res.added+' sessions in'+(res.replaced?' ('+res.replaced+' replaced)':'')+(res.skippedReal?' — '+res.skippedReal+' skipped, you had logged them yourself':'')+'.');
       break}
@@ -35167,7 +35455,9 @@ function runAction(a,v,t,e){
       if(!recs.length){flash('Nothing usable in that history.');break}
       const res=histCommit(recs);
       S.patCache=null;S.histImp=null;S.hdate=null;S.sheet=null;
-      if(S.setupResume){S.setupResume=false;startSetup();flash('Read '+res.added+' sessions — the questions are filled from your data.');break}
+      if(S.setupResume){S.setupResume=false;
+        if(S._obFlow){obStartWait();break}
+        startSetup();flash('Read '+res.added+' sessions — the questions are filled from your data.');break}
       render();
       flash(res.added+' sessions in, dates deduced'+(res.replaced?' — '+res.replaced+' from an earlier import replaced, never doubled':'')+(res.skippedReal?' · '+res.skippedReal+' skipped where you had real logs':'')+'.');break}
     case 'intakeOpen':{S.drawerOpen=false;S.sheet={t:'intake'};render();break}
@@ -35744,6 +36034,19 @@ function runAction(a,v,t,e){
     case 'rimpBack':S.rimp.res=null;render();break;
     case 'svGo':svConnect();break;
     case 'suGateGo':if(S.setup)S.setup.gate=false;render();break;
+    case 'obImportGo':{S._obFlow=1;
+      const wrapOn=(typeof inWrapper==='function')&&inWrapper();
+      if(wrapOn){try{window.webkit.messageHandlers.allena.postMessage('sync')}catch(e9){oops('obImportGo.sync',e9)}
+        obStartWait();break}
+      S.setupResume=true;S.sheet={t:'intake'};render();break}
+    case 'obBuildForMe':obGenerate();break;
+    case 'obTplOpen':if(S.setup){S.setup.tplPick=true;render()}break;
+    case 'obTplBack':if(S.setup){S.setup.tplPick=false;render()}break;
+    case 'obTplPick':{const tpl=OB_TEMPLATES.find(x=>x.id===v);if(!tpl)break;
+      if(tpl.run){obRunTemplate();break}
+      obGenerate(tpl);break}
+    case 'obRevealGo':{lset(K_ACCT,Object.assign({},acct()||{},{obRevealSeen:1}));
+      S.view='today';render();break}
     case 'suGateBack':if(S.setup)S.setup.gate=true;render();break;
     case 'healthConnectGo':{try{if(window.webkit&&window.webkit.messageHandlers&&window.webkit.messageHandlers.allena)window.webkit.messageHandlers.allena.postMessage('sync')}catch(e){}
       /* iOS shows the Health sheet exactly ONCE, ever — if it was
@@ -35773,24 +36076,18 @@ function runAction(a,v,t,e){
       try{
         const open9=(S.frRows||[]).filter(x=>!x.linked_at&&x.owner_id===S.frMe);
         const site=(CLOUD.site||'https://sathyacrisren-ui.github.io/allena-app/');
-        const sub9='One code, one friend \u2014 the week\u2019s race starts when they join.';
+        const sub9='Paste a code, type their username, or tap the link they sent you.';
         if(open9.length){const c9=open9[0].code;
-          S.sheet={t:'qr',q:{title:'Add a friend',kind:'join',code:c9,link:site+'?join='+encodeURIComponent(c9),sub:sub9}}}
-        else{S.sheet={t:'qr',q:{title:'Add a friend',kind:'join',sub:sub9}};
+          S.sheet={t:'addfr',q:{title:'Add a friend',code:c9,link:site+'?join='+encodeURIComponent(c9),sub:sub9}}}
+        else{S.sheet={t:'addfr',q:{title:'Add a friend',sub:sub9}};
           try{frInvite(true).then(function(){
             const o2=(S.frRows||[]).filter(x=>!x.linked_at&&x.owner_id===S.frMe)[0];
-            if(o2&&S.sheet&&S.sheet.t==='qr'){
+            if(o2&&S.sheet&&S.sheet.t==='addfr'){
               S.sheet.q.code=o2.code;S.sheet.q.link=site+'?join='+encodeURIComponent(o2.code);render()}})}catch(e9){}}
         render()}catch(e){}break}
     case 'frShareGo':{try{frShare(v)}catch(e){}break}
-    case 'qrOpen':{
-      try{const mine9=(S.crewRows||[]).find(x=>x.user_id===S.frMe);if(!mine9)break;
-        const site=(CLOUD.site||'https://sathyacrisren-ui.github.io/allena-app/');
-        const crew=(S.crews||[]).find(x=>x.code===mine9.crew_code)||{};
-        S.sheet={t:'qr',q:{title:crew.name||'The group',kind:'crew',code:mine9.crew_code,
-          link:site+'?crew='+encodeURIComponent(mine9.crew_code),
-          sub:'Anyone who scans joins the board \u2014 everyone races everyone.'}};
-        render()}catch(e){}break}
+    case 'frUserGo':{try{frFindByUsername(S.frUserIn||'')}catch(e){}break}
+    case 'raceGroupSel':{S.raceGroup=v||null;render();break}
     case 'crewNameOpen':{S.crewNm='';S.sheet={t:'crewname'};render();break}
     case 'crewMakeGo':{S.sheet=null;try{crewMake(S.crewNm)}catch(e){}render();break}
     case 'duelPin':{
@@ -36456,7 +36753,7 @@ function runAction(a,v,t,e){
     case '__frJoinGoPair':frJoin(S.frIn||'');break;
     case 'frRemove':frRemove(v);break;
     case 'tourNext':{if(!S.tour)break;S.tour.i++;
-      if(S.tour.i>=5){S.tour=null;lset('training-tour-v1',{seen:today()});flash('Replay it any time \u2014 Settings \u2192 Show me around.')}
+      if(S.tour.i>=TOUR_STEPS.length){S.tour=null;lset('training-tour-v1',{seen:today()});flash('Replay it any time \u2014 Settings \u2192 Show me around.')}
       render();break}
     case 'tourSkip':S.tour=null;lset('training-tour-v1',{seen:today()});render();break;
     case 'tourOpen':S.tour={i:0};S.sheet=null;S.view='today';render();break;
@@ -36540,8 +36837,19 @@ function runAction(a,v,t,e){
          asking to keep it. Already signed in (or cloud not switched
          on) skips it outright — nothing to ask for twice. */
       const already=(typeof acct==='function'&&acct()&&acct().refresh)||!(typeof acctReady==='function'&&acctReady());
-      S.view=already?'today':'signup';render();
+      const next=already?'today':'signup';
+      /* THE ONE PAYWALL MOMENT (18 Sep 2026, see viewObPaywall's own
+         comment for the research). Dark until premLive(): a real
+         launch user tomorrow goes straight to `next`, same as today. */
+      if(typeof premLive==='function'&&premLive()&&!isPremium()&&!(S.prof&&S.prof.obPwSeen)){
+        S._obNext=next;S.view='obpaywall';render();break}
+      S.view=next;render();
       flash('Your program is ready. The first sessions calibrate the weights.');break}
+    case 'obPwTrial':case 'obPwSkip':{
+      S.prof=Object.assign({},S.prof||{},{obPwSeen:1});lset(K_PROF,S.prof);
+      if(a==='obPwTrial')runAction('trialStart');   // its own flash stands
+      S.view=S._obNext||'today';S._obNext=null;render();
+      if(a==='obPwSkip')flash('Your program is ready. The first sessions calibrate the weights.');break}
     case 'suSkip':{S.prof={skipped:true};lset(K_PROF,S.prof);
       S.setup=null;S.sheet=null;S.view='today';render();
       flash('Have a look around \u2014 the Program tab builds you a block whenever you\u2019re ready.');break}
@@ -37177,7 +37485,7 @@ function dailyFindDue(){
 function dailyFindAsk(){try{
   if(!dailyFindDue())return false;
   if(S.boot!=null){S.dfQueued=true;return false}
-  if(S.view==='setup'||S.view==='signup'||S.view==='coach'||S.sess)return false;
+  if(S.view==='setup'||S.view==='signup'||S.view==='coach'||S.view==='obwait'||S.view==='obreveal'||S.sess)return false;
   if(S.sheet)return false;                 // never stack on another prompt
   if(morningDue())return false;            // readiness goes first; we take the next open
   const t=todayState();
@@ -37214,7 +37522,7 @@ function morningDue(){
 function morningAsk(){try{
   if(!morningDue())return false;
   if(S.boot!=null){S.morningQueued=true;return false}   // wait for the launch animation
-  if(S.view==='setup'||S.view==='signup'||S.view==='coach'||S.sess)return false;
+  if(S.view==='setup'||S.view==='signup'||S.view==='coach'||S.view==='obwait'||S.view==='obreveal'||S.sess)return false;
   if(S.sheet)return false;                       // never stack on another prompt
   const k=today();
   const d=S.gar.days[k]||{};
