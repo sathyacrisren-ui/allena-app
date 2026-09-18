@@ -525,14 +525,12 @@ body:not(:has(.tabbar)) .txpop{bottom:calc(env(safe-area-inset-bottom, 10px) + 1
    it reads as a glitch rather than as an arrival. From .4 with the
    overshoot kept, it reads as the same pop and has a body. */
 @keyframes sigPop{0%{transform:scale(.4);opacity:0}60%{transform:scale(1.5)}100%{transform:scale(1);opacity:1}}
-@keyframes sigDust{0%{opacity:0}40%{opacity:.7}100%{opacity:0;transform:translateY(-8px)}}
 @keyframes sigRise{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
 @keyframes sigFade{from{opacity:0}to{opacity:1}}
 #signalReveal{animation:sigFade .5s ease}
 #signalReveal .sig-link{stroke-dasharray:400 0;animation:sigLink 1.1s ease-out .3s both}
 #signalReveal .sig-a{animation:sigPop .5s ease .2s both}
 #signalReveal .sig-b{animation:sigPop .5s ease 1.3s both}
-#signalReveal .sig-dust{animation:sigDust 2.2s ease-out both;animation-iteration-count:2}
 #signalReveal .sig-eyebrow{animation:sigRise .6s ease 1.5s both}
 #signalReveal .sig-title{animation:sigRise .7s ease 1.75s both}
 #signalReveal .sig-body{animation:sigRise .7s ease 2.05s both}
@@ -1631,7 +1629,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='68d586';  // stamped by tools/build.py with the content hash
+const BUILD_ID='b4cd33';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -3509,17 +3507,78 @@ function acct(){return lget(K_ACCT,null)}
 function acctClaims(tok){try{
   const b=tok.split('.')[1].replace(/-/g,'+').replace(/_/g,'/');
   return JSON.parse(decodeURIComponent(escape(atob(b))))}catch(e){return null}}
+/* ONE READER FOR "TOKENS JUST ARRIVED" — the magic link lands back with
+   tokens in the URL hash; native Apple/Google sign-in lands back through
+   a window callback (below). Both are the same fact — a fresh access +
+   refresh pair — so both go through this one function instead of two
+   copies drifting apart. */
+function acctTokensLanded(access,refresh,expiresIn,emailHint){
+  const c=acctClaims(access);
+  lset(K_ACCT,Object.assign({},acct()||{},{email:(c&&c.email)||emailHint||'',access:access,refresh:refresh,
+    exp:Date.now()+((+expiresIn||3600)-60)*1000,lastSync:null,pendingEmail:null}));
+  S.acctPending=false;S._oauthPending=null;
+  if(S.view==='signup')S.view='today';
+  try{acctSyncSoon()}catch(e){}
+  try{cloudBkRecover()}catch(e){}}
 /* the magic link lands back here with tokens in the hash */
 try{
   const h=location.hash||'';
   if(h.indexOf('access_token=')>=0){
     const q={};h.replace(/^#/,'').split('&').forEach(kv=>{const p=kv.split('=');q[p[0]]=decodeURIComponent(p[1]||'')});
     if(q.access_token&&q.refresh_token){
-      const c=acctClaims(q.access_token);
-      lset(K_ACCT,{email:(c&&c.email)||'',access:q.access_token,refresh:q.refresh_token,
-        exp:Date.now()+((+q.expires_in||3600)-60)*1000,lastSync:null});
+      acctTokensLanded(q.access_token,q.refresh_token,q.expires_in);
       try{history.replaceState(null,'',location.pathname+location.search)}catch(e){}}}
 }catch(e){}
+/* ══ Sign in with Apple / Google (Sep 2026) ═══════════════════════════
+   Same Supabase project, same score-card-only sync — this only changes
+   HOW the tokens are earned, never what travels once they are. In a
+   browser (sandbox, web preview, or a beta user still on the web link)
+   it is an ordinary OAuth redirect through Supabase, landing back on
+   the hash-parsing block above like the magic link always has. Inside
+   the native wrapper it goes through the bridge instead, because a
+   WKWebView cannot host Apple's native sheet and Google actively
+   blocks its OAuth flow inside an embedded web view — the native side
+   does the actual sign-in and hands back the same {access,refresh}
+   shape either way. */
+function acctOAuthURL(provider,redirectTo){
+  return CLOUD.url+'/auth/v1/authorize?provider='+provider+'&redirect_to='+encodeURIComponent(redirectTo||CLOUD.site)}
+/* NATIVE NEEDS BUILD 21+ (Sep 2026 wrapper). An older wrapper on
+   someone's phone silently ignores a message type it has never heard
+   of — the promise would then hang forever with the button stuck on
+   "Connecting…" and nothing to show for it. Below that build number
+   this falls through to the same web OAuth redirect the browser and
+   sandbox already use, which any wrapper's WKWebView can still follow
+   for Apple (native presents its own sheet over the page either way)
+   — only Google truly needs the native bridge, since Google refuses
+   its own OAuth flow inside an embedded web view. */
+async function acctSignIn(provider){
+  if(S._oauthPending)return;
+  S._oauthPending=provider;render();
+  try{
+    const wr9=(typeof inWrapper==='function')&&inWrapper()&&(window.__wrapperBuild||0)>=21
+      &&window.webkit&&window.webkit.messageHandlers&&window.webkit.messageHandlers.allena;
+    if(wr9&&provider==='apple'){
+      window.webkit.messageHandlers.allena.postMessage(JSON.stringify(
+        {type:'signInApple',supaUrl:CLOUD.url,supaAnon:CLOUD.anon}));
+      return}
+    if(wr9&&provider==='google'){
+      window.webkit.messageHandlers.allena.postMessage(JSON.stringify(
+        {type:'signInGoogle',url:acctOAuthURL('google','allena://auth-callback')}));
+      return}
+    location.href=acctOAuthURL(provider)
+  }catch(e){S._oauthPending=null;flash('Could not start sign-in.');render()}}
+/* the native side calls this once, with either a landed token pair or
+   an honest reason it didn't land — never a silent nothing */
+window.acctOAuthResult=function(res){
+  try{
+    if(!res||res.cancelled){S._oauthPending=null;render();return}
+    if(!res.ok||!res.access||!res.refresh){
+      S._oauthPending=null;
+      flash(res&&res.error?String(res.error).slice(0,140):'Sign-in did not go through — try again.');
+      render();return}
+    acctTokensLanded(res.access,res.refresh,res.expires_in);
+    flash('Signed in.');render()
+  }catch(e){oops('acctOAuthResult',e);S._oauthPending=null;render()}}
 async function acctToken(){
   const a=acct();if(!a||!a.refresh)return null;
   if(a.access&&Date.now()<(a.exp||0))return a.access;
@@ -3556,12 +3615,9 @@ async function acctVerify(code){
       body:JSON.stringify({type:'email',email:email,token:String(code||'').trim()})});
     const d=await r.json();
     if(d.access_token&&d.refresh_token){
-      lset(K_ACCT,{email:(d.user&&d.user.email)||email,access:d.access_token,
-        refresh:d.refresh_token,exp:Date.now()+((+d.expires_in||3600)-60)*1000,lastSync:null});
-      S.acctPending=false;S.acctCode='';
-      flash('Signed in.');render();
-      try{acctSyncSoon()}catch(e){}
-      try{cloudBkRecover()}catch(e){}}
+      acctTokensLanded(d.access_token,d.refresh_token,d.expires_in,(d.user&&d.user.email)||email);
+      S.acctCode='';
+      flash('Signed in.');render()}
     else flash(d.msg||d.error_description||'That code did not work — codes expire quickly, send a fresh one.')
   }catch(e){flash('No connection.')}
   render()}
@@ -4870,6 +4926,25 @@ async function cloudBkRecover(){
    unsent goes on the next open (free when the hash matches), and a
    phone that came back empty pulls its record without being asked. */
 setTimeout(function(){try{cloudBkSoon();cloudBkRecover()}catch(e){oops('cloudBkBoot',e)}},1500);
+/* Apple and Google's own marks, each wearing the button treatment its
+   platform expects — the Apple pill matches this app's own light action
+   pill (a permitted Apple button colour), the Google pill is Google's
+   own documented dark-theme button (neutral surface, full-colour G) —
+   neither is reskinned into --amber, because that is not this app's
+   button to recolour. */
+function acctSocialBtn(provider,label){
+  const busy=S._oauthPending===provider;
+  const isApple=provider==='apple';
+  const icon=isApple
+    ?'<svg viewBox="0 0 384 512" width="16" height="16" fill="#000" style="flex:none"><path d="M318.7 268.7c-.2-36.7 16.4-64.4 50-84.8-18.8-26.9-47.2-41.7-84.7-44.6-35.5-2.8-74.3 20.7-88.5 20.7-15 0-49.4-19.7-76.4-19.7C63.3 141 0 184.8 0 273.5q0 39.3 14.4 81.2c12.8 36.7 59 126.7 107.2 125.2 25.2-.6 43-17.9 75.8-17.9 31.8 0 48.3 17.9 76.4 17.9 48.6-.7 90.4-82.5 102.6-119.3-65.2-30.7-57.7-90-57.7-91.9zm-56.6-164.2c27.3-32.4 24.8-61.9 24-72.5-24.1 1.4-52 16.4-67.9 34.9-17.5 19.8-27.8 44.3-25.6 71.9 26.1 2 49.9-11.4 69.5-34.3z"/></svg>'
+    :'<svg viewBox="0 0 48 48" width="16" height="16" style="flex:none"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.9-2.26 5.36-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>';
+  const bg=isApple?'linear-gradient(180deg,#F5F3EC,#E4E0D5)':'var(--raised)';
+  const col=isApple?'#0B0B0D':'var(--text)';
+  const bd=isApple?'1px solid transparent':'1px solid var(--line)';
+  const spin='<span style="width:14px;height:14px;border-radius:16px;border:2px solid rgba(120,120,120,.35);border-top-color:'+col+';display:inline-block;animation:spin .7s linear infinite;flex:none"></span>';
+  return '<button data-a="acctSignIn" data-v="'+provider+'"'+(S._oauthPending?' disabled':'')+
+    ' style="width:100%;display:flex;align-items:center;justify-content:center;gap:10px;padding:13px;border-radius:14px;background:'+bg+';border:'+bd+';color:'+col+';font-size:15px;font-weight:600;font-family:inherit;opacity:'+(S._oauthPending&&!busy?'.5':'1')+'">'+
+    (busy?spin:icon)+'<span>'+(busy?'Connecting…':label)+'</span></button>'}
 function accountSection(){
   if(!acctReady())return '<p style="color:var(--dim);font-size:13px;line-height:1.55;margin-top:8px">'+
     'Cloud sign-in is not switched on in this build yet. When it is, signing in adds the no-key coach chat and backs up your score card — and only your score card. Sets, weights, body and rehab data never leave this phone.</p>';
@@ -4903,8 +4978,13 @@ function accountSection(){
       :'<button data-a="acctSend2" class="btn mt" style="color:var(--dim)">Send a fresh code</button>')+
     '<button data-a="acctReset" class="btn mt" style="color:var(--faint);font-size:11px">Different email</button>';
   return '<p style="color:var(--dim);font-size:13px;line-height:1.55;margin-top:8px">'+
-      'Sign in with just your email — an emailed code, no password. It unlocks the coach chat without any API key, backs up your score card for the race, and backs up your whole training record to your account on its own after every change, so a new phone or a reinstall gets everything back. The backup is your row alone on the server; nobody else can read it.</p>'+
-    '<input data-in="acctEmail" value="'+esc(S.acctEmail||'')+'" placeholder="you@email.com" autocomplete="email" inputmode="email" class="mono" style="width:100%;margin-top:12px;background:var(--surface);border:1px solid var(--line);border-radius:12px;color:var(--text);padding:12px;font-size:13px;outline:none">'+
+      'One account unlocks the coach chat without any API key, backs up your score card for the race, and backs up your whole training record on its own after every change — a new phone or a reinstall gets everything back. Nobody else can read your row.</p>'+
+    '<div style="display:flex;flex-direction:column;gap:10px;margin-top:14px">'+
+    acctSocialBtn('apple','Continue with Apple')+acctSocialBtn('google','Continue with Google')+'</div>'+
+    '<div style="display:flex;align-items:center;gap:10px;margin:16px 0"><div style="flex:1;height:1px;background:var(--line)"></div>'+
+    '<span class="mono" style="color:var(--faint);font-size:11px;letter-spacing:.08em">OR WITH EMAIL</span>'+
+    '<div style="flex:1;height:1px;background:var(--line)"></div></div>'+
+    '<input data-in="acctEmail" value="'+esc(S.acctEmail||'')+'" placeholder="you@email.com" autocomplete="email" inputmode="email" class="mono" style="width:100%;background:var(--surface);border:1px solid var(--line);border-radius:12px;color:var(--text);padding:12px;font-size:17px;outline:none">'+
     '<button data-a="acctSend" class="btn mt" style="color:var(--amber)">Email me a sign-in code</button>'}
 /* ══ PODS — a race that does not need your friends (14 Sep 2026) ═══
    FRONT-DOOR.md Part 2. Three people at the same STAGE, matched by
@@ -5585,6 +5665,17 @@ A.backup=(auto)=>{
   /* auto-backups raise a real iOS save prompt — once a day is care,
      every save is nagging (owner-reported, Sep 2026) */
   if(auto&&Date.now()-(lget(K_BK,0)||0)<20*36e5)return;
+  /* A SIGNED-IN ACCOUNT ALREADY BACKS UP ITSELF (phase-1 QA, 18 Sep
+     2026, owner ruling). cloudBkSoon/cloudBkPush now ride every write
+     to a training key and never need a save-file dialog to prove it —
+     so the once-a-day file prompt, which used to be the ONLY backup a
+     phone had, became a second, redundant iOS save sheet for anyone
+     signed in. It stays for a signed-OUT account, where it is still
+     the only copy that exists anywhere but this phone. The manual
+     Back up now / export buttons are unaffected — this only silences
+     the AUTOMATIC prompt. One gate here covers every caller of
+     A.backup(true), not just the ones that exist today. */
+  if(auto&&acctReady()&&acct())return;
   const mode=download(new Blob([JSON.stringify(backupObj(),null,2)],{type:'application/json'}),
   'training-backup-'+today()+'.json');
   lset(K_BK,Date.now());
@@ -6036,7 +6127,11 @@ function viewSetup(){
   if(st.gate&&!SANDBOX&&!lget('training-welcome-v1',null)){
     const wi=st.wi||0;
     const wrapOn=(typeof inWrapper==='function')&&inWrapper();
-    const steps=2+(wrapOn?2:0)+((typeof acctReady==='function'&&acctReady())?1:0);
+    /* the account step used to live here (wi 4) — moved to the END of
+       onboarding (viewSignup, after day zero) on the owner's call, 18
+       Sep 2026: asking someone to sign up before they have seen the
+       app do anything is asking too early. */
+    const steps=2+(wrapOn?2:0);
     const shown=Math.min(wi+1,steps);
     /* wi 0 — THE PITCH (owner call, 3 Sep: the first screen sells,
        instantly). One claim no competitor can make, proven with the
@@ -6085,13 +6180,7 @@ function viewSetup(){
       '<p style="color:var(--dim);font-size:15px;line-height:1.7;margin-top:12px">This is the one that unlocks everything. Your watch \u2014 Garmin, Apple Watch, whatever you wear \u2014 already syncs workouts, sleep, heart rate and more into Apple Health.</p>'+
       '<p style="color:var(--dim);font-size:15px;line-height:1.7;margin-top:12px">Link it once and Allena ingests it automatically, forever: every workout lands moments after you finish, and the finds no single-purpose app can make switch on.</p>',
       '<button data-a="wHealth" class="big disp" style="background:var(--amber);color:var(--bg);font-size:17px">Link Health</button>'+
-      '<button data-a="wNext" class="btn" style="color:var(--dim)">Later</button>');
-    if(wi===4)return wpage('One account, every device',
-
-      '<div class="mt2">'+accountSection()+'</div>',
-      ((typeof acct==='function'&&acct()&&acct().refresh)
-        ?'<button data-a="wDone" class="big disp" style="background:var(--amber);color:var(--bg);font-size:17px">Done \u2014 let\u2019s build</button>'
-        :'<button data-a="wDone" class="btn" style="color:var(--dim)">Skip for now</button>'))}
+      '<button data-a="wNext" class="btn" style="color:var(--dim)">Later</button>')}
   if(st.gate){
     const door=(a,label,sub,primary)=>'<button data-a="'+a+'" class="card" style="width:100%;text-align:left;padding:17px 18px'+(primary?';border-color:var(--amber)':'')+'">'+
       '<span style="display:flex;align-items:center;gap:12px"><span style="flex:1;min-width:0">'+
@@ -6223,7 +6312,7 @@ function viewSetup(){
       '<span style="flex:1"><span style="display:block;font-size:13px;font-weight:600">Add the knee rehab pathway</span>'+
       '<span style="color:var(--faint);font-size:11px">Criteria-gated phases and testing in their own tab</span></span></button></div>';
     b+='<p class="eyebrow" style="margin-top:20px">Anything else Allena should know</p>'+
-      '<textarea data-in="setup.notes" rows="3" placeholder="Left knee, physio-guided. Bench is the priority." style="margin-top:8px;font-size:15px">'+esc(st.notes)+'</textarea>'+
+      '<textarea data-in="setup.notes" rows="3" placeholder="Left knee, physio-guided. Bench is the priority." style="margin-top:8px;font-size:17px">'+esc(st.notes)+'</textarea>'+
       '<p style="color:var(--faint);font-size:11px;line-height:1.55;margin-top:12px">Anything sharp, swelling or numb is a health professional\'s call, not an app\'s.</p>'}
   if(st.step===7&&!st.reviewedInjuries&&injuriesOf(st.restr||{}).length){
     const list=blockedList(st.restr||{});
@@ -6520,6 +6609,21 @@ function viewDay0(){
     '<button data-a="day0Go" class="big disp mt" style="background:var(--amber);color:var(--bg);font-size:17px">Start</button>'+
     '</div>';
   return h}
+/* THE LAST DOOR (owner ask, 18 Sep 2026): sign-up sits at the END of
+   onboarding now, after the wizard and after day zero's own findings —
+   never before anyone has seen the app do anything. One screen, one
+   real reason (a phone can be lost or replaced), Apple/Google/email
+   inside the same accountSection() every other sign-in surface uses,
+   and a plain way out that says exactly where to find it later. */
+function viewSignup(){
+  return '<div class="view pad stg pinpage" style="padding-top:40px">'+
+    '<p class="mono" style="color:var(--amber);font-size:11px;letter-spacing:.14em">LAST STEP</p>'+
+    '<h1 class="disp" style="font-size:28px;font-weight:600;margin-top:8px;line-height:1.15">Keep this program</h1>'+
+    '<p style="color:var(--dim);font-size:15px;line-height:1.6;margin-top:10px">A phone gets lost, replaced or reinstalled. One account brings your score card and your whole training record back on a new device — your sets, weights and rehab data never leave this phone either way.</p>'+
+    '<div class="pinbody">'+accountSection()+'</div>'+
+    '<div class="pinfoot">'+
+    '<button data-a="signupSkip" class="btn" style="color:var(--dim);width:100%">Skip for now</button>'+
+    '<p style="color:var(--faint);font-size:11px;text-align:center;margin-top:8px">You can sign in later from Data → Account.</p></div></div>'}
 const MUSCLE_RULES=[
  ['Chest',/bench press|chest press|chest-supported press|push[\s-]?up|weighted dip|chest dip|(?<!rear delt )(?<!rear-delt )(?<!reverse )\bfly\b|(?<!rear delt )(?<!rear-delt )(?<!reverse )flye|pec deck|crossover|incline (db |dumbbell |barbell |machine |smith )?press|machine incline|high press|neutral-?grip db press|decline press|svend|\bbp\b(?![\s\S]*dip)|\bbench\b(?![\s-]?dip)/i,40],
  ['Front delts',/shoulder press|overhead press|military press|landmine press|push press|arnold|wall slide|front raise|half-kneeling db press|seated dumbbell press|standing barbell press|smith machine press|overhead carry|\bohp\b/i,40],
@@ -7211,19 +7315,19 @@ function viewOwn(){
     h+='<div class="card mt" style="padding:14px 16px">'+
       '<div style="display:flex;align-items:center;gap:8px">'+
       '<span style="width:9px;height:9px;border-radius:8px;background:'+dayCol(di)+';flex:none"></span>'+
-      '<input data-ownday="'+di+'" value="'+esc(day.name)+'" style="flex:1;background:none;border:none;outline:none;color:var(--text);font-size:15px;font-weight:600">'+
+      '<input data-ownday="'+di+'" value="'+esc(day.name)+'" style="flex:1;background:none;border:none;outline:none;color:var(--text);font-size:17px;font-weight:600">'+
       (p.days.length>1?'<button data-a="ownDelDay" data-v="'+di+'" style="color:var(--red);font-size:11px;flex:none">Remove day</button>':'')+'</div>';
     if(!day.exercises.length)h+='<p style="color:var(--faint);font-size:13px;margin-top:12px">No exercises yet.</p>';
     h+='<div data-draglist="ownex" data-dragarg="'+di+'" style="margin-top:12px;display:flex;flex-direction:column;gap:8px">'+
       day.exercises.map((e,ei)=>{const st=(e.sets['default']||[])[0]||{};
         return '<div data-dragitem="'+ei+'" style="display:flex;align-items:center;gap:8px;border-top:1px solid var(--line);padding-top:8px">'+
           '<span class="mono" style="color:var(--faint);font-size:11px;letter-spacing:1px;flex:none">⋮⋮</span>'+
-          '<input data-ownex="'+di+':'+ei+'" value="'+esc(e.name)+'" style="flex:1;min-width:0;background:none;border:none;outline:none;color:var(--text);font-size:13px">'+
-          '<input data-ownsets="'+di+':'+ei+'" value="'+(e.sets['default']||[]).length+'" inputmode="numeric" class="mono" style="width:28px;background:var(--surface);border:1px solid var(--line);border-radius:8px;color:var(--text);font-size:13px;padding:5px 0;text-align:center">'+
+          '<input data-ownex="'+di+':'+ei+'" value="'+esc(e.name)+'" style="flex:1;min-width:0;background:none;border:none;outline:none;color:var(--text);font-size:17px">'+
+          '<input data-ownsets="'+di+':'+ei+'" value="'+(e.sets['default']||[]).length+'" inputmode="numeric" class="mono" style="width:28px;background:var(--surface);border:1px solid var(--line);border-radius:8px;color:var(--text);font-size:17px;padding:5px 0;text-align:center">'+
           '<span class="mono" style="color:var(--faint);font-size:11px">×</span>'+
-          '<input data-ownreps="'+di+':'+ei+'" value="'+esc(String(st.reps==null?'':st.reps))+'" class="mono" style="width:46px;background:var(--surface);border:1px solid var(--line);border-radius:8px;color:var(--text);font-size:13px;padding:5px 0;text-align:center">'+
-          '<input data-ownw="'+di+':'+ei+'" value="'+(st.w==null?'':st.w)+'" inputmode="decimal" placeholder="kg" class="mono" style="width:44px;background:var(--surface);border:1px solid var(--line);border-radius:8px;color:var(--text);font-size:13px;padding:5px 0;text-align:center">'+
-          '<input data-ownrpe="'+di+':'+ei+'" value="'+(st.rpe==null?'':st.rpe)+'" inputmode="decimal" placeholder="rpe" class="mono" style="width:38px;background:var(--surface);border:1px solid var(--line);border-radius:8px;color:var(--text);font-size:13px;padding:5px 0;text-align:center">'+
+          '<input data-ownreps="'+di+':'+ei+'" value="'+esc(String(st.reps==null?'':st.reps))+'" class="mono" style="width:46px;background:var(--surface);border:1px solid var(--line);border-radius:8px;color:var(--text);font-size:17px;padding:5px 0;text-align:center">'+
+          '<input data-ownw="'+di+':'+ei+'" value="'+(st.w==null?'':st.w)+'" inputmode="decimal" placeholder="kg" class="mono" style="width:44px;background:var(--surface);border:1px solid var(--line);border-radius:8px;color:var(--text);font-size:17px;padding:5px 0;text-align:center">'+
+          '<input data-ownrpe="'+di+':'+ei+'" value="'+(st.rpe==null?'':st.rpe)+'" inputmode="decimal" placeholder="rpe" class="mono" style="width:38px;background:var(--surface);border:1px solid var(--line);border-radius:8px;color:var(--text);font-size:17px;padding:5px 0;text-align:center">'+
           '<button data-a="ownDelEx" data-v="'+di+':'+ei+'" style="color:var(--red);font-size:15px;flex:none;padding:0 2px">×</button></div>'}).join('')+'</div>';
     h+='<div class="row mt"><button data-a="ownAddEx" data-v="'+di+'" class="btn" style="flex:1;font-size:13px;color:var(--amber)">+ Exercise</button>'+
       '<button data-a="ownPick" data-v="'+di+'" class="btn" style="flex:1;font-size:13px;color:var(--dim)">Browse library</button></div></div>'});
@@ -7392,7 +7496,7 @@ function viewImport(){
       [['auto','Let Allena decide'],['plan','A plan to follow'],['hist','Logged history']].map(m9=>
         '<button data-a="impKind" data-v="'+m9[0]+'" class="pill" style="flex:none;white-space:nowrap;font-size:13px'+((f.kindHint||'auto')===m9[0]?';background:var(--text);color:var(--bg);border-color:var(--text);font-weight:600':'')+'">'+m9[1]+'</button>').join('')+'</div>'+
       '<p class="eyebrow mt2">Paste it</p>'+
-      '<textarea data-in="imp.text" rows="7" placeholder="Day 1 — Push&#10;Bench press 4 x 5 @ 100kg&#10;Incline DB press 3 x 10&#10;..." style="margin-top:8px;font-size:15px">'+esc(f.text)+'</textarea>';
+      '<textarea data-in="imp.text" rows="7" placeholder="Day 1 — Push&#10;Bench press 4 x 5 @ 100kg&#10;Incline DB press 3 x 10&#10;..." style="margin-top:8px;font-size:17px">'+esc(f.text)+'</textarea>';
     h+='<p class="eyebrow mt2">Or a photo / spreadsheet</p>'+
       '<label class="btn mt" style="display:block;text-align:center;cursor:pointer">'+(f.img?'Photo attached — choose another':'Choose a photo')+
       '<input type="file" accept="image/*" data-impfile="1" style="display:none"></label>'+
@@ -11830,7 +11934,7 @@ function treeDust(){
   /* motes in the tree's own colours: the three domain ramps' bright ends
      and the four find tiers. Deterministic placement, looping. */
   try{
-    const C=['#1FDD68','#4FB6FF','#F056AE','#3C6FB8','#6E7FE8','#C46BFF','#C9D3E0','#4FEA8C','#86D6FF','#FA8FC9'];
+    const C=['#1FDD68','#4FB6FF','#F056AE','#3C6FB8','#6E7FE8','#C46BFF','#E0E7F2','#4FEA8C','#86D6FF','#FA8FC9'];
     return Array.from({length:12},(_,i)=>'<i class="tree-dust" style="left:'+(8+(i*13.7)%84).toFixed(0)+'%;top:'+(18+(i*21.3)%62).toFixed(0)+'%;color:'+C[i%C.length]+';animation-delay:'+(i*0.55).toFixed(2)+'s;animation-duration:'+(5.2+(i%4)*0.9).toFixed(1)+'s"></i>').join('')}
   catch(e){oops('treeDust',e);return ''}}
 function weeksRacedCard(){
@@ -15455,8 +15559,12 @@ const RARITY=[
   ['rare',    '#C46BFF','Rare find',    'rgba(196,107,255,.14)', 2],
   /* PLATINUM, NOT GOLD (owner, 17 Sep 2026: "yellow looks corny"). A cool
      silver-blue at the top of the ladder: 108 RGB from purple, well over
-     the 55 pin, and it reads as the rarest thing without shouting. */
-  ['epic',    '#C9D3E0','Big one',      'rgba(201,211,224,.16)', 3]];
+     the 55 pin, and it reads as the rarest thing without shouting.
+     LIFTED TO A TRUE SILVER (phase-1 QA, 18 Sep 2026): #C9D3E0 read as
+     plain grey next to the other three, saturated blues below it — the
+     rarest tier looked the flattest. Lighter and a touch more silver-blue,
+     same hue direction, same rule (never touch the other three). */
+  ['epic',    '#E0E7F2','Big one',      'rgba(224,231,242,.16)', 3]];
 function rarityOf(k){return RARITY.find(x=>x[0]===k)||RARITY[0]}
 /* THE TIER SHOWS IN THE CHROME, NOT ONLY THE WORD (same ruling: "make it
    look better, demonstrate their ranking with colour and UI design
@@ -17580,7 +17688,12 @@ function corrPhrase(c){
   return{title:title,body:body,x:x,strong:Math.abs(c.rho)>=0.65&&!S9.sched,good:good,sched:!!S9.sched}}
 function correlationDiscoveries(){
   const D=[];
-  const cur=correlations();
+  /* free sees the strongest correlations the grid clears, not the whole
+     reservoir (owner call, 18 Sep) — correlations() is already sorted
+     strongest-first, so a cap here is a narrower search, never a locked
+     result: see corrFreeCap() in 19c-premium.js. */
+  const full=correlations();
+  const cur=(typeof isPremium==='function'&&isPremium())?full:full.slice(0,corrFreeCap());
   cur.forEach(c=>{
     const p=corrPhrase(c);
     D.push({rar:(p.contra||p.sched)?'common':(p.strong?'epic':'rare'),t:p.title,d:p.body,x:p.x||'',tag:'signal',contra:p.contra?1:0,sched:p.sched?1:0,id:corrIdentity(c),k:c.k||null})});
@@ -17604,22 +17717,34 @@ function correlationDiscoveries(){
     const live={};
     /* state keys are family|outcome — the bar is what tells them apart
        from the legacy sig:out:lag keys, which an ex: outcome would
-       otherwise look exactly like (caught re-reading the diff) */
-    cur.forEach(c=>{
+       otherwise look exactly like (caught re-reading the diff).
+       This tracks against the FULL reservoir, not the capped `cur` —
+       a correlation dropping below the free cap because stronger ones
+       appeared is not the same as it fading, and must never be
+       announced as "A link faded" just for being outranked. */
+    full.forEach(c=>{
       const key=corrFamily(c.sig)+'|'+c.out;live[key]=1;
+      /* a correlation beyond the free cap still gets tracked (so the
+         bookkeeping is ready the moment it's premium, or the moment it
+         is strong enough to rank in), but it never earns a "found",
+         "holding stronger" or "back again" finding while it's a
+         correlation this user has never actually been shown — that
+         would leak the capped correlations through the state-change
+         door instead of the cap. */
+      const visible=cur.indexOf(c)>=0;
       const prev=st[key];
       if(prev&&prev.gone){
         /* returned: sustained presence after a fade */
         if(!prev.back)prev.back=tk;
         if(daysBetween(prev.back,tk)>=14){
-          const p=corrPhrase(c);
-          D.push({rar:'uncommon',t:'Back again: '+p.title.toLowerCase(),
-            d:'This link faded once and has cleared the bar again for two weeks running (correlation '+(Math.round(c.rho*100)/100)+' across '+c.n+' days).',
-            tag:'signal',id:'corrback:'+key+':'+prev.back});
+          if(visible){const p=corrPhrase(c);
+            D.push({rar:'uncommon',t:'Back again: '+p.title.toLowerCase(),
+              d:'This link faded once and has cleared the bar again for two weeks running (correlation '+(Math.round(c.rho*100)/100)+' across '+c.n+' days).',
+              tag:'signal',id:'corrback:'+key+':'+prev.back})}
           delete prev.gone;delete prev.back;prev.rho=c.rho;prev.n=c.n;dirty=true}
         return}
       if(prev&&prev.miss){delete prev.miss;dirty=true}
-      if(prev&&c.n>=prev.n+14&&Math.abs(c.rho)>=Math.abs(prev.rho)+0.1&&(!prev.upAt||daysBetween(prev.upAt,tk)>=28)){
+      if(visible&&prev&&c.n>=prev.n+14&&Math.abs(c.rho)>=Math.abs(prev.rho)+0.1&&(!prev.upAt||daysBetween(prev.upAt,tk)>=28)){
         const p=corrPhrase(c);
         D.push({rar:'uncommon',t:'Holding stronger: '+p.title.toLowerCase(),
           d:'Two more weeks of evidence and the link tightened (correlation '+(Math.round(c.rho*100)/100)+' across '+c.n+' days, from '+(Math.round(prev.rho*100)/100)+' across '+prev.n+'). The pattern is earning trust.',
@@ -17713,8 +17838,6 @@ function signalRevealHtml(){
     '<line class="sig-link" x1="70" y1="60" x2="230" y2="150" stroke="'+(sg.c||'var(--green)')+'" stroke-width="1.4" opacity=".55"/>'+
     '<circle class="sig-a" cx="70" cy="60" r="6" fill="var(--amber)"/>'+
     '<circle class="sig-b" cx="230" cy="150" r="6" fill="'+(sg.c||'var(--green)')+'"/>'+
-    Array.from({length:22},(_,i)=>{const a=i*0.618*6.283,rr=30+((i*37)%120);
-      return '<circle class="sig-dust" style="animation-delay:'+(i*40)+'ms" cx="'+(150+Math.cos(a)*rr).toFixed(0)+'" cy="'+(100+Math.sin(a)*rr*0.6).toFixed(0)+'" r="1.3" fill="#7BA88A" opacity="0"/>'}).join('')+
     '</svg>'+
     '<div style="position:relative;margin-top:34vh">'+
     '<p class="mono sig-eyebrow" style="font-size:11px;letter-spacing:.24em;color:'+(sg.c||'var(--green)')+'">'+(sg.e||'\u2726 AN INSIGHT')+'</p>'+
@@ -21483,7 +21606,7 @@ function treePopFinds(){
   catch(e){oops('treePopFinds',e);return []}}
 function treePopHtml(){
   try{
-    if(S.view==='tree'||S.view==='session'||S.view==='setup'||S.view==='evidence')return '';
+    if(S.view==='tree'||S.view==='session'||S.view==='setup'||S.view==='signup'||S.view==='evidence')return '';
     if(S.sess&&S.sess.phase!=='done')return '';
     if(S.signalReveal||S.tour||S.boot!=null)return '';
     if(S._txPopHide===today())return '';
@@ -26314,6 +26437,7 @@ function viewFindings(){
     wrapF(LENS.h,LENS.f,LENS.n)+
     findPills()+
     lensWord('disc')+
+    (typeof corrSellCard==='function'?corrSellCard():'')+
     '<button data-a="deepGo" class="btn mt2" style="color:'+(deepRdy?'var(--amber)':'var(--dim)')+';font-size:13px">'+
       (deepRdy?'This week\u2019s read is ready \u203a':'This week\u2019s read \u2014 what the model makes of it \u203a')+'</button>'+
     '</div>'}
@@ -27108,7 +27232,25 @@ const PREM_FEATURES=[
    Implementing the wider search is an ENGINE change, not a UI one, and
    it needs the owner's call on where the free grid stops. The lock copy
    below is written for that design and is honest about it today:
-   nothing is hidden, the search is just narrower. */
+   nothing is hidden, the search is just narrower.
+
+   THE OWNER MADE THAT CALL (18 Sep 2026): free gets the STRONGEST few
+   correlations the grid clears, not the whole 32-deep reservoir —
+   Premium's Insights runs the full search. This is still "a finding is
+   never locked after it is found": corrFreeCap() only limits how many
+   NEW correlations correlationDiscoveries() turns into findings going
+   forward, in 13c-correlate.js. Anything already banked in
+   training-bank-v1 stays banked and visible forever, cap or no cap —
+   see bankDiscoveries() in 18-today-cards.js, which only ever adds. */
+const CORR_CAP_VARIANTS=[3,5,8];
+function corrFreeCap(){
+  try{
+    if(S.prof&&S.prof.corrCapN)return S.prof.corrCapN;
+    const n=CORR_CAP_VARIANTS[Math.floor(Math.random()*CORR_CAP_VARIANTS.length)];
+    S.prof=Object.assign({},S.prof||{},{corrCapN:n});
+    lset(K_PROF,S.prof);
+    return n}
+  catch(e){oops('corrFreeCap',e);return CORR_CAP_VARIANTS[1]}}
 
 const FREE_FEATURES=[
   'Logging, and the clock that witnesses it',
@@ -27150,7 +27292,11 @@ function subSave(s){try{S._sub=s;lset(K_PREM,s)}catch(e){oops('subSave',e)}}
    codebase, finished, waiting for products in App Store Connect.
    FLIP THIS ONLY when StoreKit is wired AND the products exist. */
 const PREM_LIVE=false;
-function premLive(){return PREM_LIVE}
+/* Settings → Beta testing → Preview Premium (S.prof.premBeta) flips
+   this on for the person testing it, same pattern as the chronological
+   tree's beta pick — never for a real launch user, PREM_LIVE alone
+   still decides that. */
+function premLive(){return PREM_LIVE||!!(S.prof&&S.prof.premBeta)}
 
 /* ENTITLEMENT and THE LAUNCH FLAG are two different questions, and they
    are two functions so both stay testable. subEntitled() answers "has
@@ -27168,7 +27314,7 @@ function subEntitled(){
 /* the single gate. Everything that locks reads through here, so
    wiring StoreKit later touches exactly one function. */
 function isPremium(){
-  try{return PREM_LIVE?subEntitled():true}   // nothing gates before launch
+  try{return premLive()?subEntitled():true}   // nothing gates before launch (or beta preview)
   catch(e){oops('isPremium',e);return true}}
 
 function subState(){
@@ -27200,6 +27346,21 @@ function lockCard(featKey,opts){
       esc(n===1?'1 more is waiting in your data.':n+' more are waiting in your data.')+'</p>':'')+
     '<button data-a="upgradeOpen" data-v="'+esc(featKey)+'" class="btn" style="margin-top:12px;width:100%">See what Premium adds</button>'+
     '</div>'}
+
+/* the correlation-cap sell (18 Sep 2026, owner: "sell deep reads as
+   the cooler version — the analyst gives them a hypothesis to test in
+   their training"). Sits on the Findings page, under the correlations
+   free already found. `n` is real — correlations() has already run
+   the full search, corrFreeCap() just decided how much of it a free
+   account gets turned into findings (see correlationDiscoveries()). */
+function corrSellCard(){
+  try{
+    if(typeof isPremium!=='function'||isPremium())return '';
+    const full=correlations(),cap=corrFreeCap(),extra=full.length-cap;
+    if(extra<=0)return '';
+    return lockCard('insights',{n:extra,
+      d:'You’re seeing the strongest '+cap+' correlations Allena has found in your data so far. Premium runs the full search — every signal against every outcome — and each Monday’s read turns what it finds into a hypothesis to test in your training.'})}
+  catch(e){oops('corrSellCard',e);return ''}}
 
 /* a quiet one-liner for dense surfaces where a card is too loud */
 function premLine(featKey,txt){
@@ -29361,6 +29522,13 @@ function viewProgress(){
     '<span style="width:8px;height:8px;border-radius:8px;background:var(--amber);flex:none"></span>'+
     '<span style="flex:1;font-size:13px;color:var(--dim)">New pattern since your last session: <b style="color:var(--text)">'+esc(S.newPattern)+'</b></span>'+
     '<button data-a="patSeen" class="mono" style="color:var(--faint);font-size:11px;flex:none">✕</button></div>';}
+  /* THE PROGRESS TAB'S BADGE NEEDS A DOOR ON PROGRESS (phase-1 QA, 18
+     Sep 2026): the tab could badge unseen collection finds with nothing
+     on the page leading to them — a red count nobody landing here could
+     clear. collOpen already marks every find seen the moment the
+     collection renders, so this reuses that exact door instead of
+     inventing a second way to clear the same count. */
+  h+=collFreshCard();
   if(tabRehab){h+='<div class="seg" style="margin-top:12px">'+
     [['train','Training'],['rehab','Rehab']].map(x=>'<button data-a="progTab" data-v="'+x[0]+'"'+((S.progTab||'train')===x[0]?' class="on"':'')+'>'+x[1]+'</button>').join('')+'</div>';
     if((S.progTab||'train')==='rehab')return h+rehabProgress()+'</div>'}
@@ -29401,6 +29569,15 @@ function isoWeek(iso){const d=new Date(iso);const t=new Date(Date.UTC(d.getFullY
   const y=t.getUTCFullYear();const w=Math.ceil(((t-Date.UTC(y,0,1))/864e5+1)/7);
   return y+'-W'+String(w).padStart(2,'0')}
 
+function collFreshCard(){
+  try{
+    const n=(typeof collFreshN==='function')?collFreshN():0;
+    if(!n)return '';
+    return '<button data-a="collOpen" class="card mt" style="width:100%;text-align:left;padding:14px 16px;display:flex;align-items:center;gap:12px;border-color:var(--amber)">'+
+      '<span style="width:8px;height:8px;border-radius:8px;background:var(--amber);flex:none"></span>'+
+      '<span style="flex:1;font-size:13px;color:var(--dim)">'+n+' new find'+(n===1?'':'s')+' waiting in the collection.</span>'+
+      '<span style="color:var(--faint);font-size:13px;flex:none">Open ›</span></button>'}
+  catch(e){oops('collFreshCard',e);return ''}}
 function backupCard(){
   const d=backupDays(),due=backupDue();
   const label=d===null?'Never backed up':(d===0?'Backed up today':d===1?'Backed up yesterday':'Last backup '+d+' days ago');
@@ -29562,7 +29739,8 @@ function viewData(){
     setRow(I.bug,'Report a problem','','__report'),
     setRow(I.demo,'Demo data',demoPresent()?'loaded':'','Demo data'),
     setRow(I.demo,'Demo mode for filming',localStorage.getItem('allena-demo-live')?'ON':'','__demomode'),
-    navRow(SET_ICONS.trend,'Chronological tree',(function(){try{return treeTimeOn()?'ON':'OFF'}catch(e){return 'ON'}})(),'treeCompare')]);
+    navRow(SET_ICONS.trend,'Chronological tree',(function(){try{return treeTimeOn()?'ON':'OFF'}catch(e){return 'ON'}})(),'treeCompare'),
+    setRow(I.load,'Preview Premium',(S.prof&&S.prof.premBeta)?'ON':'OFF','__premBeta')]);
   const KNOWN=['You','Get help','Account & sync','Program library','Your own block','Rehab pathway','Running','Daily check-in','Profile','Barbell weight','Available equipment','Units','Notifications','Report a problem','Allena — AI coach','Export','Restore','Demo data','Start fresh'];
   const left=Object.keys(byTitle).filter(k=>KNOWN.indexOf(k)<0);
   if(left.length)h+=setGroup('More',left.map(k=>setRow(I.prog,k,'',k)));
@@ -29617,7 +29795,7 @@ function dataRaw(){
    (S.prof&&S.prof.goal?'<div class="card" style="padding:14px 16px;margin-top:12px"><p style="font-size:15px;font-weight:600">'+esc(S.prof.name||'You')+'</p>'+
      '<p class="mono" style="color:var(--faint);font-size:11px;margin-top:4px">'+esc(S.prof.goal+' · '+S.prof.days+' days/wk · '+S.prof.eq)+(restrList(S.prof)?' · '+esc(restrList(S.prof)):'')+'</p></div>'
      :'<p style="color:var(--dim);font-size:13px;margin-top:8px">No profile yet - the app can build a personalised program from a few questions.</p>')+
-   ((!S.prof||!S.prof.name)?'<div class="row mt" style="gap:8px"><input data-in="pname" value="" placeholder="Your name (for the welcome line)" autocomplete="off" style="flex:1;min-width:0;background:var(--surface);border:1px solid var(--line);border-radius:12px;color:var(--text);padding:11px;font-size:15px;outline:none"><button data-a="pnameSave" class="pill" style="flex:none">Save</button></div>':'')+
+   ((!S.prof||!S.prof.name)?'<div class="row mt" style="gap:8px"><input data-in="pname" value="" placeholder="Your name (for the welcome line)" autocomplete="off" style="flex:1;min-width:0;background:var(--surface);border:1px solid var(--line);border-radius:12px;color:var(--text);padding:11px;font-size:17px;outline:none"><button data-a="pnameSave" class="pill" style="flex:none">Save</button></div>':'')+
    '<p style="color:var(--faint);font-size:11px;line-height:1.5;margin-top:8px">Building a program from these answers lives under Program \u2192 Personalised program.</p></div>'+
    '<div class="mt2"><p class="eyebrow">Rehab pathway</p>'+
    '<p style="color:var(--faint);font-size:13px;line-height:1.55;margin-top:8px">Turn on anything you are rehabbing. Staged pathways gate progression on criteria; managed protocols have no healing clock and are about loading the tissue well. The Rehab tab appears while at least one is on and disappears when they are all off — nothing is deleted either way.</p>'+
@@ -29703,14 +29881,14 @@ function dataRaw(){
      (S.prof&&S.prof.goal?'<p style="font-size:15px;font-weight:600;margin-top:8px">'+esc(S.prof.name||'You')+'</p>'+
        '<p class="mono" style="color:var(--faint);font-size:11px;margin-top:3px">'+esc(S.prof.goal+' · '+S.prof.days+' days/wk')+(restrList(S.prof)?' · '+esc(restrList(S.prof)):'')+'</p>'
        :'<p style="color:var(--dim);font-size:13px;margin-top:8px">No profile yet — Allena can build a program from a few questions.</p>')+
-     ((!S.prof||!S.prof.name)?'<div class="row mt" style="gap:8px"><input data-in="pname" value="" placeholder="Your name" autocomplete="off" style="flex:1;min-width:0;background:var(--surface);border:1px solid var(--line);border-radius:12px;color:var(--text);padding:11px;font-size:15px;outline:none"><button data-a="pnameSave" class="pill" style="flex:none">Save</button></div>':'')+
+     ((!S.prof||!S.prof.name)?'<div class="row mt" style="gap:8px"><input data-in="pname" value="" placeholder="Your name" autocomplete="off" style="flex:1;min-width:0;background:var(--surface);border:1px solid var(--line);border-radius:12px;color:var(--text);padding:11px;font-size:17px;outline:none"><button data-a="pnameSave" class="pill" style="flex:none">Save</button></div>':'')+
      '<button data-a="setupOpen" class="btn mt">'+(S.prof&&S.prof.goal?'Edit profile &amp; generate a new block':'Set up a personalised program')+'</button>'+
      ((S.goals||[]).length?'<p class="mono" style="color:var(--faint);font-size:11px;margin-top:12px">Goals: '+esc((S.goals||[]).map(g=>g.ex).join(', '))+'</p>':'')+
      '</div></div>'+
    '<div class="mt2"><p class="eyebrow">Allena — AI coach</p>'+
    '<p style="color:var(--dim);font-size:13px;line-height:1.55;margin-top:8px">Two ways to bring Allena\'s chat to life. Easiest: paste an <b>Allena cloud link</b> if you have one — no account, no key. Or paste your own Anthropic API key (console.anthropic.com). Either lives only in this phone\'s storage. Fresh session context rides along with every message, and only the last few turns are kept.</p>'+
-   '<input data-in="ai.proxy" value="'+esc(S.ai.proxy||'')+'" placeholder="Allena cloud link (https://…)" autocomplete="off" class="mono" style="width:100%;margin-top:12px;background:var(--surface);border:1px solid var(--line);border-radius:12px;color:var(--text);padding:12px;font-size:13px;outline:none">'+
-   '<input data-in="ai.key" value="'+esc(S.ai.key)+'" placeholder="or your own key: sk-ant-…" autocomplete="off" class="mono" style="width:100%;margin-top:8px;background:var(--surface);border:1px solid var(--line);border-radius:12px;color:var(--text);padding:12px;font-size:13px;outline:none">'+
+   '<input data-in="ai.proxy" value="'+esc(S.ai.proxy||'')+'" placeholder="Allena cloud link (https://…)" autocomplete="off" class="mono" style="width:100%;margin-top:12px;background:var(--surface);border:1px solid var(--line);border-radius:12px;color:var(--text);padding:12px;font-size:17px;outline:none">'+
+   '<input data-in="ai.key" value="'+esc(S.ai.key)+'" placeholder="or your own key: sk-ant-…" autocomplete="off" class="mono" style="width:100%;margin-top:8px;background:var(--surface);border:1px solid var(--line);border-radius:12px;color:var(--text);padding:12px;font-size:17px;outline:none">'+
    '<div class="row" style="margin-top:8px">'+MODELS.map(m=>'<button data-a="aiModel" data-v="'+m[0]+'" class="pill" style="flex:1'+(S.ai.model===m[0]?';background:var(--text);color:var(--bg);border-color:var(--text);font-weight:600':'')+'">'+m[1]+'</button>').join('')+'</div>'+
    (function(){const ready9=aiReady();
      return '<button data-a="aiSave" class="btn mt" style="'+(ready9?'background:var(--amber);color:var(--bg);border:none;font-weight:600':'')+'">Save Allena settings</button>'})()+
@@ -29779,11 +29957,11 @@ function youPageHtml(){
   const sexPill=(v,l)=>'<button data-a="meSex" data-v="'+v+'" class="pill" style="flex:1'+((pr.sex||'')===v?';background:var(--text);color:var(--bg);border-color:var(--text);font-weight:600':'')+'">'+l+'</button>';
   return '<p style="color:var(--dim);font-size:13px;line-height:1.55;margin-top:8px">Age and sex calibrate the strength and running standards in Where you stand. The name is just your welcome line. Saved as you type — nothing here leaves the phone.</p>'+
     '<p class="eyebrow" style="margin-top:16px">Name</p>'+
-    '<input data-in="prof.name" value="'+esc(pr.name||'')+'" autocomplete="off" style="width:100%;margin-top:8px;background:var(--surface);border:1px solid var(--line);border-radius:12px;color:var(--text);padding:12px;font-size:15px;outline:none">'+
+    '<input data-in="prof.name" value="'+esc(pr.name||'')+'" autocomplete="off" style="width:100%;margin-top:8px;background:var(--surface);border:1px solid var(--line);border-radius:12px;color:var(--text);padding:12px;font-size:17px;outline:none">'+
     '<p class="eyebrow" style="margin-top:16px">Age</p>'+
-    '<input data-in="prof.age" value="'+esc(pr.age!=null?pr.age:'')+'" inputmode="numeric" style="width:100%;margin-top:8px;background:var(--surface);border:1px solid var(--line);border-radius:12px;color:var(--text);padding:12px;font-size:15px;outline:none">'+
+    '<input data-in="prof.age" value="'+esc(pr.age!=null?pr.age:'')+'" inputmode="numeric" style="width:100%;margin-top:8px;background:var(--surface);border:1px solid var(--line);border-radius:12px;color:var(--text);padding:12px;font-size:17px;outline:none">'+
     '<p class="eyebrow" style="margin-top:16px">Height (cm)</p>'+
-    '<input data-in="prof.height" value="'+esc(pr.height!=null?pr.height:'')+'" inputmode="numeric" style="width:100%;margin-top:8px;background:var(--surface);border:1px solid var(--line);border-radius:12px;color:var(--text);padding:12px;font-size:15px;outline:none">'+
+    '<input data-in="prof.height" value="'+esc(pr.height!=null?pr.height:'')+'" inputmode="numeric" style="width:100%;margin-top:8px;background:var(--surface);border:1px solid var(--line);border-radius:12px;color:var(--text);padding:12px;font-size:17px;outline:none">'+
     (function(){try{
       const h9=+pr.height;if(!(h9>120&&h9<230))return '<p style="color:var(--faint);font-size:11px;line-height:1.5;margin-top:8px">Height unlocks the fat-free mass index once a scan or bodyfat reading exists.</p>';
       const sc=(typeof scansSorted==='function'?scansSorted():[])[0];
@@ -30858,7 +31036,7 @@ function sheetHtml(){
         :'<p style="color:var(--faint);font-size:13px;margin-top:12px">Your own code appears once you have a best week of at least 2 sessions.</p>')+
       '<p class="eyebrow mt2">Got theirs?</p>'+
       '<button data-a="fghostPaste" class="big disp mt" style="background:var(--raised);border:1px solid var(--line);color:var(--text);font-size:15px">Paste their code or link</button>'+
-      '<textarea data-in="fgIn" rows="2" placeholder="…or type it here: AG1.…" style="margin-top:12px;font-size:13px">'+esc(S.fgIn||'')+'</textarea>'+
+      '<textarea data-in="fgIn" rows="2" placeholder="…or type it here: AG1.…" style="margin-top:12px;font-size:17px">'+esc(S.fgIn||'')+'</textarea>'+
       '<button data-a="fghostGo" class="big disp mt" style="background:var(--amber);color:var(--bg);font-size:15px">Add the ghost</button>'+
       (f?'<div class="card mt" style="padding:12px 15px;display:flex;align-items:center;gap:12px">'+
         '<span style="flex:1;font-size:13px">Racing <b>'+esc(f.n)+'</b> — best week '+f.s+' sessions'+(f.k?', '+udStr(f.k):'')+'</span>'+
@@ -30942,10 +31120,10 @@ function sheetHtml(){
       (f.days.length>1?'<p class="eyebrow mt2">Long run day</p>'+
         '<div class="row" style="gap:8px;margin-top:8px">'+f.days.map(longPill).join('')+'</div>':'')+
       (f.goal!=='base'?'<p class="eyebrow mt2">Goal time \u2014 if you have one</p>'+
-        '<input data-in="rgoal.time" value="'+esc(f.time||'')+'" placeholder="'+(f.goal==='marathon'?'e.g. 3:45':f.goal==='half'?'e.g. 1:45':f.goal==='10k'?'e.g. 48:00':'e.g. 22:30')+'" autocomplete="off" style="width:100%;margin-top:8px;background:var(--surface);border:1px solid var(--line);border-radius:12px;color:var(--text);padding:11px;font-size:15px;outline:none;font-family:-apple-system,system-ui,sans-serif;font-weight:600;text-align:center">'+
+        '<input data-in="rgoal.time" value="'+esc(f.time||'')+'" placeholder="'+(f.goal==='marathon'?'e.g. 3:45':f.goal==='half'?'e.g. 1:45':f.goal==='10k'?'e.g. 48:00':'e.g. 22:30')+'" autocomplete="off" style="width:100%;margin-top:8px;background:var(--surface);border:1px solid var(--line);border-radius:12px;color:var(--text);padding:11px;font-size:17px;outline:none;font-family:-apple-system,system-ui,sans-serif;font-weight:600;text-align:center">'+
         '<p style="color:var(--faint);font-size:11px;line-height:1.5;margin-top:8px">Sets the race-pace work in the peak weeks. Allena will say honestly if the goal is a long way from your current training.</p>'+
         '<p class="eyebrow mt2">Race date \u2014 if you have one</p>'+
-        '<input type="date" data-in="rgoal.date" value="'+esc(f.date||'')+'" style="width:100%;margin-top:8px;background:var(--surface);border:1px solid var(--line);border-radius:12px;color:var(--text);padding:11px;font-size:15px;outline:none;-webkit-appearance:none;font-family:-apple-system,system-ui,sans-serif;font-weight:600;text-align:center">'+
+        '<input type="date" data-in="rgoal.date" value="'+esc(f.date||'')+'" style="width:100%;margin-top:8px;background:var(--surface);border:1px solid var(--line);border-radius:12px;color:var(--text);padding:11px;font-size:17px;outline:none;-webkit-appearance:none;font-family:-apple-system,system-ui,sans-serif;font-weight:600;text-align:center">'+
         '<p style="color:var(--faint);font-size:11px;line-height:1.5;margin-top:8px">With a date the plan periodizes backwards from it \u2014 build, peak, then a real taper. Without one you get an open-ended build toward the distance.</p>':'')+
       (enough?'<button data-a="runGoalGo" class="big disp mt2" style="background:var(--amber);color:var(--bg);font-size:15px">Build my plan</button>'
         :'<button class="big disp mt2" style="background:var(--raised);color:var(--faint);font-size:15px" disabled>Pick '+(minD-f.days.length)+' more day'+(minD-f.days.length===1?'':'s')+'</button>')+
@@ -31043,9 +31221,9 @@ function sheetHtml(){
       (f.ex.length?'<div class="card mt" data-draglist="pplan" style="padding:8px 12px">'+
         f.ex.map((e,i)=>'<div data-dragitem="'+i+'" style="display:grid;grid-template-columns:16px minmax(0,1fr) 40px 62px 24px;gap:8px;align-items:center;padding:6px 0'+(i?';border-top:1px solid var(--line)':'')+'">'+
           '<span class="mono" style="color:var(--faint);font-size:13px;letter-spacing:1px">⋮⋮</span>'+
-          '<input data-ppex="'+i+':n" value="'+esc(e.n)+'" style="background:transparent;border:none;color:var(--text);font-size:13px;padding:6px 0;outline:none;min-width:0">'+
-          '<input data-ppex="'+i+':s" value="'+esc(e.s)+'" inputmode="numeric" style="background:var(--surface);border:1px solid var(--line);border-radius:8px;color:var(--dim);font-size:13px;padding:6px 4px;text-align:center;outline:none">'+
-          '<input data-ppex="'+i+':r" value="'+esc(e.r)+'" style="background:var(--surface);border:1px solid var(--line);border-radius:8px;color:var(--dim);font-size:13px;padding:6px 4px;text-align:center;outline:none">'+
+          '<input data-ppex="'+i+':n" value="'+esc(e.n)+'" style="background:transparent;border:none;color:var(--text);font-size:17px;padding:6px 0;outline:none;min-width:0">'+
+          '<input data-ppex="'+i+':s" value="'+esc(e.s)+'" inputmode="numeric" style="background:var(--surface);border:1px solid var(--line);border-radius:8px;color:var(--dim);font-size:17px;padding:6px 4px;text-align:center;outline:none">'+
+          '<input data-ppex="'+i+':r" value="'+esc(e.r)+'" style="background:var(--surface);border:1px solid var(--line);border-radius:8px;color:var(--dim);font-size:17px;padding:6px 4px;text-align:center;outline:none">'+
           '<button data-a="pplanExDel" data-v="'+i+'" style="color:var(--faint);font-size:15px;padding:5px 0;flex:none">✕</button></div>').join('')+'</div>':'')+
       '<div style="display:grid;grid-template-columns:2fr 64px 84px;gap:8px;margin-top:12px">'+
       '<input data-in="pform.exn" value="'+esc(f.exn||'')+'" placeholder="Exercise">'+
@@ -31222,7 +31400,7 @@ function sheetHtml(){
       '<p style="color:var(--dim);font-size:13px;line-height:1.65;margin-top:8px">Paste the results text and it reads on the phone \u2014 nothing leaves it. A photo of the sheet works too'+(aiReady()?'':' once the AI is set up')+'.</p>'+
       '<p class="eyebrow" style="margin-top:16px">Draw date</p>'+
       '<input type="date" data-bdate="1" value="'+esc(S.bloodDate||today())+'" style="width:100%;margin-top:8px;background:var(--surface);border:1px solid var(--line);border-radius:12px;color:var(--text);padding:11px;font-size:17px;outline:none">'+
-      '<textarea data-bpaste="1" placeholder="Paste the results here \u2014 e.g.  Ferritin  18 ug/L" style="width:100%;min-height:110px;margin-top:12px;background:var(--surface);border:1px solid var(--line);border-radius:12px;color:var(--text);padding:11px;font-size:15px;outline:none;font-family:inherit">'+esc(S.bloodIn||'')+'</textarea>'+
+      '<textarea data-bpaste="1" placeholder="Paste the results here \u2014 e.g.  Ferritin  18 ug/L" style="width:100%;min-height:110px;margin-top:12px;background:var(--surface);border:1px solid var(--line);border-radius:12px;color:var(--text);padding:11px;font-size:17px;outline:none;font-family:inherit">'+esc(S.bloodIn||'')+'</textarea>'+
       '<button data-a="bloodTextGo" class="big disp mt" style="background:var(--amber);color:var(--bg);font-size:15px">Read what I pasted</button>'+
       (aiReady()?'<label class="btn mt" style="display:block;text-align:center;cursor:pointer;color:var(--amber);font-size:13px">'+(S._bloodBusy?'Reading the photo\u2026':'\ud83d\udcf7 Photo of the results \u2014 Allena reads it')+
         '<input type="file" accept="image/*" data-bloodfile="1" style="display:none"></label>':aiLockHtml('Reading a results photo'))+
@@ -31566,7 +31744,7 @@ function sheetHtml(){
         '<span style="font-size:13px;font-weight:600;display:block">'+esc(x[0])+'</span>'+
         '<span style="color:var(--faint);font-size:11px;line-height:1.45">'+esc(x[1])+'</span></div>').join('')+'</div>'+
       '<button data-a="impGuideOpen" data-v="runimp" class="btn" style="width:100%;color:var(--amber)">The full step-by-step guide</button>'+
-      '<textarea data-in="rimp.text" rows="7" placeholder="Paste the CSV, the activity list, or a GPX file here" style="margin-top:12px;font-size:13px">'+esc(R.text||'')+'</textarea>'+
+      '<textarea data-in="rimp.text" rows="7" placeholder="Paste the CSV, the activity list, or a GPX file here" style="margin-top:12px;font-size:17px">'+esc(R.text||'')+'</textarea>'+
       '<label class="btn mt" style="display:block;text-align:center;cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(R.fileName?esc(midName(R.fileName))+' — choose another':'Or choose a file — Excel, CSV, GPX, TCX')+
       '<input type="file" accept=".xlsx,.csv,.tsv,.txt,.gpx,.tcx,text/plain,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" data-rimpfile="1" style="display:none"></label>'+
       (R.err?'<p style="color:var(--red);font-size:13px;line-height:1.5;margin-top:8px">'+esc(R.err)+'</p>':'')+
@@ -31603,7 +31781,7 @@ function sheetHtml(){
         '<span style="width:4px;height:26px;border-radius:3px;background:'+z[3]+';opacity:'+(z[0]==='z1'?.5:1)+';flex:none"></span>'+
         '<span style="flex:1;min-width:0"><span style="font-size:13px;font-weight:600;display:block">'+z[1]+'</span>'+
         '<span style="color:var(--faint);font-size:11px">'+z[2]+'</span></span>'+
-        '<input data-in="rform.'+z[0]+'" value="'+(f[z[0]]||'')+'" inputmode="decimal" placeholder="0" class="mono" style="width:74px;flex:none;text-align:center;padding:9px 0;font-size:15px">'+
+        '<input data-in="rform.'+z[0]+'" value="'+(f[z[0]]||'')+'" inputmode="decimal" placeholder="0" class="mono" style="width:74px;flex:none;text-align:center;padding:9px 0;font-size:17px">'+
         '</div>').join('')+'</div>'+
         (function(){const t=['z1','z2','z3','z4','z5'].reduce((a,k)=>a+(+f[k]||0),0);
           return t?'<p class="mono" style="color:var(--amber);font-size:11px;margin-top:8px">'+Math.round(t)+(Math.abs(t-100)<12?'% entered':' minutes entered')+'</p>':''})()
@@ -31616,7 +31794,7 @@ function sheetHtml(){
       '<input type="file" accept=".xml,text/xml,application/xml" data-hkfile="1" style="display:none"></label>'+
       '<p class="eyebrow mt2">Or paste it from your watch</p>'+
       '<p style="color:var(--faint);font-size:11px;line-height:1.5;margin-top:3px">Copy the summary out of Garmin Connect or Strava and drop it here — Allena reads the numbers out.</p>'+
-      '<textarea data-in="rform.paste" rows="3" placeholder="e.g. 10.42 km, 52:18, avg HR 148, 86 m elevation" style="margin-top:8px;font-size:15px">'+esc(f.paste||'')+'</textarea>'+
+      '<textarea data-in="rform.paste" rows="3" placeholder="e.g. 10.42 km, 52:18, avg HR 148, 86 m elevation" style="margin-top:8px;font-size:17px">'+esc(f.paste||'')+'</textarea>'+
       (f.paste&&f.paste.trim()?'<button data-a="runParse" class="btn mt" style="border-color:var(--amber);color:var(--amber);font-size:13px">Read those numbers</button>':'')+
       '<button data-a="runSaveGo" class="big disp mt2" style="background:'+((f.km>0&&f.mins>0)?'var(--amber)':'var(--raised)')+';color:'+((f.km>0&&f.mins>0)?'var(--bg)':'var(--faint)')+';font-size:15px">'+(f.id?'Save changes':'Save the run')+'</button>')}
   if(S.sheet.t==='checkin'){
@@ -32517,6 +32695,7 @@ function render(){
   else if(S.view==='data')body=viewData();
   else if(S.view==='setup')body=viewSetup();
   else if(S.view==='day0')body=viewDay0();
+  else if(S.view==='signup')body=viewSignup();
   else if(S.view==='quick')body=viewQuick();
   else if(S.view==='coach')body=viewCoach();
   else if(S.view==='scans')body=viewScans();
@@ -32593,7 +32772,17 @@ function render(){
      Running's count (Running lives inside Train now); Progress wears the
      analysis rooms'. The same numbers the drawer rows read: one fact. */
   DOT.home=DOT.run;
-  DOT.progress=DOT.signals+DOT.collection;
+  /* PROGRESS ONLY WEARS WHAT PROGRESS CAN CLEAR (phase-1 QA, 18 Sep 2026):
+     this used to be signals+collection, but signals never had a door on
+     Progress — landing there did nothing, and nothing on the page led to
+     Health data either (that room moved to You on 17 Sep). It was also
+     a straight contradiction of this file's own rule 30 lines down
+     ("the Health data row never wears one [a red bubble]"), which zeroes
+     DOT.signals for exactly that reason, just too late to stop this line
+     reading it first. Collection DOES have a door Progress can own — see
+     the fresh-finds row collFreshCard() adds to the page below — so it
+     is the only thing left on the badge. */
+  DOT.progress=DOT.collection;
   /* ═══ ONE PAGE, ONE HIGHLIGHT (owner, on video, 15 Sep 2026: "clicking
      back brings the hamburger but highlighting a different page than you
      were originally on") ════════════════════════════════════════════════
@@ -32681,7 +32870,7 @@ function render(){
 
   const tabBarHtml=()=>{
     if(S.sess&&S.view==='session')return '';
-    if(S.boot||S.view==='setup'||S.view==='welcome'||S.view==='day0')return '';
+    if(S.boot||S.view==='setup'||S.view==='welcome'||S.view==='day0'||S.view==='signup')return '';
     /* SOCIAL IS A TAB, REHAB IS A DRAWER ROOM (owner, 16 Sep 2026).
        Worth recording the trade, because it cuts against the wedge: the
        injured athlete is who this app is FOR, and their room is now one
@@ -33465,9 +33654,9 @@ tickEvery(function(){try{
     if(settling)return;
     clear();
     if(S.drawerOpen||S.sheet||S.boot)return;
-    if(S.view==='session'||S.view==='coach'||S.view==='setup')return;
+    if(S.view==='session'||S.view==='coach'||S.view==='setup'||S.view==='signup')return;
     if(document.querySelector('.sessfix'))return;
-    if(document.querySelector('.fbwrap,#txwrap'))return;
+    if(document.querySelector('#findBig,#txwrap'))return;   /* the collection card deck (class is fb-wrap, not fbwrap — this selector never matched, which is why swiping the deck also dragged the page underneath it) */
     const t=e.touches[0];
     if(t.clientX<=30)return;                       /* the drawer's edge */
     if(e.target.closest&&e.target.closest('[data-scrub],[data-draglist],input,textarea,select,.scroller'))return;
@@ -36343,7 +36532,15 @@ function runAction(a,v,t,e){
       if(wantAcl){S.view='home';S.sheet={t:'aclpick'};render();
         flash('Your program is ready. The first sessions calibrate the weights.');break}
       S.view='day0';render();break}
-    case 'day0Go':{S.view='today';render();
+    case 'day0Go':{
+      /* THE SIGN-UP SCREEN IS THE LAST DOOR, NOT THE FIRST (owner ask,
+         18 Sep 2026) — it used to sit mid-welcome-track, before anyone
+         had seen the app do anything. It shows value first now: the
+         wizard, the program, day zero's own findings, THEN one screen
+         asking to keep it. Already signed in (or cloud not switched
+         on) skips it outright — nothing to ask for twice. */
+      const already=(typeof acct==='function'&&acct()&&acct().refresh)||!(typeof acctReady==='function'&&acctReady());
+      S.view=already?'today':'signup';render();
       flash('Your program is ready. The first sessions calibrate the weights.');break}
     case 'suSkip':{S.prof={skipped:true};lset(K_PROF,S.prof);
       S.setup=null;S.sheet=null;S.view='today';render();
@@ -36535,6 +36732,9 @@ function runAction(a,v,t,e){
     case 'acctSend':case 'acctSend2':{const e2=(S.acctEmail||(acct()&&(acct().pendingEmail||acct().email))||'').trim();
       if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e2)){flash('Enter a real email first.');break}
       acctSend(e2);break}
+    case 'acctSignIn':acctSignIn(v);break;
+    case 'signupSkip':{S.view='today';render();
+      flash('You can sign in any time from Data → Account.');break}
     case 'notifDump':notifDumpAsk();break;
     case 'hkDumpAsk':{try{S._hkDump='waiting';render();
       window.webkit.messageHandlers.allena.postMessage(JSON.stringify({type:'hkdump'}))}catch(e){}break}
@@ -36590,8 +36790,7 @@ function runAction(a,v,t,e){
     case 'wNext':{const st9=S.setup||(S.setup={gate:true});let wi=(st9.wi||0)+1;
       const wr9=(typeof inWrapper==='function')&&inWrapper();
       if(!wr9&&(wi===2||wi===3))wi=4;
-      if(wi===4&&!(typeof acctReady==='function'&&acctReady()))wi=5;
-      if(wi>=5){lset('training-welcome-v1',1);delete st9.wi}else st9.wi=wi;
+      if(wi>=4){lset('training-welcome-v1',1);delete st9.wi}else st9.wi=wi;
       render();break}
     /* (former duplicate 'sigOpen' case merged above — a switch keeps only its first) */
     case 'arrivalGo':{lset('training-arrival-v1',1);try{hapticRun('find')}catch(e){};render();break}
@@ -36600,7 +36799,6 @@ function runAction(a,v,t,e){
       const wr9=(typeof inWrapper==='function')&&inWrapper();
       if(!wr9&&(wi===3||wi===2))wi=1;
       st9.wi=Math.max(0,wi);render();break}
-    case 'wDone':{lset('training-welcome-v1',1);if(S.setup)delete S.setup.wi;render();break}
     case 'wNotifYes':{const P=notifPrefs();P.asked=1;P.on=true;notifSave();notifSync();runAction('wNext');break}
     case 'wNotifNo':{const P=notifPrefs();P.asked=1;P.on=false;notifSave();runAction('wNext');break}
     case 'wHealth':{try{if(window.webkit&&window.webkit.messageHandlers&&window.webkit.messageHandlers.allena)
@@ -36616,6 +36814,9 @@ function runAction(a,v,t,e){
       if(v==='__hguide'){S.sheet=null;S.impgMode='health';S.impg='garmin';S.impgStep=0;
         S.guideFrom=S.view;S._navQuiet=1;S.view='guide';render();break}
       if(v==='__rirfix'){S.sheet={t:'rirfix'};render();break}
+      if(v==='__premBeta'){S.prof=Object.assign({},S.prof||{},{premBeta:!(S.prof&&S.prof.premBeta)});
+        lset(K_PROF,S.prof);render();
+        flash(S.prof.premBeta?'Previewing Premium on this device. Real launch users still see Free-only.':'Preview off.');break}
       S.sheet={t:'dset',k:v};render();break}
     case 'rirFixGo':{let n=0;
       const fix=l=>{const r=parseFloat(l.rpe);
@@ -36976,7 +37177,7 @@ function dailyFindDue(){
 function dailyFindAsk(){try{
   if(!dailyFindDue())return false;
   if(S.boot!=null){S.dfQueued=true;return false}
-  if(S.view==='setup'||S.view==='coach'||S.sess)return false;
+  if(S.view==='setup'||S.view==='signup'||S.view==='coach'||S.sess)return false;
   if(S.sheet)return false;                 // never stack on another prompt
   if(morningDue())return false;            // readiness goes first; we take the next open
   const t=todayState();
@@ -37013,7 +37214,7 @@ function morningDue(){
 function morningAsk(){try{
   if(!morningDue())return false;
   if(S.boot!=null){S.morningQueued=true;return false}   // wait for the launch animation
-  if(S.view==='setup'||S.view==='coach'||S.sess)return false;
+  if(S.view==='setup'||S.view==='signup'||S.view==='coach'||S.sess)return false;
   if(S.sheet)return false;                       // never stack on another prompt
   const k=today();
   const d=S.gar.days[k]||{};
