@@ -1680,7 +1680,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='9892cd';  // stamped by tools/build.py with the content hash
+const BUILD_ID='b32d67';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -4014,9 +4014,15 @@ async function crewJoin(code){
     const h=await frHeaders();if(!h||!S.frMe){flash('Sign in first.');return}
     const r=await fetch(CLOUD.url+'/rest/v1/crew_members',{method:'POST',headers:h,
       body:JSON.stringify([{crew_code:code,user_id:S.frMe}])});
-    if(r.ok||r.status===409){flash('You\u2019re in — the group races together.');
-      acctSync(false);frLoad(true)}
-    else flash('That group link did not match ('+r.status+').')}catch(e){flash('No connection.')}}
+    /* PostgREST maps BOTH a duplicate membership (23505 — already in)
+       AND a bad crew_code (23503, the FK to crews) to HTTP 409. Reading
+       the status alone told a mistyped code "you're in" (review, 19 Sep
+       2026); the body's own `code` says which. */
+    if(r.ok){flash('You\u2019re in — the group races together.');acctSync(false);frLoad(true);return}
+    if(r.status===409){const d9=await r.json().catch(()=>({}));
+      if(d9.code==='23505'){flash('You\u2019re in — the group races together.');acctSync(false);frLoad(true);return}
+      flash('That group link did not match.');return}
+    flash('That group link did not match.')}catch(e){flash('No connection.')}}
 async function crewLeave(code){
   /* takes the group you are looking at, not just "the" group — there
      can be several now */
@@ -18045,7 +18051,24 @@ function corrNames(key){
   catch(e){oops('corrNames',e);return null}}
 function corrPhrase(c){
   const M=S._corrMaps||{sigs:CORR_SIGNALS,outs:CORR_OUTCOMES};
-  const S9=M.sigs[c.sig]||CORR_SIGNALS[c.sig],O=M.outs[c.out]||CORR_OUTCOMES[c.out];
+  const S9=M.sigs[c.sig]||CORR_SIGNALS[c.sig];
+  /* A PER-LIFT OUTCOME'S NAME DOES NOT NEED THE LIVE MAP (owner-caught,
+     19 Sep 2026, live screenshot: a full-screen reveal titled just "A
+     pattern" with no body). corrMaps(days) is the only place an "ex:"
+     outcome like ex:Bench ever gets its descriptor, and S._corrMaps is
+     only ever SET on the full-compute path through correlations() — its
+     three cache-hit shortcuts (memo, disk-stamp match, cold-open warm)
+     all return early without touching it. So a correlation about a
+     specific lift, read on anything but the one render that just
+     finished the full grid, fell through both M.outs and the static
+     CORR_OUTCOMES (which has no per-lift entries at all) into this
+     function's own contentless fallback. corrNames() already patches
+     around the same gap for its own callers (line above); the shape is
+     reconstructed here too, identical to what corrMaps builds it as,
+     because it is derived from the key alone and needs nothing from
+     the account's data to be right. */
+  const O=M.outs[c.out]||CORR_OUTCOMES[c.out]||
+    (String(c.out).slice(0,3)==='ex:'?{n:String(c.out).slice(3)+' top set',good:'up',dir:1,exo:1}:null);
   if(!S9||!O)return{title:'A pattern',body:'',strong:false,good:true};
   // does the signal RISING move the outcome UP or DOWN?
   const signalUp=S9.inv?-1:1;
