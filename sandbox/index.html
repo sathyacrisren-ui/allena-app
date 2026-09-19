@@ -349,7 +349,7 @@ body.swiping{touch-action:none}
   box-shadow:inset 0 1px 0 rgba(255,255,255,.12),0 0 16px -2px color-mix(in srgb,var(--gold) 55%,transparent)}
 .tabbar button.tmid:active .tmidr{transform:scale(.95)}
 .tabbar button.tmid:active svg{transform:none}
-.tabbar button.tmid .tdot{top:-4px;left:auto;right:-2px;margin-left:0;background:rgba(40,40,44,1);border:1px solid rgba(255,255,255,.18);color:var(--text);font-weight:600}
+.tabbar button.tmid .tdot{top:-4px;left:auto;right:-2px;margin-left:0;background:rgba(40,40,44,1);border:1px solid rgba(255,255,255,.18);color:#F2F0EA;font-weight:600}
 @media (prefers-reduced-motion:reduce){.tabbar button svg{transition:none}
   .tabbar button.tmid .tmidr{transition:none}}
 .sessfix{height:100dvh;display:flex;flex-direction:column;overflow:hidden}
@@ -1680,7 +1680,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='3b46e1';  // stamped by tools/build.py with the content hash
+const BUILD_ID='d4dd35';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -2826,8 +2826,12 @@ function regulate(rows,c,opts){
   const belowLow=reps.filter(r=>r<low).length;
   const allTop=high>0&&reps.length&&reps.every(r=>r>=high);
   const decay=reps.length>1?reps[0]-reps[reps.length-1]:0;
-  const step=exInc(opts.prog,c.ex,W);
-  const pctCut=p=>-Math.max(step,Math.round(W*p/2.5)*2.5);
+  const cutBase=light9?wTop9:W;
+  const step=exInc(opts.prog,c.ex,cutBase);
+  const pctCut=p=>{
+    const raw=-Math.max(step,Math.round(cutBase*p/2.5)*2.5);
+    return light9?(wTop9+raw)-W:raw};
+  const barNote=light9?' '+uwNum(wTop9)+' '+uwUnit()+' was actually on the bar — the new number is measured from there, not from '+uwNum(W)+'.':'';
 
   // 1. reps missed — but only a load problem if the effort was actually there
   if(belowLow>=2&&d!=null&&d<=-1){
@@ -2835,14 +2839,14 @@ function regulate(rows,c,opts){
     out.msg='Reps came up short on '+belowLow+' sets, but average RPE was '+(Math.round(avg*10)/10)+' against a target of '+tTxt+'. That is stopping early rather than a weight problem — same load next time, taken closer to '+tR+'.';
     out.why='under-effort miss, load unchanged'}
   else if(belowLow>=2){out.level='warn';out.delta=pctCut(0.05);out.outcome='overshot';
-    out.msg='Missed the bottom of the range on '+belowLow+' sets'+(avg!=null?' at RPE '+(Math.round(avg*10)/10):'')+'. Dropping '+uwNum(Math.abs(out.delta))+' '+uwUnit()+' — the load is ahead of you today.';
+    out.msg='Missed the bottom of the range on '+belowLow+' sets'+(avg!=null?' at RPE '+(Math.round(avg*10)/10):'')+'. Dropping '+uwNum(Math.abs(out.delta))+' '+uwUnit()+' — the load is ahead of you today.'+barNote;
     out.why='reps under target on '+belowLow+' sets'}
   // 2. effort past target — the case that used to slip through
   else if(d!=null&&d>=0.75){
     const sev=(mx>=10&&d>=1)?0.07:0.05;
     out.level='warn';out.delta=pctCut(sev);out.outcome='overshot';
     out.msg=(mx>=10?'Sets taken to failure against a target of RPE '+tTxt+'. ':'Effort ran '+(Math.round(d*10)/10)+' above target. ')+
-      'Taking '+uwNum(Math.abs(out.delta))+' '+uwUnit()+' off. Hitting the reps at maximum effort is not the same as hitting the prescription — it buys fatigue you did not need.';
+      'Taking '+uwNum(Math.abs(out.delta))+' '+uwUnit()+' off. Hitting the reps at maximum effort is not the same as hitting the prescription — it buys fatigue you did not need.'+barNote;
     out.why='avg RPE '+(Math.round(avg*10)/10)+' vs target '+tTxt}
   // 3. slightly hot — hold, do not add
   else if(d!=null&&d>=0.4){out.level='ok';out.outcome='held';
@@ -3452,6 +3456,7 @@ const CLOUD={url:'https://xpvgivjdkmmukmfbjojc.supabase.co',anon:'sb_publishable
 const K_ACCT='training-account-v1';
 function acctReady(){return !!(CLOUD.url&&CLOUD.anon)}
 function acct(){return lget(K_ACCT,null)}
+function acctOn(){return !!(acctReady()&&acct()&&acct().refresh)}
 function acctClaims(tok){try{
   const b=tok.split('.')[1].replace(/-/g,'+').replace(/_/g,'/');
   return JSON.parse(decodeURIComponent(escape(atob(b))))}catch(e){return null}}
@@ -3466,8 +3471,8 @@ function acctTokensLanded(access,refresh,expiresIn,emailHint){
     exp:Date.now()+((+expiresIn||3600)-60)*1000,lastSync:null,pendingEmail:null}));
   S.acctPending=false;S._oauthPending=null;
   if(S.view==='signup')S.view='today';
-  try{acctSyncSoon()}catch(e){}
-  try{cloudBkRecover()}catch(e){}}
+  try{cloudBkRecover()}catch(e){}
+  try{acctSyncSoon()}catch(e){}}
 /* the magic link lands back here with tokens in the hash */
 try{
   const h=location.hash||'';
@@ -3522,7 +3527,8 @@ window.acctOAuthResult=function(res){
     if(!res||res.cancelled){S._oauthPending=null;render();return}
     if(!res.ok||!res.access||!res.refresh){
       S._oauthPending=null;
-      flash(res&&res.error?String(res.error).slice(0,140):'Sign-in did not go through — try again.');
+      if(res&&res.error)oops('acctOAuthResult',new Error(String(res.error).slice(0,200)));
+      flash('Sign-in did not go through — try again.');
       render();return}
     acctTokensLanded(res.access,res.refresh,res.expires_in);
     flash('Signed in.');render()
@@ -3686,8 +3692,8 @@ async function acctSync(loud){
       try{haptic('success')}catch(e9){}
       done(true);return true}
     if(await legacyRetry(r))return true;
-    let why='';try{why=(await r.text()).slice(0,120)}catch(e9){}
-    if(loud)flash('Sync failed ('+r.status+')'+(why?' — '+why:'')+'.');
+    try{oops('acctSync',new Error('sync '+r.status+': '+(await r.text()).slice(0,200)))}catch(e9){}
+    if(loud)flash('Sync failed ('+r.status+'). Try again in a minute.');
     done(false);return false}catch(e){if(loud)flash('No connection.');done(false);return false}}
 /* ══ friends & the weekly race (Part 3 step 1-2, 7 Sep) ══════
    Self-detecting: until supabase/social.sql is pasted, every call
@@ -3916,9 +3922,24 @@ async function frFindByUsername(name){
     const out=await r.json();
     if(!out){flash('Nobody in Allena uses that name.');return}
     if(out==='already'){flash('You already race '+name+'.');return}
-    S.frUserIn='';acctSync(false);frLoad(true);
-    flash(name+' is in \u2014 you race from Monday.')
+    if(out==='pending'){flash('Already asked \u2014 waiting on '+name+'.');return}
+    if(out==='ambiguous'){flash('More than one person uses that name \u2014 ask '+name+' for their code instead.');return}
+    S.frUserIn='';frLoad(true);
+    flash('Asked '+name+' to race \u2014 they need to accept.')
   }catch(e){flash('No connection.')}}
+async function frAcceptRequest(ownerId){
+  try{const h=await frHeaders();if(!h)return;
+    const r=await fetch(CLOUD.url+'/rest/v1/rpc/accept_friend_request',
+      {method:'POST',headers:Object.assign({'content-type':'application/json'},h),
+       body:JSON.stringify({p_owner:ownerId})});
+    if(!r.ok){flash('Could not accept that \u2014 try again.');return}
+    acctSync(false);frLoad(true)}catch(e){flash('No connection.')}}
+async function frDeclineRequest(ownerId){
+  try{const h=await frHeaders();if(!h||!S.frMe)return;
+    const r9=await fetch(CLOUD.url+'/rest/v1/friends?owner_id=eq.'+encodeURIComponent(ownerId)+'&friend_id=eq.'+encodeURIComponent(S.frMe),
+      {method:'DELETE',headers:h});
+    if(!r9.ok)oops('frDeclineRequest',new Error('decline failed '+r9.status));
+    frLoad(true)}catch(e){oops('frDeclineRequest',e)}}
 /* IN-APP ACCOUNT DELETION (audit S1, 10 Sep 2026). App Store guideline
    5.1.1(v): an app that lets you create an account must let you delete
    it from inside the app — a "email us" line is an explicit rejection.
@@ -3941,7 +3962,10 @@ async function acctDelete(){
       await del('/rest/v1/friends?or=(owner_id.eq.'+uid+',friend_id.eq.'+uid+')');
       await del('/rest/v1/crew_members?user_id=eq.'+uid);
       await del('/rest/v1/nudges?or=(from_id.eq.'+uid+',to_id.eq.'+uid+')');
-      await del('/rest/v1/snapshots?user_id=eq.'+uid)}
+      await del('/rest/v1/snapshots?user_id=eq.'+uid);
+      await del('/rest/v1/backups?user_id=eq.'+uid);
+      await del('/rest/v1/pod_members?user_id=eq.'+uid);
+      await del('/rest/v1/pod_pool?user_id=eq.'+uid)}
     let authGone=false;
     try{const r2=await fetch(CLOUD.url+'/functions/v1/delete-account',
       {method:'POST',headers:Object.assign({'content-type':'application/json'},h),body:'{}'});
@@ -4014,10 +4038,6 @@ async function crewJoin(code){
     const h=await frHeaders();if(!h||!S.frMe){flash('Sign in first.');return}
     const r=await fetch(CLOUD.url+'/rest/v1/crew_members',{method:'POST',headers:h,
       body:JSON.stringify([{crew_code:code,user_id:S.frMe}])});
-    /* PostgREST maps BOTH a duplicate membership (23505 — already in)
-       AND a bad crew_code (23503, the FK to crews) to HTTP 409. Reading
-       the status alone told a mistyped code "you're in" (review, 19 Sep
-       2026); the body's own `code` says which. */
     if(r.ok){flash('You\u2019re in — the group races together.');acctSync(false);frLoad(true);return}
     if(r.status===409){const d9=await r.json().catch(()=>({}));
       if(d9.code==='23505'){flash('You\u2019re in — the group races together.');acctSync(false);frLoad(true);return}
@@ -4565,7 +4585,7 @@ function friendsSection(){
         .some(k=>{if(h9[k]==='w'){reignP++;return false}return true})}catch(e9){}
     /* my rank and lifetime tier word, the card's second line (design
        system, 17 Sep 2026); the crown line outranks it when held */
-    const myRank9=(function(){try{return (R.find(x=>x.me)||{}).rank||0}catch(e9){return 0}})();
+    const myRank9=(function(){try{return L.length?L.filter(f9=>(f9.week||0)>mine).length+1:0}catch(e9){return 0}})();
     const myTier9=(function(){try{const t9=liveTier(Math.round(dp0.live||0));return t9?String(t9[1]).toLowerCase():''}catch(e9){return ''}})();
     const profCard='<div class="card mt" style="padding:18px;display:flex;align-items:center;gap:14px">'+
       '<button data-a="avOpen" style="width:58px;height:58px;border-radius:58px;background:none;border:2.5px solid '+avRing((acct()||{}).av,'var(--blue)')+';display:flex;align-items:center;justify-content:center;font-size:19px;font-weight:600;flex:none;padding:0">'+avInner((acct()||{}).av,myInitP,'var(--text)')+'</button>'+
@@ -4585,7 +4605,18 @@ function friendsSection(){
       '<p class="micro" style="letter-spacing:.12em">this week \u203a</p></button></div>';
     /* weeks raced lives here now (owner, 17 Sep 2026) — a race fact,
        beside the race; silent until it is true */
-    return profCard+groupPills+floorHtml('rank')+floorHtml('week')+
+    const incoming9=(S.frRows||[]).filter(x=>x.friend_id===S.frMe&&!x.linked_at);
+    const reqCard=incoming9.length?'<div class="card mt" style="padding:14px 16px">'+
+      '<p class="micro">Wants to race you</p>'+
+      incoming9.map(function(x){
+        const sn9=(S.frSnaps||[]).find(function(s9){return s9.user_id===x.owner_id})||{};
+        const nm9=sn9.display||'Someone';
+        return '<div style="display:flex;align-items:center;gap:10px;margin-top:10px">'+
+          '<span style="flex:1;font-size:15px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(nm9)+'</span>'+
+          '<button data-a="frDeclineGo" data-v="'+esc(x.owner_id)+'" class="btn" style="font-size:13px;color:var(--faint)">Decline</button>'+
+          '<button data-a="frAcceptGo" data-v="'+esc(x.owner_id)+'" class="btn" style="font-size:13px;background:var(--amber);color:var(--bg)">Accept</button>'+
+          '</div>'}).join('')+'</div>':'';
+    return profCard+reqCard+groupPills+floorHtml('rank')+floorHtml('week')+
       iBody('racelaw','Every honest number in a witnessed session earns — each set\u2019s weight, reps and effort, plus one for finishing — capped per day. Witnessed means your watch overlapped the session at working heart rate, or the phone ran the clock and the sets spread like real training. Imported, typed-later and demo sessions earn regular points but never race. Your score uploads when your app opens; you see theirs as of their last open. A group link races everyone who joins it on one board, and the weekly crown settles across everyone on it \u2014 friends and group alike. A mate who has not opened the app since Monday shows 0 until they do; their last week still counts.')+
       (L.length?(function(){
         const myFirst=String((S.prof&&S.prof.name)||'').split(' ')[0];
@@ -4859,15 +4890,18 @@ function obRaceTick(step){
     /* stop the moment the board is no longer on screen or was reopened
        (S._obRaceT reset) — a timer with nothing left to update is a leak,
        not a loop */
-    if(!S._obRaceT||S.view!=='social')return;
+    if(!S._obRaceT)return;
+    if(S.view!=='social'){
+      S._obRaceT=0;S._obRaceStep=0;S._obRaceJab=0;return}
     if(typeof document!=='undefined'&&document.visibilityState==='hidden'){
       setTimeout(function(){obRaceTick(step)},500);return}
+    const reduced9=(typeof matchMedia==='function')&&matchMedia('(prefers-reduced-motion: reduce)').matches;
     let oldRects=null;
     if(step===3){                                    // the one reorder — measure before it
-      oldRects={};
-      ['jess','marco','priya','you'].forEach(function(k){
-        const el=document.getElementById('obr-'+k);
-        if(el)oldRects[k]=el.getBoundingClientRect()});
+      if(!reduced9){oldRects={};
+        ['jess','marco','priya','you'].forEach(function(k){
+          const el=document.getElementById('obr-'+k);
+          if(el)oldRects[k]=el.getBoundingClientRect()})}
       S._obRaceJab=1}
     S._obRaceStep=step;
     render();
@@ -4879,7 +4913,7 @@ function obRaceTick(step){
       void el.offsetWidth;
       el.style.transition='transform .45s cubic-bezier(.22,1,.36,1)';
       el.style.transform='none'});
-    if(step<6)setTimeout(function(){obRaceTick(step+1)},1000)}
+    if(step<6)setTimeout(function(){obRaceTick(step+1)},reduced9?0:1000)}
   catch(e){oops('obRaceTick',e)}}
 function raceExampleBoard(){
   try{if(!S._obRaceT){S._obRaceT=1;S._obRaceStep=0;S._obRaceJab=0;
@@ -4889,14 +4923,21 @@ function raceExampleBoard(){
     priya:(typeof rarityOf==='function'?rarityOf('rare')[1]:'#C46BFF'),you:'var(--faint)'};
   const NM={jess:'Jess',marco:'Marco',priya:'Priya',you:'You'};
   const order=step>=3?['jess','marco','priya','you']:['jess','priya','marco','you'];
-  const jab=S._obRaceJab?'Marco just passed Priya.':'Jess trained four days this week. You have not logged one yet.';
+  const signedIn9=(typeof acctOn==='function')&&acctOn();
+  const mineNow9=signedIn9?Math.round((dataPoints().weekLive)||0):0;
+  const jab=S._obRaceJab?'Marco just passed Priya.'
+    :(signedIn9&&mineNow9>0?'You\u2019re on '+mineNow9+' this week. Find friends to race it against.'
+      :'Jess trained four days this week. You have not logged one yet.');
   return '<div class="card mt2" style="padding:16px">'+
     '<p class="mono" style="font-size:11px;letter-spacing:.14em;color:var(--faint)">EXAMPLE · THE WEEK’S RACE</p>'+
     '<div style="display:flex;flex-direction:column;gap:8px;margin-top:10px">'+
     order.map((k,i)=>'<div id="obr-'+k+'" style="display:flex;align-items:center;gap:10px">'+
       '<span class="mono" style="width:18px;font-size:13px;color:var(--faint)">'+(i+1)+'</span>'+
       '<span style="flex:1;font-size:13px;font-weight:600">'+esc(NM[k])+'</span>'+
-      '<span class="mono" data-cu="obrace'+k+'" style="font-size:15px;font-weight:700;color:'+COL[k]+'">'+OBRACE_FRAMES[k][step]+'</span></div>').join('')+
+      (k==='you'&&signedIn9
+        ?'<span class="mono" style="font-size:15px;font-weight:700;color:'+COL[k]+'">'+mineNow9+'</span>'
+        :'<span class="mono" data-cu="obrace'+k+'" style="font-size:15px;font-weight:700;color:'+COL[k]+'">'+OBRACE_FRAMES[k][step]+'</span>')+
+      '</div>').join('')+
     '</div>'+
     '<p style="color:var(--dim);font-size:13px;line-height:1.5;margin-top:10px">'+esc(jab)+'</p>'+
     '<button data-a="addFriendOpen" class="big disp mt2" style="background:var(--amber);color:var(--bg);font-size:15px">Join a race with friends</button></div>'}
@@ -4962,7 +5003,7 @@ return '<div class="view pad stg phpad">'+
     (typeof cerReplayHtml==='function'?cerReplayHtml():'')+'</div>'}
 let acctSyncT=null;
 function acctSyncSoon(){
-  if(!acctReady()||!acct())return;
+  if(!acctOn())return;
   clearTimeout(acctSyncT);acctSyncT=setTimeout(function(){acctSync(false)},1500);
   cloudBkSoon()}
 /* ══ THE CLOUD BACKUP (owner ruling, 17 Sep 2026: "we have to make a
@@ -4983,10 +5024,7 @@ function cloudBkPayload(){
   return{blob:blob,bytes:blob.length,sessions:sessions,hash:String(h)}}
 let cloudBkT=null,cloudBkLast=0,cloudBkBusy=false;
 function cloudBkSoon(){
-  /* four quiet seconds after the last write, and never more than one
-     push every 45 s while someone is logging set after set — the hash
-     check in cloudBkPush makes an unchanged record free either way */
-  if(!acctReady()||!acct()||S._bkCap===false)return;
+  if(!acctOn()||S._bkCap===false)return;
   clearTimeout(cloudBkT);
   const wait=Math.max(4000,45000-(Date.now()-cloudBkLast));
   cloudBkT=setTimeout(function(){cloudBkT=null;cloudBkPush(false)},wait)}
@@ -5001,6 +5039,8 @@ try{document.addEventListener('visibilitychange',function(){if(document.visibili
   window.addEventListener('pagehide',cloudBkFlush)}catch(e){oops('cloudBkHooks',e)}
 async function cloudBkPush(loud,urgent){
   if(!acctReady())return false;
+  const a0=acct()||{};
+  if(!a0.bkPulled){cloudBkPull().then(function(){cloudBkSoon()});return false}
   if(cloudBkBusy){cloudBkSoon();return false}   // one in flight: the next one queues behind it
   cloudBkBusy=true;
   if(loud){S.bkBusy=true;render()}
@@ -5011,13 +5051,12 @@ async function cloudBkPush(loud,urgent){
     const pay=cloudBkPayload();
     const a=acct()||{};
     if(!loud&&a.bkHash===pay.hash)return done(true);   // nothing changed since the last push
+    const body9=JSON.stringify([{user_id:c.sub,blob:pay.blob,bytes:pay.bytes,sessions:pay.sessions,updated_at:new Date().toISOString()}]);
     const r=await fetch(CLOUD.url+'/rest/v1/backups?on_conflict=user_id',{method:'POST',
       headers:{'content-type':'application/json',apikey:CLOUD.anon,
         Authorization:'Bearer '+tok,Prefer:'resolution=merge-duplicates,return=minimal'},
-      /* keepalive lets a request outlive the page, but browsers cap a
-         keepalive body at 64 KB — a bigger record goes the ordinary way */
-      keepalive:!!(urgent&&pay.bytes<60000),
-      body:JSON.stringify([{user_id:c.sub,blob:pay.blob,bytes:pay.bytes,sessions:pay.sessions,updated_at:new Date().toISOString()}])});
+      keepalive:!!(urgent&&body9.length<48000),
+      body:body9});
     cloudBkLast=Date.now();
     if(r.ok){S._bkCap=true;
       lset(K_ACCT,Object.assign({},acct(),{bkAt:new Date().toISOString(),bkHash:pay.hash,bkBytes:pay.bytes,bkSessions:pay.sessions}));
@@ -5029,7 +5068,6 @@ async function cloudBkPush(loud,urgent){
     if(loud)flash('Backup failed ('+r.status+').');return done(false)}
   catch(e){oops('cloudBkPush',e);if(loud)flash('No connection.');return done(false)}}
 async function cloudBkPull(){
-  /* the row for this account, or null: {blob,updated_at,sessions,bytes} */
   try{
     if(!acctReady())return null;
     const tok=await acctToken();if(!tok)return null;
@@ -5038,6 +5076,7 @@ async function cloudBkPull(){
       {headers:{apikey:CLOUD.anon,Authorization:'Bearer '+tok}});
     if(!r.ok){if(r.status===404||r.status===400)S._bkCap=false;return null}
     S._bkCap=true;
+    lset(K_ACCT,Object.assign({},acct()||{},{bkPulled:true}));
     const rows=await r.json();
     return (Array.isArray(rows)&&rows[0]&&rows[0].blob)?rows[0]:null}
   catch(e){oops('cloudBkPull',e);return null}}
@@ -5049,17 +5088,18 @@ async function cloudBkRecover(){
      A device that already has sessions is never touched unasked; that
      merge stays behind Restore from the cloud on Account. */
   try{
+    const a9=acct()||{};
+    if(a9.bkRecovered)return;
     if((S.history||[]).some(h=>!h.demo))return;
+    if((S.runs||[]).length)return;
+    if(S.acl&&S.acl.on)return;
     if(!acct()||!acct().refresh)return;
     const row=await cloudBkPull();if(!row||!row.blob)return;
     doRestore(row.blob);
-    lset(K_ACCT,Object.assign({},acct()||{},{bkAt:row.updated_at,bkSessions:row.sessions||0}));
+    lset(K_ACCT,Object.assign({},acct()||{},{bkAt:row.updated_at,bkSessions:row.sessions||0,bkRecovered:true}));
     lset(K_BK,Date.now())}
   catch(e){oops('cloudBkRecover',e)}}
-/* THE COLD OPEN CATCHES UP: anything a crash or a dead connection left
-   unsent goes on the next open (free when the hash matches), and a
-   phone that came back empty pulls its record without being asked. */
-setTimeout(function(){try{cloudBkSoon();cloudBkRecover()}catch(e){oops('cloudBkBoot',e)}},1500);
+setTimeout(function(){try{cloudBkRecover();cloudBkSoon()}catch(e){oops('cloudBkBoot',e)}},1500);
 /* Apple and Google's own marks, each wearing the button treatment its
    platform expects — the Apple pill matches this app's own light action
    pill (a permitted Apple button colour), the Google pill is Google's
@@ -5809,7 +5849,7 @@ A.backup=(auto)=>{
      Back up now / export buttons are unaffected — this only silences
      the AUTOMATIC prompt. One gate here covers every caller of
      A.backup(true), not just the ones that exist today. */
-  if(auto&&acctReady()&&acct())return;
+  if(auto&&acctOn())return;
   const mode=download(new Blob([JSON.stringify(backupObj(),null,2)],{type:'application/json'}),
   'training-backup-'+today()+'.json');
   lset(K_BK,Date.now());
@@ -11041,8 +11081,17 @@ function viewRehabHub(){
        (targ9?'<span class="micro" style="letter-spacing:.14em;white-space:nowrap">'+sess9+' of '+targ9+' this week</span>':'')+'</div>'+
        '<div style="display:flex;flex-direction:column;gap:8px;margin-top:14px">'+
        cards.map(c=>{
+         /* THE TICK READ A FLAG NO SESSION ROW CARRIES (review, 19 Sep
+            2026): rehabState(k).log is the FLARE log (protoFlare writes
+            bare date strings there) — every non-ACL card read that,
+            found no x.date/x.d ever set, and stayed a hollow ring even
+            on a day the corner's own count (rehabWeekSessions) says was
+            trained. Same shape rehabWeekSessions already uses: a
+            completed history row today whose progId belongs to a
+            program built for this protocol (rehabProto===c.k). */
          const doneT=(function(){try{if(c.k==='acl')return (S.history||[]).some(h9=>h9.complete&&h9.acl&&hKey(h9)===today());
-           return (rehabState(c.k).log||[]).some(x=>String(x.date||x.d||'').slice(0,10)===today())}catch(e9){return false}})();
+           const pids9=S.lib.programs.filter(p9=>p9.rehabProto===c.k).map(p9=>p9.id);
+           return (S.history||[]).some(h9=>h9.complete&&pids9.indexOf(h9.progId)>=0&&hKey(h9)===today())}catch(e9){return false}})();
          const chip=c.k==='acl'?('phase '+S.acl.phase):(c.mode==='staged'?('stage '+rehabState(c.k).stage):'ongoing');
          return '<button data-a="'+(c.k==='acl'?'aclOpen':'protoOpen')+'"'+(c.k==='acl'?'':' data-v="'+c.k+'"')+' style="width:100%;text-align:left;display:flex;align-items:center;gap:12px;padding:13px 14px;border-radius:14px;min-height:56px;'+
            (doneT?'background:rgba(48,209,88,.08);border:1px solid rgba(48,209,88,.20)':'background:linear-gradient(180deg,var(--pane-raised-top),var(--pane-raised-bottom));border:1px solid rgba(255,255,255,.10)')+'">'+
@@ -13028,7 +13077,18 @@ function runDel(id){
   S.history=S.history.filter(h=>h.id!=='run-'+id);saveHistory()}
 function runDeleted(w){
   /* was this workout removed by the user? */
-  try{const d=S.runSeen||{};return !!(d['del:'+w.id]||d[runDelSig(w)])}catch(e){return false}}
+  try{const d=S.runSeen||{};if(d['del:'+w.id]||d[runDelSig(w)])return true;
+    /* THE LEGACY SIGNATURE STILL COUNTS (review, 19 Sep 2026): runDelSig
+       grew a time component on 15 Sep 2026 (day+distance alone
+       tombstoned every run that day within range of the deleted one).
+       A tombstone written under the OLD two-part shape before that
+       date no longer matches the new three-part key, so a run deleted
+       on an earlier build can come back from the next Health sync.
+       Check the old shape too — a legacy key that happens to collide
+       with a different run only re-hides something already gone. */
+    const d9=String(w.date).slice(0,10);
+    const legacy9='delsig:'+d9+':'+Math.round((+w.km||0)*5)/5;
+    return !!d[legacy9]}catch(e){return false}}
 function runDelCount(){try{return Object.keys(S.runSeen||{}).filter(k=>k.indexOf('del:')===0).length}catch(e){return 0}}
 function runUndelete(){
   /* the one door back: forget every deletion and ask Health again */
@@ -14108,6 +14168,20 @@ function hkNative(list){
     if(!out.length)return;
     const res=hkImport({workouts:out,skipped:{}});
     try{if(res.added)hkPulse(res.added)}catch(e9){}
+    /* THE BULK SYNC NEVER ASKS FOR HEART RATE (owner-caught live, 19 Sep
+       2026, on a walk that genuinely had one in Apple Health: "no heart
+       rate came with it" was wrong, not honest). fetchWorkouts() on the
+       native side never queries heart rate at all — every field it
+       hands over is act/date/time/mins/km/src, so every workout Health
+       syncs in bulk lands at hr:0 here, whatever the watch actually
+       recorded. HealthBridge.swift already has a per-window HR query
+       (fetchHR), used until now only for lifting sessions (see
+       hrWitnessAsk below) — the same bridge call asks for it here too,
+       per newly-added cardio row, so this needs no native rebuild. */
+    try{if(res.added)out.forEach(w=>{
+      if(w.hr)return;
+      const r=(S.runs||[]).find(x=>String(x.id)===w.id);
+      if(r&&!r.hr)runHrAsk(r)})}catch(e9){oops('hkNative.hrAsk',e9)}
     if(res.added){flash(res.added+' workout'+(res.added===1?'':'s')+' in from Apple Health.');
       try{sorceryOnArrival('workout')}catch(e9){}
       render()}
@@ -15391,12 +15465,34 @@ function hrWitnessAsk(h){
     window.webkit.messageHandlers.allena.postMessage(JSON.stringify(
       {type:'hr',id:String(h.id),start:start,end:end}))
   }catch(e){}}
+/* THE SAME WITNESS, FOR CARDIO (owner-caught live, 19 Sep 2026). A
+   lifting session gets its heart rate asked for over its own window;
+   a run, ride or walk synced in from Apple Health never did — the
+   bulk workout list carries no HR field at all (fetchWorkouts in
+   HealthBridge.swift), so hkNative always wrote hr:0 regardless of
+   what the watch actually recorded, and the row read "no heart rate
+   came with it" even when Health plainly had one. The 'RUN:' prefix
+   on the id keeps this answer from colliding with a lifting session
+   that happens to share a raw id (hkHR below routes on it). */
+function runHrAsk(r){
+  try{
+    if(!inWrapper()||!r||r.hr||!r.date)return;
+    const start=Math.round(new Date(r.date+'T'+(r.time||'12:00')).getTime()/1000);
+    const end=Math.round(start+Math.max(10,(+r.mins||30))*60);
+    window.webkit.messageHandlers.allena.postMessage(JSON.stringify(
+      {type:'hr',id:'RUN:'+String(r.id),start:start,end:end}))
+  }catch(e){oops('runHrAsk',e)}}
 function hrWitnessBackfill(){
   try{
     if(!inWrapper())return;
     const cut=Date.now()-7*864e5,cutK=dayKey(new Date(cut));
     (S.history||[]).filter(h=>h.complete&&!h.run&&!h.hr&&!h.manual&&h.startedAt&&h.startedAt>cut)
       .slice(-4).forEach(hrWitnessAsk);
+    /* the same backfill for cardio already sitting at hr:0 from before
+       this fix existed — only rows Health itself witnessed (an 'hk' id),
+       so a hand-typed run with a genuinely unknown HR is left alone */
+    (S.runs||[]).filter(r=>!r.hr&&String(r.id||'').slice(0,2)==='hk'&&String(r.date).slice(0,10)>=cutK)
+      .slice(-4).forEach(runHrAsk);
     /* the after-the-fact witness (owner ruling, 3 Sep: 'recorded live'
        is defined by the witnesses, not the typing): a session typed
        later has no clock to window, so the day is scanned in 3-hour
@@ -15423,6 +15519,18 @@ function hrWitnessBackfill(){
   }catch(e){}}
 function hkHR(id,res){
   try{
+    if(String(id).indexOf('RUN:')===0){
+      if(!res||!(res.n>0))return;
+      const r=(S.runs||[]).find(x=>String(x.id)===String(id).slice(4));
+      if(!r||r.hr)return;
+      r.hr=Math.round(res.avg);
+      runSave();
+      /* a retro-witnessed HR can flip this run's race outcome (runRaces
+         reads r.hr directly) — push the corrected week now, not at
+         tomorrow's sync (same law as the lifting witness above) */
+      try{if(typeof acctSync==='function')acctSync(false)}catch(e9){}
+      render();
+      return}
     if(String(id).indexOf('DAY:')===0){
       const q=String(id).split(':'),hid=q[1];
       const P=S._hrDay||(S._hrDay={});
@@ -18100,14 +18208,24 @@ function corrPhrase(c){
   const x='Found by checking every signal against every outcome in your own days, keeping only links that hold on both halves of the data and clear a strict threshold. It says these two move together, not that one causes the other.'+
     (also.length?' Also seen as '+also.join(', ')+' \u2014 the same fact through the same family of signals, counted once.':'');
   return{title:title,body:body,x:x,strong:Math.abs(c.rho)>=0.65&&!S9.sched,good:good,sched:!!S9.sched}}
+/* THE FREE CAP HAS ONE READER (review, 19 Sep 2026): it used to live
+   only inside correlationDiscoveries(), so deepProven() and the
+   "since you last looked" counter both handed a free account MORE
+   correlations than the findings list had ever shown them — the read
+   citing a link nobody had been let see, "N new insights" counting
+   correlations that were never released as one. Every consumer of "the
+   correlations a person may currently see" calls this now; correlations()
+   itself stays the engine's honest, uncapped answer. */
+function corrVisible(){
+  const full=correlations();
+  return (typeof isPremium==='function'&&isPremium())?full:full.slice(0,corrFreeCap())}
 function correlationDiscoveries(){
   const D=[];
   /* free sees the strongest correlations the grid clears, not the whole
      reservoir (owner call, 18 Sep) — correlations() is already sorted
      strongest-first, so a cap here is a narrower search, never a locked
      result: see corrFreeCap() in 19c-premium.js. */
-  const full=correlations();
-  const cur=(typeof isPremium==='function'&&isPremium())?full:full.slice(0,corrFreeCap());
+  const cur=corrVisible();
   cur.forEach(c=>{
     const p=corrPhrase(c);
     D.push({rar:(p.contra||p.sched)?'common':(p.strong?'epic':'rare'),t:p.title,d:p.body,x:p.x||'',tag:'signal',contra:p.contra?1:0,sched:p.sched?1:0,id:corrIdentity(c),k:c.k||null})});
@@ -18129,6 +18247,15 @@ function correlationDiscoveries(){
     const tk=today();
     const daysBetween=(a,b)=>Math.round((new Date(b+'T12:00')-new Date(a+'T12:00'))/864e5);
     const live={};
+    /* THE DEAD-ZONE DISEASE, FIFTH INSTANCE (review, 19 Sep 2026): when
+       corrVisible() was split out, its own local `full` stayed scoped
+       to that function — this loop still referenced the name from the
+       OLD single-function version, now a plain ReferenceError on every
+       call, caught by the try/catch below and silently disabling every
+       strengthened/faded/back-again finding. Re-declared here, exactly
+       as the comment beneath already said it must be: the full
+       reservoir, not corrVisible()'s capped list. */
+    const full=correlations();
     /* state keys are family|outcome — the bar is what tells them apart
        from the legacy sig:out:lag keys, which an ex: outcome would
        otherwise look exactly like (caught re-reading the diff).
@@ -19502,7 +19629,7 @@ const FIND_GLOSS=[
    dir:-1, ref:'you',
    note:'Lower is usually fitter or better recovered, but the number that matters is yours, not a chart.'},
   {k:'e1rm',     m:/\b(1RM|e1RM|estimated max)\b/i,
-   say:'estimated max', is:'the heaviest single rep you would likely manage, worked out from a set you actually did. You never have to test it.',
+   say:'estimated max', is:'the heaviest single rep the set works out to, worked out from a set you actually did. You never have to test it.',
    dir:1, ref:'named'},
   {k:'rpe',      m:/\bRPE\b/i,
    say:'RPE', is:'how hard a set felt, 1 to 10. 10 means nothing left.',
@@ -19594,7 +19721,7 @@ function findMeaningHtml(f){
    nothing to beat and inventing a comparison would be worse than
    silence. Same for a first, a streak and a date. */
 const REF_EXEMPT=/\b(sets logged|sessions logged|first time|first ever|your first|streak|days running|logged since|crossed|longest|quickest|fastest|heaviest|biggest|most \w+ ever|best ever|personal best)\b/i;
-const REF_HAS=/(\bvs\b|\bagainst\b|\bcompared\b|% of|past about|normal for you|your usual|up from|down from|was |were |previous|last time|used to|now |gone from|from \\d|next rung|away|median|average of your|of raw|threshold|target|baseline|either way|others|other nights|out of|of the \d)/i;
+const REF_HAS=/(\bvs\b|\bagainst\b|\bcompared\b|% of|past about|normal for you|your usual|up from|down from|was |were |previous|last time|used to|now |gone from|from \d|next rung|away|median|average of your|of raw|threshold|target|baseline|either way|others|other nights|out of|of the \d)/i;
 /* a number a reader could reasonably ask "is that good?" about: a
    multiplier, a percentage, or a measured unit. Bare integers are not
    included — those are counts, and counts are odometers. */
@@ -21356,9 +21483,25 @@ function growTreeTime(W,Hh,opts){
     /* the axis: months down the left, the two ends named */
     (function(){const MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
       const FS=Math.pow(z,0.25);
+      /* MONTHS COLLIDE WHEN THE TRUNK IS SHORT FOR ITS SPAN (owner-caught
+         on a live screenshot, 19 Sep 2026: years of month labels stacked
+         into one illegible band). Every month between the first and last
+         day ticked regardless of how much vertical room the account's
+         actual trunk gave it — a sparse multi-year account (a handful of
+         active days spread over years) draws a short trunk for a long
+         calendar span, so a dozen months land in the same few pixels
+         zoom cannot fix, because zoom only stretches width (txApplyZoom
+         sets the container's width, never its height). Below a month's
+         own label height, only the year (January) still ticks — the
+         months between it stop claiming room they do not have rather
+         than drawing on top of each other. */
+      const monthPx=usable/Math.max(1,d.span)*30.44;
+      const yearsOnly=monthPx<16;
       const d9=new Date(d.first+'T12:00');d9.setDate(1);d9.setMonth(d9.getMonth()+1);let guard=0;
       while(guard++<400){const k=dayKey(d9);if(k>d.last)break;
-        const y=yAt(d.frac(k)),jan=d9.getMonth()===0;
+        const jan=d9.getMonth()===0;
+        if(yearsOnly&&!jan){d9.setMonth(d9.getMonth()+1);continue}
+        const y=yAt(d.frac(k));
         out+='<line x1="10" y1="'+f1(y)+'" x2="'+(jan?26:18)+'" y2="'+f1(y)+'" stroke="var(--faint)" stroke-width="'+(jan?1.2:0.7)+'" opacity="'+(jan?.7:.4)+'"/>'+
           '<text x="30" y="'+f1(y+3)+'" font-size="'+f1((jan?9:7.5)*FS)+'" fill="var(--faint)" opacity="'+(jan?.9:.6)+'" font-family="-apple-system,system-ui,sans-serif">'+MON[d9.getMonth()]+(jan?' '+d9.getFullYear():'')+'</text>';
         bd(10,y,2);d9.setMonth(d9.getMonth()+1)}
@@ -24412,7 +24555,7 @@ function sinceSnap(){
   try{s9.streak=dayStreak()}catch(e){}
   try{s9.pts=Math.round(dataPoints().total)}catch(e){}
   try{s9.km=Math.round(weeklyKm(1)[0].km*10)/10}catch(e){}
-  try{s9.ins=correlations().length}catch(e){}
+  try{s9.ins=(typeof corrVisible==='function'?corrVisible():correlations()).length}catch(e){}
   return s9}
 function sinceData(){
   try{
@@ -25363,6 +25506,7 @@ function demoLoad(){
 function demoPresent(){return S.history.some(h=>h.demo)||S.scans.some(x=>x.demo)}
 function demoWipe(){
   // strip every trace of the sample account; safe to call silently
+  const wasDemo9=demoPresent();
   S.history=S.history.filter(h=>!h.demo);lset(K_H,S.history);
   S.scans=S.scans.filter(x=>!x.demo);scanSave();
   S.goals=S.goals.filter(g=>!g.demo);lset(K_GOALS,S.goals);
@@ -25370,8 +25514,9 @@ function demoWipe(){
   if(S.lib.activeId==='demo-block')S.lib.activeId=(S.lib.programs[0]||{}).id;
   saveLib();
   if(S.gar.demo){S.gar={on:false,steps:false,morning:true,days:{}};garSave()}
-  S.supp={on:false,days:{}};lset(K_SUPP,S.supp);
-  S.daily={on:false,days:{}};lset(K_DAILY,S.daily);
+  if(wasDemo9){
+    S.supp={on:false,days:{}};lset(K_SUPP,S.supp);
+    S.daily={on:false,days:{}};lset(K_DAILY,S.daily)}
   if(S.prof&&S.prof.name==='Demo'){S.prof=null;ldel(K_PROF)}
   S.demo=false}
 function demoClear(){
@@ -27075,7 +27220,7 @@ function deepProven(){
      certainty word drifts from the number it described (R17, and the
      PI-RADS failure the research names). */
   const tierOf=c=>c.contra?'backwards':c.sched?'schedule':((c.n||0)>=30?'holds':'sofar');
-  try{correlations().forEach(c=>{const p=corrPhrase(c);
+  try{(typeof corrVisible==='function'?corrVisible():correlations()).forEach(c=>{const p=corrPhrase(c);
     const it={k:'corr',t:p.title,d:p.body,contra:!!p.contra,sched:!!p.sched,n:c.n||0,
       rar:p.contra||p.sched?'common':(p.strong?'epic':'rare')};
     it.tier=tierOf(it);L.push(it)})}catch(e){oops('deepProven.corr',e)}
@@ -27969,7 +28114,7 @@ function viewObPaywall(){
     premPriceHtml({on:false},cur);
   h+=premContrastHtml();
   h+='<button data-a="obPwTrial" class="big disp mt" style="background:var(--amber);color:var(--bg);font-size:15px">Start your '+PRICE.trialDays+'-day free trial</button>'+
-    '<p style="color:var(--faint);font-size:11px;text-align:center;margin-top:8px">Free today. We\u2019ll remind you before day '+PRICE.trialDays+'. Then '+esc(PRICE.yr[cur])+' a year unless you cancel \u2014 nothing charges you now.</p>';
+    '<p style="color:var(--faint);font-size:11px;text-align:center;margin-top:8px">Free for '+PRICE.trialDays+' days. Then '+esc(PRICE.yr[cur])+' a year unless you cancel \u2014 nothing charges you now.</p>';
   h+='</div>';
 
   h+='<button data-a="obPwSkip" class="big disp mt2" style="width:100%">Continue free</button>';
@@ -28356,7 +28501,7 @@ function viewToday(){
     h+='<p style="color:var(--dim);font-size:13px;line-height:1.6;margin-top:14px">'+esc(OB_LINE1)+' '+esc(OB_LINE2)+'</p>';
     h+=obExampleCorrPills()}}catch(e){oops('obEmptyToday',e)}
   /* demo pills live in Settings now (owner, 10 Sep: 'i dont want to see that on today') */
-  try{if(!S.signalReveal&&!S.signalShownFor){const sg=(typeof revealDue==='function'?revealDue():signalDue());
+  try{if(!S._peek&&!S.signalReveal&&!S.signalShownFor){const sg=(typeof revealDue==='function'?revealDue():signalDue());
     if(sg){S.signalShownFor=sg.id;S.signalReveal=sg;setTimeout(function(){render()},400)}}}catch(e){}
   /* the Health link outranks everything — it is the one tap that
      unlocks the whole engine, so it is the FIRST thing a fresh
@@ -31885,7 +32030,7 @@ function sheetHtml(){
         (r.km?bigNum(r.km,'km run'):bigNum(r.sets,'sets'))+'</div>'+
       (r.move?'<div class="card mt2" style="padding:13px 15px"><p class="mono" style="font-size:var(--t-caption);color:var(--green);letter-spacing:.06em">BIGGEST MOVE</p>'+
         '<p style="font-size:13px;font-weight:600;margin-top:4px">'+esc(r.move.ex)+' up '+r.move.pct+'%</p></div>':'')+
-      (r.disc?'<div class="card mt" style="padding:13px 15px"><p class="mono" style="font-size:var(--t-caption);color:'+rarityOf(r.disc.rar)[1]+';letter-spacing:.06em">BEST FIND · '+esc(r.disc.rar.toUpperCase())+'</p>'+
+      (r.disc?'<div class="card mt" style="padding:13px 15px"><p class="mono" style="font-size:var(--t-caption);color:'+rarInk(r.disc.rar)+';letter-spacing:.06em">BEST FIND · '+esc(r.disc.rar.toUpperCase())+'</p>'+
         '<p style="font-size:13px;font-weight:600;margin-top:4px">'+esc(r.disc.t)+'</p></div>':'')+
       '<div class="card mt" style="padding:13px 15px;border-color:color-mix(in srgb, var(--text) 42%, transparent)"><p class="mono" style="font-size:var(--t-caption);color:var(--amber);letter-spacing:.06em">WORTH FIXING</p>'+
         '<p style="color:var(--dim);font-size:13px;line-height:1.55;margin-top:4px">'+esc(r.fix)+'</p></div>'+
@@ -33260,7 +33405,17 @@ function cuSweep(){
      several of these spans render via toLocaleString(). */
   S._cuPrev=S._cuPrev||{};
   document.querySelectorAll('[data-cu]').forEach(el=>{
-    const k=el.getAttribute('data-cu'),to=parseInt(String(el.textContent||'').replace(/,/g,''),10);
+    const k=el.getAttribute('data-cu'),txt9=String(el.textContent||'');
+    /* THE COUNT-UP ENDS ON AN UNFORMATTED NUMBER (review, 19 Sep 2026):
+       a compact figure like "12k" (ptsShort) parses as 12 — commas were
+       stripped but the 'k' was not, so parseInt silently truncated at
+       it — and even a plain comma-formatted "1,038" lost its commas on
+       the FINAL frame, since the tick always wrote a bare
+       Math.round(...). Bail on anything that is not purely digits and
+       commas, and restore the original text exactly once the count
+       finishes, so the real formatting survives the animation. */
+    if(/[^\d,\s]/.test(txt9))return;
+    const to=parseInt(txt9.replace(/,/g,''),10);
     if(isNaN(to))return;
     const from=S._cuPrev[k];
     S._cuPrev[k]=to;
@@ -33274,7 +33429,7 @@ function cuSweep(){
       if(!el2)return;
       const p=Math.min(1,(Date.now()-t0)/dur);
       const e9=1-Math.pow(1-p,3);
-      el2.textContent=Math.round(from+(to-from)*e9);
+      el2.textContent=p>=1?txt9:String(Math.round(from+(to-from)*e9));
       if(p<1)requestAnimationFrame(tick);
       else setTimeout(()=>{const el3=document.querySelector('[data-cu="'+k+'"]');
         if(el3){el3.style.textShadow='none'}},900)};
@@ -33874,7 +34029,23 @@ function render(){
          actually dismissed, rather than giving up on the tour forever. */
       if(!(typeof arrivalDue==='function'&&arrivalDue())){
         S._tourChecked=1;
-        if(!lget('training-tour-v1',null)){S.tour={i:0};setTimeout(function(){try{render()}catch(e9){}},60)}}}}catch(e){}
+        if(!lget('training-tour-v1',null)){
+          /* THE TOUR FIRES FOR EVERY EXISTING ACCOUNT, NOT JUST A FRESH
+             ONE (review, 19 Sep 2026): training-tour-v1 never existed
+             before this feature shipped, so an established account with
+             months of real history hit this exact branch on its next
+             open — a four-step spotlight walkthrough aimed at someone
+             who has been training here for months, its step 1 often
+             pointing at nothing an account with data actually shows.
+             obRevealSeen is stamped the moment "Take me in" is tapped at
+             the end of the real onboarding flow (obRevealGo) — signed in
+             or not — so it is the one honest signal for "just arrived".
+             An account without it has simply never been asked before
+             this build; it is marked seen without being shown the tour,
+             the same way older data silently adopts a new schema, and
+             stays reachable any time from the Settings row. */
+          if(acct()&&acct().obRevealSeen){S.tour={i:0};setTimeout(function(){try{render()}catch(e9){}},60)}
+          else lset('training-tour-v1',Date.now())}}}}catch(e){}
     /* the boot overlay also lives OUTSIDE the render cycle: it mounts
        once, and step ticks (or a mid-boot render — e.g. the iOS wrapper
        delivering Health data) update only the text lines, so the ring
@@ -33906,7 +34077,12 @@ function render(){
        try{hapticRun('find')}catch(e){}}}
      else if(sh9)sh9.remove()}
     {let fc9=document.getElementById('friendCelebHost');
-     if(S.friendCeleb){if(!fc9){fc9=document.createElement('div');fc9.id='friendCelebHost';
+     /* NEVER OVER A LIVE SET (review, 19 Sep 2026): frLoad polls while
+        the app is open, so a friend accepting mid-session used to drop
+        this full-screen gold card straight over the set screen and the
+        rest clock. Same guard the tour and the insight reveal already
+        use — the moment waits one render for a screen where it is safe. */
+     if(S.friendCeleb&&!S.tour&&!onSessionScreen()){if(!fc9){fc9=document.createElement('div');fc9.id='friendCelebHost';
        fc9.innerHTML=friendCelebHtml();document.body.appendChild(fc9);
        try{hapticRun('find')}catch(e){}}}
      else if(fc9)fc9.remove()}
@@ -34307,8 +34483,18 @@ tickEvery(function(){try{
     const fn=VIEWFN[R[j]];
     if(typeof fn!=='function')return null;
     let html='';
+    /* A PEEK IS A PREVIEW, NOT A REAL RENDER (review, 19 Sep 2026): a
+       view function calling fn() here is not "the app is now on this
+       screen" — it is a snapshot drawn beside the page while a finger
+       decides. viewToday() queues the daily insight reveal and reruns
+       render() as a side effect of being called at all, so a 20 px drag
+       toward Today from another tab could arm and consume that reveal
+       before the user ever actually arrived. S._peek tells any view
+       function to skip its side effects for this one call. */
+    S._peek=1;
     try{html=fn()}
     catch(e){oops('swipePeek',e);return null}
+    finally{S._peek=0}
     if(!html||typeof html!=='string')return null;
     const el=document.createElement('div');
     el.className='pgpeek';
@@ -36531,6 +36717,8 @@ function runAction(a,v,t,e){
         render()}catch(e){}break}
     case 'frShareGo':{try{frShare(v)}catch(e){}break}
     case 'frUserGo':{try{frFindByUsername(S.frUserIn||'')}catch(e){}break}
+    case 'frAcceptGo':{try{frAcceptRequest(v)}catch(e){oops('frAcceptGo',e)}break}
+    case 'frDeclineGo':{try{frDeclineRequest(v)}catch(e){oops('frDeclineGo',e)}break}
     case 'raceGroupSel':{S.raceGroup=v||null;render();break}
     case 'crewNameOpen':{S.crewNm='';S.sheet={t:'crewname'};render();break}
     case 'crewMakeGo':{S.sheet=null;try{crewMake(S.crewNm)}catch(e){}render();break}
@@ -36542,7 +36730,7 @@ function runAction(a,v,t,e){
         render()}catch(e){}break}
     case 'crewMake':{try{crewMake()}catch(e){}break}
     case 'crewShare':{try{crewShare(v)}catch(e){}break}
-    case 'crewLeave':{try{crewLeave()}catch(e){}break}
+    case 'crewLeave':{try{crewLeave(v)}catch(e){}break}
     /* and Back from the evidence returns to the card it was opened from
        (owner-caught on video, 15 Sep: it was landing on the collection).
        The card is remembered rather than kept open, because the overlay
@@ -38017,6 +38205,13 @@ function morningAsk(){try{
   if(!morningDue())return false;
   if(S.boot!=null){S.morningQueued=true;return false}   // wait for the launch animation
   if(S.view==='setup'||S.view==='signup'||S.view==='coach'||S.view==='obwait'||S.view==='obreveal'||S.sess)return false;
+  /* the tour outranks a morning check-in the same way it outranks
+     the daily-find pop-up (review, 19 Sep 2026): dayCheck's
+     focus/visibilitychange/pageshow retrigger can fire mid-tour and
+     open a sheet UNDER the tour's scrim — dimmed, untappable, and the
+     tour's own bubble now floats over a screen the user cannot use
+     until Skip/Done */
+  if(S.tour)return false;
   if(S.sheet)return false;                       // never stack on another prompt
   const k=today();
   const d=S.gar.days[k]||{};
