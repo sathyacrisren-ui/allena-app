@@ -1680,7 +1680,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='febe8a';  // stamped by tools/build.py with the content hash
+const BUILD_ID='494330';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -4504,6 +4504,28 @@ async function nudgePull(tok,h){
       body:JSON.stringify({seen:true})});
     S._ndgLast.st='done'
   }catch(e){try{S._ndgLast=Object.assign(S._ndgLast||{},{st:'error: '+String(e&&e.message||e).slice(0,60)})}catch(e2){}}}
+/* NUDGES POLL WHILE THE APP IS OPEN (owner ask, 18 Sep 2026: "nudges
+   don't work when someone is in the app, it should continuously be
+   pinging server for nudges"). The only existing call to nudgePull rode
+   dayCheck, gated to once a calendar day (S._frDay) — so a nudge sent
+   while a friend was mid-session sat unseen until the NEXT day's first
+   open. tickEvery (00-core.js, audit A3) already sleeps the interval the
+   moment the screen goes hidden and wakes it on return — which is
+   exactly "while someone is in the app" — reused here at a network
+   rate rather than its own 0.5-1s UI-clock rate. A flag guards against a
+   slow request overlapping the next tick. */
+let _ndgPollBusy=false;
+tickEvery(function(){
+  if(_ndgPollBusy||!acctReady()||!acct())return;
+  _ndgPollBusy=true;
+  (async function(){
+    try{
+      const tok=await acctToken();if(!tok)return;
+      const h=await frHeaders();if(!h)return;
+      await nudgePull(tok,h)}
+    catch(e){oops('ndgPoll',e)}
+    finally{_ndgPollBusy=false}
+  })()},30000);
 function frRename(id,nm){
   try{const a9=acct()||{};const m=a9.frNames||{};
     nm=String(nm||'').trim().slice(0,14);
@@ -6861,6 +6883,13 @@ function viewObReveal(){
   const list=(function(){try{return correlationDiscoveries()}catch(e){return[]}})();
   const dp=obDataPointsN(),shown=S._obDpReady?dp:0;
   const have=obReadyDays(),need=Math.max(0,12-have);
+  /* Insights went premium-only 19 Sep — list is now empty for a free
+     account even once it has real correlations, so "not enough data
+     yet" would be a lie the moment it has 12+ days. gated distinguishes
+     that case from the genuinely-early one, which behaves the same for
+     every account regardless of plan. */
+  const gated=!list.length&&!(typeof isPremium==='function'&&isPremium())&&
+    (function(){try{return correlations().length>0}catch(e){return false}})();
   const cards=list.map(d=>{
     const rc=rarChrome(d.rar,false),r=rarityOf(d.rar);
     return '<button data-a="findOpen" data-v="'+esc(d.id)+'" class="card" style="width:100%;text-align:left;padding:15px 16px;border-color:'+rc.border+';border-width:'+rc.width+';background:'+rc.fill+'">'+
@@ -6870,10 +6899,13 @@ function viewObReveal(){
   return '<div class="view pad pinpage" style="padding-top:40px">'+
     '<p class="mono" style="color:var(--amber);font-size:11px;letter-spacing:.14em">YOUR DATA, READ TOGETHER</p>'+
     '<h1 class="disp gradhead" style="font-size:28px;font-weight:650;margin-top:8px;line-height:1.15">'+
-    (list.length?('Allena found '+list.length+' thing'+(list.length===1?'':'s')+' in your data.'):'Nothing to show yet.')+'</h1>'+
+    (list.length?('Allena found '+list.length+' thing'+(list.length===1?'':'s')+' in your data.')
+      :gated?'Allena already found something.':'Nothing to show yet.')+'</h1>'+
     (list.length
       ?('<p class="mono" style="color:var(--faint);font-size:11px;letter-spacing:.06em;margin-top:10px">READ FROM <span data-cu="obdp">'+shown+'</span> LOGGED DATA POINTS</p>'+
         '<div class="stg" style="margin-top:20px;display:flex;flex-direction:column;gap:10px">'+cards+'</div>')
+      :gated?('<p style="color:var(--dim);font-size:13px;line-height:1.6;margin-top:10px">The engine has run the full search on your data — Premium is what shows the result.</p>'+
+        (typeof lockCard==='function'?lockCard('insights',{}):''))
       :('<p style="color:var(--dim);font-size:13px;line-height:1.6;margin-top:10px">The engine needs at least 12 days that carry both a logged session and a morning check-in. You have '+have+' so far'+(need?', '+need+' more to go':'')+'.</p>'))+
     '<div class="pinfoot"><button data-a="obRevealGo" class="big disp" style="background:var(--amber);color:var(--bg);font-size:17px">Take me in</button></div></div>'}
 const MUSCLE_RULES=[
@@ -14036,6 +14068,17 @@ function hkNative(list){
     if(!Array.isArray(list))return;
     try{hkPulse(0)}catch(e9){}
     const out=[];
+    /* THE AUTOMATIC SYNC IS THE THING BEING SOLD (owner ruling, 19 Sep
+       2026): the native side still reads the whole Health archive (10
+       years, see ios/Allena/HealthBridge.swift) every time, because
+       that read is free and instant on-device — what changes for a
+       free account is which of those rows Allena actually KEEPS.
+       Anything already imported before this ruling is unaffected
+       (hkImport only ever adds, on top of the dedupe in `have`); this
+       only stops NEW rows older than the window from landing going
+       forward, same shape as the Insights cap above it. */
+    const hkFree=!(typeof isPremium==='function'&&isPremium());
+    const hkCut=hkFree?dayKey(new Date(Date.now()-30*864e5)):null;
     list.forEach(w=>{
       const actName=String(w.act||'').replace('HKWorkoutActivityType','');
       if(actName==='Strength'||actName==='HIIT'){
@@ -14050,6 +14093,7 @@ function hkNative(list){
       if(paceSaysWalk(t,+w.km||0,mins))t='walk';
       const date=String(w.date||'').slice(0,10),time=String(w.time||'08:00').slice(0,5);
       if(!/^\d{4}-\d{2}-\d{2}$/.test(date))return;
+      if(hkCut&&date<hkCut)return;
       out.push({date:date,time:time,type:t,
         km:Math.round((+w.km||0)*100)/100,mins:mins,
         rpe:t==='easy'?4:t==='walk'?2:5,hr:Math.round(+w.hr||0),elev:0,
@@ -16630,9 +16674,15 @@ function hkDaily(rows){
     if(!Array.isArray(rows))return;
     try{hkPulse(0)}catch(e9){}
     const st=hkDailyStore();let n=0;
+    /* same window as the workout side, hkNative() in 12b-intake.js —
+       a free account keeps its existing history either way, this only
+       stops NEW body-signal days older than 30 out from landing. */
+    const hkFree=!(typeof isPremium==='function'&&isPremium());
+    const hkCut=hkFree?dayKey(new Date(Date.now()-30*864e5)):null;
     rows.forEach(r=>{
       const k=String(r.date||'').slice(0,10);
       if(!/^\d{4}-\d{2}-\d{2}$/.test(k))return;
+      if(hkCut&&k<hkCut)return;
       const d=st.days[k]=st.days[k]||{};
       if(r.spo2!=null&&isFinite(+r.spo2)&&+r.spo2>0&&+r.spo2<=1)r.spo2=Math.round(+r.spo2*1000)/10;
       ['rhr','hrv','vo2','steps','sleep','sldeep','slrem','resp','wtemp','spo2','flow'].forEach(f=>{
@@ -17145,9 +17195,12 @@ function hkTiming(rows){
     if(typeof rows==='string')rows=JSON.parse(rows);
     if(!Array.isArray(rows)||!rows.length)return;
     const st=hkDailyStore();let n=0;
+    const hkFree=!(typeof isPremium==='function'&&isPremium());
+    const hkCut=hkFree?dayKey(new Date(Date.now()-30*864e5)):null;
     rows.forEach(r=>{
       const k=String(r.date||'').slice(0,10);
       if(!/^\d{4}-\d{2}-\d{2}$/.test(k))return;
+      if(hkCut&&k<hkCut)return;
       const d=st.days[k]=st.days[k]||{};
       ['msteps','eprot','ecarb'].forEach(f=>{
         if(r[f]!=null&&isFinite(+r[f])&&+r[f]>=0&&+r[f]<=1){
@@ -26405,7 +26458,7 @@ function dayCard(p,d,i,done,daily){
      buttons ((i), the toggle) and HTML silently splits nested buttons
      — the stats row was landing OUTSIDE the card with a void where
      the card broke (beta-caught via Dafydd, 9 Sep) */
-  return '<div class="card'+(sugg?' an-glow':'')+'" data-a="'+(locked?'weekLockedInfo':gated?'weekGateOpen':'prevOpen')+'" data-v="'+p.id+':'+i+'" style="width:100%;text-align:left;padding:18px;display:block;cursor:pointer'+(sugg?';background:linear-gradient(180deg,rgba(255,255,255,.085),rgba(255,255,255,.03)),radial-gradient(125% 95% at 100% 0%,rgba(110,127,232,.17),transparent 62%);border-color:rgba(255,255,255,.12);box-shadow:inset 0 1px 0 var(--edge-light),var(--shadow-card)':'')+(sugg?';border-color:var(--amber)':'')+'">'+
+  return '<div class="card'+(sugg?' an-glow':'')+'" data-a="'+(locked?'weekLockedInfo':gated?'weekGateOpen':'prevOpen')+'" data-v="'+p.id+':'+i+'" data-holdmenu="'+i+'" style="width:100%;text-align:left;padding:18px;display:block;cursor:pointer'+(sugg?';background:linear-gradient(180deg,rgba(255,255,255,.085),rgba(255,255,255,.03)),radial-gradient(125% 95% at 100% 0%,rgba(110,127,232,.17),transparent 62%);border-color:rgba(255,255,255,.12);box-shadow:inset 0 1px 0 var(--edge-light),var(--shadow-card)':'')+(sugg?';border-color:var(--amber)':'')+'">'+
     (sugg?'<p class="eyebrow" style="color:var(--amber);margin:0 0 6px">Allena suggests today</p>'+
       (suggWhy?'<p style="color:var(--dim);font-size:11px;line-height:1.5;margin:-2px 0 8px">Because '+esc(suggWhy)+'.</p>':''):'')+
     '<div style="display:flex;align-items:center;gap:8px">'+
@@ -27414,8 +27467,27 @@ async function deepRun(){
       render();return}
     const bank=discBank();
     const dealt=[];
-    items.forEach((x,i)=>{const id='insight:'+today()+':'+i;
-      if(!bank[id])bank[id]={t:x.t,d:x.d+' — the model\u2019s reading of what the engine proved.',
+    /* A REPEAT UPDATES ITS CARD IN PLACE, NOT A NEW ONE (owner, 18 Sep
+       2026: "users keep complaining that they keep getting the same
+       insight cards constantly, especially those with many data
+       points"). Every deal used to mint id='insight:'+today()+':'+i
+       regardless of whether the title matched something already
+       banked — DEEP_SYS asks the model to give a link that still
+       holds ONE short line rather than a fresh paragraph, but nothing
+       stopped that short line from landing as a brand-new card with a
+       brand-new found date and a full reveal anyway. A data-rich
+       account has MORE correlations that keep holding week after
+       week, so it is exactly the account that saw this worst. Match
+       on title — the same string the prompt already asks the model to
+       keep stable for a repeat — and refresh the existing card
+       instead of minting a twin. found is never touched, only the
+       words and the rarity; a genuinely new title still mints and
+       still deals as new. */
+    items.forEach((x,i)=>{
+      const prior=Object.keys(bank).find(k=>bank[k]&&bank[k].tag==='insight'&&bank[k].t===x.t);
+      const id=prior||('insight:'+today()+':'+i);
+      if(prior){bank[id].d=x.d+' — the model\u2019s reading of what the engine proved.';bank[id].rar=x.rar}
+      else bank[id]={t:x.t,d:x.d+' — the model\u2019s reading of what the engine proved.',
         rar:x.rar,tag:'insight',found:today()};
       dealt.push(id)});
     bankSave();
@@ -27598,7 +27670,7 @@ const PRICE={
    STRUCTURALLY CANNOT show the thing being sold. */
 
 const PREM_FEATURES=[
-  {k:'insights',n:'Insights',free:'Your strongest few',
+  {k:'insights',n:'Insights',free:'—',
    d:'Every signal, every outcome'},
   {k:'history',n:'History',free:'Last 12 weeks',
    d:'All-time'},
@@ -27637,31 +27709,27 @@ const PREM_FEATURES=[
    below is written for that design and is honest about it today:
    nothing is hidden, the search is just narrower.
 
-   THE OWNER MADE THAT CALL (18 Sep 2026): free gets the STRONGEST few
-   correlations the grid clears, not the whole 32-deep reservoir —
-   Premium's Insights runs the full search. This is still "a finding is
-   never locked after it is found": corrFreeCap() only limits how many
-   NEW correlations correlationDiscoveries() turns into findings going
-   forward, in 13c-correlate.js. Anything already banked in
-   training-bank-v1 stays banked and visible forever, cap or no cap —
-   see bankDiscoveries() in 18-today-cards.js, which only ever adds. */
-const CORR_CAP_VARIANTS=[3,5,8];
-function corrFreeCap(){
-  try{
-    if(S.prof&&S.prof.corrCapN)return S.prof.corrCapN;
-    const n=CORR_CAP_VARIANTS[Math.floor(Math.random()*CORR_CAP_VARIANTS.length)];
-    S.prof=Object.assign({},S.prof||{},{corrCapN:n});
-    lset(K_PROF,S.prof);
-    return n}
-  catch(e){oops('corrFreeCap',e);return CORR_CAP_VARIANTS[1]}}
-
+THE OWNER MADE THAT CALL (18 Sep 2026), THEN WENT FURTHER (19 Sep):
+   free no longer gets a "strongest few" cap of Insights at all —
+   Premium's Insights runs the full search, free doesn't reach it. The
+   correlation engine needs n>=12 paired days before it can say
+   anything (corrEffN, corrDayData's own floor), so a partial free cap
+   was already close to moot; this just says it plainly instead of
+   pretending a narrower search is the product. Still not a locked
+   RESULT: corrFreeCap() only limits how many NEW correlations
+   correlationDiscoveries() turns into findings going forward, in
+   13c-correlate.js. Anything already banked in training-bank-v1 stays
+   banked and visible forever, cap or no cap — see bankDiscoveries() in
+   18-today-cards.js, which only ever adds. */
+const CORR_FREE_CAP=0;
+function corrFreeCap(){return CORR_FREE_CAP}
 const FREE_FEATURES=[
   'Logging, and the clock that witnesses it',
   'The whole rehab pathway, check-ins and physio plans',
   'The race, the board, the crown and your friends',
   'Your tree, your points and your collection',
   'Today’s call, and the daily find',
-  'Every finding the engine reaches — findings are never locked',
+  'Every discovery and pattern the engine reaches — never locked',
   'The quality gate, and every safety refusal',
   'Twelve weeks of history',
   'A written read once a month'];
@@ -27750,19 +27818,18 @@ function lockCard(featKey,opts){
     '<button data-a="upgradeOpen" data-v="'+esc(featKey)+'" class="btn" style="margin-top:12px;width:100%">See what Premium adds</button>'+
     '</div>'}
 
-/* the correlation-cap sell (18 Sep 2026, owner: "sell deep reads as
-   the cooler version — the analyst gives them a hypothesis to test in
-   their training"). Sits on the Findings page, under the correlations
-   free already found. `n` is real — correlations() has already run
-   the full search, corrFreeCap() just decided how much of it a free
-   account gets turned into findings (see correlationDiscoveries()). */
+/* the Insights sell (18 Sep 2026, owner: "sell deep reads as the
+   cooler version — the analyst gives them a hypothesis to test in
+   their training"; amended 19 Sep when Insights went fully premium).
+   Sits on the Findings page. `n` is real — correlations() has already
+   run the full search; a free account just never sees the result. */
 function corrSellCard(){
   try{
     if(typeof isPremium!=='function'||isPremium())return '';
-    const full=correlations(),cap=corrFreeCap(),extra=full.length-cap;
-    if(extra<=0)return '';
-    return lockCard('insights',{n:extra,
-      d:'You’re seeing the strongest '+cap+' correlations Allena has found in your data so far. Premium runs the full search — every signal against every outcome — and each Monday’s read turns what it finds into a hypothesis to test in your training.'})}
+    const n=correlations().length;
+    if(!n)return '';
+    return lockCard('insights',{n:n,
+      d:'Allena has already found '+n+' correlation'+(n===1?'':'s')+' in your data — sleep, protein, HRV, the lifts and runs that move together. Premium unlocks the list, and each Monday’s read turns what it finds into a hypothesis to test in your training.'})}
   catch(e){oops('corrSellCard',e);return ''}}
 
 /* a quiet one-liner for dense surfaces where a card is too loud */
@@ -30719,6 +30786,19 @@ function sheetHtml(){
     '<button data-a="progRename" data-v="'+S.sheet.id+'" class="btn mt" style="color:var(--amber)">Save name</button>'+
     '<p style="color:var(--dim);font-size:13px;line-height:1.55;margin-top:20px">Removing takes it out of the library. Sessions already logged under it stay in History. You can re-import it any time from a backup.</p>'+
     '<button data-a="removeProg" data-v="'+S.sheet.id+'" class="big disp mt" style="background:var(--red);color:#fff;font-size:17px">Remove</button>')}
+  if(S.sheet.t==='manageday'){
+    const p9=activeProgSafe(),di9=S.sheet.id,d9=p9&&p9.days[di9];
+    if(!d9)return wrapSheet('Manage this day','<p style="color:var(--dim);font-size:13px">That day is gone.</p>');
+    const only9=p9.days.length<=1,last9=di9===p9.days.length-1;
+    const doneN9=(S.history||[]).filter(h=>h.complete&&h.progId===p9.id&&h.dayIdx===di9).length;
+    return wrapSheet('Manage this day',
+    '<p class="eyebrow">Name</p>'+
+    '<input data-in="dayname" value="'+esc(d9.name)+'" placeholder="Day name" style="margin-top:8px">'+
+    '<button data-a="dayRename" data-v="'+di9+'" class="btn mt" style="color:var(--amber)">Save name</button>'+
+    (only9?'<p style="color:var(--faint);font-size:13px;line-height:1.55;margin-top:20px">This is the program’s only day — it can’t be removed.</p>'
+      :!last9?'<p style="color:var(--faint);font-size:13px;line-height:1.55;margin-top:20px">Only the last day in the program can be removed this way — remove the days after this one first.</p>'
+      :'<p style="color:var(--dim);font-size:13px;line-height:1.55;margin-top:20px">Removing takes it out of the program from here on.'+(doneN9?' The '+doneN9+' session'+(doneN9===1?'':'s')+' you’ve already logged against it stay in History.':'')+'</p>'+
+      '<button data-a="dayDelOpen" data-v="'+di9+'" class="big disp mt" style="background:var(--red);color:#fff;font-size:17px">Remove this day</button>'))}
   if(S.sheet.t==='goals'){
     S.gform=S.gform||{ex:null,w:60,r:8};
     let inner='';
@@ -34964,6 +35044,35 @@ try{
   },{passive:true});
 })();
 
+/* ── hold a session card in the Program list to manage it (owner ask,
+   18 Sep 2026: "holding down the session in the program... delete or
+   edit"). A plain long-press — no drag to track — so it needs none of
+   the finger-following work above. A COMPLETED HOLD IS NOT A TAP holds
+   here too: the tree's tooltip gesture (above) proved the fix — flag
+   S._heldTap for one tick after the hold fires so the synthetic click
+   that follows never falls through to the card's own data-a. */
+(function(){
+  let tmr=null,fired=false,el=null,x0=0,y0=0;
+  const clear=function(){if(tmr){clearTimeout(tmr);tmr=null}el=null;fired=false};
+  document.addEventListener('touchstart',function(e){
+    clear();
+    const t=e.target.closest&&e.target.closest('[data-holdmenu]');
+    if(!t)return;
+    if(e.target.closest('button,a,input,textarea,select'))return;
+    el=t;const p=e.touches[0];x0=p.clientX;y0=p.clientY;
+    tmr=setTimeout(function(){
+      fired=true;try{haptic('medium')}catch(e2){oops('holdMenu.haptic',e2)}
+      try{runAction('dayManageOpen',el.getAttribute('data-holdmenu'))}catch(e2){oops('holdMenu.open',e2)}
+    },420)},{passive:true});
+  document.addEventListener('touchmove',function(e){
+    if(!tmr)return;
+    const p=e.touches[0];
+    if(Math.abs(p.clientX-x0)>10||Math.abs(p.clientY-y0)>10)clear()},{passive:true});
+  ['touchend','touchcancel'].forEach(function(ev){document.addEventListener(ev,function(){
+    const was=fired;clear();
+    if(was){S._heldTap=1;setTimeout(function(){S._heldTap=0},350)}},{passive:true})});
+})();
+
 /* ══ SWIPE THROUGH THE COLLECTION LIKE A DECK ══════════════════════
    (owner, 16 Sep 2026: "I want to be able to swipe through them like a
    deck of cards".)
@@ -36863,6 +36972,37 @@ function runAction(a,v,t,e){
     case 'cerReplay':{S.cerReplay=1;render();break}
     case 'raceRulesOpen':{S.sheet={t:'racerules'};render();break}
     case 'addDayOpen':{S.sheet={t:'addday'};render();break}
+    /* HOLD A SESSION TO MANAGE IT (owner ask, 18 Sep 2026). Rename works
+       on any day; removal is only offered for the LAST day in the
+       program — p.days[i] is a plain array index, and S.history rows
+       carry dayIdx pointing straight into it, so pulling a day out of
+       the middle would silently repoint every later day's history at
+       the wrong session. Appending is how a day gets added in the
+       first place (dayRepeat, cusPickGo, recDayAdd all push), so the
+       constraint costs nothing in the common case: remove the ones you
+       added most recently first. */
+    case 'dayManageOpen':{const p9=activeProgSafe();const di9=+v;
+      if(!p9||!p9.days[di9])break;
+      S.sheet={t:'manageday',id:di9};render();break}
+    case 'dayRename':{const p9=activeProgSafe();const di9=+v;
+      if(!p9||!p9.days[di9])break;
+      const el9=document.querySelector('[data-in="dayname"]');
+      const nm=el9?String(el9.value).trim():'';
+      if(!nm){flash('Give it a name first.');break}
+      p9.days[di9].name=nm.slice(0,40);saveLib();S.sheet=null;render();flash('Renamed.');break}
+    case 'dayDelOpen':{const p9=activeProgSafe();const di9=+v;
+      if(!p9||!p9.days[di9])break;
+      if(p9.days.length<=1){flash('This is the only day — it can’t be removed.');break}
+      if(di9!==p9.days.length-1){flash('Remove the days after this one first.');break}
+      const doneN=(S.history||[]).filter(h=>h.complete&&h.progId===p9.id&&h.dayIdx===di9).length;
+      S.confirm={t:'Remove '+p9.days[di9].name+'?',
+        d:'It comes out of the program from here on.'+(doneN?' The '+doneN+' session'+(doneN===1?'':'s')+' you’ve already logged against it stay in History — this only changes the plan ahead.':''),
+        go:'dayDelGo',v:String(di9),ok:'Remove it',no:'Keep it'};
+      S.sheet={t:'confirm'};render();break}
+    case 'dayDelGo':{const p9=activeProgSafe();const di9=+v;
+      if(!p9||!p9.days[di9]||di9!==p9.days.length-1){S.sheet=null;render();break}
+      p9.days.pop();saveLib();S.sheet=null;S.patCache=null;render();
+      flash('Day removed.');break}
     case 'cusPickOpen':{S.cusSel=[];S.sheet={t:'cuspick'};render();break}
     case 'cusPickTog':{S.cusSel=S.cusSel||[];
       const i9=S.cusSel.indexOf(v);
