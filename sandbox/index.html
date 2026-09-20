@@ -1680,7 +1680,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='d4dd35';  // stamped by tools/build.py with the content hash
+const BUILD_ID='6555a6';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -10611,6 +10611,14 @@ function rehabBankMoments(){
           wk7.length+' check-ins this week averaging '+(Math.round(avg*10)/10)+' out of 10'+(everLow?' — up from days it sat at 4 or under':'')+'. Fear of reinjury predicts return to sport independently of strength; this number coming back is a milestone, not a footnote.');
         if(avg>=9)put('conf:9','epic','The knee is yours again',
           'Confidence averaging '+(Math.round(avg*10)/10)+' out of 10 across '+wk7.length+' honest answers this week. The head comes back too — and yours has.')}}catch(e9){}
+    /* the watch's own gait read, banked ONLY on a real, noise-cleared
+       improvement (gaitAsymTrend, above) — a decline is a physio flag,
+       never a collectible, and this is a passive signal so it banks at
+       common, well under the hop-test LSI crossings' rare/epic */
+    try{
+      const g9=gaitAsymTrend();
+      if(g9&&g9.real&&g9.improved)put('gaitasym:even','common','A steadier week of walking',
+        'Your watch measured '+(Math.round(g9.rAvg*10)/10)+'% walking asymmetry this week, down from '+(Math.round(g9.pAvg*10)/10)+'% two weeks ago — a real move, not day-to-day noise. Passive data, not a phase criterion.')}catch(e9){oops('rehabBankMoments.gait',e9)}
     if(dirty){bankSave();try{haptic('success')}catch(e){}}}catch(e){}}
 
 /* ── the hero (Sep 2026 rebuild) ─────────────────────────────
@@ -10708,6 +10716,39 @@ function climbPanel(){
         '<p style="font-size:17px;margin-top:10px">'+esc(p.n)+'. '+(p.mode==='staged'?'Criteria-gated. Green means met, never passed through.':'Loading the tissue well and watching how it answers.')+'</p>'}
     return h+'</div>'}
   catch(e){oops('climbPanel',e);return ''}}
+function gaitAsymTrend(){
+  /* last 7 settled days of watch-measured walking asymmetry against the
+     7 before that. Needs 3+ readings in each window — a sparse wearer
+     gets null, not a guessed trend (the twelve-readings lesson, 15 Sep
+     2026). `real` only ever comes from libRealMove (13e) — the one
+     reader for "is this bigger than the signal's own noise" — never a
+     bare week-over-week difference on a signal this noisy. */
+  try{
+    const rows=(typeof hkdSeries==='function')?hkdSeries('walkasym',30):[];
+    if(rows.length<3)return null;
+    const cut=dayKey(new Date(Date.now()-6*864e5));
+    const recent=rows.filter(r=>r.date>=cut),prior=rows.filter(r=>r.date<cut);
+    if(recent.length<3)return null;
+    const avg=a=>a.reduce((x,y)=>x+y.v,0)/a.length;
+    const rAvg=avg(recent),n=recent.length;
+    if(prior.length<3)return{rAvg:rAvg,n:n,real:false};
+    const pAvg=avg(prior),delta=rAvg-pAvg;
+    const mv=(typeof libRealMove==='function')?libRealMove('walkasym',delta,7):null;
+    return{rAvg:rAvg,pAvg:pAvg,n:n,real:!!(mv&&mv.real),improved:delta<0}
+  }catch(e){oops('gaitAsymTrend',e);return null}}
+function gaitAsymLine(){
+  try{
+    const g=gaitAsymTrend();if(!g)return null;
+    const rAvgR=Math.round(g.rAvg*10)/10;
+    let tail='';
+    if(g.real){
+      const pAvgR=Math.round(g.pAvg*10)/10;
+      tail=g.improved?' That is down from '+pAvgR+'% two weeks ago.'
+        :' That is up from '+pAvgR+'% two weeks ago — worth flagging to your physio; it changes nothing about today’s session.'}
+    return '<p style="font-size:13px;line-height:1.6;margin-top:8px"><b>The watch’s word on your gait:</b> <span style="color:var(--dim)">'+
+      rAvgR+'% asymmetry from all-day walking, averaged over '+g.n+' days this week.'+tail+
+      ' Passive and never a criterion. The hop-test symmetry above is what moves a phase.</span></p>'
+  }catch(e){oops('gaitAsymLine',e);return null}}
 function openDoorsCard(){
   try{
     if(!(S.acl&&S.acl.on))return '';
@@ -10766,7 +10807,18 @@ function openDoorsCard(){
       const legs9=pairLine('legs',x=>x.legL,x=>x.legR);
       const arms9=pairLine('arms',x=>x.ex&&x.ex.armL,x=>x.ex&&x.ex.armR);
       if(legs9&&(legInj||legs9.sym<95))h+=legs9.html;
-      if(arms9&&(armInj||arms9.sym<95))h+=arms9.html;}catch(e9){}
+      if(arms9&&(armInj||arms9.sym<95))h+=arms9.html;
+      /* THE WATCH'S WORD ON GAIT (owner ask, 19 Sep 2026): walking
+         asymmetry is a passive, all-day gait-sensor reading — nowhere
+         near the clinical weight of a measured hop-test LSI, so it
+         never touches phaseMet/aclGateState and never gets called
+         "LSI". It sits beside the scan's leg-symmetry line above,
+         in the same voice, for the same reason: a second, honest
+         witness on the same knee. libRealMove (13e) is the one reader
+         for "is this bigger than the signal's own noise" — a raw
+         week-over-week average would flag phantom trends on a signal
+         this noisy. */
+      if(legInj){const g9=gaitAsymLine();if(g9)h+=g9}}catch(e9){}
     if(!hasOpenGoal)h+='<button data-a="goalsOpen" class="btn mt" style="border-color:var(--green);color:var(--green);font-size:13px">Set a goal in the open rooms</button>';
     h+='<p style="color:var(--faint);font-size:11px;line-height:1.55;margin-top:12px">Running comes back with the gates, not the calendar \u2014 the climb above is the road. Everything here counts the whole way through.</p>';
     return h+'</div>'}catch(e){return ''}}
@@ -16798,8 +16850,15 @@ function hkDaily(rows){
       if(!/^\d{4}-\d{2}-\d{2}$/.test(k))return;
       if(hkCut&&k<hkCut)return;
       const d=st.days[k]=st.days[k]||{};
-      if(r.spo2!=null&&isFinite(+r.spo2)&&+r.spo2>0&&+r.spo2<=1)r.spo2=Math.round(+r.spo2*1000)/10;
-      ['rhr','hrv','vo2','steps','sleep','sldeep','slrem','resp','wtemp','spo2','flow'].forEach(f=>{
+      /* percent-type HK quantities hand back a 0-1 fraction (doubleValue
+         for HKUnit.percent() is the fraction, not the 0-100 figure) —
+         the same conversion spo2 already needed, now shared by every
+         gait-percent field */
+      ['spo2','walkasym','dblsupport','walksteady'].forEach(pf=>{
+        if(r[pf]!=null&&isFinite(+r[pf])&&+r[pf]>0&&+r[pf]<=1)r[pf]=Math.round(+r[pf]*1000)/10});
+      ['rhr','hrv','vo2','steps','sleep','sldeep','slrem','resp','wtemp','spo2','flow',
+       'flights','standmin','exmin','ambwalk','walkspeed','walkasym','dblsupport',
+       'stairup','stairdown','sixmwt','walksteady','hrr'].forEach(f=>{
         if(r[f]!=null&&isFinite(+r[f])&&+r[f]>0){
           /* a 16-hour "night" is two sources writing one night (§2.2)
              or a watch left on the charger under a sleeping wrist —
@@ -16851,7 +16910,7 @@ function hkdSeries(f,days,opts){
     .sort().map(k=>({date:k,v:st.days[k][f]}))}
 function hkdSettled(f,k){
   try{if(k!==today())return true;
-    if(f==='steps'||f==='msteps')return false;
+    if(f==='steps'||f==='msteps'||f==='flights'||f==='standmin'||f==='exmin'||f==='ambwalk')return false;
     if(f==='sleep'||f==='sldeep'||f==='slrem')return new Date().getHours()>=10;
     return true}catch(e){return true}}
 function hrvGate(){
@@ -17108,7 +17167,19 @@ const SIG_WHY={
  'Protein':'The repair budget. Days over ~120 g get compared against next-day recovery and strength — the correlation engine\u2019s favourite input.',
  'Carbs':'The work fuel. Big-carb days beside big-session days show whether your volume runs on them.',
  'Fat':'The slow fuel — tracked for the complete intake picture.',
- 'Bodyweight':'The denominator. Strength standards, bodyweight ratios and Where-you-stand percentiles all move with it.'};
+ 'Bodyweight':'The denominator. Strength standards, bodyweight ratios and Where-you-stand percentiles all move with it.',
+ 'Flights climbed':'Stairs are load on a knee that squats can\u2019t replace. Tracked beside the pain and swelling check-ins.',
+ 'Stand minutes':'How much of the day was spent upright, not just moving \u2014 the direct read on whether too much sitting changes how you feel.',
+ 'Exercise minutes':'Apple\u2019s own tally of time spent moving hard enough to count. A second read on what a day actually asked of you, independent of what got logged in a session.',
+ 'All-day walking':'Walking and running distance from your phone and watch, all day \u2014 workouts included. Different from a run you log: this is everything.',
+ 'Walking speed':'How fast you naturally walk, measured passively by your watch. A slow, steady mover on a healing knee is worth noticing either direction.',
+ 'Walking asymmetry':'How evenly you load each leg while walking, from your watch\u2019s own gait sensor. The ACL side is exactly what this was built to catch.',
+ 'Double support time':'The share of every step spent with both feet down \u2014 rises when a gait turns cautious or uneven. Watched beside the ACL side.',
+ 'Stair ascent speed':'How fast you climb stairs.',
+ 'Stair descent speed':'How fast you go down stairs \u2014 often the first thing to slow on a reconstructed knee, before pain says anything.',
+ 'Walking steadiness':'Apple\u2019s own fall-risk read on your gait. Low and falling belongs in front of a physio, not just in Allena.',
+ 'Heart-rate recovery':'How many beats your heart rate drops in the first minute after hard effort. A fitter, more recovered engine drops faster.',
+ 'Six-minute walk':'An occasional background fitness check your watch runs on its own. Rare, but a real functional-capacity read when it lands.'};
 const SIG_KINDS=[
   {k:'Sleep',hk:'sleep',f:v=>Math.round(v/6)/10,u:'h',src:'Apple Health'},
   {k:'Resting heart rate',hk:'rhr',u:' bpm',src:'Apple Health'},
@@ -17124,7 +17195,19 @@ const SIG_KINDS=[
   {k:'REM sleep',hk:'slrem',u:' min',src:'Apple Watch sleep stages'},
   {k:'Wrist temperature',hk:'wtemp',u:'\u00b0C',src:'Apple Watch, overnight'},
   {k:'Breathing rate',hk:'resp',u:'/min',src:'Apple Watch, overnight'},
-  {k:'Blood oxygen',hk:'spo2',u:'%',src:'Apple Watch'}];
+  {k:'Blood oxygen',hk:'spo2',u:'%',src:'Apple Watch'},
+  {k:'Flights climbed',hk:'flights',u:'',src:'Apple Watch/iPhone'},
+  {k:'Stand minutes',hk:'standmin',u:' min',src:'Apple Watch'},
+  {k:'Exercise minutes',hk:'exmin',u:' min',src:'Apple Watch'},
+  {k:'All-day walking',hk:'ambwalk',u:' km',src:'Apple Watch/iPhone, all-day'},
+  {k:'Walking speed',hk:'walkspeed',u:' m/s',src:'Apple Watch, passive'},
+  {k:'Walking asymmetry',hk:'walkasym',u:'%',src:'Apple Watch gait sensor'},
+  {k:'Double support time',hk:'dblsupport',u:'%',src:'Apple Watch gait sensor'},
+  {k:'Stair ascent speed',hk:'stairup',u:' m/s',src:'Apple Watch, passive'},
+  {k:'Stair descent speed',hk:'stairdown',u:' m/s',src:'Apple Watch, passive'},
+  {k:'Walking steadiness',hk:'walksteady',u:'%',src:'Apple Watch'},
+  {k:'Heart-rate recovery',hk:'hrr',u:' bpm',src:'Apple Watch, post-workout'},
+  {k:'Six-minute walk',hk:'sixmwt',u:' m',src:'Apple Watch, occasional'}];
 function sigSnap(){
   /* per-metric snapshot: last day carrying data + how many days do —
      day-granular seen-tracking missed same-day arrivals entirely
@@ -17553,8 +17636,12 @@ function spearman(pairs){
 const CORR_BOUNDS={sleep:[60,960],sldeep:[0,600],slrem:[0,600],hrv:[5,250],rhr:[30,120],
   steps:[1,60000],vo2:[15,90],wtemp:[30,42],resp:[5,40],spo2:[70,100],
   bw:[25,300],protein:[0,500],carb:[0,1200],fat:[0,500],kcal:[200,8000],ready:[0,100],
-  msteps:[0,1],eprot:[0,1],ecarb:[0,1],pain:[0,10],stiff:[0,10],conf:[0,10],swell:[0,10]};
-const CORR_CUMUL={steps:1,kcal:1,protein:1,carb:1,fat:1,msteps:1,eprot:1,ecarb:1,walkkm:1};
+  msteps:[0,1],eprot:[0,1],ecarb:[0,1],pain:[0,10],stiff:[0,10],conf:[0,10],swell:[0,10],
+  flights:[0,200],standmin:[0,600],exmin:[0,600],ambwalk:[0,50],walkspeed:[0.1,3],
+  walkasym:[0,60],dblsupport:[0,60],stairup:[0.02,2],stairdown:[0.02,2],
+  sixmwt:[50,1200],walksteady:[0,100],hrr:[1,100]};
+const CORR_CUMUL={steps:1,kcal:1,protein:1,carb:1,fat:1,msteps:1,eprot:1,ecarb:1,walkkm:1,
+  flights:1,standmin:1,exmin:1,ambwalk:1};
 /* ═══ TWELVE READINGS ARE NOT TWELVE OBSERVATIONS (15 Sep 2026) ══════
    The gate's t-test assumes each day is an independent draw. Almost none
    of these signals are: sleep tonight looks like sleep last night, and a
@@ -17614,7 +17701,11 @@ function corrDayData(){
       put(k,'steps',d.steps);put(k,'vo2',d.vo2);
       put(k,'wtemp',d.wtemp);put(k,'resp',d.resp);put(k,'spo2',d.spo2);
       put(k,'sldeep',d.sldeep);put(k,'slrem',d.slrem);
-      put(k,'msteps',d.msteps);put(k,'eprot',d.eprot);put(k,'ecarb',d.ecarb)});
+      put(k,'msteps',d.msteps);put(k,'eprot',d.eprot);put(k,'ecarb',d.ecarb);
+      put(k,'flights',d.flights);put(k,'standmin',d.standmin);put(k,'exmin',d.exmin);
+      put(k,'ambwalk',d.ambwalk);put(k,'walkspeed',d.walkspeed);put(k,'walkasym',d.walkasym);
+      put(k,'dblsupport',d.dblsupport);put(k,'stairup',d.stairup);put(k,'stairdown',d.stairdown);
+      put(k,'sixmwt',d.sixmwt);put(k,'walksteady',d.walksteady);put(k,'hrr',d.hrr)});
     const flows=Object.keys(st).filter(k=>st[k].flow).sort();
     if(flows.length){
       const starts=flows.filter(k=>{const y=new Date(k+'T12:00');y.setDate(y.getDate()-1);
@@ -17786,7 +17877,19 @@ const CORR_SIGNALS={
   slrem:{n:'a REM-heavy night',dir:'more REM sleep'},
   msteps:{n:'a morning-heavy step day',dir:'more of the day\u2019s steps before noon'},
   eprot:{n:'protein loaded late',dir:'a bigger share of protein after 5pm'},
-  ecarb:{n:'carbs loaded late',dir:'a bigger share of carbs after 5pm'}};
+  ecarb:{n:'carbs loaded late',dir:'a bigger share of carbs after 5pm'},
+  flights:{n:'a big stair day',dir:'more flights climbed'},
+  standmin:{n:'a day spent mostly upright',dir:'more standing time'},
+  exmin:{n:'a day with a lot of exercise minutes',dir:'more Apple exercise minutes'},
+  ambwalk:{n:'a big all-day walking day',dir:'more all-day walking distance'},
+  walkspeed:{n:'a faster natural walking pace',dir:'a faster walking pace'},
+  walkasym:{n:'a more even gait',dir:'less walking asymmetry',inv:1},
+  dblsupport:{n:'a steadier, more even stride',dir:'less double-support time',inv:1},
+  stairup:{n:'faster stair climbing',dir:'a faster stair-ascent speed'},
+  stairdown:{n:'faster stair descending',dir:'a faster stair-descent speed'},
+  sixmwt:{n:'a longer six-minute walk distance',dir:'a longer six-minute walk distance'},
+  walksteady:{n:'a steadier gait',dir:'higher walking steadiness'},
+  hrr:{n:'a quicker post-effort heart-rate drop',dir:'a faster heart-rate recovery'}};
 const CORR_OUTCOMES={
   topset:{n:'top set',good:'up',dir:1},
   tonnage:{n:'session volume',good:'up',dir:1},
@@ -17807,19 +17910,35 @@ const CORR_OUTCOMES={
   conf:{n:'knee confidence',good:'up',dir:1},
   swell:{n:'the swelling check-in',good:'down',dir:-1,neg:1},
   adher:{n:'how much of the plan got done',good:'up',dir:1}};
+/* THE SAME "A PATTERN" BUG, ON THE SIGNAL SIDE (owner-caught live,
+   twice now — the 19 Sep fix only patched the OUTCOME half). These
+   nine three-day-window signals never depend on the account's own
+   data — every field below is a plain literal, nothing reads `days` —
+   so there was never a reason to rebuild them inside corrMaps() on
+   every call. Living only there meant they existed exclusively on
+   S._corrMaps, which the three cache-hit shortcuts in correlations()
+   all skip setting; a correlation whose SIGNAL was one of these
+   (sleep3, rhr3, ...), read on any render but the one that just
+   finished the full grid, fell through M.sigs and the static
+   CORR_SIGNALS (which never had them either) into corrPhrase's
+   contentless fallback — same failure, same blank "A pattern" card,
+   just the other operand. A real constant fixes it the same way a
+   real constant already fixes everything in CORR_SIGNALS: always
+   there, staleness cannot touch it. */
+const CORR_SIGNALS3={
+  steps3:{n:'a big-step stretch',dir:'a bigger three-day step average'},
+  kcal3:{n:'a well-fed stretch',dir:'more calories across three days'},
+  protein3:{n:'a high-protein stretch',dir:'more protein across three days'},
+  sleep3:{n:'a well-slept stretch',dir:'better sleep across three nights'},
+  rhr3:{n:'a settled resting heart rate',dir:'a lower three-day resting HR',inv:1},
+  carb3:{n:'a high-carb stretch',dir:'more carbs across three days'},
+  fat3:{n:'a high-fat stretch',dir:'more fat across three days'},
+  load3:{n:'a heavy training stretch',dir:'a bigger three-day training load',trained:1},
+  km3:{n:'a big running stretch',dir:'more running km across three days',trained:1}};
 function corrMaps(days){
   /* the effective grid, built per account: baseline maps plus every
      ex: outcome present in the rows and the windowed signal variants */
-  const sigs=Object.assign({},CORR_SIGNALS,{
-    steps3:{n:'a big-step stretch',dir:'a bigger three-day step average'},
-    kcal3:{n:'a well-fed stretch',dir:'more calories across three days'},
-    protein3:{n:'a high-protein stretch',dir:'more protein across three days'},
-    sleep3:{n:'a well-slept stretch',dir:'better sleep across three nights'},
-    rhr3:{n:'a settled resting heart rate',dir:'a lower three-day resting HR',inv:1},
-    carb3:{n:'a high-carb stretch',dir:'more carbs across three days'},
-    fat3:{n:'a high-fat stretch',dir:'more fat across three days'},
-    load3:{n:'a heavy training stretch',dir:'a bigger three-day training load',trained:1},
-    km3:{n:'a big running stretch',dir:'more running km across three days',trained:1}});
+  const sigs=Object.assign({},CORR_SIGNALS,CORR_SIGNALS3);
   const outs=Object.assign({},CORR_OUTCOMES);
   const seenEx={};
   Object.keys(days).forEach(k=>Object.keys(days[k]).forEach(f=>{
@@ -18141,14 +18260,16 @@ const CORR_PRIOR={sleep:1,sleep2:1,sleep3:1,hrv:1,hrvswing:1,rhr:1,rhr3:1,ready:
   protein:1,protein3:1,carb:1,carb3:1,kcal3:1,sleepvar:1,vo2:1,
   kcal:0,fat:0,fat3:0,bw:0,bwtrend:0,steps:0,steps3:0,load:0,load3:0,
   km:0,km3:0,walkkm:0,ridekm:0,sessmins:0,resty:0,hour:0,weekend:0,
-  wtemp:0,resp:0,cyc:0,spo2:1,msteps:0,eprot:0,ecarb:0,sldeep:1,slrem:1};
+  wtemp:0,resp:0,cyc:0,spo2:1,msteps:0,eprot:0,ecarb:0,sldeep:1,slrem:1,
+  flights:0,standmin:0,exmin:0,ambwalk:0,walkspeed:1,walkasym:1,dblsupport:1,
+  stairup:1,stairdown:1,sixmwt:1,walksteady:1,hrr:1};
 function corrNames(key){
   /* the plain words for a family|outcome state key, from the same maps
      the live finding reads. Null when either side cannot be named. */
   try{
     const bits=String(key).split('|');if(bits.length!==2)return null;
     const M=S._corrMaps||{sigs:CORR_SIGNALS,outs:CORR_OUTCOMES};
-    const sg=(M.sigs[bits[0]]||CORR_SIGNALS[bits[0]]||{}).n;
+    const sg=(M.sigs[bits[0]]||CORR_SIGNALS[bits[0]]||CORR_SIGNALS3[bits[0]]||{}).n;
     let on=(M.outs[bits[1]]||CORR_OUTCOMES[bits[1]]||{}).n;
     if(!on&&bits[1].slice(0,3)==='ex:')on=bits[1].slice(3)+' top set';
     if(!sg||!on)return null;
@@ -18159,22 +18280,21 @@ function corrNames(key){
   catch(e){oops('corrNames',e);return null}}
 function corrPhrase(c){
   const M=S._corrMaps||{sigs:CORR_SIGNALS,outs:CORR_OUTCOMES};
-  const S9=M.sigs[c.sig]||CORR_SIGNALS[c.sig];
-  /* A PER-LIFT OUTCOME'S NAME DOES NOT NEED THE LIVE MAP (owner-caught,
-     19 Sep 2026, live screenshot: a full-screen reveal titled just "A
-     pattern" with no body). corrMaps(days) is the only place an "ex:"
-     outcome like ex:Bench ever gets its descriptor, and S._corrMaps is
-     only ever SET on the full-compute path through correlations() — its
-     three cache-hit shortcuts (memo, disk-stamp match, cold-open warm)
-     all return early without touching it. So a correlation about a
-     specific lift, read on anything but the one render that just
-     finished the full grid, fell through both M.outs and the static
-     CORR_OUTCOMES (which has no per-lift entries at all) into this
-     function's own contentless fallback. corrNames() already patches
-     around the same gap for its own callers (line above); the shape is
-     reconstructed here too, identical to what corrMaps builds it as,
-     because it is derived from the key alone and needs nothing from
-     the account's data to be right. */
+  /* NEITHER OPERAND CAN TRUST THE LIVE MAP (owner-caught, 19 Sep 2026,
+     twice — a live screenshot both days, same blank "A pattern" card).
+     S._corrMaps is only ever SET on the full-compute path through
+     correlations() — its three cache-hit shortcuts (memo, disk-stamp
+     match, cold-open warm) all return early without touching it. The
+     signal side falls back to CORR_SIGNALS3 for the three-day-window
+     variants (sleep3, rhr3, ...), which corrMaps only ever merged in
+     fresh and the static CORR_SIGNALS never had; the outcome side
+     falls back the same way for a per-lift "ex:" outcome, which
+     corrMaps(days) is the only place that ever built at all. Both
+     fallbacks are safe because neither is really account-dependent —
+     the window signals are fixed literals, and a lift's name comes
+     straight out of its own key — corrNames() already patched around
+     the same two gaps for its own callers (above). */
+  const S9=M.sigs[c.sig]||CORR_SIGNALS[c.sig]||CORR_SIGNALS3[c.sig];
   const O=M.outs[c.out]||CORR_OUTCOMES[c.out]||
     (String(c.out).slice(0,3)==='ex:'?{n:String(c.out).slice(3)+' top set',good:'up',dir:1,exo:1}:null);
   if(!S9||!O)return{title:'A pattern',body:'',strong:false,good:true};
@@ -18200,7 +18320,7 @@ function corrPhrase(c){
     const x='Read it with a raised eyebrow. Far more likely your schedule bunches things (hard sessions landing after short nights, say), or something else drives both. Allena will not coach against '+S9.n+'.';
     return{title:title,body:body,x:x,strong:false,good:false,contra:true}}
   const title=O.n.charAt(0).toUpperCase()+O.n.slice(1)+' runs '+move+' after '+S9.n;
-  const also=(c.also||[]).map(a=>(M.sigs[a]||CORR_SIGNALS[a]||{}).n).filter(Boolean);
+  const also=(c.also||[]).map(a=>(M.sigs[a]||CORR_SIGNALS[a]||CORR_SIGNALS3[a]||{}).n).filter(Boolean);
   const body='Across '+c.n+' days, your '+on+' tends to be '+move+' '+when+' '+S9.dir+' '+
     '(correlation '+(Math.round(c.rho*100)/100)+'). '+
     (S9.sched?'A schedule pattern \u2014 the calendar, not your body \u2014 filed as context.'
@@ -19411,7 +19531,8 @@ const LIB_NOISE={
   sleep: {n:'sleep',          u:' min', cap:300},
   steps: {n:'steps',          u:'',     cap:25000},
   vo2:   {n:'VO2 max',        u:'',     cap:10},
-  bw:    {n:'weight',         u:' kg',  cap:3}};
+  bw:    {n:'weight',         u:' kg',  cap:3},
+  walkasym:{n:'walking asymmetry',u:'%',cap:20}};
 function libNoise(f){
   /* the band for one daily signal, measured from its own consecutive
      readings. null until there is enough to measure honestly — a band
