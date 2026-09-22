@@ -1709,7 +1709,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='45f911';  // stamped by tools/build.py with the content hash
+const BUILD_ID='6db414';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -11882,6 +11882,7 @@ function viewRun(){
   // every run, grouped the way a runner actually looks for one
   const mode=S.runGroup||'month';
   const groups=runGroups(R,mode);
+  h+=dupeCard();
   h+=collapser('allruns','Every activity',
     actsLabel(R)+' · '+udNum(Math.round(R.reduce((a,r)=>a+(r.km||0),0)))+' '+udUnit()+' · grouped by '+
       ({month:'month',type:'session type',week:'week',dist:'distance'})[mode],
@@ -29895,6 +29896,7 @@ function viewHistory(){
     '<h1 class="disp vh1">History</h1>'+
     '<div class="row" style="margin-top:16px">'+
     [['sessions','Lifting'],['runs','Runs'],['blocks','Blocks'],['notes','Notes']].map(x=>'<button data-a="histTab" data-v="'+x[0]+'" class="pill" style="flex:1;padding:11px 0'+(tab===x[0]?';background:var(--text);color:var(--bg);border-color:var(--text);font-weight:600':'')+'">'+x[1]+'</button>').join('')+'</div>';
+  if(tab==='sessions'||tab==='runs')h+=dupeCard();
   if(tab==='notes'){
     const rows=[];
     (S.history||[]).forEach(h9=>{if(!h9.exNotes)return;
@@ -30053,8 +30055,12 @@ function logSelDelete(){
 function logSelBar(kind){
   if(!logSelOn(kind))return '';
   const n=logSelN();
-  return '<div style="position:fixed;left:0;right:0;bottom:0;z-index:60;display:flex;align-items:center;gap:10px;'+
-    'padding:12px 16px;padding-bottom:calc(12px + env(safe-area-inset-bottom));'+
+  /* z-index 61 and tall enough to COVER the tab bar (z-index 60, ten
+     pixels off the bottom and 54 tall) — the bar sat UNDER it and the
+     Delete button could not be reached (owner, 22 Sep: "I can select
+     but can't delete"). While you are picking, this owns the bottom. */
+  return '<div style="position:fixed;left:0;right:0;bottom:0;z-index:61;display:flex;align-items:center;gap:10px;'+
+    'padding:16px 16px;padding-bottom:calc(18px + env(safe-area-inset-bottom));'+
     'background:var(--raised);border-top:1px solid var(--line)">'+
     '<span class="mono" style="flex:1;min-width:0;font-size:13px;color:var(--dim)">'+n+' selected</span>'+
     '<button data-a="logSelOff" class="btn" style="width:auto;padding:10px 16px;font-size:13px">Cancel</button>'+
@@ -30065,6 +30071,74 @@ function logSelTick(on){
   return '<span style="flex:none;width:22px;height:22px;border-radius:11px;display:flex;align-items:center;justify-content:center;'+
     'border:2px solid '+(on?'var(--amber)':'var(--line)')+';background:'+(on?'var(--amber)':'transparent')+';'+
     'color:var(--bg);font-size:13px;font-weight:700;line-height:1">'+(on?'✓':'')+'</span>'}
+
+/* ══ TWO ROWS CANNOT BE THE SAME ROW (owner, 22 Sep 2026, on video:
+   "they double select when I select one") ══════════════════════════
+   Not a selection bug. Three taps ticked six rows, and each pair was
+   the same activity a day apart — same distance, same pace, same
+   heart rate — because the restore that duplicated them KEPT THE
+   ORIGINAL ID. Selection is keyed by id, so both rows answered to it,
+   which is the right behaviour on data that should not exist.
+   An id is an identity: two rows holding one is a broken record, and
+   every reader that looks a row up by id (delete, the tombstone, the
+   HealthKit dedupe, the mirrored history row) is already picking one
+   of them arbitrarily.
+   WHICH ONE IS REAL IS NOT A COIN FLIP. A HealthKit id carries its
+   own date — hk20260909t0630 — so where an id says one day and the
+   row says another, the row is the copy and the id is the witness.
+   Only when nothing decides it does the first one win. */
+function dupeDateOf(id){
+  const m=/^hk(\d{4})(\d{2})(\d{2})t/.exec(String(id||''));
+  return m?m[1]+'-'+m[2]+'-'+m[3]:null}
+function dupePick(rows){
+  /* the row the id vouches for, else the first */
+  for(let i=0;i<rows.length;i++){
+    const d=dupeDateOf(rows[i].id);
+    if(d&&String(rows[i].date).slice(0,10)===d)return i}   // auditcheck-allow: utc-day-key — a run row stores a local YYYY-MM-DD
+  return 0}
+function dupeGroups(list){
+  const by={};
+  (list||[]).forEach(function(r){if(!r||r.id==null)return;
+    const k=String(r.id);(by[k]=by[k]||[]).push(r)});
+  return Object.keys(by).filter(k=>by[k].length>1).map(k=>by[k])}
+function dupeScan(){
+  try{
+    const gr=dupeGroups(runs());
+    const gh=dupeGroups((S.history||[]).filter(h=>h&&!h.run));
+    const extra=function(g){return g.reduce((a,rows)=>a+rows.length-1,0)};
+    return{runs:extra(gr),sessions:extra(gh),n:extra(gr)+extra(gh)}}
+  catch(e){oops('dupeScan',e);return{runs:0,sessions:0,n:0}}}
+function dupeFix(){
+  try{
+    let n=0;
+    const drop=function(list){
+      const kill={};
+      dupeGroups(list).forEach(function(rows){
+        const keep=rows[dupePick(rows)];
+        rows.forEach(function(r){if(r!==keep){kill[list.indexOf(r)]=1;n++}})});
+      return list.filter((r,i)=>!kill[i])};
+    const r2=drop(runs());
+    if(r2.length!==runs().length){S.runs=r2;runSave()}
+    /* the mirrored rows go with them, and the lifting log is scanned
+       the same way — one restore duplicated both */
+    const live={};(S.runs||[]).forEach(r=>{live['run-'+r.id]=1});
+    const h1=(S.history||[]).filter(h=>!(h&&h.run&&String(h.id).indexOf('run-')===0&&!live[String(h.id)]));
+    const h2=drop(h1);
+    if(h2.length!==(S.history||[]).length){S.history=h2;saveHistory()}
+    S.patCache=null;
+    return n}
+  catch(e){oops('dupeFix',e);return 0}}
+/* the card, wherever a log is shown — silent when the record is clean */
+function dupeCard(){
+  const d=dupeScan();
+  if(!d.n)return '';
+  const what=d.runs&&d.sessions?d.runs+' activities and '+d.sessions+' sessions'
+    :d.runs?d.runs+' activit'+(d.runs===1?'y':'ies')
+    :d.sessions+' session'+(d.sessions===1?'':'s');
+  return '<div class="card mt" style="padding:16px;border-color:var(--amber)">'+
+    '<p style="font-size:15px;line-height:1.55">'+what+' are in here twice. '+
+    'Each copy shares an id with its twin, so tapping one picks both — they are one row stored two times, not two days of training.</p>'+
+    '<button data-a="dupeAsk" class="btn mt" style="color:var(--amber);border-color:var(--amber)">Remove the copies</button></div>'}
 function liftPts(ex){const raw=[];
   S.history.forEach(h=>{let best=0;
     h.log.forEach(l=>{if(gBase(l.ex)!==ex||!l.w||!l.r)return;best=Math.max(best,e1rm(l.w,l.r,l.rpe))});
@@ -36300,6 +36374,13 @@ function runAction(a,v,t,e){
       if(!logSelN())S.logSel=null;                 // untick the last one and you are out
       render();break}
     case 'logSelOff':S.logSel=null;render();break;
+    case 'dupeAsk':{const d9=dupeScan();if(!d9.n)break;
+      S.confirm={t:'Remove '+d9.n+' duplicate row'+(d9.n===1?'':'s')+'?',
+        d:'One copy of each stays. Where a Health id names its own day the row that matches it is the one kept, so the date stays right.',
+        go:'dupeGo',v:'',ok:'Remove the copies'};
+      S.sheet={t:'confirm'};render();break}
+    case 'dupeGo':{const n9=dupeFix();S.sheet=null;render();
+      flash(n9?n9+' duplicate'+(n9===1?'':'s')+' removed.':'Nothing to remove.');break}
     case 'logSelAsk':{const n9=logSelN();if(!n9)break;
       S.confirm={t:'Delete '+n9+' '+logSelNoun(n9)+'?',d:logSelWarn(),go:'logSelGo',v:''};
       S.sheet={t:'confirm'};render();break}
