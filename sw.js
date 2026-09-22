@@ -21,9 +21,23 @@ function cacheable(req){
   const p=new URL(req.url).pathname;
   if(p.indexOf('/sandbox/')>=0)return false;
   return req.mode==='navigate'||/\.(png|html)$/.test(p)||/\/$/.test(p)}
+/* ══ NETWORK FIRST IS NOT FRESH FIRST (22 Sep 2026) ═══════════════════
+   GitHub Pages serves the page with `cache-control: max-age=600`, so a
+   plain fetch() can be answered out of the HTTP cache for ten minutes
+   after a deploy — and the wrapper hands back the SAME build it had,
+   through a force-quit, with nothing saying why. A fix can be live and
+   verified by curl and still not reach the one person testing it.
+   The page is the one thing that must never come from a stale cache:
+   a navigation goes to the network with `cache:'reload'`, which skips
+   the HTTP cache on the way out and still revalidates properly. The
+   CACHE FALLBACK below is untouched, so offline is unaffected. */
+function pageFetch(req){
+  if(req.mode!=='navigate')return fetch(req);
+  try{return fetch(new Request(req,{cache:'reload'}))}catch(e){}
+  return fetch(req)}                       // no Request constructor: behave exactly as before
 self.addEventListener('fetch',e=>{
   const req=e.request;
   if(!cacheable(req))return;
-  e.respondWith(fetch(req).then(res=>{
+  e.respondWith(pageFetch(req).then(res=>{
     if(res&&res.ok){const copy=res.clone();caches.open(CACHE).then(c=>c.put(req,copy)).catch(()=>{})}
     return res}).catch(()=>caches.match(req).then(hit=>hit||(req.mode==='navigate'?caches.match('./'):undefined)).then(hit=>hit||Response.error())))});
