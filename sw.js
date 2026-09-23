@@ -9,7 +9,11 @@
    is gone (a throttled App Review network, a gym basement). Nothing
    cross-origin is ever cached: Supabase, Anthropic and Strava calls pass
    straight through. */
-const CACHE='allena-shell-v1';
+/* BUMPED v1 -> v2 (23 Sep 2026). `activate` deletes every cache whose name is not
+   the current one, so renaming is how a stale page already sitting in the shell
+   cache is thrown away rather than kept. A fix can be live, verified by curl, and
+   still lose to a copy the phone is holding. */
+const CACHE='allena-shell-v2';
 self.addEventListener('install',e=>{self.skipWaiting()});
 self.addEventListener('activate',e=>{
   e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim()))});
