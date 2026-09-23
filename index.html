@@ -1709,7 +1709,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='bc65ba';  // stamped by tools/build.py with the content hash
+const BUILD_ID='dd5e3c';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -24786,6 +24786,8 @@ function collTiers(){
    below still renders them for the standalone page. */
 function collectionBody(){
   const st=bankStats(),l=bankList();
+  /* stale findings get their door where the findings live */
+  const orph=(typeof orphanCard==='function')?orphanCard():'';
   const GROUPS=[
     ['insights','Insights',['signal','insight','call','unlock'],'What the engine found between your numbers.','Sync a watch and train \u2014 the links surface on their own.'],
     ['bests','Records & bests',['record','reps','session','round'],'Bests, biggest days, rep records and the plates that mean something.','Keep logging weights and reps.'],
@@ -24823,6 +24825,7 @@ function collectionBody(){
   if(seenC)l.forEach(d=>{if(!seenIds[d.id]){freshIds[d.id]=1;freshBy[gOf(d)]=(freshBy[gOf(d)]||0)+1}});
   try{const all={};l.forEach(d=>all[d.id]=1);lset('training-collseen-v1',{ids:all})}catch(e){}
   const mode=S.collBy||'cat';
+  h+=orph;
   h+='<div style="display:flex;gap:7px;margin-top:14px">'+
     [['new','Newest'],['tier','By rarity'],['cat','Category']].map(x=>
       '<button data-a="collBy" data-v="'+x[0]+'" style="flex:1;text-align:center;min-height:44px;padding:11px 0;border-radius:var(--r-full);font-size:15px;'+
@@ -26029,6 +26032,10 @@ function demoWipe(){
     S.supp={on:false,days:{}};lset(K_SUPP,S.supp);
     S.daily={on:false,days:{}};lset(K_DAILY,S.daily)}
   if(S.prof&&S.prof.name==='Demo'){S.prof=null;ldel(K_PROF)}
+  /* AND THE FINDINGS THE DEMO CAUSED (23 Sep 2026). The demo banks none
+     itself; the engines bank them FROM it, so wiping the data used to
+     leave every one of them behind pointing at a day that had gone. */
+  try{if(typeof findOrphanSweep==='function')findOrphanSweep()}catch(e9){oops('demoWipe.finds',e9)}
   S.demo=false}
 function demoClear(){
   demoWipe();
@@ -30179,6 +30186,56 @@ function dupeCard(){
     '<p style="font-size:15px;line-height:1.55">'+what+' are in here twice. '+
     'Each copy shares an id with its twin, so tapping one picks both — they are one row stored two times, not two days of training.</p>'+
     '<button data-a="dupeAsk" class="btn mt" style="color:var(--amber);border-color:var(--amber)">Remove the copies</button></div>'}
+
+/* ══ A FINDING WHOSE DAY NO LONGER EXISTS (owner, 23 Sep 2026: 190 finds
+   against 23 sessions — "it is from the demo pollution for sure") ══════
+   `demoWipe()` strips the demo history, scans, goals and programme. It has
+   never touched the collection, and it could not have: the demo never
+   BANKS a finding, it produces the data the discovery engines then bank
+   findings from. So wiping the demo left every finding it caused behind,
+   each one pointing at a day that is no longer on the device.
+   The test is deliberately narrow, because a banked finding is the user's
+   collection, their points and their blossoms, and deleting a real one is
+   worse than keeping a stale one:
+     - it must carry a `when` — the day its event happened. A finding with
+       no `when` is a lifetime or ratio claim about no particular day and
+       is never touched.
+     - that day must hold NOTHING: no session, no run, no health day, no
+       body scan. Any one of them and the finding keeps its evidence.
+   Both conditions, or it stays. */
+function findDayHasData(k){
+  try{
+    if(!k)return true;                                   // no day named: never a candidate
+    if((S.history||[]).some(h=>h&&hKey(h)===k))return true;
+    if((S.runs||[]).some(r=>r&&String(r.date).slice(0,10)===k))return true;   // auditcheck-allow: utc-day-key — a run row stores a local YYYY-MM-DD
+    const hd=(typeof hkDailyStore==='function')?(hkDailyStore().days||{}):{};
+    if(hd[k])return true;
+    if((S.scans||[]).some(x=>x&&String(x.date||'').slice(0,10)===k))return true;
+    return false}
+  catch(e){oops('findDayHasData',e);return true}}         // on doubt, keep the finding
+function findOrphans(){
+  try{return bankList().filter(x=>x&&x.t&&x.when&&!findDayHasData(String(x.when).slice(0,10)))}
+  catch(e){oops('findOrphans',e);return[]}}
+function findOrphanSweep(){
+  try{
+    const dead=findOrphans();if(!dead.length)return 0;
+    const bank=discBank();
+    dead.forEach(x=>{delete bank[x.id]});
+    bankSave();
+    try{const seen=lget('training-revealseen-v1',{})||{};
+      dead.forEach(x=>{delete seen[x.id]});lset('training-revealseen-v1',seen)}catch(e9){}
+    S.patCache=null;S._txModel=null;
+    return dead.length}
+  catch(e){oops('findOrphanSweep',e);return 0}}
+/* the offer, beside the duplicate one — never silent: this changes the
+   points figure and the tree, and rule 4 says nothing disappears quietly */
+function orphanCard(){
+  const n=findOrphans().length;
+  if(!n)return '';
+  return '<div class="card mt" style="padding:16px;border-color:var(--amber)">'+
+    '<p style="font-size:15px;line-height:1.55">'+n+' finding'+(n===1?'':'s')+' point at days that are no longer on this phone — '+
+    'left behind when the sample account was removed. Clearing them lowers your points by what they were worth.</p>'+
+    '<button data-a="orphanAsk" class="btn mt" style="color:var(--amber);border-color:var(--amber)">Clear them</button></div>'}
 function liftPts(ex){const raw=[];
   S.history.forEach(h=>{let best=0;
     h.log.forEach(l=>{if(gBase(l.ex)!==ex||!l.w||!l.r)return;best=Math.max(best,e1rm(l.w,l.r,l.rpe))});
@@ -36415,6 +36472,13 @@ function runAction(a,v,t,e){
       if(!logSelN())S.logSel=null;                 // untick the last one and you are out
       render();break}
     case 'logSelOff':S.logSel=null;render();break;
+    case 'orphanAsk':{const n9=findOrphans().length;if(!n9)break;
+      S.confirm={t:'Clear '+n9+' stale finding'+(n9===1?'':'s')+'?',
+        d:'Each one describes a day that is no longer on this phone. Your points drop by what they were worth, and the blossoms leave the tree.',
+        go:'orphanGo',v:'',ok:'Clear them'};
+      S.sheet={t:'confirm'};render();break}
+    case 'orphanGo':{const n9=findOrphanSweep();S.sheet=null;render();
+      flash(n9?n9+' stale finding'+(n9===1?'':'s')+' cleared.':'Nothing to clear.');break}
     case 'dupeAsk':{const d9=dupeScan();if(!d9.n)break;
       S.confirm={t:'Remove '+d9.n+' duplicate row'+(d9.n===1?'':'s')+'?',
         d:'One copy of each stays. Where a Health id names its own day the row that matches it is the one kept, so the date stays right.',
