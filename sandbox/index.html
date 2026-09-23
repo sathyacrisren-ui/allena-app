@@ -1709,7 +1709,7 @@ const S={view:'today',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='946310';  // stamped by tools/build.py with the content hash
+const BUILD_ID='b8c677';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -11899,7 +11899,7 @@ function viewRun(){
         '<span class="mono" style="color:var(--faint);font-size:13px;flex:none">'+(open?'⌄':'›')+'</span></button>'+
         (open?'<div style="border-top:1px solid var(--line);padding:10px 12px;display:flex;flex-direction:column;gap:8px">'+
           g.runs.map(r=>runRow(r)).join('')+'</div>':'')+'</div>'}).join(''));
-  return h+logSelBar('run')+'</div>'}
+  return h+'</div>'}
 function runDetail(kind){
   const R=runs();
   const back='<button data-a="nav" data-v="run" class="btn" style="width:auto;padding:8px 14px;color:var(--dim);font-size:13px;margin-bottom:14px">‹ Running</button>';
@@ -29943,7 +29943,7 @@ function viewHistory(){
         '<p class="eyebrow">'+esc(monthName(mk))+'</p>'+
         '<span class="mono" style="color:var(--faint);font-size:11px">'+actsLabel(list)+' \u00b7 '+udStr(km)+'</span></div>'+
         '<div style="margin-top:8px;display:flex;flex-direction:column;gap:8px">'+list.map(r=>runRow(r)).join('')+'</div>'});
-    return h+logSelBar('run')+'</div>'}
+    return h+'</div>'}
   /* lifting, by month — newest first, each session expandable in place */
   const lifts=S.history.filter(r=>!r.run);
   if(!lifts.length)return h+'<p style="color:var(--dim);font-size:15px;margin-top:20px">Nothing logged yet. Log a single set and it appears here straight away.</p></div>';
@@ -29987,7 +29987,7 @@ function viewHistory(){
             '<button data-a="histEdit" data-v="'+r.id+'" class="btn" style="flex:1;border-color:var(--amber);color:var(--amber);font-size:13px;padding:11px 4px;border-radius:12px;white-space:nowrap">Edit</button>'+
             '<button data-a="delHist" data-v="'+r.id+'" class="btn" style="flex:1;color:var(--red);font-size:13px;padding:11px 4px;border-radius:12px;white-space:nowrap">Delete</button></div>'+
             '</div>':'')+'</div>'}).join('')+'</div>'});
-  return h+logSelBar('sess')+'</div>'}
+  return h+'</div>'}
 function monthName(ym){
   try{return new Date(ym+'-15T12:00').toLocaleDateString(undefined,{month:'long',year:'numeric'})}catch(e){return ym}}
 
@@ -30050,16 +30050,26 @@ function logSelDelete(){
     saveHistory()}
   S.logSel=null;S.open=null;S.patCache=null;
   return n}
-/* the bar: the only place the count and the two exits live. Fixed to
-   the bottom because a hold can start anywhere in a long month. */
-function logSelBar(kind){
-  if(!logSelOn(kind))return '';
+/* ══ THE BAR BELONGS TO THE CHROME, NOT THE PAGE (owner, 23 Sep 2026,
+   fourth report: "Still no delete button I'm outraged") ══════════════
+   It was rendered inside the view, and `#app` is `position:relative;
+   z-index:1` while `#extra` — which holds the tab bar — is `z-index:60`.
+   Those are two stacking contexts, so NOTHING inside #app can paint
+   above the tab bar whatever z-index it is given: a z of 61 on the bar
+   was only ever competing with its own siblings inside #app. The shell's
+   own comment at that rule records the same class of bug being hit once
+   before ("#app has no business beating #extra").
+   It reads as a rendering bug and is not one; it is a parenting bug. So
+   the bar is emitted into #extra AFTER the tab bar, the way every other
+   full-width piece of chrome in this app already is.
+   It also survived a desktop browser test, because at 1024px wide the
+   Delete button sits outside the centred tab bar's horizontal extent and
+   nothing overlaps. Only a phone-width hit test finds it. */
+function logSelBarHtml(){
+  const m=logSel();
+  if(!m)return '';
   const n=logSelN();
-  /* z-index 61 and tall enough to COVER the tab bar (z-index 60, ten
-     pixels off the bottom and 54 tall) — the bar sat UNDER it and the
-     Delete button could not be reached (owner, 22 Sep: "I can select
-     but can't delete"). While you are picking, this owns the bottom. */
-  return '<div style="position:fixed;left:0;right:0;bottom:0;z-index:61;display:flex;align-items:center;gap:10px;'+
+  return '<div class="logselbar" style="position:fixed;left:0;right:0;bottom:0;z-index:61;display:flex;align-items:center;gap:10px;'+
     'padding:16px 16px;padding-bottom:calc(18px + env(safe-area-inset-bottom));'+
     'background:var(--raised);border-top:1px solid var(--line)">'+
     '<span class="mono" style="flex:1;min-width:0;font-size:13px;color:var(--dim)">'+n+' selected</span>'+
@@ -34676,7 +34686,8 @@ function render(){
      so and offers the way out rather than trapping the user behind it. */
   const piece=(fn,tag)=>{try{return fn()}catch(e9){oops(tag,e9);return ''}};
   const extraHtml=piece(tourHtml,'tourHtml')+piece(sessPillHtml,'sessPillHtml')+
-    piece(drawerHtml,'drawerHtml')+piece(tabBarHtml,'tabBarHtml')+sheetSafe()+
+    piece(drawerHtml,'drawerHtml')+piece(tabBarHtml,'tabBarHtml')+
+    piece(logSelBarHtml,'logSelBarHtml')+sheetSafe()+
     piece(function(){return (typeof phaseCerHtml==='function')?phaseCerHtml():''},'phaseCer')+
     piece(function(){return (typeof treePopHtml==='function')?treePopHtml():''},'treePop')+
     (S.toast?'<div class="toast"><div class="'+(S.toastGold?'gold':'')+'">'+esc(S.toast)+'</div></div>':'');
