@@ -22,6 +22,8 @@
 <style>
 /* the page pager owns horizontal swipes (25 Sep 2026): never let the browser's own back/forward overscroll gesture steal one */
 html,body{overscroll-behavior-x:none}
+/* the three swipe rooms: no top/bottom bounce, which would stretch the page down while a sideways swipe is still being recognised (26 Sep 2026) */
+html.pgroom,html.pgroom body{overscroll-behavior-y:none}
 html{zoom:var(--ts,1)}
 /* double-tap zoom off, pinch zoom used to be KEPT here (beta-caught by
    Angus, 10 Sep: 'you can randomly zoom in anywhere if you double tap').
@@ -256,13 +258,19 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
    beside the drawer and the toast), so the inset has to be scoped from
    body — `#app:has(.tabbar)` silently never matched and the last card on
    every page sat under the bar. Caught in the browser, not in a test. */
-body:has(.tabbar) #app{padding-bottom:calc(16px + env(safe-area-inset-bottom))}
+body:has(.tabbar) #app{padding-bottom:calc(92px + env(safe-area-inset-bottom))}
 body:has(.tabbar) #app:has(.sessfix),body:has(.tabbar) #app:has(.pinpage){padding-bottom:0}
 /* the neighbouring page during a swipe: a real render of the room you
    are dragging toward, sitting under the tab bar and above the page */
 .pgpeek{position:fixed;inset:0;z-index:5;overflow:hidden;background:var(--bg);
   will-change:transform;contain:strict}
 .pgpeek>.view{height:100%;overflow:hidden;contain:layout paint}
+/* THE PEEK SITS WHERE THE PAGE WILL LAND (owner, on video, 26 Sep 2026:
+   "when swiping through pages screen jumps up then down"). The real page
+   drops below the status bar through #app>.view:first-child's notch
+   margin; the peek is not inside #app, so it slid in 47px high and fell
+   into place the moment the swipe committed. Same margin, same place. */
+.pgpeek>.view:first-child{margin-top:env(safe-area-inset-top)}
 /* ── NOTHING ELSE MOVES WHILE A PAGE IS MOVING ─────────────────────
    Five things animate forever on a typical screen (glows, a pulse,
    the dust). During a swipe there are already two full-page layers
@@ -1711,7 +1719,7 @@ const S={view:'crown',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='b6667e';  // stamped by tools/build.py with the content hash
+const BUILD_ID='b72bfb';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -22912,8 +22920,22 @@ function treeXSheet(){
    zooms a picture, never a redraw. Light ground on purpose (owner,
    "only in light mode"): the page carries its own tokens inline. */
 const CROWN_C={lift:'#248A3D',run:'#0040DD',ride:'#0E7C86',rehab:'#C2185B',gold:'#B8892B',ink:'#1E2233',paper:'#F7F4EE'};
+/* THE TREE FOLLOWS THE THEME (owner, 26 Sep 2026: "the new tree page needs
+   to be on dark mode if the user's mode is in dark mode"). The dark set
+   is the iOS dark palette the rest of the app uses; paper is the dark
+   ground, so a gate bead and the surgery scar still read as cut marks. */
+const CROWN_CD={lift:'#30D158',run:'#409CFF',ride:'#40C8E0',rehab:'#FF6482',gold:'#E0A458',ink:'#ECE8DE',paper:'#0B0B0D'}; /* auditcheck-allow: hardcoded-theme-colour — the dark palette, chosen by crownPal() from the live theme */
+function crownDark(){try{return crestTheme()==='dark'}catch(e){oops('crownDark',e);return false}}
+function crownPal(){return crownDark()?CROWN_CD:CROWN_C}
 const CROWN_SECT={lift:[-1.3,2.8],run:[1.9,5.6],ride:[1.9,5.6],rehab:[4.9,6.5]};
 const CROWN_TOK='--text:#1E2233;--dim:#57534C;--faint:#6B685F;--surface:#FFFFFF;--raised:#EFEBE3;--cardline:rgba(30,34,51,.12);background:#F7F4EE;color:#1E2233';
+/* the page's own tokens. Light carries the paper set inline; dark
+   declares none of the shared ones, so the app's dark --text, --dim and
+   --faint apply as they do everywhere else. The --cr-* four are the
+   crown's own: a label's backing, a ring's line, the ready green, ink. */
+function crownTok(){return crownDark()
+  ?'--cr-lab:rgba(11,11,13,.85);--cr-line:rgba(242,240,234,.25);--cr-go:#30D158;--cr-ink:#F2F0EA;--cr-card:rgba(255,255,255,.05);--cr-cardline:rgba(255,255,255,.1);color:var(--text)' /* auditcheck-allow: hardcoded-theme-colour — dark branch of crownTok() */
+  :CROWN_TOK+';--cr-lab:rgba(247,244,238,.9);--cr-line:rgba(30,34,51,.28);--cr-go:#248A3D;--cr-ink:#1E2233;--cr-card:#FFFFFF;--cr-cardline:rgba(30,34,51,.12)'}
 function crownRgba(hex,a){const n=parseInt(hex.slice(1),16);return 'rgba('+(n>>16)+','+(n>>8&255)+','+(n&255)+','+a+')'}
 function crownRng(seed){let a=seed>>>0;return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
 function crownSeed(){
@@ -22972,7 +22994,7 @@ function crownData(){
      the same kind's session a week earlier */
   const links=[];try{const bank=discBank();Object.keys(bank).forEach(id=>{const b=bank[id];if(!b||(b.tag!=='signal'&&b.tag!=='insight')||!b.found)return;
     const a=sessions.filter(x=>x.day<=b.found).pop();if(!a)return;const prior=sessions.filter(x=>x.kind===a.kind&&x.wi<=a.wi-1);const c=prior.pop();if(!c)return;
-    const rar=b.rar||'common';const col=rar==='epic'?'#1E2233':rar==='rare'?'#AF52DE':rar==='uncommon'?'#5E5CE6':'#64D2FF';links.push({a,b:c,col,title:b.t||'',id})})}catch(e){oops('crownLinks',e)}
+    const rar=b.rar||'common';const col=rar==='epic'?'ink':rar==='rare'?'#AF52DE':rar==='uncommon'?'#5E5CE6':'#64D2FF';links.push({a,b:c,col,title:b.t||'',id})})}catch(e){oops('crownLinks',e)}
   return {weeks,sessions,first,links,seed:crownSeed()}}
 function crownModel(D){
   /* space colonisation (Runions 2007): every session is an attractor at
@@ -22998,24 +23020,25 @@ function crownModel(D){
 function crownPaint(c,W,M,opts){
   /* draws the crown into a 2D context W wide and W high; returns the
      scale and the model-to-pixel map so taps can be resolved later */
-  opts=opts||{};const cx=W/2,cy=W/2;const R=crownRng(77);
-  c.fillStyle=CROWN_C.paper;c.fillRect(0,0,W,W);c.lineCap='round';c.lineJoin='round';
+  opts=opts||{};const cx=W/2,cy=W/2;const R=crownRng(77);const PL=crownPal(),dk=PL===CROWN_CD;
+  /* dark leaves the ground transparent so the page's own washes show through */
+  if(!dk){c.fillStyle=PL.paper;c.fillRect(0,0,W,W)}c.lineCap='round';c.lineJoin='round';
   const SC=opts.fixed?W*0.42*Math.min(1,Math.sqrt(Math.max(1,M.N)/150)):W*0.42;const px=(x,y)=>[cx+x*SC,cy+y*SC];
-  const sh=c.createRadialGradient(cx,cy+W*0.01,SC*0.4,cx,cy+W*0.01,SC*1.1);sh.addColorStop(0,'rgba(30,34,51,.07)');sh.addColorStop(1,'rgba(30,34,51,0)');c.fillStyle=sh;c.beginPath();c.arc(cx,cy+W*0.01,SC*1.1,0,7);c.fill();
+  const sh=c.createRadialGradient(cx,cy+W*0.01,SC*0.4,cx,cy+W*0.01,SC*1.1);sh.addColorStop(0,dk?'rgba(255,255,255,.035)':'rgba(30,34,51,.07)');sh.addColorStop(1,dk?'rgba(255,255,255,0)':'rgba(30,34,51,0)');c.fillStyle=sh;c.beginPath();c.arc(cx,cy+W*0.01,SC*1.1,0,7);c.fill();
   const fo=opts.focus||null;const hit=L=>!fo||(fo==='pr'?!!L.s.pr:fo==='links'?false:L.s.kind===fo);
   const mg=L=>(L.s.mag!=null?L.s.mag:0.6);
-  c.save();c.globalCompositeOperation='multiply';const leaf=W*0.011;
-  M.leaves.forEach(L=>{const [x,y]=px(L.x,L.y);const col=CROWN_C[L.s.kind];const m=mg(L),dim=hit(L)?1:0.25,sc=0.7+0.6*m;for(let i=0;i<7;i++){const a=R()*6.28,d=Math.sqrt(R())*W*0.03;c.fillStyle=crownRgba(col,(0.14+0.12*R())*(0.6+0.4*m)*dim);c.beginPath();c.ellipse(x+Math.cos(a)*d,y+Math.sin(a)*d,leaf*(0.8+R()*0.7)*sc,leaf*(0.45+R()*0.4)*sc,R()*6.28,0,7);c.fill()}});
+  c.save();c.globalCompositeOperation=dk?'screen':'multiply';const leaf=W*0.011;
+  M.leaves.forEach(L=>{const [x,y]=px(L.x,L.y);const col=PL[L.s.kind];const m=mg(L),dim=hit(L)?1:0.25,sc=0.7+0.6*m;for(let i=0;i<7;i++){const a=R()*6.28,d=Math.sqrt(R())*W*0.03;c.fillStyle=crownRgba(col,(0.14+0.12*R())*(0.6+0.4*m)*dim);c.beginPath();c.ellipse(x+Math.cos(a)*d,y+Math.sin(a)*d,leaf*(0.8+R()*0.7)*sc,leaf*(0.45+R()*0.4)*sc,R()*6.28,0,7);c.fill()}});
   c.restore();
-  M.nodes.forEach(n=>{if(n.parent<0)return;const p=M.nodes[n.parent];const [x0,y0]=px(p.x,p.y),[x1,y1]=px(n.x,n.y);c.strokeStyle=crownRgba(CROWN_C.ink,0.9);c.lineWidth=Math.max(0.6,W*0.026*Math.pow(n.wf,1.3));c.beginPath();c.moveTo(x0,y0);c.lineTo(x1,y1);c.stroke()});
-  M.leaves.forEach(L=>{const [x,y]=px(L.x,L.y),[nx,ny]=px(L.nx,L.ny);const dim=hit(L)?1:0.25,sc=0.7+0.6*mg(L);c.strokeStyle=crownRgba(CROWN_C.ink,0.7*dim);c.lineWidth=0.7;c.beginPath();c.moveTo(nx,ny);c.lineTo(x,y);c.stroke();
-    const a=Math.atan2(y-ny,x-nx);c.fillStyle=dim<1?crownRgba(CROWN_C[L.s.kind],0.25):CROWN_C[L.s.kind];c.beginPath();c.ellipse(x,y,W*0.009*sc,W*0.0055*sc,a,0,7);c.fill();c.strokeStyle=crownRgba(CROWN_C.ink,0.5*dim);c.lineWidth=0.5;c.stroke();
-    if(L.s.pr){c.fillStyle='#FFFFFF';c.beginPath();c.arc(x+W*0.008,y-W*0.008,W*0.005,0,7);c.fill();c.strokeStyle=crownRgba(CROWN_C.ink,0.7);c.lineWidth=0.8;c.stroke()}
-    if(L.s.won){c.fillStyle=CROWN_C.gold;c.beginPath();c.arc(x-W*0.008,y+W*0.008,W*0.005,0,7);c.fill()}
-    if(L.s.gate){c.fillStyle=CROWN_C.paper;c.beginPath();c.arc(x,y,W*0.0035,0,7);c.fill()}});
-  M.links.forEach(L=>{const [x0,y0]=px(L.a.x,L.a.y),[x1,y1]=px(L.b.x,L.b.y);const mx=(x0+x1)/2+(cy-(y0+y1)/2)*0.25,my=(y0+y1)/2+((x0+x1)/2-cx)*0.25;c.strokeStyle=crownRgba(L.col,0.85);c.lineWidth=fo==='links'?2.4:1.3;c.setLineDash([4,3]);c.beginPath();c.moveTo(x0,y0);c.quadraticCurveTo(mx,my,x1,y1);c.stroke();c.setLineDash([])});
-  const trunk=Math.max(W*0.012,Math.min(W*0.03,W*0.026*(M.nodes[0]?M.nodes[0].wf:0.5)));c.fillStyle=crownRgba(CROWN_C.ink,0.94);c.beginPath();c.arc(cx,cy,trunk,0,7);c.fill();
-  if(opts.scar){c.strokeStyle=CROWN_C.paper;c.lineWidth=1.4;c.beginPath();c.moveTo(cx-trunk*0.55,cy+trunk*0.45);c.lineTo(cx+trunk*0.45,cy-trunk*0.55);c.stroke()}
+  M.nodes.forEach(n=>{if(n.parent<0)return;const p=M.nodes[n.parent];const [x0,y0]=px(p.x,p.y),[x1,y1]=px(n.x,n.y);c.strokeStyle=crownRgba(PL.ink,0.9);c.lineWidth=Math.max(0.6,W*0.026*Math.pow(n.wf,1.3));c.beginPath();c.moveTo(x0,y0);c.lineTo(x1,y1);c.stroke()});
+  M.leaves.forEach(L=>{const [x,y]=px(L.x,L.y),[nx,ny]=px(L.nx,L.ny);const dim=hit(L)?1:0.25,sc=0.7+0.6*mg(L);c.strokeStyle=crownRgba(PL.ink,0.7*dim);c.lineWidth=0.7;c.beginPath();c.moveTo(nx,ny);c.lineTo(x,y);c.stroke();
+    const a=Math.atan2(y-ny,x-nx);c.fillStyle=dim<1?crownRgba(PL[L.s.kind],0.25):PL[L.s.kind];c.beginPath();c.ellipse(x,y,W*0.009*sc,W*0.0055*sc,a,0,7);c.fill();c.strokeStyle=crownRgba(PL.ink,0.5*dim);c.lineWidth=0.5;c.stroke();
+    if(L.s.pr){c.fillStyle='#FFFFFF';c.beginPath();c.arc(x+W*0.008,y-W*0.008,W*0.005,0,7);c.fill();c.strokeStyle=crownRgba(PL.ink,0.7);c.lineWidth=0.8;c.stroke()}
+    if(L.s.won){c.fillStyle=PL.gold;c.beginPath();c.arc(x-W*0.008,y+W*0.008,W*0.005,0,7);c.fill()}
+    if(L.s.gate){c.fillStyle=PL.paper;c.beginPath();c.arc(x,y,W*0.0035,0,7);c.fill()}});
+  M.links.forEach(L=>{const [x0,y0]=px(L.a.x,L.a.y),[x1,y1]=px(L.b.x,L.b.y);const mx=(x0+x1)/2+(cy-(y0+y1)/2)*0.25,my=(y0+y1)/2+((x0+x1)/2-cx)*0.25;c.strokeStyle=crownRgba(L.col==='ink'?PL.ink:L.col,0.85);c.lineWidth=fo==='links'?2.4:1.3;c.setLineDash([4,3]);c.beginPath();c.moveTo(x0,y0);c.quadraticCurveTo(mx,my,x1,y1);c.stroke();c.setLineDash([])});
+  const trunk=Math.max(W*0.012,Math.min(W*0.03,W*0.026*(M.nodes[0]?M.nodes[0].wf:0.5)));c.fillStyle=crownRgba(PL.ink,0.94);c.beginPath();c.arc(cx,cy,trunk,0,7);c.fill();
+  if(opts.scar){c.strokeStyle=PL.paper;c.lineWidth=1.4;c.beginPath();c.moveTo(cx-trunk*0.55,cy+trunk*0.45);c.lineTo(cx+trunk*0.45,cy-trunk*0.55);c.stroke()}
   return {S:SC,px,trunk}}
 function crownStamp(){try{return (S.history||[]).filter(h=>h.complete).length+':'+Object.keys(discBank()||{}).length+':'+crownFirstDay()+':'+Object.keys(((acct()||{}).duelHist)||{}).length}catch(e){oops('crownStamp',e);return '0'}}
 function crownImage(W,opts){
@@ -23023,7 +23046,7 @@ function crownImage(W,opts){
      no canvas (the test harnesses) or nothing logged */
   try{
     const focus=S.crownFocus||null;
-    const stamp=crownStamp()+':'+W+':'+((opts&&opts.fixed)?1:0)+':'+(focus||'');
+    const stamp=crownStamp()+':'+W+':'+((opts&&opts.fixed)?1:0)+':'+(focus||'')+':'+(crownDark()?'d':'l');
     if(S._crownImg&&S._crownImg.stamp===stamp)return S._crownImg.src;
     const D=crownData();if(!D.weeks.length)return '';
     const c=document.createElement('canvas');if(!c||typeof c.getContext!=='function')return '';
@@ -23048,9 +23071,10 @@ function crownKeyHtml(){
   /* the key is a row of FOCUS chips (25 Sep 2026): tap one kind and the
      crown repaints with everything else dimmed; tap it again to clear */
   const on=S.crownFocus||null;
-  const chip=(v,c,label)=>'<button data-a="crownFocus" data-v="'+v+'" style="display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:999px;border:1px solid '+(on===v?'#1E2233':'transparent')+';background:none;font-size:13px;color:'+(on===v?'#1E2233':'#6B685F')+'"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:'+c+'"></span>'+label+'</button>';
+  const chip=(v,c,label)=>'<button data-a="crownFocus" data-v="'+v+'" style="display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:999px;border:1px solid '+(on===v?'var(--text)':'transparent')+';background:none;font-size:13px;color:'+(on===v?'var(--text)':'var(--faint)')+'"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:'+c+'"></span>'+label+'</button>';
   const hasLinks=!!(S._crownImg&&S._crownImg.links&&S._crownImg.links.length);
-  return '<p style="margin-top:6px;text-align:center">'+chip('lift',CROWN_C.lift,'lifting')+chip('run',CROWN_C.run,'running')+chip('rehab',CROWN_C.rehab,'rehab')+chip('pr','#FFFFFF;border:1px solid #1E2233;box-sizing:border-box','PR')+(hasLinks?chip('links','#5E5CE6','threads'):'')+'</p>'}
+  const PL=crownPal();
+  return '<p style="margin-top:6px;text-align:center">'+chip('lift',PL.lift,'lifting')+chip('run',PL.run,'running')+chip('rehab',PL.rehab,'rehab')+chip('pr','#FFFFFF;border:1px solid var(--text);box-sizing:border-box','PR')+(hasLinks?chip('links','#5E5CE6','threads'):'')+'</p>'}
 function crownLabelsHtml(){
   /* the layer a zoom reveals: month rings, one label per leaf (the top
      lift, the run's distance and pace), the thread's finding, and the
@@ -23073,21 +23097,21 @@ function crownReadRing(C){
   try{const a=(typeof deepArm==='function')?deepArm():null;if(!a)return '';
     const d=Math.max(9,(C.trunk||0.02)*2*100*2.2).toFixed(2);const circ=2*Math.PI*17;const p=Math.max(0,Math.min(1,a.p||0));
     return '<span class="crt'+(a.ready?' crt-on':'')+'" style="width:'+d+'%;height:'+d+'%">'+
-      '<svg viewBox="0 0 40 40" style="width:100%;height:100%;display:block;transform:rotate(-90deg)"><circle cx="20" cy="20" r="17" fill="none" stroke="rgba(30,34,51,.16)" stroke-width="2.4"/>'+
-      '<circle cx="20" cy="20" r="17" fill="none" stroke="'+(a.ready?'#248A3D':'#1E2233')+'" stroke-width="2.4" stroke-linecap="round" stroke-dasharray="'+(circ*p).toFixed(2)+' '+circ.toFixed(2)+'"/></svg>'+
+      '<svg viewBox="0 0 40 40" style="width:100%;height:100%;display:block;transform:rotate(-90deg)"><circle cx="20" cy="20" r="17" fill="none" style="stroke:var(--cr-line);opacity:.6" stroke-width="2.4"/>'+
+      '<circle cx="20" cy="20" r="17" fill="none" style="stroke:'+(a.ready?'var(--cr-go)':'var(--cr-ink)')+'" stroke-width="2.4" stroke-linecap="round" stroke-dasharray="'+(circ*p).toFixed(2)+' '+circ.toFixed(2)+'"/></svg>'+
       (a.ready?'<span class="crt-lab">READ READY</span>':'')+'</span>'}
   catch(e){oops('crownReadRing',e);return ''}}
-const CROWN_CSS='<style>[data-crown] .crl{position:absolute;transform:translate(-50%,-150%) scale(var(--iz,1));font-size:11px;line-height:1.2;color:#1E2233;background:rgba(247,244,238,.9);padding:1px 5px;border-radius:4px;white-space:nowrap;display:none}'+
+const CROWN_CSS='<style>[data-crown] .crl{position:absolute;transform:translate(-50%,-150%) scale(var(--iz,1));font-size:11px;line-height:1.2;color:var(--cr-ink);background:var(--cr-lab);padding:1px 5px;border-radius:4px;white-space:nowrap;display:none}'+
   '[data-crown] .crk{color:#5E5CE6;border:1px dashed #5E5CE6}'+
-  '[data-crown] .crr{position:absolute;display:none;transform:translate(-50%,-50%);border:1px dashed rgba(30,34,51,.28);border-radius:50%;box-sizing:border-box}'+
-  '[data-crown] .crm{width:auto;height:auto;border:0;border-radius:4px;font-size:11px;color:#6B685F;background:rgba(247,244,238,.9);padding:0 5px;transform:translate(-50%,-50%) scale(var(--iz,1))}'+
+  '[data-crown] .crr{position:absolute;display:none;transform:translate(-50%,-50%);border:1px dashed var(--cr-line);border-radius:50%;box-sizing:border-box}'+
+  '[data-crown] .crm{width:auto;height:auto;border:0;border-radius:4px;font-size:11px;color:var(--faint);background:var(--cr-lab);padding:0 5px;transform:translate(-50%,-50%) scale(var(--iz,1))}'+
   '[data-crown].z2 .crl,[data-crown].z2 .crr{display:block}[data-crown] .crd{display:none}[data-crown].z4 .crd{display:inline}'+
   '[data-crown] .crt{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%)}'+
-  '[data-crown] .crt-lab{position:absolute;left:50%;top:100%;transform:translate(-50%,4px) scale(var(--iz,1));font-size:11px;letter-spacing:.12em;color:#248A3D;white-space:nowrap}'+
+  '[data-crown] .crt-lab{position:absolute;left:50%;top:100%;transform:translate(-50%,4px) scale(var(--iz,1));font-size:11px;letter-spacing:.12em;color:var(--cr-go);white-space:nowrap}'+
   '@keyframes crtPulse{0%,100%{opacity:.75}50%{opacity:1}}[data-crown] .crt-on{animation:crtPulse 1.8s ease-in-out infinite}@media (prefers-reduced-motion:reduce){[data-crown] .crt-on{animation:none}}</style>';
 function crownDots(){
   /* Three page dots centred, middle one filled, others empty */
-  return '<div data-crowndots="1" aria-hidden="true" style="text-align:center;margin-top:12px;letter-spacing:8px"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:rgba(30,34,51,.25)"></span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#1E2233"></span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:rgba(30,34,51,.25)"></span></div>'}
+  return '<div data-crowndots="1" aria-hidden="true" style="text-align:center;margin-top:12px;letter-spacing:8px"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--text);opacity:.25"></span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--text)"></span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--text);opacity:.25"></span></div>'}
 function crownCard(){
   /* the tree page card: the crown, the number under it in a unit a
      stranger knows, the training word with its two percentages */
@@ -23095,13 +23119,13 @@ function crownCard(){
     const D=crownData();if(!D.weeks.length)return '';
     const src=crownImage(900);if(!src)return '';
     const w=crownWord(D);const n=D.sessions.length;
-    return '<div class="card an-hero mt" style="padding:14px 14px 18px;text-align:center;'+CROWN_TOK+'">'+
-      '<p class="micro" style="color:#6B685F;letter-spacing:.14em">SINCE '+esc(new Date(D.first+'T12:00').toLocaleDateString(undefined,{day:'numeric',month:'short',year:'numeric'}).toUpperCase())+'</p>'+
+    return '<div class="card an-hero mt" style="padding:14px 14px 18px;text-align:center;'+crownTok()+'">'+
+      '<p class="micro" style="color:var(--faint);letter-spacing:.14em">SINCE '+esc(new Date(D.first+'T12:00').toLocaleDateString(undefined,{day:'numeric',month:'short',year:'numeric'}).toUpperCase())+'</p>'+
       '<div data-a="crownOpen" style="cursor:pointer;margin:6px auto 0;max-width:340px"><img src="'+src+'" alt="Your crown" style="display:block;width:100%;height:auto;border-radius:18px"></div>'+
       '<p class="disp" style="font-size:40px;font-weight:600;letter-spacing:-.02em;line-height:1;margin-top:8px">'+n+' session'+(n===1?'':'s')+'</p>'+
-      '<p style="font-size:15px;color:#57534C;margin-top:6px">'+esc(w.word)+' · '+w.S+'% strength · '+w.E+'% endurance</p>'+
+      '<p style="font-size:15px;color:var(--dim);margin-top:6px">'+esc(w.word)+' · '+w.S+'% strength · '+w.E+'% endurance</p>'+
       crownKeyHtml()+
-      '<p style="font-size:13px;color:#57534C;margin-top:10px">'+D.weeks.length+' week'+(D.weeks.length===1?'':'s')+' of showing up. Every leaf is a session. Tap to zoom in.</p></div>'}
+      '<p style="font-size:13px;color:var(--dim);margin-top:10px">'+D.weeks.length+' week'+(D.weeks.length===1?'':'s')+' of showing up. Every leaf is a session. Tap to zoom in.</p></div>'}
   catch(e){oops('crownCard',e);return ''}}
 function crownMoments(){
   /* Overlay moments: goal ceremony, crest update, race ceremony, replay */
@@ -23142,10 +23166,10 @@ function viewCrown(){
 
     /* Header with name and span */
     const name=String((S.prof&&S.prof.name)||'You').split(' ')[0];
-    const spanHtml=span?'<span style="font-size:15px;color:#57534C">'+esc(span)+'</span>':'';
+    const spanHtml=span?'<span style="font-size:15px;color:var(--dim)">'+esc(span)+'</span>':'';
 
     /* SINCE line */
-    const sinceLine=first?'<p class="micro" style="text-align:center;color:#6B685F;letter-spacing:.14em;margin-top:12px">SINCE '+esc(new Date(first+'T12:00').toLocaleDateString(undefined,{day:'numeric',month:'short',year:'numeric'}).toUpperCase())+'</p>':'';
+    const sinceLine=first?'<p class="micro" style="text-align:center;color:var(--faint);letter-spacing:.14em;margin-top:12px">SINCE '+esc(new Date(first+'T12:00').toLocaleDateString(undefined,{day:'numeric',month:'short',year:'numeric'}).toUpperCase())+'</p>':'';
 
     /* Crown box */
     const crownBox=src?'<div data-crown="1" style="position:relative;overflow:hidden;touch-action:none;width:100%;aspect-ratio:1;max-height:70vh;margin:12px auto 0;border-radius:18px">'+
@@ -23155,13 +23179,13 @@ function viewCrown(){
     let sessionsLine='';
     if(D.sessions.length>0){
       sessionsLine='<p class="disp" style="text-align:center;font-size:40px;font-weight:600;letter-spacing:-.02em;line-height:1;margin-top:12px">'+D.sessions.length+' session'+(D.sessions.length===1?'':'s')+'</p>';
-      if(w)sessionsLine+='<p style="text-align:center;font-size:15px;color:#57534C;margin-top:6px">'+esc(w.word)+' · '+w.S+'% strength · '+w.E+'% endurance</p>';
+      if(w)sessionsLine+='<p style="text-align:center;font-size:15px;color:var(--dim);margin-top:6px">'+esc(w.word)+' · '+w.S+'% strength · '+w.E+'% endurance</p>';
       sessionsLine+=crownKeyHtml()}
 
     /* Weeks span line */
     let weeksLine='';
     if(D.weeks.length>0){
-      weeksLine='<p class="micro" style="text-align:center;color:#6B685F;letter-spacing:.14em;margin-top:12px">'+span.toUpperCase()+'</p>';
+      weeksLine='<p class="micro" style="text-align:center;color:var(--faint);letter-spacing:.14em;margin-top:12px">'+span.toUpperCase()+'</p>';
       weeksLine+='<p class="disp" style="text-align:center;font-size:23px;font-weight:600;letter-spacing:-.02em;margin-top:6px">'+D.weeks.length+' week'+(D.weeks.length===1?'':'s')+' of showing up.</p>'}
 
     /* EARNED card */
@@ -23174,19 +23198,19 @@ function viewCrown(){
       if(wins>0)items.push(wins+' week'+(wins===1?'':'s')+' won');
       if(gates>0)items.push(gates+' gate'+(gates===1?'':'s'));
       const earnedBody=items.length>0?
-        '<p class="disp" style="font-size:23px;font-weight:600;letter-spacing:-.02em;color:#1E2233;margin:0">'+items.join(' · ')+'</p>'+
-        '<p style="font-size:15px;color:#57534C;margin-top:8px">A white blossom is a PR. Gold is a week won. Nothing here can be bought or lost.</p>':
-        '<p class="disp" style="font-size:23px;font-weight:600;letter-spacing:-.02em;color:#1E2233;margin:0">Nothing yet</p>'+
-        '<p style="font-size:15px;color:#57534C;margin-top:8px">The first PR draws a white blossom. A week won draws gold.</p>';
-      earnedCard='<div style="border:1px solid rgba(30,34,51,.12);border-radius:12px;background:#FFFFFF;padding:18px;margin:12px 0 0;text-align:left">'+
-        '<p class="micro" style="color:#6B685F;letter-spacing:.14em;margin-bottom:8px">EARNED</p>'+
+        '<p class="disp" style="font-size:23px;font-weight:600;letter-spacing:-.02em;color:var(--text);margin:0">'+items.join(' · ')+'</p>'+
+        '<p style="font-size:15px;color:var(--dim);margin-top:8px">A white blossom is a PR. Gold is a week won. Nothing here can be bought or lost.</p>':
+        '<p class="disp" style="font-size:23px;font-weight:600;letter-spacing:-.02em;color:var(--text);margin:0">Nothing yet</p>'+
+        '<p style="font-size:15px;color:var(--dim);margin-top:8px">The first PR draws a white blossom. A week won draws gold.</p>';
+      earnedCard='<div style="border:1px solid var(--cr-cardline);border-radius:12px;background:var(--cr-card);padding:18px;margin:12px 0 0;text-align:left">'+
+        '<p class="micro" style="color:var(--faint);letter-spacing:.14em;margin-bottom:8px">EARNED</p>'+
         earnedBody+'</div>'}
 
     /* Empty state or moments */
     const isEmpty=!src;
-    const emptyState=isEmpty?'<p style="padding:24px 12px;text-align:center;color:#57534C;font-size:15px">Nothing logged yet. The crown grows a leaf for every session.</p>':'';
+    const emptyState=isEmpty?'<p style="padding:24px 12px;text-align:center;color:var(--dim);font-size:15px">Nothing logged yet. The crown grows a leaf for every session.</p>':'';
 
-    return '<div class="view pad stg phpad" style="min-height:100vh;box-sizing:border-box;'+CROWN_TOK+'">'+
+    return '<div class="view pad stg phpad" style="min-height:100vh;box-sizing:border-box;'+crownTok()+'">'+
       CROWN_CSS+pageHead(name,spanHtml,{noBtns:1,avatar:false})+
       sinceLine+
       crownBox+
@@ -23194,7 +23218,7 @@ function viewCrown(){
       weeksLine+
       earnedCard+
       emptyState+
-      '<p class="micro" style="text-align:center;color:#6B685F;letter-spacing:.2em;margin-top:22px">ALLENA</p>'+
+      '<p class="micro" style="text-align:center;color:var(--faint);letter-spacing:.2em;margin-top:22px">ALLENA</p>'+
       crownDots()+
       crownMoments()+'</div>'}
   catch(e){oops('viewCrown',e);return '<div class="view pad">'+pageHead('Crown','',{})+'</div>'}}
@@ -35176,36 +35200,42 @@ function render(){
      through onBar, so nothing becomes unreachable. Social is labelled
      Race, which is what the page is. */
   tabBarTabs=function(){
-    /* read the gate live, not from the render that assigned this closure —
-       a caller between renders (the swipe, a test) must get today's set */
-    const hasRehab=(S.acl&&S.acl.on)||(typeof activeProtocols==='function'&&activeProtocols().length);
-    const T9=[['today','Today',ICONS.today],
-            ['home','Train',ICONS.home],
-            /* THE CENTRE IS THE LEVEL RING (owner, 17 Sep 2026: "the data
-               icon goes to where the tree icon is in the bottom menu") and
-               it opens the tree-and-points page, which holds the tree card,
-               the points and the shelf; the explorer is one tap in from the
-               tree card. The unseen-find count still rides on it. */
-            ['points','Your tree and points',null],
-            ['social','Race',ICONS.social],
-            /* REHAB LIVES IN THE HAMBURGER (owner, 17 Sep 2026: "move rehab
-               to the hamburger"), reversing the conditional fifth slot from
-               earlier the same day. Progress holds the slot on every account. */
-            ['progress','Progress',ICONS.progress]];
-    /* THE SURFACE TABLE (Phase 2a): a hidden tab is filtered out, but the
-       bar itself is never allowed to drop below three — the whole point
-       is to hide a ROOM, not break the bar's own layout. */
-    const T9f=T9.filter(t=>surfOn(t[0]));
+    /* THE BAR IS TRAIN · TREE · RACE (owner, 26 Sep 2026: "keep the bottom
+       menu bar but now it will just be train - tree - race. Everything
+       else goes into the hamburger"). The tree is the crown, the first
+       screen, and sits in the centre. Read live, never from a closure. */
+    const T9=[['home','Train',ICONS.home],
+            ['crown','Tree',null],
+            ['social','Race',ICONS.social]];
+    /* THE SURFACE TABLE (Phase 2a): a hidden room drops out, but the bar
+       is never allowed to break its own layout, so it keeps all three */
+    const T9f=T9.filter(t=>t[0]==='crown'||surfOn(t[0]));
     return T9f.length>=3?T9f:T9};
-  tabBarRooms=function(){/* THE SWIPE ORDER (owner, 25 Sep 2026): from the crown, a
-                              leftward swipe lands on Train, a rightward one on Race.
-                              A room the surface table hides drops out of the pager. */
-    try{return ['social','crown','home'].filter(v=>v==='crown'||surfOn(v))}catch(e){oops('tabRooms',e);return ['social','crown','home']}};
+  /* THE SWIPE FOLLOWS THE BAR: left to right, Train, Tree, Race. From the
+     tree a finger moving left lands on Race and one moving right on Train. */
+  tabBarRooms=function(){try{return tabBarTabs().map(t=>t[0])}catch(e){oops('tabRooms',e);return ['home','crown','social']}};
 
   const tabBarHtml=()=>{
-    /* THE BAR IS GONE (owner, 25 Sep 2026): the crown is the home, Race
-       and Train are a swipe away, everything else is in the drawer. */
-    return ''};
+    if(S.sess&&S.view==='session')return '';
+    if(S.boot||S.view==='setup'||S.view==='welcome'||S.view==='day0'||S.view==='signup'||S.view==='obwait'||S.view==='obreveal')return '';
+    const T9=tabBarTabs();
+    /* the centre one is a different object, not a bigger version of the
+       same one: a capsule inside the bar carrying the points figure, no
+       label, and the count of finds not yet looked at */
+    const treeBtn=()=>{
+      const n9=(typeof treeXNewN==='function')?treeXNewN():0;
+      const lit=n9>0;
+      return '<button data-a="drawerNav" data-v="crown" class="tmid'+(isOn('crown')?' on':'')+(lit?' lit':'')+'"'+
+        ' aria-label="Your tree"'+(isOn('crown')?' aria-current="page"':'')+'>'+
+        '<span class="tmidr">'+levelRing(22,{bare:true})+'<span class="tmidn" data-cu="ptscap">'+(function(){const t9=dataPoints().total;return t9<10000?Math.round(t9).toLocaleString():ptsShort(t9)})()+'</span></span>'+
+        (n9?'<span class="tdot">'+badgeN(n9)+'</span>':'')+'</button>'};
+    const btn=t=>t[0]==='crown'?treeBtn():
+      '<button data-a="drawerNav" data-v="'+t[0]+'" class="'+(isOn(t[0])?'on':'')+'"'+
+      ' aria-label="'+esc(t[1])+'"'+(isOn(t[0])?' aria-current="page"':'')+'>'+
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">'+t[2]+'</svg>'+
+      '<span>'+esc(t[1])+'</span>'+
+      (DOT[t[0]]?'<span class="tdot">'+badgeN(DOT[t[0]])+'</span>':'')+'</button>';
+    return '<div class="tabbar"><nav>'+T9.map(btn).join('')+'</nav></div>'};
 
   /* ══ drawerRows() (Phase 2a amendment) ══════════════════════════════════════════════════
      ONE READER for what the drawer holds: an ordered list of plain
@@ -35229,9 +35259,9 @@ function render(){
        exactly what the bar cannot hold; onBar mirrors the same two
        gates the bar reads, so a room the bar is not showing today
        still has its drawer row. */
-    /* WITH THE BAR GONE, every room needs a drawer row (owner, 25 Sep
-       2026: "everything else in the hamburger"), so nothing is on a bar */
-    const onBar={today:0,home:0,social:0,progress:0,acl:0,run:0};
+    /* NO ROOM HAS TWO DOORS: Train and Race are on the bar (owner, 26 Sep
+       2026), so their rows leave the drawer; everything else lives here */
+    const onBar={today:0,home:1,social:1,progress:0,acl:0,run:0};
     const DOT9={acl:unseenRehab(),run:unseenRun()};
     ['acl','run'].forEach(k9=>{if(!surfOn(k9))DOT9[k9]=0});
     const out=[];
@@ -35239,7 +35269,7 @@ function render(){
        both are single-purpose doors, not views. */
     const push=(k,label,a,v,badge)=>{if(!surfOn('row.'+k))return;
       out.push({k:k,label:label,a:a||'drawerNav',v:v||k,badge:badge||0,dot:false})};
-    /* the rooms first: they are the navigation now the bar is gone */
+    /* the rooms first: the bar carries only Train, Tree and Race */
     if(!onBar.today)push('today','Today');
     if(!onBar.home)push('home','Train');
     if(!onBar.social)push('social','Race');
@@ -35439,6 +35469,16 @@ function render(){
        re-renders keep their position; explicit scroll targets win. */
     try{if(S.view!==render.__lastView){render.__lastView=S.view;
       if(!S.scrollTo)window.scrollTo(0,0)}}catch(e){}
+    /* THE SWIPE ROOMS DO NOT BOUNCE (owner, on video, 26 Sep 2026: "when
+       swiping through pages screen jumps up then down"). A swipe has to
+       travel 18px sideways before the pager takes it, and a finger drifts
+       downward on the way; at the top of a page iOS spent that drift
+       stretching the whole page down, which then held until the page
+       changed. Only the three rooms the pager moves between lose the
+       bounce; every other page keeps it. */
+    try{let r9=[];try{r9=tabBarRooms()}catch(e9){oops('pgroomRooms',e9)}
+      document.documentElement.classList.toggle('pgroom',r9.indexOf(S.view)>=0&&!S.sheet&&!S.drawerOpen)}
+    catch(e){oops('pgroom',e)}
     try{document.body.classList.toggle('sesslive',
       !!(S.sess&&S.view!=='session'&&S.view!=='coach'&&S.sess.phase!=='done'))}catch(e){}
     /* A SHEET OVER THE SESSION NEEDS AN OPAQUE BACKDROP (owner-caught,
@@ -35653,6 +35693,14 @@ function render(){
         render.__pgT=setTimeout(()=>{try{ap.classList.remove('pgnav','back')}catch(e9){oops('pgnav.clear',e9)}},340)}}
       catch(e){oops('pgnav',e)}
     if(navQuiet){try{const vEl=document.querySelector('#app .view.stg');if(vEl)vEl.classList.remove('stg')}catch(e){}}
+    /* THE TITLE ARRIVES ONCE TOO (owner, on video, 26 Sep 2026: "when
+       swiping through pages screen jumps up then down"). Every page title
+       carries .ptitle, a fade-and-rise from 7px below, and the whole page
+       is rebuilt on each render, so the title replayed it after a swipe
+       (the finger had already slid it into place, and it blinked out and
+       rose again) and on every in-page tap. It plays only when a page
+       arrives fresh from an ordinary tap. */
+    if(navQuiet||!viewChanged){try{document.querySelectorAll('#app .ptitle').forEach(el=>el.classList.remove('ptitle'))}catch(e){oops('ptitleQuiet',e)}}
     if(!big){try{const vEl=document.querySelector('#app .view.stg');if(vEl&&vEl.classList&&vEl.classList.remove)vEl.classList.remove('stg')}catch(e){}}
     if(key){const el=document.querySelector('[data-in="'+key+'"]');
       if(el){el.focus();try{if(pos!=null)el.setSelectionRange(pos,pos)}catch(e){}}}
