@@ -1719,7 +1719,7 @@ const S={view:'crown',week:(LIB&&LIB.activeId&&WEEKMAP[LIB.activeId])||1,weekMap
   if(l.porder.indexOf('patterns')<0)l.porder.unshift('patterns');
 if(!l.phide)l.phide={};if(!l.order)l.order=['stats','program','sessions','goals','habits','support'];return l})(),gar:lget(K_GAR,{on:false,steps:false,morning:true,days:{}}),garSkip:false,scans:lget(K_SCAN,[]),sform:null,weekStarts:lget(K_WK,{}),dropped:lget(K_DROP,{}),offload:lget(K_OFF,{}),allow:lget(K_ALLOW,{}),cut:lget(K_CUT,{}),addback:lget(K_ADD,{}),patSeen:lget(K_PSEEN,{}),runs:lget(K_RUN,[]),runSeen:lget(K_RUNSEEN,{}),runOn:(function(){const v=lget('training-runon-v1',null);if(v!==null)return !!v;return true})(),rehab:lget(K_REH,{}),appts:lget(K_APPT,[]),phys:lget(K_PHYS,{}),runplan:lget('training-runplan-v1',null),aptform:null,pform:null,prev:null,prevGo:null,acl:lget(K_ACL,{on:false,mode:null,date:null,phase:1,tests:[],flares:[]}),aform:null,autoBk:lget('training-autobk-v1',{on:true}),persisted:false,quick:null,hint:null,ai:lget(K_AI,{key:'',model:'claude-haiku-4-5-20251001'}),coach:{thread:[],busy:false,input:'',focus:null,sent:false,chatId:null},chats:lget(K_CHATS,[]),drawerOpen:false};
 if(S.sess){S.note=S.sess.note||S.note;if(S.sess.phase!=='done')S.sess.phase='ready'}
-const BUILD_ID='b72bfb';  // stamped by tools/build.py with the content hash
+const BUILD_ID='81a1a6';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -6984,15 +6984,18 @@ function goalStats(g){
   pts.sort((a,b)=>a.t-b.t);
   const cur=pts.length?Math.max.apply(null,pts.map(p=>p.v)):0;
   const start=pts.length?pts[0].v:0;
-  let eta=null,flat=false;
+  let eta=null,flat=false,down=null,spanWk=0;
   const win=pts.filter(p=>p.t>=Date.now()-120*864e5);
   if(win.length>=3&&(win[win.length-1].t-win[0].t)>=14*864e5){
     const n=win.length;let mx=0,my=0;win.forEach(p=>{mx+=p.t;my+=p.v});mx/=n;my/=n;
     let num=0,den=0;win.forEach(p=>{num+=(p.t-mx)*(p.v-my);den+=(p.t-mx)*(p.t-mx)});
     const perWk=(den?num/den:0)*7*864e5;
-    if(perWk<=0.05)flat=true;else eta=Math.max(0,(target-cur)/perWk)}
+    /* a decline is not a plateau: below -0.05 kg a week it is named, with its size and window */
+    spanWk=Math.max(2,Math.round((win[win.length-1].t-win[0].t)/(7*864e5)));
+    if(perWk< -0.05)down=Math.max(1,Math.round(-perWk*spanWk));
+    else if(perWk<=0.05)flat=true;else eta=Math.max(0,(target-cur)/perWk)}
   const pct=cur>=target?100:(cur<=start?(cur>0?5:0):Math.max(5,Math.min(99,Math.round((cur-start)/Math.max(1,target-start)*100))));
-  return{target:target,cur:cur,start:start,actual:actual,eta:eta,flat:flat,n:pts.length,pct:pct}}
+  return{target:target,cur:cur,start:start,actual:actual,eta:eta,flat:flat,down:down,spanWk:spanWk,n:pts.length,pct:pct}}
 function checkGoals(e){
   for(const g of S.goals){
     if(!g.done&&gBase(e.ex)===g.ex&&e.w>=g.w&&e.r>=g.r){
@@ -7643,6 +7646,7 @@ function goalsCard(){
     if(done)sub='<span style="color:var(--green)">DONE · '+fmtDate(g.done)+'</span>';
     else if(st.cur>=st.target)sub='<span style="color:var(--amber)">strength is there — go take the actual set</span>';
     else if(st.n<3)sub='building data — projections start after a few sessions';
+    else if(st.down)sub='down about '+st.down+' kg over the last '+st.spanWk+' weeks'+(goalFlag()?' — worth raising with your physio':'');
     else if(st.flat)sub='trend flat — projection paused, keep logging';
     else if(st.eta!=null){const d=new Date(Date.now()+st.eta*7*864e5);
       sub='projected ≈ '+Math.max(1,Math.ceil(st.eta))+' wks · '+d.toLocaleDateString(undefined,{day:'numeric',month:'short'})}
@@ -18774,6 +18778,61 @@ function correlations(){
     corrCacheSave(stamp,v);
     return v;
   }catch(e){return[]}}
+/* ═══ WHAT A FINDING LOOKS LIKE IN YOUR OWN UNITS (crown roots, 27 Sep 2026) ═══
+   A rho is a number nobody can read. The root sheet shows the finding
+   as the two halves of the user's own days: the input split at its
+   median, the outcome's average on each side with the day counts, how
+   many pairs moved together against the half chance would give, and
+   the first paired date. Every number is re-paired here from the same
+   days and the same lag the grid used, so the sheet cannot drift from
+   the finding. Null when the finding is no longer live — a root is
+   only drawn for a finding that still holds. */
+const CORR_UNITS={sleep:['h',v=>Math.round(v/6)/10],sleep2:['h',v=>Math.round(v/6)/10],sleep3:['h',v=>Math.round(v/6)/10],
+  sldeep:['min',Math.round],slrem:['min',Math.round],hrv:['ms',Math.round],rhr:['bpm',Math.round],rhr3:['bpm',Math.round],
+  steps:['steps',v=>Math.round(v/100)*100],steps3:['steps',v=>Math.round(v/100)*100],protein:['g',Math.round],protein3:['g',Math.round],
+  carb:['g',Math.round],carb3:['g',Math.round],fat:['g',Math.round],fat3:['g',Math.round],kcal:['kcal',v=>Math.round(v/10)*10],
+  kcal3:['kcal',v=>Math.round(v/10)*10],bw:['kg',v=>Math.round(v*10)/10],km:['km',v=>Math.round(v*10)/10],km3:['km',v=>Math.round(v*10)/10],
+  walkkm:['km',v=>Math.round(v*10)/10],ridekm:['km',v=>Math.round(v*10)/10],sessmins:['min',Math.round],
+  topset:['kg',Math.round],benchtop:['kg',Math.round],squattop:['kg',Math.round],deadtop:['kg',Math.round],
+  tonnage:['kg',v=>Math.round(v/10)*10],effort:['RPE',v=>Math.round(v*10)/10],pace:['min/km',v=>Math.round(v*100)/100],
+  beatkm:['beats/km',Math.round],pain:['/10',v=>Math.round(v*10)/10],sleepo:['h',v=>Math.round(v/6)/10],
+  hrvo:['ms',Math.round],rhro:['bpm',Math.round],readyo:['',Math.round]};
+function corrUnit(f){if(f&&f.slice(0,3)==='ex:')return ['kg',Math.round];return CORR_UNITS[f]||['',v=>Math.round(v*10)/10]}
+function corrEffect(id){
+  try{
+    const live=correlations()||[];
+    const f=live.find(c=>{try{return corrIdentity(c)===id}catch(e){oops('corrEffectId',e);return false}});
+    if(!f)return null;
+    const stamp=corrStamp();
+    if(!S._corrDays||S._corrDays.stamp!==stamp)S._corrDays={stamp:stamp,d:corrDayData()};
+    const days=S._corrDays.d;
+    const pairs=[];
+    Object.keys(days).sort().forEach(k=>{const s=days[k][f.sig];if(s==null)return;
+      const d=new Date(k+'T12:00');d.setDate(d.getDate()+f.lag);const ok=dayKey(d);
+      const o=days[ok]&&days[ok][f.out];if(o==null)return;pairs.push({k:k,ok:ok,s:s,o:o})});
+    if(pairs.length<6)return null;
+    const sv=pairs.map(p=>p.s).sort((a,b)=>a-b);
+    const mid=sv.length%2?sv[(sv.length-1)/2]:(sv[sv.length/2-1]+sv[sv.length/2])/2;
+    let hi=pairs.filter(p=>p.s>mid),lo=pairs.filter(p=>p.s<mid);
+    /* a signal that sits on its median most days (weekend, hour) splits on the value itself */
+    if(hi.length<3||lo.length<3){hi=pairs.filter(p=>p.s>=mid);lo=pairs.filter(p=>p.s<mid);
+      if(hi.length<3||lo.length<3)return null}
+    const mean=a=>a.reduce((x,p)=>x+p.o,0)/a.length;
+    const om=pairs.map(p=>p.o).sort((a,b)=>a-b);
+    const omid=om.length%2?om[(om.length-1)/2]:(om[om.length/2-1]+om[om.length/2])/2;
+    /* concordance: a pair "moves together" when both sit on the same side of their medians */
+    let together=0,counted=0;
+    pairs.forEach(p=>{if(p.s===mid||p.o===omid)return;counted++;
+      if((p.s>mid)===(p.o>omid))together++});
+    if(f.rho<0)together=counted-together;
+    const su=corrUnit(f.sig),ou=corrUnit(f.out);
+    return{sig:f.sig,out:f.out,lag:f.lag,rho:f.rho,n:pairs.length,
+      split:su[1](mid),sigUnit:su[0],outUnit:ou[0],
+      hiMean:ou[1](mean(hi)),loMean:ou[1](mean(lo)),hiN:hi.length,loN:lo.length,
+      together:together,counted:counted,chance:Math.round(counted/2),
+      first:pairs[0].k,last:pairs[pairs.length-1].k,
+      outDays:pairs.map(p=>p.ok),sigDays:pairs.map(p=>p.k)}}
+  catch(e){oops('corrEffect',e);return null}}
 /* the common-sense layer (beta-caught by Angus, 3 Sep: 'your incline
    bench increase is correlated to less sleep' — statistically real,
    physiologically backwards). Priors encode what exercise science
@@ -22765,7 +22824,7 @@ function treePopFinds(){
   catch(e){oops('treePopFinds',e);return []}}
 function treePopHtml(){
   try{
-    if(S.view==='tree'||S.view==='session'||S.view==='setup'||S.view==='signup'||S.view==='evidence'||S.view==='obwait'||S.view==='obreveal')return '';
+    if(S.view==='tree'||S.view==='crownx'||S.view==='crown'||S.view==='session'||S.view==='setup'||S.view==='signup'||S.view==='evidence'||S.view==='obwait'||S.view==='obreveal')return '';
     if(S.sess&&S.sess.phase!=='done')return '';
     if(S.signalReveal||S.tour||S.boot!=null)return '';
     if(S._txPopHide===today())return '';
@@ -22899,224 +22958,588 @@ function treeXSheet(){
         (r.id?'<button data-a="txOpenRun" data-v="'+esc(String(r.id))+'" class="btn mt2" style="color:var(--amber)">Open it on the running page</button>':''))}
     return null}
   catch(e){oops('treeXSheet',e);return null}}
-/* ══ THE CROWN (23 Sep 2026) ═══════════════════════════════════
+/* ══ THE CROWN (23 Sep 2026; rebuilt 27 Sep 2026) ════════════════
    The tree seen from above. Every completed session is a leaf the
    tree grew to reach: placed by the week it happened (oldest at the
-   centre, time is radius) and by its kind (a wide, overlapping sector
-   per domain, so the crown shows the mix), then the branches are grown
-   from the trunk toward their own data by space colonisation, so
-   trunk, limbs, branches and twigs come out of the record by
-   construction and there is a tappable data point at the end of every
-   twig. Widths by descendants (da Vinci). A PR is a white blossom, a
+   centre, time is radius) and by its kind (a sector per domain, and
+   inside lifting a limb per lift), then the branches are grown from
+   the trunk toward their own data by space colonisation, so trunk,
+   limbs, branches and twigs come out of the record by construction.
+   A PR is a white blossom on the session that set it AT THE TIME, a
    week the race was won is one gold mark, a rehab gate a pale bead,
-   the surgery a scar across the trunk. A banked correlation is a
-   dashed thread between the found-day session and the same kind's
-   session a week earlier. Nothing unearned is drawn: a week not
-   trained adds nothing and takes nothing away. Research and the eight
-   prototypes that led here: research/emblem/SYNTHESIS.md.
+   the surgery a scar across the trunk. Nothing unearned is drawn.
 
-   The drawing is cached as an image keyed on the record, so the tree
-   page pays for it once per data change and the crown view pans and
-   zooms a picture, never a redraw. Light ground on purpose (owner,
-   "only in light mode"): the page carries its own tokens inline. */
-const CROWN_C={lift:'#248A3D',run:'#0040DD',ride:'#0E7C86',rehab:'#C2185B',gold:'#B8892B',ink:'#1E2233',paper:'#F7F4EE'};
-/* THE TREE FOLLOWS THE THEME (owner, 26 Sep 2026: "the new tree page needs
-   to be on dark mode if the user's mode is in dark mode"). The dark set
-   is the iOS dark palette the rest of the app uses; paper is the dark
-   ground, so a gate bead and the surgery scar still read as cut marks. */
-const CROWN_CD={lift:'#30D158',run:'#409CFF',ride:'#40C8E0',rehab:'#FF6482',gold:'#E0A458',ink:'#ECE8DE',paper:'#0B0B0D'}; /* auditcheck-allow: hardcoded-theme-colour — the dark palette, chosen by crownPal() from the live theme */
+   THE REBUILD (owner, 27 Sep 2026: "blurry when you zoom in... needs to
+   be clickable then it opens its own page... see the progress of your
+   lifts in one glance... correlation lines are ugly... hard to click...
+   an athlete should see it and be proud of their progress, and also be
+   able to see where they're lacking"). Six research tracks, the plan in
+   research/crown-2026-09/SYNTHESIS.md. What changed and why:
+   - SHARP AT ANY ZOOM. It was one PNG stretched up to 6x. Now the model
+     is geometry in world units and a canvas the size of the screen
+     redraws the visible part at the exact zoom (track 1).
+   - NO BEADS. Each step was its own round-capped half-see-through
+     stroke, so every joint painted twice. Now each limb is one filled,
+     tapered outline, Chaikin-smoothed, widths from the pipe rule
+     r ∝ leaves-below^(1/2.05) (tracks 1 and 6).
+   - THE THICK LIMBS ARE YOUR LIFTS. Up to five, goal lifts first; each
+     lift's sessions grow from its own stem (track 3).
+   - PRs AT THE TIME (prMap in 22). The old reader compared a session
+     with later ones too, so a record lost its blossom when beaten.
+   - THREADS BECAME ROOTS. A thread joined two sessions neither of which
+     was what the finding was about. A root runs from a labelled chip
+     outside the canopy ("Sleep · Bench") to the lift or domain the
+     finding is about; thick at both ends so it points neither way;
+     dashed only when the finding has faded (track 4).
+   - BUDS AT THE RIM. Where you are lacking is a closed bud at this
+     week's edge, only where your own goal, programme or physio plan
+     sets the target; never damage to anything already grown (track 5).
+   - MARKS GROW AT THE SQUARE ROOT OF THE ZOOM, positions never move, so
+     zooming spreads a cluster apart (owner ruling, 14 Sep, re-applied).
+   - THE WOOD IS QUIET. Warm grey, leaves are the loudest thing (track 6). */
+const CROWN_C={lift:'#248A3D',run:'#0040DD',ride:'#0E7C86',rehab:'#C2185B',gold:'#9A6F1E',ink:'#1E2233',paper:'#F7F4EE',wood0:'#3A3530',wood1:'#8C8378',wdim:'#C9C2B7',chip:'#FFFFFF',lab:'rgba(247,244,238,.88)'}; /* auditcheck-allow: hardcoded-theme-colour — the light palette, chosen by crownPal() */
+/* THE TREE FOLLOWS THE THEME (owner, 26 Sep 2026). The dark set is the
+   iOS dark palette the rest of the app uses. Light gold is #9A6F1E, not
+   #B8892B, which failed 3:1 on paper (track 6). */
+const CROWN_CD={lift:'#30D158',run:'#409CFF',ride:'#40C8E0',rehab:'#FF6482',gold:'#E0A458',ink:'#ECE8DE',paper:'#0B0B0D',wood0:'#7A7268',wood1:'#A39B8F',wdim:'#46423C',chip:'#1C1C1F',lab:'rgba(11,11,13,.78)'}; /* auditcheck-allow: hardcoded-theme-colour — the dark palette, chosen by crownPal() from the live theme */
 function crownDark(){try{return crestTheme()==='dark'}catch(e){oops('crownDark',e);return false}}
 function crownPal(){return crownDark()?CROWN_CD:CROWN_C}
-const CROWN_SECT={lift:[-1.3,2.8],run:[1.9,5.6],ride:[1.9,5.6],rehab:[4.9,6.5]};
 const CROWN_TOK='--text:#1E2233;--dim:#57534C;--faint:#6B685F;--surface:#FFFFFF;--raised:#EFEBE3;--cardline:rgba(30,34,51,.12);background:#F7F4EE;color:#1E2233';
 /* the page's own tokens. Light carries the paper set inline; dark
    declares none of the shared ones, so the app's dark --text, --dim and
-   --faint apply as they do everywhere else. The --cr-* four are the
-   crown's own: a label's backing, a ring's line, the ready green, ink. */
+   --faint apply as they do everywhere else. */
 function crownTok(){return crownDark()
   ?'--cr-lab:rgba(11,11,13,.85);--cr-line:rgba(242,240,234,.25);--cr-go:#30D158;--cr-ink:#F2F0EA;--cr-card:rgba(255,255,255,.05);--cr-cardline:rgba(255,255,255,.1);color:var(--text)' /* auditcheck-allow: hardcoded-theme-colour — dark branch of crownTok() */
   :CROWN_TOK+';--cr-lab:rgba(247,244,238,.9);--cr-line:rgba(30,34,51,.28);--cr-go:#248A3D;--cr-ink:#1E2233;--cr-card:#FFFFFF;--cr-cardline:rgba(30,34,51,.12)'}
 function crownRgba(hex,a){const n=parseInt(hex.slice(1),16);return 'rgba('+(n>>16)+','+(n>>8&255)+','+(n&255)+','+a+')'}
+function crownMix(h1,h2,t){const a=parseInt(h1.slice(1),16),b=parseInt(h2.slice(1),16);const m=(x,y)=>Math.round(x+(y-x)*t);
+  return 'rgb('+m(a>>16,b>>16)+','+m(a>>8&255,b>>8&255)+','+m(a&255,b&255)+')'}
 function crownRng(seed){let a=seed>>>0;return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+/* one seed per leaf, from its own id: drawing or culling part of the
+   tree can never reshuffle another leaf (the old shared sequence did) */
+function crownHash(s){let h=2166136261;s=String(s);for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619)}return h>>>0}
 function crownSeed(){
-  /* seeded on the account, never rerolled: the first logged day and the
-     profile name, so the same record always draws the same crown */
   try{let h=7;const s=String((S.prof&&S.prof.name)||'')+String(crownFirstDay()||'');for(let i=0;i<s.length;i++)h=(h*31+s.charCodeAt(i))>>>0;return h||7}catch(e){oops('crownSeed',e);return 7}}
 function crownFirstDay(){let first=null;(S.history||[]).forEach(h=>{if(!h.complete)return;const k=hKey(h);if(k&&(!first||k<first))first=k});return first}
 function crownKind(h){
-  /* lift / run / ride / rehab; null for a walk or a hike, which is not
-     training the crown draws (A WALK IS NOT A RUN) */
+  /* lift / run / ride / rehab; null for a walk or a hike (A WALK IS NOT A RUN) */
   if(h.run){const r=(S.runs||[]).find(x=>'run-'+x.id===h.id);const t=r?r.type:null;if(t&&!isRunType(t))return (t==='walk'||t==='hike')?null:'ride';return 'run'}
   if(h.rehab)return 'rehab';
   try{const p=((S.lib&&S.lib.programs)||[]).find(x=>x.id===h.progId);if(p&&(p.acl||p.rehabProto||p.kind==='rehab'))return 'rehab'}catch(e){oops('crownKind',e)}
   return 'lift'}
 function crownWeekMon(k){const d=new Date(k+'T12:00');const dow=(d.getDay()+6)%7;d.setDate(d.getDate()-dow);return dayKey(d)}
+/* the world the canvas fits: the canopy reaches 1.0, the root chips sit
+   on a ring at 1.16, and their labels need the rest */
+const CROWN_EXT=1.5,CROWN_CHIP_R=1.24;
+/* the chips need the outer ring; a tree with no roots fills the frame */
+function crownExtOf(C){try{return crownRoots(C).length?CROWN_EXT:crownBuds(C).length?1.2:1.12}catch(e){oops('crownExt',e);return CROWN_EXT}}
+const CROWN_DOMS=['lift','rehab','run','ride'];
+const CROWN_DNAME={lift:'Lifting',run:'Running',ride:'Riding',rehab:'Rehab'};
+function crownLifts(sessions){
+  /* up to five lifts on their own limbs: goal lifts first, then the lifts
+     trained in the most weeks of the last twelve, six weeks logged at
+     least (track 3). A lift is its aliases, so a goal named one way and
+     logged another stays one limb. */
+  const out=[];const taken={};
+  const add=(name,members,goal)=>{if(out.length>=5)return;const m=members.filter(x=>x&&!taken[x]);if(!m.length)return;m.forEach(x=>taken[x]=1);out.push({name,members:m,goal:goal||null})};
+  try{(S.goals||[]).filter(g=>g&&!g.done&&g.ex).forEach(g=>{const nm=goalNames(g);add(String(nm[0]||g.ex),nm,g)})}catch(e){oops('crownLiftGoals',e)}
+  try{const cut=dayKey(new Date(Date.now()-84*864e5));const all={},recent={};
+    sessions.forEach(s=>{if(s.kind!=='lift')return;const seen={};(s.h.log||[]).forEach(l=>{if(!(+l.w>0&&+l.r>0))return;const b=gBase(l.ex);if(!b||seen[b])return;seen[b]=1;
+      (all[b]=all[b]||{})[s.wi]=1;if(s.day>=cut)(recent[b]=recent[b]||{})[s.wi]=1})});
+    Object.keys(all).filter(b=>Object.keys(all[b]).length>=6&&recent[b])
+      .sort((a,b)=>(Object.keys(recent[b]).length-Object.keys(recent[a]).length)||(Object.keys(all[b]).length-Object.keys(all[a]).length)||a.localeCompare(b))
+      .forEach(b=>add(b,[b],null))}catch(e){oops('crownLiftPick',e)}
+  return out}
 function crownData(){
-  /* the record as trained weeks: every completed session with a day,
-     a kind, whether it held a PR; weeks counted from the first logged
+  /* the record as trained weeks: every completed session with a day, a
+     kind, the PRs it set at the time; weeks counted from the first logged
      day; a week with nothing is not a week here */
-  const first=crownFirstDay();if(!first)return {weeks:[],sessions:[],first:null,links:[],seed:7};
+  const first=crownFirstDay();if(!first)return {weeks:[],sessions:[],first:null,lifts:[],seed:7};
   const t0=new Date(crownWeekMon(first)+'T12:00');
   const wk=k=>Math.round((new Date(crownWeekMon(k)+'T12:00')-t0)/(7*864e5));
+  let PRM={};try{PRM=prMap()}catch(e){oops('crownPRmap',e)}
   const sessions=[];(S.history||[]).forEach(h=>{if(!h.complete)return;const k=hKey(h);if(!k)return;const kind=crownKind(h);if(!kind)return;
-    let pr=false;try{if(!h.run&&h.log&&h.log.length)pr=sessionPRs(h).length>0}catch(e){oops('crownPR',e)}
-    sessions.push({id:String(h.id),day:k,wi:wk(k),kind,pr,mins:h.minutes||0,title:h.dayTitle||h.dayName||'',h})});
-  sessions.sort((a,b)=>a.day.localeCompare(b.day));
+    const prs=(!h.run&&PRM[String(h.id)])||[];
+    sessions.push({id:String(h.id),day:k,wi:wk(k),kind,pr:prs.length>0,prs,mins:h.minutes||0,title:h.dayTitle||h.dayName||'',h})});
+  sessions.sort((a,b)=>a.day.localeCompare(b.day)||a.id.localeCompare(b.id));
   const byW={};sessions.forEach(s=>{(byW[s.wi]=byW[s.wi]||[]).push(s)});
   const weeks=Object.keys(byW).map(Number).sort((a,b)=>a-b).map((wi,i)=>({wi,i,ss:byW[wi]}));
   const idx={};weeks.forEach(w=>idx[w.wi]=w.i);sessions.forEach(s=>{s.ti=idx[s.wi]});   // ti: trained-week index, the radius
-  /* MAGNITUDE AT A GLANCE (owner, 25 Sep 2026: "see lift trends at a
-     glance then zoom in for more detail"): a lift's tonnage, a run's
-     distance, each against the athlete's own 90th percentile, so a big
-     day is a big bright leaf. And the label a zoom reveals. */
+  /* MAGNITUDE AT A GLANCE: a lift's tonnage, a run's distance, each
+     against the athlete's own 90th percentile, so a big day is a big leaf */
   try{
     const p90=arr=>{const a=arr.filter(x=>x>0).sort((x,y)=>x-y);return a.length?a[Math.min(a.length-1,Math.floor(a.length*0.9))]:0};
     const ton=s=>(s.h.log||[]).reduce((a,l)=>a+((+l.w>0&&+l.r>0)?(+l.w)*(+l.r):0),0);
     const kmOf=s=>(s.h.log||[]).reduce((a,l)=>a+(+l.km||0),0);
     const tP=p90(sessions.filter(s=>s.kind==='lift').map(ton)),kP=p90(sessions.filter(s=>s.kind==='run'||s.kind==='ride').map(kmOf));
-    const shortDay=k=>{try{return new Date(k+'T12:00').toLocaleDateString(undefined,{day:'numeric',month:'short'})}catch(e){return k}};
-    sessions.forEach(s=>{let v=0.5;s.dayS=shortDay(s.day);
+    sessions.forEach(s=>{let v=0.5;s.dayS=fmtDay(s.day);
       if(s.kind==='lift'){const t=ton(s);v=tP>0&&t>0?t/tP:(t>0?1:0.5);
         let best=null;(s.h.log||[]).forEach(l=>{if(!(+l.w>0&&+l.r>0))return;const e=e1rm(+l.w,+l.r,l.rpe);if(!best||e>best.e)best={ex:gBase(l.ex),w:+l.w,r:+l.r,e}});
-        s.top=best?best.ex:null;s.lab=best?(String(best.ex).slice(0,14)+' '+best.w+'\u00d7'+best.r):'Session'}
+        s.top=best?best.ex:null;s.lab=best?(String(best.ex).slice(0,14)+' '+best.w+'×'+best.r):'Session'}
       else if(s.kind==='rehab'){v=0.6;s.lab='Rehab'}
-      else{const k=kmOf(s);v=kP>0&&k>0?k/kP:(k>0?1:0.5);const mins=s.mins||(s.h.log||[]).reduce((a,l)=>a+(+l.mins||0),0);
-        s.lab=(k?Math.round(k*10)/10+' km':(s.kind==='ride'?'Ride':'Run'))+(k&&mins?' \u00b7 '+paceStr(mins,k):'')}
+      else{const k=kmOf(s);v=kP>0&&k>0?k/kP:(k>0?1:0.5);const mins=s.mins||(s.h.log||[]).reduce((a,l)=>a+(+l.mins||0),0);s.km=k;
+        s.lab=(k?Math.round(k*10)/10+' km':(s.kind==='ride'?'Ride':'Run'))+(k&&mins?' · '+paceStr(mins,k):'')}
       s.mag=Math.max(0.35,Math.min(1,v))})}catch(e){oops('crownMag',e);sessions.forEach(s=>{if(s.mag==null)s.mag=0.6;if(!s.lab)s.lab=''})}
-  /* weeks won: the race's own settled verdicts (duelHist, keyed by the
-     week's Monday, 'w' when won) — one gold mark per week, on its last
-     session; gold is only ever a week won */
+  /* weeks won: the race's own settled verdicts — one gold mark per week,
+     on its last session; gold is only ever a week won */
   try{const hist=(acct()||{}).duelHist||{};weeks.forEach(w=>{const mon=crownWeekMon(w.ss[0].day);if(hist[mon]==='w')w.ss[w.ss.length-1].won=true})}catch(e){oops('crownWon',e)}
-  /* rehab gates: banked once by the climb, so a bead is a real event —
-     it sits on the last rehab session on or before the day it was found */
+  /* rehab gates: banked once by the climb, so a bead is a real event */
   try{const bank=discBank();Object.keys(bank).forEach(id=>{const b=bank[id];if(!b||!/^(aclgate|aclphase|lsi):/.test(id)||!b.found)return;const s=sessions.filter(x=>x.kind==='rehab'&&x.day<=b.found).pop();if(s)s.gate=true})}catch(e){oops('crownGate',e)}
-  /* correlations: a banked signal find joins the found-day session to
-     the same kind's session a week earlier */
-  const links=[];try{const bank=discBank();Object.keys(bank).forEach(id=>{const b=bank[id];if(!b||(b.tag!=='signal'&&b.tag!=='insight')||!b.found)return;
-    const a=sessions.filter(x=>x.day<=b.found).pop();if(!a)return;const prior=sessions.filter(x=>x.kind===a.kind&&x.wi<=a.wi-1);const c=prior.pop();if(!c)return;
-    const rar=b.rar||'common';const col=rar==='epic'?'ink':rar==='rare'?'#AF52DE':rar==='uncommon'?'#5E5CE6':'#64D2FF';links.push({a,b:c,col,title:b.t||'',id})})}catch(e){oops('crownLinks',e)}
-  return {weeks,sessions,first,links,seed:crownSeed()}}
+  /* the lift limbs, and each lifting session's limb: the chosen lift it
+     did the most working sets of; a session with none of them grows on
+     the "other lifting" limb */
+  const lifts=crownLifts(sessions);
+  sessions.forEach(s=>{if(s.kind!=='lift')return;s.lift=-1;let bn=0;
+    lifts.forEach((L,i)=>{const n=(s.h.log||[]).filter(l=>+l.w>0&&+l.r>0&&L.members.indexOf(gBase(l.ex))>=0).length;if(n>bn){bn=n;s.lift=i}})});
+  lifts.forEach((L,i)=>{L.n=sessions.filter(s=>s.lift===i).length;L.prs=sessions.filter(s=>s.lift===i&&s.prs.some(p=>L.members.indexOf(p.ex)>=0)).length});
+  return {weeks,sessions,first,lifts,seed:crownSeed()}}
+function crownGroup(s){return s.kind==='lift'?(s.lift>=0?'L'+s.lift:'Lx'):s.kind}
+function crownSectors(D){
+  /* contiguous sectors with a narrow gap between domains, like the gaps
+     between real tree crowns: lifting centred at the top, then rehab,
+     running and riding clockwise. Each takes its share of the sessions,
+     never under a seventh, so a small domain is still something to tap.
+     Inside lifting, a sub-sector per lift limb the same way. */
+  const per={};D.sessions.forEach(s=>{per[s.kind]=(per[s.kind]||0)+1});
+  const doms=CROWN_DOMS.filter(k=>per[k]);if(!doms.length)return {sect:{},dom:{},gap:-Math.PI/2};
+  const GAP=doms.length>1?0.09:0.34,tot=D.sessions.length;
+  const share=doms.map(k=>Math.max(1/7,per[k]/tot));const ssum=share.reduce((a,b)=>a+b,0);
+  const avail=Math.PI*2-GAP*doms.length;
+  const dom={};let a=-Math.PI/2-(share[0]/ssum*avail)/2;
+  const gaps=[];doms.forEach((k,i)=>{const w=share[i]/ssum*avail;dom[k]=[a,a+w];a+=w+GAP;gaps.push(a-GAP/2)});
+  const gapAt=a-GAP/2;   // the gap before lifting, where the month labels go
+  const sect={};
+  doms.forEach(k=>{if(k!=='lift'){sect[k]=dom[k];return}
+    const gs=[];D.lifts.forEach((L,i)=>{if(L.n)gs.push(['L'+i,L.n])});
+    const other=D.sessions.filter(s=>s.kind==='lift'&&s.lift<0).length;if(other)gs.push(['Lx',other]);
+    const SG=gs.length>1?0.035:0,[a0,a1]=dom.lift;const sh=gs.map(g=>Math.max(0.12,g[1]/per.lift));const s2=sh.reduce((x,y)=>x+y,0);
+    const av=(a1-a0)-SG*(gs.length-1);let b=a0;gs.forEach((g,i)=>{const w=sh[i]/s2*av;sect[g[0]]=[b,b+w];b+=w+SG})});
+  return {sect,dom,gap:gapAt,gaps}}
 function crownModel(D){
-  /* space colonisation (Runions 2007): every session is an attractor at
-     its radius and sector; the tree grows from the trunk toward the
-     nearest one until every attractor has been reached; a lone
-     attractor still pulls its nearest node, so nothing is left out */
-  const N=D.weeks.length;if(!N)return {nodes:[],leaves:[],links:[],N:0};
-  const R=crownRng(D.seed);const rOf=ti=>0.12+0.88*Math.pow((ti+0.5)/N,0.75);
-  const attract=D.sessions.map(s=>{const sc=CROWN_SECT[s.kind]||CROWN_SECT.lift;const a=sc[0]+(sc[1]-sc[0])*(0.1+0.8*R())+(R()-0.5)*0.7;const r=rOf(s.ti)*(0.93+R()*0.14);return {x:Math.cos(a)*r,y:Math.sin(a)*r,s,done:false,node:0}});
-  const STEP=0.032,KILL=0.045;const nodes=[{x:0,y:0,parent:-1}];
-  for(let it=0;it<700;it++){const pull=new Map();let any=false;
-    for(const a of attract){if(a.done)continue;any=true;let best=0,bd=1e9;for(let i=0;i<nodes.length;i++){const n=nodes[i];const dx=a.x-n.x,dy=a.y-n.y;const d2=dx*dx+dy*dy;if(d2<bd){bd=d2;best=i}}
-      if(bd<KILL*KILL){a.done=true;a.node=best;continue}
-      const n=nodes[best];const d=Math.sqrt(bd)||1;const p=pull.get(best)||{x:0,y:0};p.x+=(a.x-n.x)/d;p.y+=(a.y-n.y)/d;pull.set(best,p)}
-    if(!any||!pull.size)break;
-    pull.forEach((p,i)=>{const n=nodes[i];const len=Math.hypot(p.x,p.y)||1;const vx=p.x/len+(R()-0.5)*0.3,vy=p.y/len+(R()-0.5)*0.3;const vl=Math.hypot(vx,vy)||1;nodes.push({x:n.x+vx/vl*STEP,y:n.y+vy/vl*STEP,parent:i})})}
-  const desc=new Array(nodes.length).fill(1);for(let i=nodes.length-1;i>0;i--)desc[nodes[i].parent]+=desc[i];
-  const maxD=desc[0]||1;nodes.forEach((n,i)=>n.wf=Math.sqrt(desc[i]/maxD));
-  const leaves=attract.filter(a=>a.done).map(a=>{const n=nodes[a.node];return {x:a.x,y:a.y,nx:n.x,ny:n.y,s:a.s}});
-  const at={};leaves.forEach(L=>at[L.s.id]=L);
-  const links=D.links.map(l=>({a:at[l.a.id],b:at[l.b.id],col:l.col,title:l.title,id:l.id})).filter(l=>l.a&&l.b);
-  return {nodes,leaves,links,N,rOf}}
-function crownPaint(c,W,M,opts){
-  /* draws the crown into a 2D context W wide and W high; returns the
-     scale and the model-to-pixel map so taps can be resolved later */
-  opts=opts||{};const cx=W/2,cy=W/2;const R=crownRng(77);const PL=crownPal(),dk=PL===CROWN_CD;
-  /* dark leaves the ground transparent so the page's own washes show through */
-  if(!dk){c.fillStyle=PL.paper;c.fillRect(0,0,W,W)}c.lineCap='round';c.lineJoin='round';
-  const SC=opts.fixed?W*0.42*Math.min(1,Math.sqrt(Math.max(1,M.N)/150)):W*0.42;const px=(x,y)=>[cx+x*SC,cy+y*SC];
-  const sh=c.createRadialGradient(cx,cy+W*0.01,SC*0.4,cx,cy+W*0.01,SC*1.1);sh.addColorStop(0,dk?'rgba(255,255,255,.035)':'rgba(30,34,51,.07)');sh.addColorStop(1,dk?'rgba(255,255,255,0)':'rgba(30,34,51,0)');c.fillStyle=sh;c.beginPath();c.arc(cx,cy+W*0.01,SC*1.1,0,7);c.fill();
-  const fo=opts.focus||null;const hit=L=>!fo||(fo==='pr'?!!L.s.pr:fo==='links'?false:L.s.kind===fo);
-  const mg=L=>(L.s.mag!=null?L.s.mag:0.6);
-  c.save();c.globalCompositeOperation=dk?'screen':'multiply';const leaf=W*0.011;
-  M.leaves.forEach(L=>{const [x,y]=px(L.x,L.y);const col=PL[L.s.kind];const m=mg(L),dim=hit(L)?1:0.25,sc=0.7+0.6*m;for(let i=0;i<7;i++){const a=R()*6.28,d=Math.sqrt(R())*W*0.03;c.fillStyle=crownRgba(col,(0.14+0.12*R())*(0.6+0.4*m)*dim);c.beginPath();c.ellipse(x+Math.cos(a)*d,y+Math.sin(a)*d,leaf*(0.8+R()*0.7)*sc,leaf*(0.45+R()*0.4)*sc,R()*6.28,0,7);c.fill()}});
-  c.restore();
-  M.nodes.forEach(n=>{if(n.parent<0)return;const p=M.nodes[n.parent];const [x0,y0]=px(p.x,p.y),[x1,y1]=px(n.x,n.y);c.strokeStyle=crownRgba(PL.ink,0.9);c.lineWidth=Math.max(0.6,W*0.026*Math.pow(n.wf,1.3));c.beginPath();c.moveTo(x0,y0);c.lineTo(x1,y1);c.stroke()});
-  M.leaves.forEach(L=>{const [x,y]=px(L.x,L.y),[nx,ny]=px(L.nx,L.ny);const dim=hit(L)?1:0.25,sc=0.7+0.6*mg(L);c.strokeStyle=crownRgba(PL.ink,0.7*dim);c.lineWidth=0.7;c.beginPath();c.moveTo(nx,ny);c.lineTo(x,y);c.stroke();
-    const a=Math.atan2(y-ny,x-nx);c.fillStyle=dim<1?crownRgba(PL[L.s.kind],0.25):PL[L.s.kind];c.beginPath();c.ellipse(x,y,W*0.009*sc,W*0.0055*sc,a,0,7);c.fill();c.strokeStyle=crownRgba(PL.ink,0.5*dim);c.lineWidth=0.5;c.stroke();
-    if(L.s.pr){c.fillStyle='#FFFFFF';c.beginPath();c.arc(x+W*0.008,y-W*0.008,W*0.005,0,7);c.fill();c.strokeStyle=crownRgba(PL.ink,0.7);c.lineWidth=0.8;c.stroke()}
-    if(L.s.won){c.fillStyle=PL.gold;c.beginPath();c.arc(x-W*0.008,y+W*0.008,W*0.005,0,7);c.fill()}
-    if(L.s.gate){c.fillStyle=PL.paper;c.beginPath();c.arc(x,y,W*0.0035,0,7);c.fill()}});
-  M.links.forEach(L=>{const [x0,y0]=px(L.a.x,L.a.y),[x1,y1]=px(L.b.x,L.b.y);const mx=(x0+x1)/2+(cy-(y0+y1)/2)*0.25,my=(y0+y1)/2+((x0+x1)/2-cx)*0.25;c.strokeStyle=crownRgba(L.col==='ink'?PL.ink:L.col,0.85);c.lineWidth=fo==='links'?2.4:1.3;c.setLineDash([4,3]);c.beginPath();c.moveTo(x0,y0);c.quadraticCurveTo(mx,my,x1,y1);c.stroke();c.setLineDash([])});
-  const trunk=Math.max(W*0.012,Math.min(W*0.03,W*0.026*(M.nodes[0]?M.nodes[0].wf:0.5)));c.fillStyle=crownRgba(PL.ink,0.94);c.beginPath();c.arc(cx,cy,trunk,0,7);c.fill();
-  if(opts.scar){c.strokeStyle=PL.paper;c.lineWidth=1.4;c.beginPath();c.moveTo(cx-trunk*0.55,cy+trunk*0.45);c.lineTo(cx+trunk*0.45,cy-trunk*0.55);c.stroke()}
-  return {S:SC,px,trunk}}
-function crownStamp(){try{return (S.history||[]).filter(h=>h.complete).length+':'+Object.keys(discBank()||{}).length+':'+crownFirstDay()+':'+Object.keys(((acct()||{}).duelHist)||{}).length}catch(e){oops('crownStamp',e);return '0'}}
-function crownImage(W,opts){
-  /* the crown as a data URL, cached on the record; '' where there is
-     no canvas (the test harnesses) or nothing logged */
+  /* space colonisation (Runions 2007) with the three limits track 6 asked
+     for: an attractor only pulls nodes within about six steps (so no long
+     straight spurs), a new step may turn at most 25 degrees from its
+     parent (55 for a side branch — no right-angle circuit boards), and a
+     gentle outward pull (tropism 0.25). Each group grows from its own
+     stem, so a lift's sessions can only ever be reached by its own limb. */
+  const N=D.weeks.length;const rOf=ti=>0.14+0.86*Math.pow((ti+0.5)/Math.max(1,N),0.75);
+  if(!N)return {nodes:[],leaves:[],chains:[],N:0,rOf,SE:{sect:{},dom:{},gap:0},groups:{},rings:[],TR:0.02};
+  const SE=crownSectors(D);
+  const nodes=[{x:0,y:0,p:-1,g:null,kids:0}];
+  Object.keys(SE.sect).forEach(g=>{const a=(SE.sect[g][0]+SE.sect[g][1])/2;const i1=nodes.length;
+    nodes.push({x:Math.cos(a)*0.035,y:Math.sin(a)*0.035,p:0,g,kids:0});nodes.push({x:Math.cos(a)*0.075,y:Math.sin(a)*0.075,p:i1,g,kids:0});nodes[i1].kids=1});
+  const att=D.sessions.map(s=>{const R=crownRng(crownHash(s.id));const g=crownGroup(s);const sc=SE.sect[g]||[0,0.5];
+    const a=sc[0]+(sc[1]-sc[0])*(0.07+0.86*R());const r=rOf(s.ti)*(0.95+R()*0.1);
+    return {x:Math.cos(a)*r,y:Math.sin(a)*r,s,g,done:false,node:-1,best:-1,bd:1e9}});
+  const upd=(a,i)=>{const n=nodes[i];if(n.g!==a.g)return;const dx=a.x-n.x,dy=a.y-n.y;const d=dx*dx+dy*dy;if(d<a.bd){a.bd=d;a.best=i}};
+  att.forEach(a=>{for(let i=1;i<nodes.length;i++)upd(a,i)});
+  const STEP=0.024,KILL=0.034,INF=STEP*6.5;
+  const cos25=Math.cos(25*Math.PI/180),cos55=Math.cos(55*Math.PI/180);
+  const dirs=nodes.map(()=>[]);
+  for(let it=0;it<1400;it++){
+    const pull=new Map();let open=0;
+    const addPull=a=>{const n=nodes[a.best];const d=Math.sqrt(a.bd)||1;const p=pull.get(a.best)||{x:0,y:0,c:0,nd:1e9,nx:0,ny:0};p.x+=(a.x-n.x)/d;p.y+=(a.y-n.y)/d;p.c++;if(d<p.nd){p.nd=d;p.nx=(a.x-n.x)/d;p.ny=(a.y-n.y)/d}pull.set(a.best,p)};
+    for(const a of att){if(a.done)continue;if(a.bd<KILL*KILL){a.done=true;a.node=a.best;continue}open++;if(a.bd<=INF*INF)addPull(a)}
+    if(!open)break;
+    /* nothing within reach: every open attractor pulls its nearest node,
+       so no session is ever left off the drawing */
+    if(!pull.size)for(const a of att)if(!a.done)addPull(a);
+    /* grow one step from every pulled node; a step the limits refuse
+       leaves the node free of them next time, and a whole iteration that
+       grows nothing retries with every limit off, so growth never stalls
+       into a fan of long twigs from one node */
+    const grow=relax=>{const added=[];
+      pull.forEach((p,i)=>{const n=nodes[i];let vx=p.x,vy=p.y;const vl=Math.hypot(vx,vy);
+        if(!relax&&vl<0.15*p.c&&p.c>1)return;   // pulled both ways at once: wait for the tree to grow closer
+        vx/=vl||1;vy/=vl||1;
+        /* relaxed, a node pulled both ways steps toward its nearest attractor */
+        if(relax&&vl<0.5*p.c){vx=p.nx;vy=p.ny}
+        const rl=Math.hypot(n.x,n.y);if(!relax&&rl>1e-6){vx+=0.25*n.x/rl;vy+=0.25*n.y/rl;const l2=Math.hypot(vx,vy)||1;vx/=l2;vy/=l2}
+        if(!relax&&!n.free&&n.p>=0){const P=nodes[n.p];let dx=n.x-P.x,dy=n.y-P.y;const dl=Math.hypot(dx,dy)||1;dx/=dl;dy/=dl;
+          const lim=n.kids?cos55:cos25;const dot=dx*vx+dy*vy;
+          if(dot<lim){/* rotate the parent's heading toward the pull by the limit */
+            const cr=dx*vy-dy*vx;const ang=Math.acos(Math.max(-1,Math.min(1,lim)))*(cr<0?-1:1);
+            vx=dx*Math.cos(ang)-dy*Math.sin(ang);vy=dx*Math.sin(ang)+dy*Math.cos(ang)}}
+        /* a child already heading this way does the job; never grow a twin */
+        if(dirs[i].some(d=>d[0]*vx+d[1]*vy>(relax?0.9995:0.985))){n.free=true;return}
+        dirs[i].push([vx,vy]);n.kids++;
+        nodes.push({x:n.x+vx*STEP,y:n.y+vy*STEP,p:i,g:n.g,kids:0});dirs.push([]);added.push(nodes.length-1)});
+      return added};
+    let added=grow(false);if(!added.length)added=grow(true);
+    if(!added.length){/* truly stuck: attach whatever is left to its nearest node */
+      for(const a of att)if(!a.done&&a.best>=0){a.done=true;a.node=a.best}break}
+    for(const a of att){if(a.done)continue;for(const i of added)upd(a,i)}}
+  for(const a of att)if(!a.done&&a.best>=0){a.done=true;a.node=a.best}
+  /* the pipe rule: a node's radius from the leaves it carries */
+  const lb=new Array(nodes.length).fill(0);
+  const leaves=att.filter(a=>a.node>=0).map(a=>{lb[a.node]++;const n=nodes[a.node];return {x:a.x,y:a.y,nx:n.x,ny:n.y,s:a.s,g:a.g,ang:Math.atan2(a.y-n.y,a.x-n.x)}});
+  for(let i=nodes.length-1;i>0;i--)lb[nodes[i].p]+=lb[i];
+  const tot=Math.max(1,lb[0]);const TR=0.02+0.016*Math.min(1,Math.sqrt(tot/300));
+  nodes.forEach((n,i)=>{n.lb=lb[i];n.w=i===0?TR:Math.max(0.0032,TR*0.92*Math.pow(lb[i]/tot,1/2.05))});
+  /* limbs: chains of single-child nodes, smoothed twice, one outline each */
+  const kids=nodes.map(()=>[]);for(let i=1;i<nodes.length;i++)if(lb[i]>0)kids[nodes[i].p].push(i);
+  const chains=[];const stack=kids[0].map(c=>[0,c]);
+  while(stack.length){const [p,c]=stack.pop();const ids=[p,c];let cur=c;while(kids[cur].length===1){cur=kids[cur][0];ids.push(cur)}
+    let pts=ids.map((k,j)=>[nodes[k].x,nodes[k].y,j===0?nodes[ids[1]].w:nodes[k].w]);
+    for(let r=0;r<2;r++){if(pts.length<3)break;const o=[pts[0]];for(let j=0;j<pts.length-1;j++){const A=pts[j],B=pts[j+1];
+      if(j>0)o.push([A[0]*0.75+B[0]*0.25,A[1]*0.75+B[1]*0.25,A[2]*0.75+B[2]*0.25]);if(j<pts.length-2)o.push([A[0]*0.25+B[0]*0.75,A[1]*0.25+B[1]*0.75,A[2]*0.25+B[2]*0.75])}
+      o.push(pts[pts.length-1]);pts=o}
+    let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9;pts.forEach(q=>{x0=Math.min(x0,q[0]-q[2]);y0=Math.min(y0,q[1]-q[2]);x1=Math.max(x1,q[0]+q[2]);y1=Math.max(y1,q[1]+q[2])});
+    chains.push({pts,w:pts[Math.min(1,pts.length-1)][2],g:nodes[c].g,bb:[x0,y0,x1,y1]});
+    kids[cur].forEach(k=>stack.push([cur,k]))}
+  chains.sort((a,b)=>b.w-a.w);
+  /* per group: its leaves' box (a flight's target) and where its label sits */
+  const groups={};leaves.forEach(L=>{const G=groups[L.g]||(groups[L.g]={n:0,bb:[1e9,1e9,-1e9,-1e9],rs:[]});G.n++;
+    G.bb=[Math.min(G.bb[0],L.x),Math.min(G.bb[1],L.y),Math.max(G.bb[2],L.x),Math.max(G.bb[3],L.y)];G.rs.push(Math.hypot(L.x,L.y))});
+  Object.keys(groups).forEach(g=>{const G=groups[g];const sc=SE.sect[g];G.a=sc?(sc[0]+sc[1])/2:0;
+    G.rs.sort((a,b)=>a-b);G.rmax=G.rs[G.rs.length-1]||0.5;G.rmid=G.rs[Math.floor(G.rs.length*0.45)]||0.4;delete G.rs});
+  /* a ring where the month turns, so the zoomed crown has a time axis */
+  const rings=[];try{let prev=null;D.weeks.forEach(w=>{const mo=new Date(crownWeekMon(w.ss[0].day)+'T12:00');const key=mo.getFullYear()+'-'+mo.getMonth();
+    if(prev!==null&&key!==prev)rings.push({r:rOf(w.i)-0.5*(rOf(w.i)-rOf(Math.max(0,w.i-1))),label:mo.toLocaleDateString(undefined,{month:'short'})+(mo.getMonth()===0?' '+mo.getFullYear():''),key});prev=key})}catch(e){oops('crownRings',e)}
+  return {nodes,leaves,chains,N,rOf,SE,groups,rings,TR}}
+function crownStamp(){try{return (S.history||[]).filter(h=>h.complete).length+':'+(S.history||[]).length+':'+Object.keys(discBank()||{}).length+':'+crownFirstDay()+':'+Object.keys(((acct()||{}).duelHist)||{}).length+':'+(S.goals||[]).map(g=>g.ex+(g.done?'d':'')).join(',')}catch(e){oops('crownStamp',e);return '0'}}
+function crownM(){
+  /* the model is cached on the record; focus, lens, zoom and theme are
+     paint-time only, so none of them regrow the tree */
+  const st=crownStamp();if(S._crownM&&S._crownM.stamp===st)return S._crownM;
+  const D=crownData();const M=crownModel(D);
+  S._crownM={stamp:st,D,M,roots:null,buds:null};return S._crownM}
+
+/* ── ROOTS: what a finding is about, labelled (track 4) ─────────── */
+const CROWN_SIGW={sleep:'Sleep',hrv:'HRV',rhr:'Resting HR',steps:'Steps',ready:'Readiness',protein:'Protein',carb:'Carbs',fat:'Fat',kcal:'Calories',bw:'Bodyweight',
+  load:'Training load',resty:'Rest between sets',hour:'Time of day',vo2:'VO2max',bwtrend:'Weight trend',weekend:'Weekends',km:'Running',walkkm:'Walking',ridekm:'Riding',
+  sessmins:'Session length',wtemp:'Wrist temp',resp:'Breathing rate',spo2:'Blood oxygen',cyc:'Cycle day',msteps:'Morning steps',eprot:'Late protein',ecarb:'Late carbs',
+  flights:'Stairs',standmin:'Standing',exmin:'Exercise minutes',ambwalk:'Walking',walkspeed:'Walking pace',walkasym:'Gait',dblsupport:'Stride',stairup:'Stair speed',stairdown:'Stair speed',
+  sixmwt:'Six-minute walk',walksteady:'Gait',hrr:'HR recovery',hrvswing:'HRV trend',sleepvar:'Sleep swing'};
+const CROWN_OUTW={topset:'Top set',tonnage:'Volume',effort:'Effort',fade:'Rep fade',pace:'Easy pace',beatkm:'Beats per km',pain:'Knee pain',sleepo:'Sleep',hrvo:'HRV',readyo:'Readiness',
+  benchtop:'Bench',squattop:'Squat',deadtop:'Deadlift',rideeff:'Bike efficiency',rhro:'Resting HR',stiff:'Stiffness',conf:'Confidence',swell:'Swelling',adher:'Plan done'};
+function crownSigW(fam){const f=String(fam||'').replace(/3$/,'');return CROWN_SIGW[fam]||CROWN_SIGW[f]||(f.charAt(0).toUpperCase()+f.slice(1))}
+function crownOutW(out){if(String(out).slice(0,3)==='ex:')return String(out).slice(3);return CROWN_OUTW[out]||String(out)}
+function crownRootTarget(out,D,M){
+  /* the group a finding's outcome belongs to: a lift's own limb, the
+     domain it is measured in, or the trunk for the body's own numbers */
+  const has=g=>!!(M.groups&&M.groups[g]);
+  const liftBy=re=>{let hit=null;D.lifts.forEach((L,i)=>{if(!hit&&L.members.some(m=>re.test(m))&&has('L'+i))hit='L'+i});return hit};
+  /* lifting in general, never a particular limb: a deadlift finding must not run to the bench */
+  const anyLift=()=>Object.keys(M.groups).some(g=>g.charAt(0)==='L')?'lift':null;
+  let g=null;const o=String(out);
+  if(o.slice(0,3)==='ex:'){const nm=o.slice(3);D.lifts.forEach((L,i)=>{if(!g&&L.members.indexOf(nm)>=0&&has('L'+i))g='L'+i});if(!g)g=anyLift()}
+  else if(o==='benchtop')g=liftBy(/bench/i)||anyLift();
+  else if(o==='squattop')g=liftBy(/squat/i)||anyLift();
+  else if(o==='deadtop')g=liftBy(/deadlift/i)||anyLift();
+  else if(o==='topset'||o==='tonnage'||o==='effort'||o==='fade'||o==='adher')g=anyLift();
+  else if(o==='pace'||o==='beatkm')g=has('run')?'run':null;
+  else if(o==='rideeff')g=has('ride')?'ride':null;
+  else if(o==='pain'||o==='stiff'||o==='conf'||o==='swell')g=has('rehab')?'rehab':null;
+  return g}   // null: the trunk
+function crownRoots(C){
+  /* every correlation the user has already been shown (it is in the
+     bank) and that still holds is a solid root; one that has faded is a
+     dashed one. Never an unrevealed finding: the tree must not spoil the
+     reveal. Ranked by tier, then strength. */
+  if(C.roots)return C.roots;
+  const out=[];
+  try{const bank=discBank()||{};const live=correlations()||[];const liveIds={};
+    live.forEach(f=>{let id=null;try{id=corrIdentity(f)}catch(e){oops('crownRootId',e)}if(id&&bank[id]&&!liveIds[id])liveIds[id]=f});
+    const RK={common:0,uncommon:1,rare:2,epic:3};
+    Object.keys(liveIds).forEach(id=>{const f=liveIds[id];out.push({id,fam:corrFamily(f.sig),out:f.out,rar:bank[id].rar||'common',faded:false,score:f.score||0,rk:RK[bank[id].rar]||0})});
+    Object.keys(bank).forEach(id=>{if(liveIds[id])return;const m=/^corr:([a-z0-9]+):(.+):(\d)$/.exec(id);if(!m)return;
+      out.push({id,fam:m[1],out:m[2],rar:bank[id].rar||'common',faded:true,score:0,rk:RK[bank[id].rar]||0})});
+    out.sort((a,b)=>(a.faded-b.faded)||(b.rk-a.rk)||(b.score-a.score));
+    out.forEach(r=>{r.g=crownRootTarget(r.out,C.D,C.M);r.lab=crownSigW(r.fam)+' · '+crownOutW(r.out)})}
+  catch(e){oops('crownRoots',e)}
+  C.roots=out;return out}
+function crownRootLayout(C,max){
+  /* chips on a ring outside the canopy, each at the angle of what it is
+     about, then pushed apart so no two chips or labels collide */
+  const M=C.M;const list=crownRoots(C).filter(r=>max>3||!r.faded).slice(0,max);
+  const gapA=M.SE.gap;
+  const dl=M.SE.dom.lift;
+  const gl=(M.SE.gaps&&M.SE.gaps.length?M.SE.gaps:[gapA]);let gi=0;
+  const items=list.map(r=>{let G=r.g?M.groups[r.g]:null;if(r.g==='lift'&&dl)G={a:(dl[0]+dl[1])/2,rmid:0.42};
+    /* the body's own numbers run down the nearest gap between domains, never through the leaves */
+    let a=G?G.a:gl[(gi++)%gl.length];
+    /* the body's own numbers root at the trunk's collar, on the chip's side */
+    const tx=G?Math.cos(G.a)*G.rmid*0.8:Math.cos(a)*0.1,ty=G?Math.sin(G.a)*G.rmid*0.8:Math.sin(a)*0.1;return Object.assign({},r,{a,tx,ty})});
+  items.sort((p,q)=>p.a-q.a);
+  const MIN=0.62;
+  for(let pass=0;pass<40;pass++){let moved=false;for(let i=0;i<items.length;i++){const A=items[i],B=items[(i+1)%items.length];if(items.length<2)break;
+    let d=B.a-A.a;if(i===items.length-1)d+=Math.PI*2;if(d<MIN){const push=(MIN-d)/2+0.001;A.a-=push;B.a+=push;moved=true}}if(!moved)break}
+  items.forEach(it=>{it.cx=Math.cos(it.a)*CROWN_CHIP_R;it.cy=Math.sin(it.a)*CROWN_CHIP_R});
+  return items}
+
+/* ── BUDS: where you are lacking, as the next thing to grow (track 5) ── */
+function crownBuds(C){
+  if(C.buds&&C.budsDay===today())return C.buds;C.budsDay=today();
+  const D=C.D,M=C.M,out=[];
   try{
-    const focus=S.crownFocus||null;
-    const stamp=crownStamp()+':'+W+':'+((opts&&opts.fixed)?1:0)+':'+(focus||'')+':'+(crownDark()?'d':'l');
+    if(D.weeks.length<4||D.sessions.length<12){C.buds=out;return out}
+    const no=(S.prof&&S.prof.budNo)||{};
+    const acl=!!(S.acl&&S.acl.on);let protos=[];try{protos=activeProtocols()||[]}catch(e){oops('crownBudProto',e)}
+    const rehabOn=acl||protos.length>0;
+    let hurt=false;try{hurt=painRecent()}catch(e){oops('crownBudPain',e)}
+    const injured=hurt||(acl&&(+S.acl.phase||1)<3);
+    const cut=dayKey(new Date(Date.now()-28*864e5));
+    /* 5. rehab this week, against the plan, only once it is behind pace */
+    if(rehabOn){try{const tgt=rehabWeekTarget(),done=rehabWeekSessions();const dow=(new Date().getDay()+6)%7+1;
+      if(done<tgt&&done<Math.floor(tgt*dow/7))out.push({id:'rehabwk',g:'rehab',t:'Rehab this week: '+done+' of '+tgt+' sessions from your plan.',act:'Open rehab',a:'drawerNav',v:'acl'})}catch(e){oops('crownBudRehab',e)}
+      /* 4. limb symmetry against the next gate */
+      try{if(acl){const q=aclLatest('quad');if(q&&q.lsi!=null&&q.lsi<90){const l=Math.round(q.lsi),nx=l<80?80:90;
+        out.push({id:'lsi',g:'rehab',t:'Quad symmetry: '+l+'% at the test on '+fmtDay(String(q.date||'').slice(0,10))+'. The next gate is '+nx+'%.',act:'Open rehab',a:'drawerNav',v:'acl'})}}}catch(e){oops('crownBudLsi',e)}}
+    if(!injured){
+      /* 1. goal distance, from the lift's own weekly bests */
+      try{(S.goals||[]).filter(g=>g&&!g.done&&g.ex).forEach(g=>{const T=liftTrend(goalNames(g));if(!T||!T.pts.length)return;
+        const recent=T.pts.filter(p=>p.k>=crownWeekMon(cut));if(!recent.length)return;
+        const now=Math.round(Math.max.apply(null,recent.map(p=>p.v)));const tgt=Math.round(e1rm(g.w,g.r));const gap=tgt-now;if(gap<=0)return;
+        const li=D.lifts.findIndex(L=>L.goal===g);
+        out.push({id:'goal:'+(g.id||g.ex),g:li>=0?'L'+li:null,t:String(goalNames(g)[0]||g.ex)+': best estimated max '+now+' kg over your last 4 weeks. Your goal, '+g.w+' × '+g.r+', needs about '+tgt+' kg. '+gap+' kg to go.',
+          act:li>=0?'Open the lift':'Open Progress',a:li>=0?'crownLift':'drawerNav',v:li>=0?String(li):'progress'})})}catch(e){oops('crownBudGoal',e)}
+      /* 2. work your own programme asks for that is not being done */
+      try{const p=activeProg();if(p&&!p.empty&&!p.acl&&!p.rehabProto){
+        const following=(S.history||[]).filter(h=>h.complete&&h.progId===p.id&&hKey(h)>=cut).length;
+        if(following>=4){const ask={};(p.days||[]).forEach(d=>(d.exercises||[]).forEach(e=>{const st=setsForWeek(e,S.week||1);const n=Array.isArray(st)?st.length:0;if(!n||(st[0]&&st[0].secs))return;const b=gBase(e.name);ask[b]=(ask[b]||0)+n}));
+          const got={};(S.history||[]).forEach(h=>{if(!h.complete||h.run||hKey(h)<cut)return;(h.log||[]).forEach(l=>{if(l.r){const b=gBase(l.ex);got[b]=(got[b]||0)+1}})});
+          let worst=null;Object.keys(ask).forEach(b=>{if(ask[b]<3)return;const per=(got[b]||0)/4;const ratio=per/ask[b];if(ratio<0.5&&(!worst||ratio<worst.ratio))worst={b,ratio,per,ask:ask[b]}});
+          if(worst){const li=D.lifts.findIndex(L=>L.members.indexOf(worst.b)>=0);
+            out.push({id:'prog:'+worst.b,g:li>=0?'L'+li:(M.groups.Lx?'Lx':null),t:worst.b+': your programme asks for '+worst.ask+' sets a week. Over your last 4 weeks you logged '+(Math.round(worst.per*10)/10)+' a week.',act:'Open Train',a:'drawerNav',v:'home'})}}}}
+      catch(e){oops('crownBudProg',e)}
+      /* 3. pressing against pulling, knees against hips: a coaching habit,
+         never an injury claim (no evidence ties these ratios to injury) */
+      try{const m={};(S.history||[]).forEach(h=>{if(!h.complete||h.run||hKey(h)<cut)return;(h.log||[]).forEach(l=>{if(!(l.r>0))return;if(l.rpe!=null&&l.rpe!==''&&+l.rpe<6)return;
+          const hit=muscleHits(String(l.ex||''));Object.keys(hit).forEach(k=>{if(hit[k]===1)m[k]=(m[k]||0)+1})})});
+        const sum=ks=>ks.reduce((a,k)=>a+(m[k]||0),0);
+        const push=sum(['Chest','Front delts','Triceps']),pull=sum(['Lats','Upper back','Biceps','Rear delts']);
+        const knee=sum(['Quads']),hip=sum(['Glutes','Hamstrings']);
+        if(push+pull>=16&&(push>=pull*1.6||pull>=push*1.6))out.push({id:'pushpull',g:null,t:'Pressing and pulling: '+push+' pressing sets and '+pull+' pulling sets over your last 4 weeks. Coaches usually keep these near even.',act:'Open Train',a:'drawerNav',v:'home'});
+        if(knee+hip>=12&&(knee>=hip*1.8||hip>=knee*1.8))out.push({id:'kneehip',g:null,t:'Knees and hips: '+knee+' quad sets and '+hip+' glute and hamstring sets over your last 4 weeks. Coaches usually keep these closer.',act:'Open Train',a:'drawerNav',v:'home'})}
+      catch(e){oops('crownBudBalance',e)}}
+    const keep=out.filter(b=>!no[b.id]).slice(0,3);
+    /* on the rim: the rim is always this week, so a bud can never sit in the past */
+    const rim=M.rOf(Math.max(0,M.N-1))+0.075;const used={};
+    keep.forEach(b=>{const G=b.g&&M.groups[b.g];let a=G?G.a:(M.groups.Lx?M.groups.Lx.a:(M.SE.dom.lift?(M.SE.dom.lift[0]+M.SE.dom.lift[1])/2:M.SE.gap));
+      const k=Math.round(a*10);if(used[k])a+=0.16*used[k];used[k]=(used[k]||0)+1;b.a=a;b.x=Math.cos(a)*rim;b.y=Math.sin(a)*rim});
+    C.buds=keep;return keep}
+  catch(e){oops('crownBuds',e);C.buds=[];return []}}
+
+/* ── PAINT ───────────────────────────────────────────────────────── */
+function crownView(W,H,z,ox,oy,ext){const B=Math.min(W,H)/2/(ext||CROWN_EXT)*z;return {B,cx:W/2+ox,cy:H/2+oy,u:Math.min(W,H)/390,sq:Math.sqrt(z)}}
+function crownPaint(c,C,V){
+  /* draws the crown into a 2D context in CSS pixels. V: W, H, z, ox, oy,
+     lens, sel, t (replay 0..1), labels ('none'|'home'|'full'), lit (a
+     root's day keys), roots (how many), unf {id,k} (the newest leaf
+     unfurling). Returns the view so taps can be resolved later. */
+  const M=C.M,D=C.D;const PL=crownPal(),dk=PL===CROWN_CD;
+  const W=V.W,H=V.H;const G=crownView(W,H,V.z||1,V.ox||0,V.oy||0,V.ext);const B=G.B,cx=G.cx,cy=G.cy,u=G.u,sq=G.sq;
+  const X=x=>cx+x*B,Y=y=>cy+y*B;
+  if(!dk){c.fillStyle=PL.paper;c.fillRect(0,0,W,H)}else if(c.clearRect)c.clearRect(0,0,W,H);
+  c.lineCap='round';c.lineJoin='round';
+  const vis=(x0,y0,x1,y1)=>X(x1)>=-20&&X(x0)<=W+20&&Y(y1)>=-20&&Y(y0)<=H+20;
+  const sel=V.sel||null,lens=V.lens||'all';
+  const selG=sel&&(sel.k==='lift'||sel.k==='dom')?sel.g:null;
+  const litDays=V.lit?Object.create(null):null;if(V.lit)V.lit.forEach(k=>litDays[k]=1);
+  const on=L=>{if(litDays)return !!litDays[L.s.day];if(lens==='pr')return !!L.s.pr;
+    if(selG){if(sel.k==='dom')return selG==='lift'?L.s.kind==='lift':L.g===selG;return L.g===selG}return true};
+  const dimmed=!!(litDays||lens==='pr'||selG);
+  const rMax=V.t!=null&&V.t<1?M.rOf(Math.max(0,V.t*M.N-0.5))+0.02:9;
+  const inT=L=>V.t==null||V.t>=1||Math.hypot(L.x,L.y)<=rMax;
+  /* the soft ground under the canopy */
+  try{const sh=c.createRadialGradient(cx,cy,B*0.3,cx,cy,B*1.12);sh.addColorStop(0,dk?'rgba(255,255,255,.035)':'rgba(30,34,51,.06)');sh.addColorStop(1,dk?'rgba(255,255,255,0)':'rgba(30,34,51,0)');c.fillStyle=sh;c.beginPath();c.arc(cx,cy,B*1.12,0,7);c.fill()}catch(e){oops('crownShade',e)}
+  if(V.t!=null&&V.t<1){c.save();c.beginPath();c.arc(cx,cy,Math.max(0,rMax*B+4),0,7);if(c.clip)c.clip()}
+  /* 1. canopy masses: each kind's foliage as ONE soft shape, unioned
+     before its alpha, so a dense stretch never washes out to white */
+  const massR=0.06*B;
+  ['lift','rehab','run','ride'].forEach(k=>{let any=false;c.beginPath();
+    M.leaves.forEach(L=>{if(L.s.kind!==k||!inT(L))return;const x=X(L.x),y=Y(L.y);if(x<-massR||x>W+massR||y<-massR||y>H+massR)return;c.moveTo(x+massR,y);c.arc(x,y,massR,0,Math.PI*2);any=true});
+    if(any){c.fillStyle=crownRgba(PL[k],(dk?0.2:0.16)*(dimmed?0.45:1));c.fill()}});
+  /* 2. roots, under the wood: from the chip to what the finding is about */
+  const roots=V.roots?crownRootLayout(C,V.roots):[];
+  roots.forEach(r=>{const x0=X(r.cx),y0=Y(r.cy),x3=X(r.tx),y3=Y(r.ty);
+    const x1=X(Math.cos(r.a)*0.86),y1=Y(Math.sin(r.a)*0.86),x2=X(r.tx+Math.cos(r.a)*0.22),y2=Y(r.ty+Math.sin(r.a)*0.22);
+    const we=(r.rar==='epic'?4:r.rar==='rare'?2.6:2)*u,wm=we*0.4;const selR=sel&&sel.k==='root'&&sel.id===r.id;
+    const al=r.faded?0.3:(r.rar==='epic'?0.55:r.rar==='rare'?0.4:0.34);
+    const bz=t=>{const m=1-t;return [m*m*m*x0+3*m*m*t*x1+3*m*t*t*x2+t*t*t*x3,m*m*m*y0+3*m*m*t*y1+3*m*t*t*y2+t*t*t*y3]};
+    c.fillStyle=crownRgba(PL.ink,selR?0.85:al);
+    if(r.faded){c.strokeStyle=crownRgba(PL.ink,al);c.lineWidth=1.2*u;c.setLineDash([4*u,4*u]);c.beginPath();c.moveTo(x0,y0);c.bezierCurveTo(x1,y1,x2,y2,x3,y3);c.stroke();c.setLineDash([])}
+    else{/* thick at both ends, thin in the middle, like a root graft: it points neither way */
+      const L1=[],L2=[];const n=24;for(let i=0;i<=n;i++){const t=i/n;const p=bz(t),q=bz(Math.min(1,t+0.01)),q0=bz(Math.max(0,t-0.01));let tx=q[0]-q0[0],ty=q[1]-q0[1];const tl=Math.hypot(tx,ty)||1;tx/=tl;ty/=tl;
+        const w=(wm+(we-wm)*Math.pow(Math.abs(2*t-1),1.6))/2*(selR?1.5:1);L1.push([p[0]-ty*w,p[1]+tx*w]);L2.push([p[0]+ty*w,p[1]-tx*w])}
+      c.beginPath();c.moveTo(L1[0][0],L1[0][1]);for(let i=1;i<L1.length;i++)c.lineTo(L1[i][0],L1[i][1]);for(let i=L2.length-1;i>=0;i--)c.lineTo(L2[i][0],L2[i][1]);c.closePath();c.fill()}});
+  /* 3. the wood: one tapered outline per limb, warm grey from the trunk
+     to the twigs, quieter than the leaves */
+  const wmax=M.TR||0.03;
+  /* wood thickens at the square root of the zoom like every mark, so a
+     close look spreads the twigs apart instead of filling the screen */
+  const WB=B/Math.sqrt(V.z||1);
+  M.chains.forEach(ch=>{const bb=ch.bb;if(!vis(bb[0],bb[1],bb[2],bb[3]))return;const P=ch.pts;if(P.length<2)return;
+    if(V.t!=null&&V.t<1&&Math.hypot(P[0][0],P[0][1])>rMax)return;
+    const tcol=Math.min(1,Math.max(0,1-Math.pow(ch.w/wmax,0.5)));
+    const dimC=selG&&ch.g&&!(sel.k==='dom'&&selG==='lift'?String(ch.g).charAt(0)==='L':ch.g===selG);
+    c.fillStyle=dimC?PL.wdim:crownMix(PL.wood0,PL.wood1,tcol);
+    c.beginPath();const left=[],right=[];
+    for(let i=0;i<P.length;i++){const a=P[Math.max(0,i-1)],b=P[Math.min(P.length-1,i+1)];let tx=b[0]-a[0],ty=b[1]-a[1];const tl=Math.hypot(tx,ty)||1;tx/=tl;ty/=tl;
+      const w=Math.max(0.45,P[i][2]*WB);left.push([X(P[i][0])-ty*w,Y(P[i][1])+tx*w]);right.push([X(P[i][0])+ty*w,Y(P[i][1])-tx*w])}
+    c.moveTo(left[0][0],left[0][1]);for(let i=1;i<left.length;i++)c.lineTo(left[i][0],left[i][1]);for(let i=right.length-1;i>=0;i--)c.lineTo(right[i][0],right[i][1]);c.closePath();c.fill();
+    /* the joint is its own fill: sharing the outline's path, its opposite winding cut a hole */
+    const w0=Math.max(0.45,P[0][2]*WB);c.beginPath();c.arc(X(P[0][0]),Y(P[0][1]),w0,0,Math.PI*2);c.fill()});
+  /* 4. twigs, one path */
+  c.strokeStyle=crownRgba(PL.wood1,dimmed?0.35:0.8);c.lineWidth=Math.max(0.5,0.6*u*Math.sqrt(sq));c.beginPath();
+  M.leaves.forEach(L=>{if(!inT(L))return;const x=X(L.x),y=Y(L.y);if(x<-10||x>W+10||y<-10||y>H+10)return;c.moveTo(X(L.nx),Y(L.ny));c.lineTo(x,y)});c.stroke();
+  /* 5. leaves: soft almonds, no outline, the most saturated thing here;
+     they grow at the square root of the zoom and never move */
+  const now=Date.now();
+  const leafLen=L=>{let f=1;if(V.unf&&V.unf.id===L.s.id){f=Math.max(0.05,Math.min(1,(now-V.unf.t0)/700));f=1-Math.pow(1-f,3)}return 3.7*u*sq*(0.72+0.55*L.s.mag)*f};
+  const almond=(x,y,a,len)=>{const w=len/1.8,ca=Math.cos(a),sa=Math.sin(a);const ax=x-ca*len,ay=y-sa*len,bx=x+ca*len,by=y+sa*len;
+    c.moveTo(ax,ay);c.quadraticCurveTo(x-sa*w*1.25,y+ca*w*1.25,bx,by);c.quadraticCurveTo(x+sa*w*1.25,y-ca*w*1.25,ax,ay)};
+  ['lift','rehab','run','ride'].forEach(k=>{[true,false].forEach(lit=>{let any=false;c.beginPath();
+    M.leaves.forEach(L=>{if(L.s.kind!==k||!inT(L))return;if(dimmed&&on(L)!==lit)return;if(!dimmed&&!lit)return;const x=X(L.x),y=Y(L.y);if(x<-12||x>W+12||y<-12||y>H+12)return;
+      const len=leafLen(L);almond(x+Math.cos(L.ang)*len*0.6,y+Math.sin(L.ang)*len*0.6,L.ang,len);any=true});
+    if(any){c.fillStyle=lit?PL[k]:crownRgba(PL[k],0.22);c.fill()}})});
+  /* 6. marks: a PR is a white blossom, gold is a week won, a gate a bead.
+     Glow only on a PR set this week and on the selection. */
+  const wkNow=crownWeekMon(today());
+  M.leaves.forEach(L=>{if(!inT(L))return;const s=L.s;if(!s.pr&&!s.won&&!s.gate)return;const x=X(L.x),y=Y(L.y);if(x<-12||x>W+12||y<-12||y>H+12)return;
+    const off=leafLen(L)*1.3,bx=x+Math.cos(L.ang)*off,by=y+Math.sin(L.ang)*off;const fade=dimmed&&!on(L)?0.3:1;
+    if(s.pr){const r=2.2*u*sq;const glow=crownWeekMon(s.day)===wkNow;if(glow){c.save();c.shadowColor=dk?'rgba(255,255,255,.9)':'rgba(30,34,51,.5)';c.shadowBlur=8*u}
+      c.fillStyle='rgba(255,255,255,'+fade+')';c.beginPath();
+      for(let i=0;i<5;i++){const a=L.ang+i*Math.PI*2/5;c.moveTo(bx+Math.cos(a)*r*0.9+r*0.62,by+Math.sin(a)*r*0.9);c.arc(bx+Math.cos(a)*r*0.9,by+Math.sin(a)*r*0.9,r*0.62,0,Math.PI*2)}c.fill();
+      if(glow)c.restore();
+      c.fillStyle=crownRgba(PL.gold,fade);c.beginPath();c.arc(bx,by,r*0.42,0,Math.PI*2);c.fill();
+      if(!dk){c.strokeStyle=crownRgba(PL.ink,0.35*fade);c.lineWidth=0.6;c.beginPath();c.arc(bx,by,r*1.55,0,Math.PI*2);c.stroke()}}
+    if(s.won){c.fillStyle=crownRgba(PL.gold,fade);c.beginPath();c.arc(x-Math.cos(L.ang)*off,y-Math.sin(L.ang)*off,1.8*u*sq,0,Math.PI*2);c.fill()}
+    if(s.gate){c.fillStyle=PL.paper;c.beginPath();c.arc(x,y,1.3*u*sq,0,Math.PI*2);c.fill()}});
+  if(V.t!=null&&V.t<1)c.restore();
+  /* 7. buds at the rim: closed, a 2px outline, no fill — an open item */
+  const buds=(V.t==null||V.t>=1)?(V.buds||[]):[];
+  buds.forEach(b=>{const x=X(b.x),y=Y(b.y);const h=4.2*u*sq,w=h*0.62,ca=Math.cos(b.a),sa=Math.sin(b.a);const selB=sel&&sel.k==='bud'&&sel.id===b.id;
+    const tipx=x+ca*h,tipy=y+sa*h,bx0=x-ca*h*0.7,by0=y-sa*h*0.7;
+    if(selB){c.save();c.shadowColor=dk?'rgba(255,255,255,.8)':'rgba(30,34,51,.45)';c.shadowBlur=10*u}
+    c.strokeStyle=dk?'#FFFFFF':PL.ink;c.lineWidth=2;c.beginPath();c.moveTo(tipx,tipy);
+    c.quadraticCurveTo(x-sa*w*1.4,y+ca*w*1.4,bx0,by0);c.quadraticCurveTo(x+sa*w*1.4,y-ca*w*1.4,tipx,tipy);c.stroke();
+    c.lineWidth=1.4;c.beginPath();c.moveTo(bx0,by0);c.lineTo(bx0-ca*h*0.5,by0-sa*h*0.5);c.stroke();
+    if(selB)c.restore()});
+  /* 8. the trunk, the tree read's ring around it, the surgery scar */
+  const tr=Math.max(5*u,(M.TR||0.03)*WB*1.1);
+  c.fillStyle=PL.wood0;c.beginPath();c.arc(cx,cy,tr,0,Math.PI*2);c.fill();
+  if(V.scar){c.strokeStyle=PL.paper;c.lineWidth=1.4;c.beginPath();c.moveTo(cx-tr*0.55,cy+tr*0.45);c.lineTo(cx+tr*0.45,cy-tr*0.55);c.stroke()}
+  if(V.read){const a=V.read;const rr=tr+4*u;c.lineWidth=2.2*u;c.strokeStyle=crownRgba(PL.ink,0.18);c.beginPath();c.arc(cx,cy,rr,0,Math.PI*2);c.stroke();
+    const p=Math.max(0,Math.min(1,a.p||0));if(p>0){c.strokeStyle=a.ready?PL.lift:PL.ink;c.beginPath();c.arc(cx,cy,rr,-Math.PI/2,-Math.PI/2+p*Math.PI*2);c.stroke()}}
+  /* 9. chips at the root ends, ringed in the finding's tier colour */
+  roots.forEach(r=>{const x=X(r.cx),y=Y(r.cy);const R=14*u;const col=(rarityOf(r.rar)||[])[1]||PL.ink;const selR=sel&&sel.k==='root'&&sel.id===r.id;
+    if(selR){c.save();c.shadowColor=col;c.shadowBlur=12*u}
+    c.fillStyle=PL.chip;c.beginPath();c.arc(x,y,R,0,Math.PI*2);c.fill();
+    c.strokeStyle=r.faded?crownRgba(dk?'#FFFFFF':PL.ink,0.3):col;c.lineWidth=2.2*u;if(r.faded)c.setLineDash([3*u,3*u]);c.beginPath();c.arc(x,y,R-1.1*u,0,Math.PI*2);c.stroke();c.setLineDash([]);
+    if(selR)c.restore();
+    c.fillStyle=r.faded?crownRgba(PL.ink,0.3):col;c.beginPath();c.arc(x,y,4*u,0,Math.PI*2);c.fill()});
+  /* 10. labels, most important first, each only if it does not collide
+     (the map-labelling rule, track 2); at most thirty */
+  const boxes=[];const LBL=[];
+  const place=(txt,x,y,o)=>{if(LBL.length>=30||!txt)return false;o=o||{};const fs=(o.fs||11)*u;c.font=(o.bold?'600 ':'500 ')+Math.round(fs)+'px -apple-system,system-ui,sans-serif';
+    const w=(c.measureText?c.measureText(txt).width:txt.length*fs*0.55)+8*u,h=fs+6*u;
+    /* a chip's label slides inward at the frame's edge rather than vanish */
+    if(o.chip)x=Math.max(w/2+3,Math.min(W-w/2-3,x));const bx=x-w/2,by=y-h/2;
+    if(bx<2||by<2||bx+w>W-2||by+h>H-2)return false;
+    if(boxes.some(q=>bx<q[0]+q[2]&&bx+w>q[0]&&by<q[1]+q[3]&&by+h>q[1]))return false;
+    boxes.push([bx,by,w,h]);LBL.push({txt,x,y,w,h,fs,o});return true};
+  /* the trunk and every chip hold their space first */
+  boxes.push([cx-tr-6,cy-tr-6,tr*2+12,tr*2+12]);
+  roots.forEach(r=>{const x=X(r.cx),y=Y(r.cy);boxes.push([x-15*u,y-15*u,30*u,30*u])});
+  buds.forEach(b=>{const x=X(b.x),y=Y(b.y);boxes.push([x-8*u,y-8*u,16*u,16*u])});
+  const mode=V.labels||'none';
+  if(mode!=='none'){
+    roots.forEach(r=>{const x=X(r.cx),y=Y(r.cy);const up=r.cy<0;place(r.lab,x,y+(up?-1:1)*27*u,{fs:11,bold:true,chip:1,faded:r.faded})});
+    if(V.readLab)place(V.readLab,cx,cy+tr+15*u,{fs:10,bold:true,go:1});
+    D.lifts.forEach((L,i)=>{const G9=M.groups['L'+i];if(!G9)return;const r=Math.min(G9.rmax*0.62,G9.rmid+0.08);place(L.name,X(Math.cos(G9.a)*r),Y(Math.sin(G9.a)*r),{fs:12,bold:true,lift:i})});
+    ['run','ride','rehab'].forEach(k=>{const G9=M.groups[k];if(!G9)return;place(CROWN_DNAME[k],X(Math.cos(G9.a)*G9.rmid),Y(Math.sin(G9.a)*G9.rmid),{fs:12,bold:true})});
+    if(M.groups.Lx&&V.z>=1.6)place('Other lifting',X(Math.cos(M.groups.Lx.a)*M.groups.Lx.rmid),Y(Math.sin(M.groups.Lx.a)*M.groups.Lx.rmid),{fs:11});
+    if(mode==='full'){
+      /* month rings once there is room to read them */
+      if(V.z>=1.5&&(V.t==null||V.t>=1)){const ga=M.SE.gap;
+        c.strokeStyle=crownRgba(PL.ink,0.13);c.lineWidth=1;c.setLineDash([2*u,4*u]);
+        M.rings.forEach(rg=>{const rp=rg.r*B;if(rp<18)return;c.beginPath();c.arc(cx,cy,rp,0,Math.PI*2);c.stroke()});c.setLineDash([]);
+        M.rings.forEach(rg=>{place(rg.label,X(Math.cos(ga)*rg.r),Y(Math.sin(ga)*rg.r),{fs:10,ring:1})})}
+      /* leaf labels, PRs first, once a leaf has room around it */
+      if(V.z>=3.5&&(V.t==null||V.t>=1)){const cand=M.leaves.filter(L=>{const x=X(L.x),y=Y(L.y);return x>0&&x<W&&y>0&&y<H&&(!dimmed||on(L))});
+        cand.sort((a,b)=>(b.s.pr-a.s.pr)||(b.s.mag-a.s.mag));
+        let nL=0;cand.forEach(L=>{if(nL>=12)return;if(place(L.s.lab+(V.z>=5?' · '+L.s.dayS:''),X(L.x),Y(L.y)-10*u*sq,{fs:10}))nL++})}}}
+  LBL.forEach(l=>{c.font=(l.o.bold?'600 ':'500 ')+Math.round(l.fs)+'px -apple-system,system-ui,sans-serif';c.textAlign='center';c.textBaseline='middle';
+    c.fillStyle=PL.lab;const rx=l.x-l.w/2,ry=l.y-l.h/2;
+    c.beginPath();if(c.roundRect)c.roundRect(rx,ry,l.w,l.h,4*u);else c.rect(rx,ry,l.w,l.h);c.fill();
+    c.fillStyle=l.o.go?PL.lift:l.o.ring?crownRgba(PL.ink,0.55):l.o.faded?crownRgba(PL.ink,0.5):PL.ink;c.fillText(l.txt,l.x,l.y+0.5)});
+  /* 11. the selected leaf gets a ring */
+  if(sel&&sel.k==='leaf'){const L=M.leaves.find(q=>q.s.id===sel.id);if(L){const x=X(L.x),y=Y(L.y);c.save();c.shadowColor=dk?'rgba(255,255,255,.9)':'rgba(30,34,51,.5)';c.shadowBlur=10*u;
+    c.strokeStyle=dk?'#FFFFFF':PL.ink;c.lineWidth=2;c.beginPath();c.arc(x,y,Math.max(7*u,leafLen(L)*1.5),0,Math.PI*2);c.stroke();c.restore()}}
+  return {B,cx,cy,u,sq,tr,roots,buds}}
+function crownImage(W){
+  /* the crown as a data URL for the tree page's card, cached on the
+     record; '' where there is no canvas (the test harnesses) or nothing
+     logged. The crown's own pages draw live instead. */
+  try{
+    const stamp=crownStamp()+':'+W+':'+(crownDark()?'d':'l');
     if(S._crownImg&&S._crownImg.stamp===stamp)return S._crownImg.src;
-    const D=crownData();if(!D.weeks.length)return '';
+    const C=crownM();if(!C.D.weeks.length)return '';
     const c=document.createElement('canvas');if(!c||typeof c.getContext!=='function')return '';
     c.width=W;c.height=W;const x=c.getContext('2d');if(!x||typeof x.createRadialGradient!=='function'||typeof c.toDataURL!=='function')return '';
-    const M=crownModel(D);const scar=!!(S.acl&&S.acl.on&&S.acl.date);
-    const geo=crownPaint(x,W,M,{fixed:!!(opts&&opts.fixed),scar,focus});
-    const src=c.toDataURL('image/png');
-    S._crownImg={stamp,src,trunk:geo.trunk/W,
-      leaves:M.leaves.map(L=>{const [px9,py9]=geo.px(L.x,L.y);return {x:px9/W,y:py9/W,id:L.s.id,kind:L.s.kind,lab:L.s.lab||'',day:L.s.dayS||''}}),
-      links:M.links.map(L=>{const [x0,y0]=geo.px(L.a.x,L.a.y),[x1,y1]=geo.px(L.b.x,L.b.y);return {x:(x0+x1)/2/W,y:(y0+y1)/2/W,id:L.id,title:L.title,lab:String(L.title||'').slice(0,28)}}),
-      /* a ring where the month turns, so the zoomed crown has a time axis */
-      rings:(function(){const out=[];let prev=null;try{D.weeks.forEach(w=>{const mo=new Date(crownWeekMon(w.ss[0].day)+'T12:00');const key=mo.getFullYear()+'-'+mo.getMonth();
-        if(prev!==null&&key!==prev)out.push({r:M.rOf(w.i)*geo.S/W,label:mo.toLocaleDateString(undefined,{month:'short'})});prev=key})}catch(e){oops('crownRings',e)}return out})()};
-    return src}
+    const scar=!!(S.acl&&S.acl.on&&S.acl.date);
+    crownPaint(x,C,{W,H:W,ext:crownExtOf(C),z:1,ox:0,oy:0,scar,labels:'none',buds:crownBuds(C)});
+    const src=c.toDataURL('image/png');S._crownImg={stamp,src};return src}
   catch(e){oops('crownImage',e);return ''}}
 function crownWord(D){
   /* Lifter / Runner / Hybrid, with the two shares that decide it */
   const per={};D.sessions.forEach(s=>{per[s.kind]=(per[s.kind]||0)+1});const tot=D.sessions.length||1;
   const st=Math.round(((per.lift||0)+(per.rehab||0))/tot*100),en=100-st;
   const word=st>=65?'Lifter':en>=65?'Runner':'Hybrid';return {word,S:st,E:en}}
-function crownKeyHtml(){
-  /* the key is a row of FOCUS chips (25 Sep 2026): tap one kind and the
-     crown repaints with everything else dimmed; tap it again to clear */
-  const on=S.crownFocus||null;
-  const chip=(v,c,label)=>'<button data-a="crownFocus" data-v="'+v+'" style="display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:999px;border:1px solid '+(on===v?'var(--text)':'transparent')+';background:none;font-size:13px;color:'+(on===v?'var(--text)':'var(--faint)')+'"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:'+c+'"></span>'+label+'</button>';
-  const hasLinks=!!(S._crownImg&&S._crownImg.links&&S._crownImg.links.length);
-  const PL=crownPal();
-  return '<p style="margin-top:6px;text-align:center">'+chip('lift',PL.lift,'lifting')+chip('run',PL.run,'running')+chip('rehab',PL.rehab,'rehab')+chip('pr','#FFFFFF;border:1px solid var(--text);box-sizing:border-box','PR')+(hasLinks?chip('links','#5E5CE6','threads'):'')+'</p>'}
-function crownLabelsHtml(){
-  /* the layer a zoom reveals: month rings, one label per leaf (the top
-     lift, the run's distance and pace), the thread's finding, and the
-     tree-read ring on the trunk. Rides the same transform as the picture;
-     labels counter-scale so they stay one size while the crown grows. */
-  try{const C=S._crownImg;if(!C)return '';
-    let h='<div data-crownlabels="1" style="position:absolute;inset:0;pointer-events:none;transform-origin:50% 50%">';
-    (C.rings||[]).forEach(r=>{const d=(r.r*200).toFixed(2);h+='<span class="crr" style="left:50%;top:50%;width:'+d+'%;height:'+d+'%"></span><span class="crr crm" style="left:50%;top:'+(50-r.r*100).toFixed(2)+'%">'+esc(r.label)+'</span>'});
-    (C.leaves||[]).forEach(L=>{h+='<span class="crl" style="left:'+(L.x*100).toFixed(2)+'%;top:'+(L.y*100).toFixed(2)+'%">'+esc(L.lab||'')+'<span class="crd"> \u00b7 '+esc(L.day||'')+'</span></span>'});
-    (C.links||[]).forEach(L=>{h+='<span class="crl crk" style="left:'+(L.x*100).toFixed(2)+'%;top:'+(L.y*100).toFixed(2)+'%">'+esc(L.lab||'')+'</span>'});
-    h+=crownReadRing(C)+'</div>';return h}
-  catch(e){oops('crownLabels',e);return ''}}
-function crownReadRing(C){
-  /* THE TREE READ LIVES ON THE TRUNK (owner, 25 Sep 2026: "deep read is
-     going to be now a weekly tree read with a loading circle in the
-     centre of the tree"). The ring is deepArm(): it fills with the
-     evidence the read's own gate counts, never with the calendar, and
-     it sits full only when the read is actually ready. A tap on the
-     trunk opens the read, or says what is still in the way. */
-  try{const a=(typeof deepArm==='function')?deepArm():null;if(!a)return '';
-    const d=Math.max(9,(C.trunk||0.02)*2*100*2.2).toFixed(2);const circ=2*Math.PI*17;const p=Math.max(0,Math.min(1,a.p||0));
-    return '<span class="crt'+(a.ready?' crt-on':'')+'" style="width:'+d+'%;height:'+d+'%">'+
-      '<svg viewBox="0 0 40 40" style="width:100%;height:100%;display:block;transform:rotate(-90deg)"><circle cx="20" cy="20" r="17" fill="none" style="stroke:var(--cr-line);opacity:.6" stroke-width="2.4"/>'+
-      '<circle cx="20" cy="20" r="17" fill="none" style="stroke:'+(a.ready?'var(--cr-go)':'var(--cr-ink)')+'" stroke-width="2.4" stroke-linecap="round" stroke-dasharray="'+(circ*p).toFixed(2)+' '+circ.toFixed(2)+'"/></svg>'+
-      (a.ready?'<span class="crt-lab">READ READY</span>':'')+'</span>'}
-  catch(e){oops('crownReadRing',e);return ''}}
-const CROWN_CSS='<style>[data-crown] .crl{position:absolute;transform:translate(-50%,-150%) scale(var(--iz,1));font-size:11px;line-height:1.2;color:var(--cr-ink);background:var(--cr-lab);padding:1px 5px;border-radius:4px;white-space:nowrap;display:none}'+
-  '[data-crown] .crk{color:#5E5CE6;border:1px dashed #5E5CE6}'+
-  '[data-crown] .crr{position:absolute;display:none;transform:translate(-50%,-50%);border:1px dashed var(--cr-line);border-radius:50%;box-sizing:border-box}'+
-  '[data-crown] .crm{width:auto;height:auto;border:0;border-radius:4px;font-size:11px;color:var(--faint);background:var(--cr-lab);padding:0 5px;transform:translate(-50%,-50%) scale(var(--iz,1))}'+
-  '[data-crown].z2 .crl,[data-crown].z2 .crr{display:block}[data-crown] .crd{display:none}[data-crown].z4 .crd{display:inline}'+
-  '[data-crown] .crt{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%)}'+
-  '[data-crown] .crt-lab{position:absolute;left:50%;top:100%;transform:translate(-50%,4px) scale(var(--iz,1));font-size:11px;letter-spacing:.12em;color:var(--cr-go);white-space:nowrap}'+
-  '@keyframes crtPulse{0%,100%{opacity:.75}50%{opacity:1}}[data-crown] .crt-on{animation:crtPulse 1.8s ease-in-out infinite}@media (prefers-reduced-motion:reduce){[data-crown] .crt-on{animation:none}}</style>';
+
+/* ── THE LIFTS, IN WORDS AND A SMALL STRAIGHT CHART (track 3) ─────── */
+function crownLiftInfo(C,i){
+  const L=C.D.lifts[i];if(!L)return null;
+  let T=null;try{T=liftTrend(L.members)}catch(e){oops('crownLiftTrend',e)}
+  const word=!T?'':T.state==='up'?'up':T.state==='down'?'down':T.state==='level'?'level':T.state==='back'?'back':T.state==='early'?'new':'';
+  const nums=!T?'':(T.from&&T.to)?T.from+' → '+T.to+' kg':(T.now?T.now+' kg':'');
+  return {L,T,word,nums}}
+/* THE LIFT IN ONE GLANCE (owner, 27 Sep 2026, of the panel: "the writing
+   is ugly and too hard to understand"). A number, then one short line in
+   everyday words, then the counts. Every surface of the tree reads its
+   lifts through this one function. Same states, same windows, same noise rule:
+   a change inside the lifter's own swing is not called a change. */
+function crownLiftSay(I){
+  const T=I&&I.T;if(!T)return null;const L=I.L;
+  const wk=n=>n+' week'+(n===1?'':'s');
+  let big=T.to||T.now||T.best,line='';
+  if(T.state==='early')line='New here. A trend needs six weeks of hard sets.';
+  else if(T.state==='back'){big=T.back.now;line='Back after '+wk(T.back.gapW)+' off. Your best before the break: '+T.back.best+' kg.'}
+  else{const d=Math.round(T.to-T.from);
+    if(T.state==='up')line='Up '+d+' kg in '+wk(T.weeks)+'.';
+    else if(T.state==='down'){line='Down '+(-d)+' kg in '+wk(T.weeks)+'.';try{if(goalFlag())line+=' Worth showing your physio.'}catch(e){oops('crownSayFlag',e)}}
+    else if(T.state==='level')line='Steady for '+wk(T.weeks)+'.';
+    else line=d===0?'Same as '+wk(T.weeks)+' ago.':(d>0?'Up ':'Down ')+Math.abs(d)+' kg in '+wk(T.weeks)+'. Too early to call.'}
+  let goal='';if(L.goal){const tg=Math.round(e1rm(L.goal.w,L.goal.r));const gap=tg-big;
+    goal=gap>0?gap+' kg to your '+L.goal.w+' \u00d7 '+L.goal.r+' goal.':'Strong enough for your '+L.goal.w+' \u00d7 '+L.goal.r+' goal.'}
+  const meta=L.n+' session'+(L.n===1?'':'s')+(L.prs?' \u00b7 '+L.prs+' PR'+(L.prs===1?'':'s'):'');
+  return {big:Math.round(big),line,goal,meta}}
+
+const CROWN_CSS='<style>[data-crowncv]{display:block;width:100%;height:100%;touch-action:none;-webkit-user-select:none;user-select:none}'+
+  '.crx{position:fixed;inset:0;z-index:40;display:flex;flex-direction:column;padding-top:env(safe-area-inset-top)}'+
+  '.crx-top{display:flex;align-items:center;gap:8px;padding:8px 12px 4px}'+
+  '.crx-top button{min-width:44px;min-height:44px;background:none;border:0;color:inherit}'+
+  '.crx-crumb{flex:1;min-width:0;display:flex;align-items:center;gap:4px;font-size:15px;white-space:nowrap;overflow:hidden}'+
+  '.crx-crumb button{min-width:0;min-height:36px;padding:0 2px;font-size:15px;color:var(--dim)}.crx-crumb button:last-child{color:var(--text);font-weight:600}'+
+  '.crx-lens{display:flex;gap:6px;padding:2px 12px 6px;overflow-x:auto;scrollbar-width:none}'+
+  '.crx-lens button{flex:none;min-height:32px;padding:0 12px;border-radius:999px;border:1px solid var(--cr-cardline);background:none;color:var(--dim);font-size:13px}'+
+  '.crx-lens button.on{border-color:var(--text);color:var(--text)}'+
+  '.crx-cv{position:relative;flex:1;min-height:0}'+
+  '.crx-panel{margin:0 12px calc(12px + env(safe-area-inset-bottom));padding:14px 16px;border-radius:16px;border:1px solid var(--cr-cardline);background:var(--cr-card);max-height:40vh;overflow:auto}'+
+  '.crx-panel .crx-act{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}'+
+  '.crx-panel .crx-act button{min-height:44px;padding:0 14px;border-radius:999px;border:1px solid var(--cr-cardline);background:none;color:var(--text);font-size:15px}'+
+  '.crx-panel .crx-act button.go{background:var(--text);color:var(--bg,#0B0B0D);border-color:var(--text)}'+
+  '@media (prefers-reduced-motion:reduce){.crx *{transition:none!important}}</style>';
 function crownDots(){
-  /* Three page dots centred, middle one filled, others empty */
+  /* three page dots centred, middle one filled: Train · Tree · Race */
   return '<div data-crowndots="1" aria-hidden="true" style="text-align:center;margin-top:12px;letter-spacing:8px"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--text);opacity:.25"></span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--text)"></span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--text);opacity:.25"></span></div>'}
 function crownCard(){
   /* the tree page card: the crown, the number under it in a unit a
      stranger knows, the training word with its two percentages */
   try{
-    const D=crownData();if(!D.weeks.length)return '';
+    const C=crownM();const D=C.D;if(!D.weeks.length)return '';
     const src=crownImage(900);if(!src)return '';
     const w=crownWord(D);const n=D.sessions.length;
     return '<div class="card an-hero mt" style="padding:14px 14px 18px;text-align:center;'+crownTok()+'">'+
@@ -23124,11 +23547,10 @@ function crownCard(){
       '<div data-a="crownOpen" style="cursor:pointer;margin:6px auto 0;max-width:340px"><img src="'+src+'" alt="Your crown" style="display:block;width:100%;height:auto;border-radius:18px"></div>'+
       '<p class="disp" style="font-size:40px;font-weight:600;letter-spacing:-.02em;line-height:1;margin-top:8px">'+n+' session'+(n===1?'':'s')+'</p>'+
       '<p style="font-size:15px;color:var(--dim);margin-top:6px">'+esc(w.word)+' · '+w.S+'% strength · '+w.E+'% endurance</p>'+
-      crownKeyHtml()+
-      '<p style="font-size:13px;color:var(--dim);margin-top:10px">'+D.weeks.length+' week'+(D.weeks.length===1?'':'s')+' of showing up. Every leaf is a session. Tap to zoom in.</p></div>'}
+      '<p style="font-size:13px;color:var(--dim);margin-top:10px">'+D.weeks.length+' week'+(D.weeks.length===1?'':'s')+' of showing up. Every leaf is a session.</p></div>'}
   catch(e){oops('crownCard',e);return ''}}
 function crownMoments(){
-  /* Overlay moments: goal ceremony, crest update, race ceremony, replay */
+  /* overlay moments: goal ceremony, crest update, race ceremony, replay */
   let h='';
   try{const gc=goalCerDue();if(gc)h+=goalCerHtml(gc);
     else if(!S.sheet&&(function(){try{const cu=(typeof crestUpDue==='function')?crestUpDue():null;if(!cu)return false;
@@ -23139,148 +23561,379 @@ function crownMoments(){
       h+=ceremonyHtml(cer)}}}catch(e){oops('crownMoments',e)}
   try{h+=cerReplayHtml()}catch(e){oops('crownReplay',e)}
   return h}
+function crownSpan(first){
+  if(!first)return '';const days=Math.floor((Date.now()-new Date(first+'T12:00').getTime())/864e5);
+  const weeks=Math.floor(days/7),months=Math.floor(days/30.4),years=Math.floor(days/365.25);
+  if(years>=1)return years===1?'one year':years+' years';if(months>=1)return months===1?'one month':months+' months';return weeks===1?'one week':weeks+' weeks'}
 function viewCrown(){
-  /* the crown full-page: the main screen now */
+  /* THE TREE SCREEN IS ONE SCREEN (owner, 27 Sep 2026: "need to keep today
+     in the tree screen", then "it all has to be visible on that page
+     without having to scroll", then "just keep found today pill and that's
+     it"). The view is exactly the height between the notch and the bar: the
+     header, the tree taking whatever is left, one line of counts, and the
+     day's find when there is one. The page never scrolls; the tree's own
+     page is one tap in for everything else. */
   try{
-    const D=crownData();const src=crownImage(1200);
-    const w=D.weeks.length?crownWord(D):null;
-    const first=D.first;
-
-    /* Compute the span label: "N weeks", "N months", "one year", "N years" */
-    let span='';
-    if(first){
-      const firstD=new Date(first+'T12:00');const today=new Date();
-      const days=Math.floor((today-firstD)/(24*3600000));
-      const weeks=Math.floor(days/7);
-      const months=Math.floor(days/30.4);
-      const years=Math.floor(days/365.25);
-      if(years>=1){
-        if(years===1)span='one year';
-        else span=years+' years'}
-      else if(months>=1){
-        if(months===1)span='one month';
-        else span=months+' months'}
-      else{
-        if(weeks===1)span='one week';
-        else span=weeks+' weeks'}}
-
-    /* Header with name and span */
+    const C=crownM();const D=C.D;
+    const w=D.weeks.length?crownWord(D):null;const first=D.first;const span=crownSpan(first);
     const name=String((S.prof&&S.prof.name)||'You').split(' ')[0];
     const spanHtml=span?'<span style="font-size:15px;color:var(--dim)">'+esc(span)+'</span>':'';
-
-    /* SINCE line */
-    const sinceLine=first?'<p class="micro" style="text-align:center;color:var(--faint);letter-spacing:.14em;margin-top:12px">SINCE '+esc(new Date(first+'T12:00').toLocaleDateString(undefined,{day:'numeric',month:'short',year:'numeric'}).toUpperCase())+'</p>':'';
-
-    /* Crown box */
-    const crownBox=src?'<div data-crown="1" style="position:relative;overflow:hidden;touch-action:none;width:100%;aspect-ratio:1;max-height:70vh;margin:12px auto 0;border-radius:18px">'+
-      '<img data-crownimg="1" src="'+src+'" alt="Your crown" draggable="false" style="display:block;width:100%;height:100%;object-fit:contain;transform-origin:50% 50%;will-change:transform;user-select:none;-webkit-user-select:none">'+crownLabelsHtml()+'</div>':'';
-
-    /* Sessions count and word line */
-    let sessionsLine='';
-    if(D.sessions.length>0){
-      sessionsLine='<p class="disp" style="text-align:center;font-size:40px;font-weight:600;letter-spacing:-.02em;line-height:1;margin-top:12px">'+D.sessions.length+' session'+(D.sessions.length===1?'':'s')+'</p>';
-      if(w)sessionsLine+='<p style="text-align:center;font-size:15px;color:var(--dim);margin-top:6px">'+esc(w.word)+' · '+w.S+'% strength · '+w.E+'% endurance</p>';
-      sessionsLine+=crownKeyHtml()}
-
-    /* Weeks span line */
-    let weeksLine='';
-    if(D.weeks.length>0){
-      weeksLine='<p class="micro" style="text-align:center;color:var(--faint);letter-spacing:.14em;margin-top:12px">'+span.toUpperCase()+'</p>';
-      weeksLine+='<p class="disp" style="text-align:center;font-size:23px;font-weight:600;letter-spacing:-.02em;margin-top:6px">'+D.weeks.length+' week'+(D.weeks.length===1?'':'s')+' of showing up.</p>'}
-
-    /* EARNED card */
-    let earnedCard='';
-    if(D.sessions.length>0){
-      let prs=0,wins=0,gates=0;
-      D.sessions.forEach(s=>{if(s.pr)prs++;if(s.won)wins++;if(s.gate)gates++});
-      const items=[];
-      if(prs>0)items.push(prs+' PR'+(prs===1?'':'s'));
-      if(wins>0)items.push(wins+' week'+(wins===1?'':'s')+' won');
-      if(gates>0)items.push(gates+' gate'+(gates===1?'':'s'));
-      const earnedBody=items.length>0?
-        '<p class="disp" style="font-size:23px;font-weight:600;letter-spacing:-.02em;color:var(--text);margin:0">'+items.join(' · ')+'</p>'+
-        '<p style="font-size:15px;color:var(--dim);margin-top:8px">A white blossom is a PR. Gold is a week won. Nothing here can be bought or lost.</p>':
-        '<p class="disp" style="font-size:23px;font-weight:600;letter-spacing:-.02em;color:var(--text);margin:0">Nothing yet</p>'+
-        '<p style="font-size:15px;color:var(--dim);margin-top:8px">The first PR draws a white blossom. A week won draws gold.</p>';
-      earnedCard='<div style="border:1px solid var(--cr-cardline);border-radius:12px;background:var(--cr-card);padding:18px;margin:12px 0 0;text-align:left">'+
-        '<p class="micro" style="color:var(--faint);letter-spacing:.14em;margin-bottom:8px">EARNED</p>'+
-        earnedBody+'</div>'}
-
-    /* Empty state or moments */
-    const isEmpty=!src;
-    const emptyState=isEmpty?'<p style="padding:24px 12px;text-align:center;color:var(--dim);font-size:15px">Nothing logged yet. The crown grows a leaf for every session.</p>':'';
-
-    return '<div class="view pad stg phpad" style="min-height:100vh;box-sizing:border-box;'+crownTok()+'">'+
-      CROWN_CSS+pageHead(name,spanHtml,{noBtns:1,avatar:false})+
-      sinceLine+
-      crownBox+
-      sessionsLine+
-      weeksLine+
-      earnedCard+
-      emptyState+
-      '<p class="micro" style="text-align:center;color:var(--faint);letter-spacing:.2em;margin-top:22px">ALLENA</p>'+
-      crownDots()+
-      crownMoments()+'</div>'}
+    const has=D.weeks.length>0;
+    const head=pageHead(name,spanHtml,{noBtns:1,avatar:false,sub:new Date().toLocaleDateString(undefined,{weekday:'long',day:'numeric',month:'long'})});
+    if(!has){
+      /* an empty account keeps the full Today, which carries the getting-started door */
+      let today='';try{today=todayBody()}catch(e){oops('crownToday',e)}
+      return '<div class="view pad stg phpad" style="min-height:100vh;box-sizing:border-box;'+crownTok()+'">'+CROWN_CSS+head+
+        '<p style="padding:16px 12px 4px;text-align:center;color:var(--dim);font-size:15px">Nothing logged yet. The crown grows a leaf for every session.</p>'+today+crownDots()+crownMoments()+'</div>'}
+    let prs=0,wins=0;D.sessions.forEach(s=>{if(s.pr)prs++;if(s.won)wins++});
+    const line='<p style="text-align:center;font-size:13px;color:var(--dim);margin-top:2px;flex:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+
+      '<b style="color:var(--text)">'+D.sessions.length+' sessions</b> · '+prs+' PR'+(prs===1?'':'s')+(wins?' · '+wins+' week'+(wins===1?'':'s')+' won':'')+' · '+esc(w.word)+'</p>';
+    let strip='';try{strip=todayFoundRow()}catch(e){oops('crownFound',e)}
+    return '<div class="view pad phpad crh" style="height:calc(100dvh - env(safe-area-inset-top) - 92px - env(safe-area-inset-bottom));display:flex;flex-direction:column;overflow:hidden;box-sizing:border-box;padding-top:16px;'+crownTok()+'">'+
+      CROWN_CSS+
+      '<div style="flex:none">'+head+'</div>'+
+      '<div data-crown="1" data-a="crownX" data-v="open" role="button" aria-label="Open your tree" style="position:relative;flex:1;min-height:120px;cursor:pointer">'+
+        '<canvas data-crowncv="home" aria-hidden="true" style="position:absolute;inset:0"></canvas></div>'+
+      line+'<div style="flex:none">'+strip+'</div>'+
+      '<div style="flex:none;margin-top:-4px">'+crownDots()+'</div>'+crownMoments()+'</div>'}
   catch(e){oops('viewCrown',e);return '<div class="view pad">'+pageHead('Crown','',{})+'</div>'}}
+
+/* ── ITS OWN PAGE (track 2) ────────────────────────────────────────
+   Full screen, opened from the crown with a zoom from where the tree
+   sat. Rungs, each with one sentence in the bottom panel: the whole
+   crown → a domain → a lift → a session. The week and the session live
+   in the panel, not in more zoom: one week of a year-old tree is two
+   points wide on a phone. A breadcrumb says where you are; Back goes up
+   one rung; a tap flies. S.crx holds the rung; the view transform lives
+   in the gesture module below. */
+function crownX(){return S.crx||(S.crx={rung:'canopy',lens:'all',sel:null})}
+function crownSentence(C){
+  /* the panel: a title, sometimes one big number, one or two short plain
+     lines, the counts, and at most two buttons (owner, 27 Sep 2026: the
+     paragraph it used to be was "ugly and too hard to understand") */
+  const X=crownX(),D=C.D;const sel=X.sel;
+  try{
+    if(sel&&sel.k==='leaf'){const s=D.sessions.find(q=>q.id===sel.id);if(!s)return {lines:[]};
+      const wk=D.sessions.filter(q=>q.wi===s.wi);const name={lift:'Strength',run:'Run',ride:'Ride',rehab:'Rehab'}[s.kind];
+      const lines=[(s.kind==='rehab'?'Rehab session':s.lab)+(s.mins?' \u00b7 '+s.mins+' min':'')];
+      s.prs.forEach(p=>lines.push('PR: '+p.ex+' '+p.e+' kg estimated max, up from '+p.prev+'.'));
+      return {title:name+' \u00b7 '+s.dayS,lines,meta:wk.length>1?wk.length+' sessions that week':'',
+        acts:[{a:'crownLeafOpen',v:s.id,l:(s.kind==='run'||s.kind==='ride')?'Open the run':'Open the session',go:1}]}}
+    if(sel&&sel.k==='root'){const r=crownRoots(C).find(q=>q.id===sel.id);if(!r)return {lines:[]};
+      let E=null;try{E=r.faded?null:corrEffect(r.id)}catch(e){oops('crownRootEff',e)}
+      return {title:r.lab,lines:[E?crownEffShort(E,r):r.faded?'This one has faded in your newer numbers.':'These two move together in your numbers.'],
+        meta:E?'The lit leaves are the days it is made of':'',acts:[{a:'crownRootOpen',v:r.id,l:'See the numbers',go:1}]}}
+    if(sel&&sel.k==='bud'){const b=crownBuds(C).find(q=>q.id===sel.id);if(!b)return {lines:[]};
+      return {title:'To grow',lines:[b.t],acts:[{a:b.a,v:b.v,l:b.act,go:1},{a:'crownBudNo',v:b.id,l:'Not a goal for me'}]}}
+    if(X.rung==='lift'&&X.g&&X.g.charAt(0)==='L'&&X.g!=='Lx'){const i=+X.g.slice(1);const I=crownLiftInfo(C,i);const Y=crownLiftSay(I);if(!I)return {lines:[]};
+      if(!Y)return {title:I.L.name,lines:['No hard sets logged yet.'],acts:[{a:'crownLift',v:String(i),l:'Open '+I.L.name,go:1}]};
+      return {title:I.L.name,big:Y.big+' kg',lines:[Y.line].concat(Y.goal?[Y.goal]:[]),meta:Y.meta,spark:I.T,acts:[{a:'crownLift',v:String(i),l:'Open '+I.L.name,go:1}]}}
+    if(X.rung==='lift'&&X.g==='Lx'){const n=D.sessions.filter(s=>s.kind==='lift'&&s.lift<0).length;return {title:'Other lifting',lines:[n+' session'+(n===1?'':'s')+' without one of your main lifts.']}}
+    if(X.rung==='domain'&&X.g){const k=X.g;const ss=D.sessions.filter(s=>s.kind===k);const since=ss.length?fmtDay(ss[0].day):'';
+      if(k==='lift')return {title:'Lifting',big:String(ss.length),lines:['Sessions since '+since+'.','Tap a lift to look closer.']};
+      if(k==='run'||k==='ride'){const km=Math.round(ss.reduce((a,s)=>a+(s.km||0),0));return {title:CROWN_DNAME[k],big:km?km+' km':String(ss.length),lines:[ss.length+' '+(k==='run'?'run':'ride')+(ss.length===1?'':'s')+' since '+since+'.']}}
+      if(k==='rehab'){const lines=[ss.length+' session'+(ss.length===1?'':'s')+' since '+since+'.'];
+        try{if((S.acl&&S.acl.on)||activeProtocols().length)lines.push('This week: '+rehabWeekSessions()+' of '+rehabWeekTarget()+' from your plan.')}catch(e){oops('crownRehabWk',e)}
+        return {title:'Rehab',lines,acts:[{a:'drawerNav',v:'acl',l:'Open rehab'}]}}}
+    if(X.lens==='grow'){const b=crownBuds(C);return {title:'To grow',lines:[b.length?'The closed buds at the edge come from your own goals and plan. Tap one.':(D.weeks.length<4||D.sessions.length<12?'Buds start after four weeks and twelve sessions.':'Nothing your goals or plan ask for is falling short.')]}}
+    if(X.lens==='roots'){const r=crownRoots(C);return {title:'Insights',lines:[r.length?'Each chip is something that moves with a lift. Tap one.':'None yet. Each insight you find grows a root here.']}}
+    if(X.lens==='pr'){let n=0;D.sessions.forEach(s=>{if(s.pr)n++});return {title:'PRs',big:String(n),lines:['Sessions that set a PR at the time. Each is a white blossom.']}}
+    const w=crownWord(D);
+    return {title:'Your tree',big:String(D.sessions.length),lines:['Sessions since '+(D.first?fmtDay(D.first):'')+' \u00b7 '+w.word+'.','Tap a limb to look closer.']}}
+  catch(e){oops('crownSentence',e);return {lines:[]}}}
+function crownEffShort(E,r){
+  const su=E.sigUnit,ou=E.outUnit;const hm=v=>{const m=Math.round(v*60);return Math.floor(m/60)+' h'+(m%60?' '+String(m%60).padStart(2,'0'):'')};
+  const sp=v=>su==='h'?hm(v):su?v+' '+su:String(v);const op=v=>ou==='h'?hm(v):ou==='/10'?v+' out of 10':ou?v+' '+ou:String(v);
+  return 'With '+crownSigW(r.fam).toLowerCase()+' over '+sp(E.split)+', '+crownOutW(r.out).toLowerCase()+' averaged '+op(E.hiMean)+'. Under it, '+op(E.loMean)+'.'}
+function crownEffLine(E,r){
+  /* the finding in the user's own units: both arms, their day counts,
+     how often the pair moved together against half by chance */
+  const su=E.sigUnit,ou=E.outUnit;const hm=v=>{const m=Math.round(v*60);return Math.floor(m/60)+' h'+(m%60?' '+String(m%60).padStart(2,'0'):'')};const sp=v=>su==='h'?hm(v):su?v+' '+su:String(v);const op=v=>ou==='h'?hm(v):ou==='/10'?v+' out of 10':ou?v+' '+ou:String(v);
+  const lag=E.lag===0?'the same day':E.lag===1?'the next day':'two days later';
+  return 'On the '+E.hiN+' days with '+crownSigW(r.fam).toLowerCase()+' over '+sp(E.split)+', '+crownOutW(r.out).toLowerCase()+' '+lag+' averaged '+op(E.hiMean)+'. On the other '+E.loN+', '+op(E.loMean)+'. The two moved together on '+E.together+' of '+E.counted+' days, where chance would give about '+E.chance+'.'}
+function crownCrumbs(C){
+  const X=crownX();const out=[['canopy','Crown']];
+  const dom=X.g?(X.g.charAt(0)==='L'?'lift':X.g):null;
+  if(X.rung==='domain'||X.rung==='lift'){if(dom)out.push(['dom:'+dom,CROWN_DNAME[dom]])}
+  if(X.rung==='lift'&&X.g&&X.g.charAt(0)==='L'){out.push(['g:'+X.g,X.g==='Lx'?'Other':(C.D.lifts[+X.g.slice(1)]||{}).name||''])}
+  if(X.sel&&X.sel.k==='leaf'){const s=C.D.sessions.find(q=>q.id===X.sel.id);if(s)out.push(['leaf',s.dayS])}
+  return out}
+function viewCrownX(){
+  try{const C=crownM();const X=crownX();
+    const crumbs=crownCrumbs(C);
+    const lensB=(k,l)=>'<button data-a="crownLens" data-v="'+k+'" class="'+(X.lens===k?'on':'')+'"'+(X.lens===k?' aria-pressed="true"':'')+'>'+l+'</button>';
+    const rootsN=crownRoots(C).length,budsN=crownBuds(C).length;
+    const P=crownSentence(C);
+    const panel='<div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px">'+
+        '<p class="disp" style="font-size:21px;font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(P.title||'')+'</p>'+
+        (P.big?'<p class="disp" style="font-size:26px;font-weight:600;flex:none">'+esc(P.big)+'</p>':'')+'</div>'+
+      (P.lines||[]).map((l,i)=>'<p style="font-size:'+(i?15:17)+'px;line-height:1.4;margin-top:'+(i?4:6)+'px;color:'+(i?'var(--dim)':'var(--text)')+'">'+esc(l)+'</p>').join('')+
+      /* the counts and the one button share a row, near the thumb (owner: "too hard to reach") */
+      '<div style="display:flex;align-items:center;gap:10px;margin-top:10px"><p style="flex:1;min-width:0;font-size:13px;color:var(--faint)">'+esc(P.meta||'')+'</p>'+
+      (P.acts&&P.acts.length?'<div class="crx-act" style="margin-top:0;flex:none">'+P.acts.map(a=>'<button data-a="'+esc(a.a)+'" data-v="'+esc(a.v||'')+'" class="'+(a.go?'go':'')+'">'+esc(a.l)+'</button>').join('')+'</div>':'')+'</div>';
+    return '<div class="crx" style="'+crownTok()+';background:'+(crownDark()?'var(--bg,#0B0B0D)':'#F7F4EE')+'">'+CROWN_CSS+
+      '<div class="crx-top"><button data-a="crownBack" aria-label="Back"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></button>'+
+        '<div class="crx-crumb">'+crumbs.map((c,i)=>(i?'<span style="color:var(--faint)">\u203a</span>':'')+'<button data-a="crownCrumb" data-v="'+esc(c[0])+'">'+esc(c[1])+'</button>').join('')+'</div>'+
+        '<button data-a="crownReplay" aria-label="Watch it grow" style="font-size:13px;color:var(--dim);width:auto;padding:0 6px">Watch it grow</button></div>'+
+      '<div class="crx-lens">'+lensB('all','Everything')+lensB('pr','PRs')+(rootsN?lensB('roots','Insights \u00b7 '+rootsN):'')+(budsN?lensB('grow','To grow \u00b7 '+budsN):'')+'</div>'+
+      '<div class="crx-cv" data-crown="1"><canvas data-crowncv="x" role="img" aria-label="Your tree. Pinch to zoom, tap a limb or a leaf."></canvas></div>'+
+      '<div class="crx-panel" aria-live="polite">'+panel+
+      '</div></div>'}
+  catch(e){oops('viewCrownX',e);return '<div class="view pad">'+pageHead('Your tree','',{})+'</div>'}}
+
+/* ── SHEETS ──────────────────────────────────────────────────────── */
 function crownSheet(){
-  /* the two sheets a tap on the crown opens; null for every other sheet */
+  /* the sheets a tap on the crown opens; null for every other sheet */
   try{const t=S.sheet&&S.sheet.t;
     if(t==='crownleaf'){const h=(S.history||[]).find(x=>String(x.id)===String(S.sheet.id));if(!h)return '';const k=crownKind(h)||'lift';const name={lift:'Strength session',run:'Run',ride:'Ride',rehab:'Rehab session'}[k];
-      const sets=(h.log||[]).filter(l=>l.w&&l.r).slice(0,6).map(l=>esc(l.ex)+' '+l.w+' kg × '+l.r).join('<br>');const km=(h.log||[]).reduce((a,l)=>a+(l.km||0),0);
-      let pr='';try{if(!h.run&&h.log&&h.log.length){const p=sessionPRs(h);if(p.length)pr='<p style="margin-top:8px;font-size:13px;color:var(--text)">'+p.map(x=>esc(x.ex)+' '+x.e+' kg estimated max, a PR').join('<br>')+'</p>'}}catch(e){oops('crownSheetPR',e)}
-      /* THE TAP GOES DEEPER (owner, 25 Sep 2026): a lift leaf carries its
-         top lift's own trend with this session marked, and the door to
-         the session; a run leaf the door to the run */
+      const sets=(h.log||[]).filter(l=>l.w&&l.r).slice(0,8).map(l=>esc(l.ex)+' '+l.w+' kg × '+l.r+(l.rpe?' @'+esc(l.rpe):'')).join('<br>');const km=(h.log||[]).reduce((a,l)=>a+(l.km||0),0);
+      let pr='';try{if(!h.run&&h.log&&h.log.length){const p=sessionPRs(h);if(p.length)pr='<p style="margin-top:8px;font-size:13px;color:var(--text)">'+p.map(x=>esc(x.ex)+' '+x.e+' kg estimated max, a PR at the time').join('<br>')+'</p>'}}catch(e){oops('crownSheetPR',e)}
+      /* a lift leaf carries its top lift's weekly trend with this week marked */
       let trend='';try{if(k==='lift'){let best=null;(h.log||[]).forEach(l=>{if(!(+l.w>0&&+l.r>0))return;const e=e1rm(+l.w,+l.r,l.rpe);if(!best||e>best.e)best={ex:gBase(l.ex),e}});
-          if(best&&typeof liftPts==='function'&&typeof lineChart==='function'){const pts=liftPts(best.ex);
-            if(pts&&pts.length>=3){const vs=pts.map(q=>q.v);const lo=Math.floor(Math.min.apply(null,vs)*0.9),hi=Math.ceil(Math.max.apply(null,vs)*1.1);
-              trend='<p class="micro" style="margin-top:14px">'+esc(best.ex)+' · estimated max over '+pts.length+' sessions</p>'+lineChart(pts,{min:lo,max:hi,marks:[Math.round(best.e)]})+
-                '<p style="font-size:13px;color:var(--faint);margin-top:4px">The line marks this session, '+Math.round(best.e)+' kg.</p>'}}}}catch(e9){oops('crownTrend',e9)}
+          if(best){const T=liftTrend(best.ex);if(T&&T.pts.length>=3){const Y=crownLiftSay({T,L:{name:best.ex,n:T.n,prs:0,goal:null}});trend='<p style="margin-top:14px;font-size:15px"><b>'+esc(best.ex)+'</b> '+(Y?Y.big+' kg. '+esc(Y.line):'')+'</p>'+crownLiftChart(T,null,crownWeekMon(hKey(h)))}}}}catch(e9){oops('crownTrend',e9)}
       const door=(k==='run'||k==='ride')
         ?'<button data-a="runDetail" data-v="'+esc(String(h.id).replace(/^run-/,''))+'" class="big disp mt" style="font-size:15px">Open the run</button>'
         :'<button data-a="txOpenLog" data-v="'+esc(String(h.id))+'" class="big disp mt" style="font-size:15px">Open the session</button>';
       return wrapSheet(name+' · '+fmtDate(h.date),'<p style="font-size:15px;line-height:1.55;color:var(--dim)">'+(h.minutes?h.minutes+' min':'')+(km?' · '+Math.round(km*10)/10+' km':'')+(h.dayTitle?' · '+esc(h.dayTitle):'')+'</p>'+(sets?'<p style="margin-top:8px;font-size:13px;color:var(--dim);line-height:1.6">'+sets+'</p>':'')+pr+trend+door)}
-    if(t==='crownlink'){const id=String(S.sheet.id);const b=discBank()[id];if(!b)return '';
-      let ev=false;try{ev=!!(typeof evidenceData==='function'&&evidenceData(id))}catch(e9){oops('crownEv',e9)}
-      return wrapSheet('Finding','<p class="disp" style="font-size:20px;font-weight:600;line-height:1.2">'+esc(b.t||'')+'</p><p style="margin-top:8px;font-size:15px;line-height:1.55;color:var(--dim)">'+esc(b.d||'')+'</p><p style="margin-top:8px;font-size:13px;color:var(--faint)">The thread joins the session on the day this was found to the same kind of session the week before.</p>'+
-        '<div style="display:flex;gap:10px;margin-top:14px"><button data-a="findOpen" data-v="'+esc(id)+'" class="big disp" style="font-size:15px">Open the card</button>'+(ev?'<button data-a="evidenceOpen" data-v="'+esc(id)+'" class="big disp" style="font-size:15px;background:none;border:1px solid var(--cardline);color:var(--text);box-shadow:none">See the evidence</button>':'')+'</div>')}
+    if(t==='crownlift'){const C=crownM();const i=+S.sheet.i;const I=crownLiftInfo(C,i);if(!I)return '';const L=I.L;
+      const goal=L.goal?Math.round(e1rm(L.goal.w,L.goal.r)):null;
+      const prs=C.D.sessions.filter(s=>s.prs.some(p=>L.members.indexOf(p.ex)>=0)).slice(-6).reverse();
+      const Y=crownLiftSay(I)||{big:0,line:'No hard sets logged yet.',goal:'',meta:''};
+      return wrapSheet(L.name,'<p class="disp" style="font-size:34px;font-weight:600;line-height:1">'+Y.big+' kg</p><p style="font-size:13px;color:var(--faint);margin-top:2px">estimated max</p>'+
+        '<p style="font-size:17px;line-height:1.45;margin-top:10px">'+esc(Y.line)+'</p>'+(Y.goal?'<p style="font-size:15px;color:var(--dim);margin-top:4px">'+esc(Y.goal)+'</p>':'')+
+        (I.T?crownLiftChart(I.T,goal,null):'')+
+        '<p style="font-size:13px;color:var(--faint);margin-top:6px">Each dot is your best hard set that week. An empty dot is a week of easy sets only.'+(goal?' The dashed line is your goal.':'')+(Y.meta?' '+esc(Y.meta)+'.':'')+'</p>'+
+        (prs.length?'<p class="micro" style="margin-top:16px;color:var(--faint);letter-spacing:.14em">PRS AT THE TIME</p>'+prs.map(s=>{const p=s.prs.find(q=>L.members.indexOf(q.ex)>=0);return '<p style="font-size:15px;margin-top:6px">'+esc(fmtDay(s.day))+' · '+p.e+' kg estimated max <span style="color:var(--faint)">(from '+p.prev+')</span></p>'}).join(''):'')+
+        '<button data-a="crownX" data-v="lift:'+i+'" class="big disp mt" style="font-size:15px;background:none;border:1px solid var(--cardline);color:var(--text);box-shadow:none">Show it on the tree</button>')}
+    if(t==='crownroot'){const C=crownM();const r=crownRoots(C).find(q=>q.id===String(S.sheet.id));if(!r)return '';const b=(discBank()||{})[r.id]||{};
+      let E=null;try{E=r.faded?null:corrEffect(r.id)}catch(e){oops('crownRootSheet',e)}
+      let ev=false;try{ev=!!(typeof evidenceData==='function'&&evidenceData(r.id))}catch(e9){oops('crownEv',e9)}
+      return wrapSheet(r.lab,'<p class="disp" style="font-size:20px;font-weight:600;line-height:1.2">'+esc(b.t||'')+'</p>'+
+        (E?'<p style="margin-top:10px;font-size:15px;line-height:1.55">'+esc(crownEffLine(E,r))+'</p>'+
+          '<p style="margin-top:8px;font-size:13px;color:var(--faint)">First paired '+esc(fmtDay(E.first))+', '+E.n+' pairs. The root does not say one causes the other; it says they have moved together in your numbers. The lit leaves are the sessions it is made of.</p>'
+          :'<p style="margin-top:10px;font-size:15px;line-height:1.55;color:var(--dim)">'+esc(b.d||'')+'</p>'+(r.faded?'<p style="margin-top:8px;font-size:13px;color:var(--faint)">It has faded in the newer data, so the root is dashed.</p>':''))+
+        '<div style="display:flex;gap:10px;margin-top:14px"><button data-a="findOpen" data-v="'+esc(r.id)+'" class="big disp" style="font-size:15px">Open the card</button>'+(ev?'<button data-a="evidenceOpen" data-v="'+esc(r.id)+'" class="big disp" style="font-size:15px;background:none;border:1px solid var(--cardline);color:var(--text);box-shadow:none">See the evidence</button>':'')+'</div>')}
     if(t==='crownread'){const a=(typeof deepArm==='function')?deepArm():null;if(!a)return '';
       return wrapSheet('The tree read','<p style="font-size:15px;line-height:1.55;color:var(--dim)">'+esc(a.line||'')+'</p>'+
         '<p style="margin-top:8px;font-size:13px;color:var(--faint)">The ring on the trunk fills with the sessions and runs the read has not seen yet, never with the calendar.</p>'+
         (a.ready?'<button data-a="deepGo" class="big disp mt" style="font-size:15px">Open the read</button>':''))}
   }catch(e){oops('crownSheet',e)}
   return null}
-/* ── pinch, drag and tap on the crown view ─────────────────── */
+function crownLiftChart(T,goal,markK){
+  /* the weekly-best chart: filled near-limit weeks, hollow easy weeks,
+     the goal dashed, one week marked. Under a sentence, never instead of
+     one (R20). */
+  if(!T||!T.pts||T.pts.length<2)return '';
+  const W=340,H=150,P=24;const pts=T.pts,hol=T.hollow||[];
+  const vs=pts.map(p=>p.v).concat(hol.map(h=>h.v));if(goal)vs.push(goal);
+  const lo=Math.floor(Math.min.apply(null,vs)*0.97),hi=Math.ceil(Math.max.apply(null,vs)*1.02);const sp=Math.max(1,hi-lo);
+  const t0=Math.min(pts[0].t,hol.length?hol[0].t:pts[0].t),t1=Math.max(t0+1,pts[pts.length-1].t,hol.length?hol[hol.length-1].t:0);
+  const x=t=>P+(t-t0)/(t1-t0)*(W-P*1.5),y=v=>H-P-(v-lo)/sp*(H-P*1.6);
+  const mk=markK?pts.find(p=>p.k===markK):null;
+  return '<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;display:block;margin-top:12px" role="img" aria-label="Weekly best estimated max">'+
+    '<text x="'+P+'" y="12" font-size="10" fill="var(--faint)">'+hi+' kg</text><text x="'+P+'" y="'+(H-6)+'" font-size="10" fill="var(--faint)">'+lo+' kg</text>'+
+    (goal?'<line x1="'+P+'" x2="'+(W-P/2)+'" y1="'+y(goal).toFixed(1)+'" y2="'+y(goal).toFixed(1)+'" stroke="var(--text)" stroke-opacity=".45" stroke-dasharray="4 3"/><text x="'+(W-P/2)+'" y="'+(y(goal)-4).toFixed(1)+'" text-anchor="end" font-size="10" fill="var(--dim)">goal '+goal+'</text>':'')+
+    (mk?'<line x1="'+x(mk.t).toFixed(1)+'" x2="'+x(mk.t).toFixed(1)+'" y1="'+P/2+'" y2="'+(H-P)+'" stroke="var(--text)" stroke-opacity=".25"/>':'')+
+    '<path d="'+pts.map((p,j)=>(j?'L':'M')+x(p.t).toFixed(1)+','+y(p.v).toFixed(1)).join(' ')+'" fill="none" stroke="var(--green)" stroke-width="2" stroke-linejoin="round"/>'+
+    pts.map(p=>'<circle cx="'+x(p.t).toFixed(1)+'" cy="'+y(p.v).toFixed(1)+'" r="'+(mk&&p===mk?4:2.6)+'" fill="var(--green)"/>').join('')+
+    hol.map(h=>'<circle cx="'+x(h.t).toFixed(1)+'" cy="'+y(h.v).toFixed(1)+'" r="2.6" fill="none" stroke="var(--green)" stroke-width="1.2"/>').join('')+'</svg>'}
+
+/* ── LIVE CANVAS: sharp at any zoom, pinch between the fingers ─────
+   One canvas the size of its box at the device's pixel ratio. The model
+   is geometry, so every frame is drawn at the exact zoom. If a frame
+   costs more than ~12 ms the last sharp frame slides and scales under
+   the fingers instead, and the sharp redraw lands when they lift
+   (track 1: how Excalidraw and the map apps do it). Layout is measured
+   once on pointerdown and at render, never inside a move. */
+const CRV={z:1,ox:0,oy:0,W:0,H:0,dz:1,dox:0,doy:0,slow:false,raf:0,anim:null,cv:null,home:null,replay:null,unf:null,lastTap:0};
+function crownZmax(C){
+  /* enough zoom to separate a typical pair of neighbours to a 44-point target */
+  try{if(C._zmax)return C._zmax;const L=C.M.leaves;if(L.length<4)return (C._zmax=4);const B0=Math.min(CRV.W||390,CRV.H||390)/2/(CRV.ext||CROWN_EXT);
+    const sample=L.length>400?L.filter((q,i)=>i%Math.ceil(L.length/400)===0):L;const ds=[];
+    sample.forEach(a=>{let bd=1e9;L.forEach(b=>{if(a===b)return;const d=(a.x-b.x)*(a.x-b.x)+(a.y-b.y)*(a.y-b.y);if(d<bd)bd=d});ds.push(Math.sqrt(bd)*B0)});
+    ds.sort((a,b)=>a-b);const med=Math.max(0.5,ds[Math.floor(ds.length/2)]);
+    return (C._zmax=Math.max(4,Math.min(16,1.3*44/med)))}catch(e){oops('crownZmax',e);return 6}}
+function crownVParams(C,kind){
+  const X=crownX();const home=kind==='home';
+  let read=null;try{read=(typeof deepArm==='function'&&(typeof deepOn!=='function'||deepOn()))?deepArm():null}catch(e){oops('crownReadArm',e)}
+  const lens=home?'all':X.lens;
+  const lit=(!home&&X.sel&&X.sel.k==='root'&&X.sel.lit)?X.sel.lit:null;
+  return {lens,sel:home?null:(X.sel||(X.rung==='lift'&&X.g?{k:'lift',g:X.g}:X.rung==='domain'&&X.g?{k:'dom',g:X.g}:null)),lit,
+    roots:home?0:(lens==='roots'?8:(lens==='grow'||lens==='pr'?0:3)),buds:(lens==='pr'||lens==='roots')?[]:crownBuds(C),
+    labels:home?'home':'full',scar:!!(S.acl&&S.acl.on&&S.acl.date),read,readLab:read&&read.ready?'READ READY':'',unf:CRV.unf}}
+function crownDraw(which){
+  try{const C=crownM();if(!C.D.weeks.length)return;
+    const draw=(cv,kind)=>{if(!cv||!cv.getContext)return;const ctx=cv.getContext('2d');if(!ctx)return;const dpr=Math.min(3,window.devicePixelRatio||1);
+      const W=cv.__w||cv.clientWidth,H=cv.__h||cv.clientHeight;if(!W||!H)return;
+      ctx.setTransform(dpr,0,0,dpr,0,0);
+      const ext=kind==='home'?(crownBuds(C).length?1.2:1.12):crownExtOf(C);if(kind!=='home')CRV.ext=ext;const V=Object.assign({W,H,ext,z:kind==='home'?1:CRV.z,ox:kind==='home'?0:CRV.ox,oy:kind==='home'?0:CRV.oy,t:kind==='home'?null:CRV.replay?CRV.replay.t:null},crownVParams(C,kind));
+      const t0=(typeof performance!=='undefined'?performance.now():Date.now());
+      const geo=crownPaint(ctx,C,V);cv.__geo=geo;cv.__V=V;
+      const dt=(typeof performance!=='undefined'?performance.now():Date.now())-t0;
+      if(kind!=='home'){CRV.slow=dt>12;CRV.dz=CRV.z;CRV.dox=CRV.ox;CRV.doy=CRV.oy;cv.style.transform=''}};
+    if(!which||which==='home')draw(CRV.home,'home');
+    if(!which||which==='x')draw(CRV.cv,'x')}
+  catch(e){oops('crownDraw',e)}}
+function crownFrame(){
+  /* one frame on the next animation tick; in slow mode a gesture moves
+     the last sharp frame with a CSS transform instead */
+  if(CRV.raf)return;
+  CRV.raf=requestAnimationFrame(function(){CRV.raf=0;
+    try{if(CRV.slow&&CRV.gesture&&CRV.cv){const k=CRV.z/CRV.dz;const tx=CRV.ox-CRV.dox*k,ty=CRV.oy-CRV.doy*k;
+        CRV.cv.style.transformOrigin='50% 50%';CRV.cv.style.transform='translate('+tx.toFixed(1)+'px,'+ty.toFixed(1)+'px) scale('+k.toFixed(4)+')';return}
+      crownDraw('x')}catch(e){oops('crownFrame',e)}})}
+function crownSize(cv){
+  const r=cv.getBoundingClientRect();const dpr=Math.min(3,window.devicePixelRatio||1);
+  const W=Math.max(1,Math.round(r.width)),H=Math.max(1,Math.round(r.height));
+  const bw=Math.min(4096,Math.round(W*dpr)),bh=Math.min(4096,Math.round(H*dpr));
+  if(cv.width!==bw)cv.width=bw;if(cv.height!==bh)cv.height=bh;cv.__w=W;cv.__h=H;return {W,H,left:r.left,top:r.top}}
+function crownClamp(){
+  const B=Math.min(CRV.W,CRV.H)/2/(CRV.ext||CROWN_EXT)*CRV.z;const lim=Math.max(0,B*1.15);
+  CRV.ox=Math.max(-lim,Math.min(lim,CRV.ox));CRV.oy=Math.max(-lim,Math.min(lim,CRV.oy))}
+function crownFly(wx,wy,z,ms,done){
+  /* a flight in log-zoom with the world centre eased, landing the target
+     at 42% of the canvas height so the panel never covers it */
+  const reduced=(function(){try{return !!(window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches)}catch(e){return false}})();
+  const B0=Math.min(CRV.W,CRV.H)/2/(CRV.ext||CROWN_EXT);
+  const from={z:CRV.z,wx:-CRV.ox/(B0*CRV.z),wy:(-CRV.oy-0.08*CRV.H)/(B0*CRV.z)};
+  const to={z,wx,wy};const t0=Date.now();ms=reduced?0:(ms||480);
+  const step=()=>{const f=ms?Math.min(1,(Date.now()-t0)/ms):1;const e=f<0.5?4*f*f*f:1-Math.pow(-2*f+2,3)/2;
+    const zz=Math.exp(Math.log(from.z)+(Math.log(to.z)-Math.log(from.z))*e);const cx=from.wx+(to.wx-from.wx)*e,cy=from.wy+(to.wy-from.wy)*e;
+    CRV.z=zz;CRV.ox=-cx*B0*zz;CRV.oy=-0.08*CRV.H-cy*B0*zz;CRV.gesture=f<1;crownFrame();
+    if(f<1)CRV.anim=requestAnimationFrame(step);else{CRV.anim=null;CRV.gesture=false;crownFrame();if(done)done()}};
+  if(CRV.anim)cancelAnimationFrame(CRV.anim);step()}
+function crownFlyTo(C,g){
+  /* fit a group's leaves (or a whole domain's) into the canvas */
+  const M=C.M;let bb=null;
+  Object.keys(M.groups).forEach(k=>{const hit=g==='lift'?k.charAt(0)==='L':k===g;if(!hit)return;const b=M.groups[k].bb;bb=bb?[Math.min(bb[0],b[0]),Math.min(bb[1],b[1]),Math.max(bb[2],b[2]),Math.max(bb[3],b[3])]:b.slice()});
+  if(!g||!bb){crownFly(0,0,1);return}
+  const B0=Math.min(CRV.W,CRV.H)/2/(CRV.ext||CROWN_EXT);const bw=Math.max(0.2,bb[2]-bb[0]),bh=Math.max(0.2,bb[3]-bb[1]);
+  const z=Math.max(1,Math.min(crownZmax(C),Math.min(CRV.W*0.86/(bw*B0),CRV.H*0.62/(bh*B0))));
+  crownFly((bb[0]+bb[2])/2,(bb[1]+bb[3])/2,z)}
+function crownHit(C,cv,px,py){
+  /* nearest within 22 points, by priority: trunk, chips and buds, a PR,
+     a leaf, the wood. Two leaves nearly as close as each other while
+     there is still zoom to spare is a question, not a guess: zoom in. */
+  const g=cv.__geo;if(!g)return null;const V=cv.__V||{};const M=C.M;const R=22*g.u;
+  if(Math.hypot(px-g.cx,py-g.cy)<=g.tr+10*g.u)return {t:'trunk'};
+  let best=null,bd=1e9;
+  (g.roots||[]).forEach(r=>{const d=Math.hypot(px-(g.cx+r.cx*g.B),py-(g.cy+r.cy*g.B));if(d<bd&&d<=R){bd=d;best={t:'root',id:r.id}}});
+  (g.buds||[]).forEach(b=>{const d=Math.hypot(px-(g.cx+b.x*g.B),py-(g.cy+b.y*g.B));if(d<bd&&d<=R){bd=d;best={t:'bud',id:b.id}}});
+  if(best)return best;
+  const wx=(px-g.cx)/g.B,wy=(py-g.cy)/g.B,rw=R/g.B;const near=[];
+  M.leaves.forEach(L=>{if(Math.abs(L.x-wx)>rw||Math.abs(L.y-wy)>rw)return;const d=Math.hypot(L.x-wx,L.y-wy)*g.B;if(d<=R)near.push([d-(L.s.pr?6*g.u:0),L])});
+  near.sort((a,b)=>a[0]-b[0]);
+  if(near.length){const L=near[0][1];
+    if(near.length>1&&near[1][0]<near[0][0]*1.25+3&&near[0][0]>4*g.u&&(V.z||1)<crownZmax(C)*0.7)return {t:'zoom',L};
+    return {t:'leaf',L}}
+  let nb=null,nd=1e9;M.nodes.forEach(n=>{if(!n.g||!n.lb)return;if(Math.abs(n.x-wx)>rw||Math.abs(n.y-wy)>rw)return;const d=Math.hypot(n.x-wx,n.y-wy)*g.B-n.w*g.B;if(d<nd){nd=d;nb=n}});
+  if(nb&&nd<=R)return {t:'wood',g:nb.g};
+  return null}
+function crownTap(px,py){
+  try{const C=crownM();const cv=CRV.cv;if(!cv)return;const X=crownX();const h=crownHit(C,cv,px,py);
+    const now=Date.now();
+    if(!h){if(now-CRV.lastTap<350){CRV.lastTap=0;const g=cv.__geo;const wx=(px-g.cx)/g.B,wy=(py-g.cy)/g.B;
+        const z=Math.min(crownZmax(C),CRV.z*2);const B0=Math.min(CRV.W,CRV.H)/2/(CRV.ext||CROWN_EXT);
+        /* keep the tapped point under the finger */
+        CRV.z=z;CRV.ox=px-CRV.W/2-wx*B0*z;CRV.oy=py-CRV.H/2-wy*B0*z;crownClamp();crownFrame()}
+      else CRV.lastTap=now;return}
+    CRV.lastTap=0;
+    if(h.t==='trunk'){let rd=null;try{rd=(typeof deepArm==='function')?deepArm():null}catch(e8){oops('crownTrunk',e8)}
+      if(rd&&rd.ready&&(typeof deepOn!=='function'||deepOn()))runAction('deepGo');else{S.sheet={t:'crownread'};render()}return}
+    if(h.t==='root'){let lit=null;try{const E=corrEffect(h.id);if(E)lit=E.outDays}catch(e){oops('crownLit',e)}X.sel={k:'root',id:h.id,lit};render();return}
+    if(h.t==='bud'){X.sel={k:'bud',id:h.id};render();return}
+    if(h.t==='zoom'){const L=h.L;const z=Math.min(crownZmax(C),CRV.z*2);crownFly(L.x,L.y,z,360);return}
+    const g=h.t==='leaf'?h.L.g:h.g;
+    const inG=X.rung==='lift'?X.g===g:X.rung==='domain'?(X.g==='lift'?g.charAt(0)==='L':X.g===g):false;
+    if(h.t==='leaf'&&(inG||(X.rung!=='canopy'&&!(g.charAt(0)==='L'&&X.g==='lift')))){X.sel={k:'leaf',id:h.L.s.id};
+      if(!inG){X.rung=g.charAt(0)==='L'?'lift':'domain';X.g=g}
+      feelSafe('tap');render();return}
+    /* a tap on the canopy or on another limb flies to it */
+    X.sel=null;if(g.charAt(0)==='L'){X.rung='lift';X.g=g}else{X.rung='domain';X.g=g}
+    render();crownFlyTo(C,g)}
+  catch(e){oops('crownTap',e)}}
+function feelSafe(k){try{if(typeof feel==='function')feel(k)}catch(e){oops('crownFeel',e)}}
+function crownGo(v){
+  /* the routes into the page and between rungs */
+  const X=crownX();v=String(v||'open');
+  if(v==='open'||v==='grow'||v==='roots'){S.crx={rung:'canopy',lens:v==='open'?'all':v,sel:null};CRV.z=1;CRV.ox=0;CRV.oy=0;return}
+  if(v.slice(0,5)==='lift:'){const i=v.slice(5);S.crx={rung:'lift',g:'L'+i,lens:'all',sel:null};CRV.z=1;CRV.ox=0;CRV.oy=0;CRV.pendingFly='L'+i;return}
+  if(v==='canopy'){X.rung='canopy';X.g=null;X.sel=null;CRV.pendingFly='*'}
+  else if(v.slice(0,4)==='dom:'){X.rung='domain';X.g=v.slice(4);X.sel=null;CRV.pendingFly=X.g}
+  else if(v.slice(0,2)==='g:'){X.rung='lift';X.g=v.slice(2);X.sel=null;CRV.pendingFly=X.g}
+}
+function crownBackUp(){
+  /* Back goes up one rung; from the whole crown it leaves the page */
+  const X=crownX();
+  if(X.sel){X.sel=null;return true}
+  if(X.rung==='lift'){X.rung='domain';X.g='lift';CRV.pendingFly='lift';return true}
+  if(X.rung==='domain'){X.rung='canopy';X.g=null;CRV.pendingFly='*';return true}
+  if(X.lens!=='all'){X.lens='all';return true}
+  return false}
+function crownReplayGo(){
+  /* "Watch it grow": the whole record in six seconds, from the trunk out */
+  const reduced=(function(){try{return !!(window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches)}catch(e){return false}})();
+  if(reduced)return;
+  const t0=Date.now();CRV.replay={t:0};crownFly(0,0,1,300);
+  const step=()=>{if(!CRV.replay)return;const f=Math.min(1,(Date.now()-t0)/6000);CRV.replay.t=f;crownDraw('x');
+    if(f<1)requestAnimationFrame(step);else{CRV.replay=null;crownDraw('x')}};
+  requestAnimationFrame(step)}
+function crownAfterRender(){
+  /* bind the canvases the render just made, size them once, draw */
+  try{
+    const home=document.querySelector('[data-crowncv="home"]'),cx=document.querySelector('[data-crowncv="x"]');
+    CRV.home=home||null;CRV.cv=cx||null;
+    if(!home&&!cx)return;
+    const C=crownM();
+    /* only the newest leaf unfurls, once per app session, and only if it is recent */
+    try{if(!CRV.unfDone){CRV.unfDone=1;const s=C.D.sessions[C.D.sessions.length-1];if(s&&s.day>=dayKey(new Date(Date.now()-2*864e5)))CRV.unf={id:s.id,t0:Date.now()};
+      if(CRV.unf){const tick=()=>{if(!CRV.unf)return;crownDraw();if(Date.now()-CRV.unf.t0<760)requestAnimationFrame(tick);else CRV.unf=null};requestAnimationFrame(tick)}}}catch(e){oops('crownUnfurl',e)}
+    if(home)crownSize(home);
+    if(cx){const r=crownSize(cx);CRV.W=r.W;CRV.H=r.H;C._zmax=0;
+      /* the zoom from where the tree sat on the first screen (FLIP) */
+      if(CRV.flip){const f=CRV.flip;CRV.flip=null;
+        const reduced=(function(){try{return !!(window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches)}catch(e){return false}})();
+        if(!reduced&&f.w>0){const s=f.w/Math.min(r.W,r.H);const tx=f.left+f.w/2-(r.left+r.W/2),ty=f.top+f.h/2-(r.top+r.H/2);
+          cx.style.transition='none';cx.style.transformOrigin='50% 50%';cx.style.transform='translate('+tx+'px,'+ty+'px) scale('+s+')';
+          requestAnimationFrame(()=>{cx.style.transition='transform 300ms cubic-bezier(0.4,0,0.2,1)';cx.style.transform='';setTimeout(()=>{cx.style.transition=''},320)})}}
+      if(CRV.pendingFly){const g=CRV.pendingFly;CRV.pendingFly=null;crownDraw();if(g==='*')crownFly(0,0,1);else crownFlyTo(C,g);return}}
+    crownDraw()}
+  catch(e){oops('crownAfterRender',e)}}
 (function(){
   try{
-    let z=1,px=0,py=0,ptrs=new Map(),pinch0=0,z0=1,drag=null;
-    const img=()=>document.querySelector('[data-crownimg]');
-    const apply=()=>{const tf='translate('+px+'px,'+py+'px) scale('+z+')';const i=img();if(i)i.style.transform=tf;
-      try{const L=document.querySelector('[data-crownlabels]');if(L)L.style.transform=tf;
-        const box=document.querySelector('[data-crown]');if(box){box.style.setProperty('--iz',(1/z).toFixed(3));box.classList.toggle('z2',z>=2.2);box.classList.toggle('z4',z>=4)}}catch(e9){oops('crownApply',e9)}};
-    document.addEventListener('pointerdown',e=>{const box=e.target.closest&&e.target.closest('[data-crown]');if(!box)return;e.preventDefault();ptrs.set(e.pointerId,[e.clientX,e.clientY]);
-      if(ptrs.size===2){const [a,b]=[...ptrs.values()];pinch0=Math.hypot(a[0]-b[0],a[1]-b[1]);z0=z;drag=null;return}
-      drag={x:e.clientX,y:e.clientY,px,py,moved:false,box}},{passive:false});
-    document.addEventListener('pointermove',e=>{if(!ptrs.has(e.pointerId))return;ptrs.set(e.pointerId,[e.clientX,e.clientY]);
-      if(ptrs.size===2){const [a,b]=[...ptrs.values()];z=Math.max(1,Math.min(6,z0*Math.hypot(a[0]-b[0],a[1]-b[1])/(pinch0||1)));apply();return}
-      if(drag){const dx=e.clientX-drag.x,dy=e.clientY-drag.y;if(Math.hypot(dx,dy)>4)drag.moved=true;if(z>1){px=drag.px+dx;py=drag.py+dy;apply()}}});
+    const ptrs=new Map();let pinch=null,drag=null,vel=[];
+    const inX=e=>e.target&&e.target.closest&&e.target.closest('[data-crowncv="x"]');
+    const pos=e=>{const b=CRV.box||{left:0,top:0};return [e.clientX-b.left,e.clientY-b.top]};
+    document.addEventListener('pointerdown',e=>{const cv=inX(e);if(!cv)return;e.preventDefault();
+      if(CRV.anim){cancelAnimationFrame(CRV.anim);CRV.anim=null}if(CRV.mom){cancelAnimationFrame(CRV.mom);CRV.mom=null}
+      if(!ptrs.size){const r=cv.getBoundingClientRect();CRV.box={left:r.left,top:r.top}}
+      ptrs.set(e.pointerId,pos(e));try{cv.setPointerCapture(e.pointerId)}catch(e9){oops('crownCapture',e9)}
+      if(ptrs.size===2){const [a,b]=[...ptrs.values()];const mx=(a[0]+b[0])/2,my=(a[1]+b[1])/2;const B0=Math.min(CRV.W,CRV.H)/2/(CRV.ext||CROWN_EXT);
+        /* the world point under the fingers' midpoint stays under it */
+        pinch={d0:Math.hypot(a[0]-b[0],a[1]-b[1])||1,z0:CRV.z,wx:(mx-CRV.W/2-CRV.ox)/(B0*CRV.z),wy:(my-CRV.H/2-CRV.oy)/(B0*CRV.z)};drag=null;CRV.gesture=true;return}
+      const p=pos(e);drag={x:p[0],y:p[1],ox:CRV.ox,oy:CRV.oy,moved:false,t:Date.now()};vel=[[Date.now(),p[0],p[1]]]},{passive:false});
+    document.addEventListener('pointermove',e=>{if(!ptrs.has(e.pointerId))return;const p=pos(e);ptrs.set(e.pointerId,p);
+      if(pinch&&ptrs.size>=2){const [a,b]=[...ptrs.values()];const B0=Math.min(CRV.W,CRV.H)/2/(CRV.ext||CROWN_EXT);const C=S._crownM;
+        const z=Math.max(0.9,Math.min(C?crownZmax(C):8,pinch.z0*Math.hypot(a[0]-b[0],a[1]-b[1])/pinch.d0));const mx=(a[0]+b[0])/2,my=(a[1]+b[1])/2;
+        CRV.z=z;CRV.ox=mx-CRV.W/2-pinch.wx*B0*z;CRV.oy=my-CRV.H/2-pinch.wy*B0*z;crownClamp();crownFrame();return}
+      if(drag){const dx=p[0]-drag.x,dy=p[1]-drag.y;if(!drag.moved&&Math.hypot(dx,dy)>=10){drag.moved=true;CRV.gesture=true}
+        if(drag.moved){CRV.ox=drag.ox+dx;CRV.oy=drag.oy+dy;crownClamp();vel.push([Date.now(),p[0],p[1]]);if(vel.length>5)vel.shift();crownFrame()}}},{passive:true});
     const up=e=>{if(!ptrs.has(e.pointerId))return;ptrs.delete(e.pointerId);
-      if(drag&&!drag.moved&&e.type==='pointerup'){
-        /* a tap: find the nearest leaf or thread in the image's own
-           frame (the box was measured once, at the tap, never on move) */
-        try{const r=drag.box.getBoundingClientRect();const cxp=r.left+r.width/2+px,cyp=r.top+r.height/2+py;const side=Math.min(r.width,r.height)*z;
-          const u=(e.clientX-(cxp-side/2))/side,v=(e.clientY-(cyp-side/2))/side;const C9=S._crownImg;if(C9){let best=null,bd=1e9;
-            /* the trunk is the tree read's door */
-            if(Math.hypot(u-0.5,v-0.5)*side<Math.max(16,(C9.trunk||0.02)*side*2.4)){
-              let rd=null;try{rd=(typeof deepArm==='function')?deepArm():null}catch(e8){oops('crownTrunk',e8)}
-              if(rd&&rd.ready)runAction('deepGo');else{S.sheet={t:'crownread'};render();apply()}return}
-            (C9.leaves||[]).forEach(L=>{const d=Math.hypot(L.x-u,L.y-v);if(d<bd){bd=d;best={t:'crownleaf',id:L.id}}});
-            (C9.links||[]).forEach(L=>{const d=Math.hypot(L.x-u,L.y-v)-0.01;if(d<bd){bd=d;best={t:'crownlink',id:L.id}}});
-            if(best&&bd*side<18){S.sheet=best;render();apply()}}}catch(e9){oops('crownTap',e9)}}
-      if(ptrs.size<2)drag=null;if(!ptrs.size&&z<=1){px=0;py=0;apply()}};
+      if(pinch){if(ptrs.size<2){pinch=null;if(!ptrs.size){CRV.gesture=false;crownFrame()}else{const q=[...ptrs.values()][0];drag={x:q[0],y:q[1],ox:CRV.ox,oy:CRV.oy,moved:true,t:Date.now()};vel=[]}}return}
+      if(!drag)return;const d=drag;drag=null;
+      if(!d.moved){if(e.type==='pointerup'){const p=pos(e);crownTap(p[0],p[1])}CRV.gesture=false;return}
+      /* momentum: the release velocity, decaying at 0.998 per millisecond */
+      let vx=0,vy=0;if(vel.length>=2){const a=vel[0],b=vel[vel.length-1];const dt=Math.max(1,b[0]-a[0]);if(Date.now()-b[0]<80){vx=(b[1]-a[1])/dt;vy=(b[2]-a[2])/dt}}
+      if(Math.hypot(vx,vy)<0.05){CRV.gesture=false;crownFrame();return}
+      let last=Date.now();const glide=()=>{const now=Date.now(),dt=now-last;last=now;const k=Math.pow(0.998,dt);vx*=k;vy*=k;CRV.ox+=vx*dt;CRV.oy+=vy*dt;crownClamp();
+        if(Math.hypot(vx,vy)>0.02){crownFrame();CRV.mom=requestAnimationFrame(glide)}else{CRV.mom=null;CRV.gesture=false;crownFrame()}};
+      CRV.mom=requestAnimationFrame(glide)};
     document.addEventListener('pointerup',up);document.addEventListener('pointercancel',up);
-    document.addEventListener('wheel',e=>{const box=e.target.closest&&e.target.closest('[data-crown]');if(!box)return;e.preventDefault();z=Math.max(1,Math.min(6,z*(e.deltaY<0?1.1:0.91)));if(z<=1){px=0;py=0}apply()},{passive:false});
-    window.crownReset=function(){z=1;px=0;py=0;apply()};
+    document.addEventListener('wheel',e=>{const cv=inX(e);if(!cv)return;e.preventDefault();const r=cv.getBoundingClientRect();const mx=e.clientX-r.left,my=e.clientY-r.top;
+      const B0=Math.min(CRV.W,CRV.H)/2/(CRV.ext||CROWN_EXT);const wx=(mx-CRV.W/2-CRV.ox)/(B0*CRV.z),wy=(my-CRV.H/2-CRV.oy)/(B0*CRV.z);const C=S._crownM;
+      CRV.z=Math.max(0.9,Math.min(C?crownZmax(C):8,CRV.z*(e.deltaY<0?1.12:0.9)));CRV.ox=mx-CRV.W/2-wx*B0*CRV.z;CRV.oy=my-CRV.H/2-wy*B0*CRV.z;crownClamp();crownFrame()},{passive:false});
+    window.addEventListener('resize',()=>{try{if(CRV.home||CRV.cv){if(CRV.home)crownSize(CRV.home);if(CRV.cv){const r=crownSize(CRV.cv);CRV.W=r.W;CRV.H=r.H}crownDraw()}}catch(e){oops('crownResize',e)}});
+    window.crownReset=function(){CRV.z=1;CRV.ox=0;CRV.oy=0};
   }catch(e){oops('crownGestures',e)}
 })();
 /* ══ THE CREST (24-25 Sep 2026) ═══════════════════════════════
@@ -29718,23 +30371,26 @@ function ceremonyHtml(c){
   ((c.me&&!c.pod)?'<p class="cerF" style="color:var(--text);font-size:15px;font-weight:600;margin-top:20px;animation:cerf .6s 1.9s both">You finished '+ordinal(c.me.rank)+' of '+c.me.total+' with '+c.me.pts+' point'+(c.me.pts===1?'':'s')+'.</p>':'')+
   (c.pod?'<p class="cerF" style="color:var(--faint);font-size:11px;margin-top:16px;animation:cerf .6s 2s both">Each bar is a pod\u2019s total, as of your last open. Nobody is named.</p>':'')+
   '<p class="cerF" style="color:var(--faint);font-size:13px;margin-top:24px;animation:cerf .6s 2.4s both">Fresh week. Tap to start it.</p></div>'}
-function viewToday(){
-  const dateLine=new Date().toLocaleDateString(undefined,{weekday:'long',day:'numeric',month:'long'});
-  let h='<div class="view pad stg phpad">';
-  /* two doors, side by side (owner, 15 Sep): the tree for what the
-     engines found, the ring for the read that is arming */
-  /* ONE DOOR TO THE TREE (17 Sep 2026, redesign research T2): the header
-     carried a second tree icon with the same red count as the centre
-     tab three inches below it — the exact duplication the 16 Sep "NO
-     ROOM HAS TWO DOORS" ruling removed from the drawer; the tree was
-     missed because tabBarRooms() filters it out of onBar. The centre tab
-     is the door; the header keeps the deep read's ring alone. */
-  /* THE READ LEFT THE HEADER TOO (owner, 17 Sep 2026): it is a hamburger
-     row now, and on the days it is ready it announces itself as a pill on
-     Today (deepPill in todayOrder). The header carries nothing. */
-  /* the date is the header's subtitle now (design system, 17 Sep 2026);
-     the greeting line said the same date again and went */
-  h+=pageHead('Today','',{noBtns:1,sub:dateLine});
+/* ONLY THE DAY'S FIND SITS UNDER THE TREE (owner, 27 Sep 2026: "get rid
+   of how you woke up pill, get rid of bench and the rest of the lift pills.
+   Just keep found today pill and that's it"). The full Found-today card,
+   only on a day something was found. The morning prompt still
+   asks for itself (morningAsk), and the lifts live on the tree's own page. */
+function todayFoundRow(){
+  /* the daily reveal still queues from here, as it did from Today */
+  try{if(!S._peek&&!S.signalReveal&&!S.signalShownFor){const sg=(typeof revealDue==='function'?revealDue():signalDue());
+    if(sg){S.signalShownFor=sg.id;S.signalReveal=sg;setTimeout(function(){render()},400)}}}catch(e){oops('foundReveal',e)}
+  /* full size, the same card Today always drew (owner, 27 Sep 2026:
+     "should be able to see found today pill in full size like normal") */
+  try{const c=newFindsCard();return c?'<div data-strip="found">'+c+'</div>':''}
+  catch(e){oops('todayFoundRow',e);return ''}}
+/* TODAY LIVES ON THE TREE SCREEN (owner, 27 Sep 2026: "need to keep
+   today in the tree screen. needs to be all in one page"). The body is one
+   function so the crown's first screen and the Today view draw the same
+   thing; the drawer has no Today row, and a route to 'today' lands on the
+   crown. */
+function todayBody(){
+  let h='';
   /* EMPTY STATES SHOW EXAMPLES, NEVER A BLANK (18 Sep 2026, onboarding
      redesign): a brand-new account gets the two-sentence explainer (the
      same first line the guided tour opens on) and three labelled
@@ -29895,6 +30551,25 @@ function viewToday(){
           (Ls.length>4?'<p class="mono" style="color:var(--faint);font-size:var(--t-caption);margin-top:4px;text-align:left">and '+(Ls.length-4)+' more racing</p>':'')+'</div>':'')+'</button>'}}}catch(e){}
   h+=verdictCard();
   h+=todayOrder().join('');
+  return h}
+function viewToday(){
+  const dateLine=new Date().toLocaleDateString(undefined,{weekday:'long',day:'numeric',month:'long'});
+  let h='<div class="view pad stg phpad">';
+  /* two doors, side by side (owner, 15 Sep): the tree for what the
+     engines found, the ring for the read that is arming */
+  /* ONE DOOR TO THE TREE (17 Sep 2026, redesign research T2): the header
+     carried a second tree icon with the same red count as the centre
+     tab three inches below it — the exact duplication the 16 Sep "NO
+     ROOM HAS TWO DOORS" ruling removed from the drawer; the tree was
+     missed because tabBarRooms() filters it out of onBar. The centre tab
+     is the door; the header keeps the deep read's ring alone. */
+  /* THE READ LEFT THE HEADER TOO (owner, 17 Sep 2026): it is a hamburger
+     row now, and on the days it is ready it announces itself as a pill on
+     Today (deepPill in todayOrder). The header carries nothing. */
+  /* the date is the header's subtitle now (design system, 17 Sep 2026);
+     the greeting line said the same date again and went */
+  h+=pageHead('Today','',{noBtns:1,sub:dateLine});
+  h+=todayBody();
   /* a hit goal outranks the weekly podium — it is the rarer moment */
   try{const gc=goalCerDue();if(gc)h+=goalCerHtml(gc);
     else if(!S.sheet&&(function(){try{const cu=(typeof crestUpDue==='function')?crestUpDue():null;if(!cu)return false;
@@ -30192,21 +30867,51 @@ function dayReviewLines(p,di){
   lines.push('About '+Math.max(5,Math.round(mins))+' minutes as written.');
  }catch(e){if(!lines.length)lines.push('Saved.')}
  return lines}
+/* ══ A PR IS A RECORD AT THE TIME (27 Sep 2026, crown research track 3) ══
+   sessionPRs used to compare a session against EVERY other session,
+   later ones included, so a July record lost its blossom the day August
+   beat it and only the current all-time best could ever show one (with
+   repeated equal tops, none at all: the demo read "Nothing yet" over 111
+   sessions). One chronological pass now answers for the whole record:
+   a set is a PR when it beats every EARLIER session's best for that lift.
+   A set logged at RPE 6 or easier never counts as a PR: one misjudged
+   rep of reps-in-reserve moves the estimate about 3% (Halperin 2022), and
+   a light day is exactly where that error lives. */
+function prMap(){
+  const H=S.history||[];
+  let stamp=H.length;try{H.forEach(h=>{stamp+=':'+h.id+'.'+((h.log&&h.log.length)||0)})}catch(e){oops('prStamp',e)}
+  if(S._prMap&&S._prMap.stamp===stamp)return S._prMap.m;
+  const m={},best={};
+  const rows=H.slice().sort((a,b)=>new Date(a.date).getTime()-new Date(b.date).getTime());
+  rows.forEach(h=>{if(h.run||!h.log||!h.log.length)return;
+    const top={},out=[];
+    h.log.forEach(l=>{if(!l.w||!l.r)return;const b=gBase(l.ex);const e=e1rm(l.w,l.r,l.rpe);
+      /* an easy set neither sets a PR nor raises the bar the next one must clear */
+      if(l.rpe!=null&&l.rpe!==''&&+l.rpe<=6)return;
+      top[b]=Math.max(top[b]||0,e);
+      const prior=best[b]||0;
+      if(prior&&e>prior+0.5&&!out.some(x=>x.ex===b))out.push({ex:b,e:Math.round(e),prev:Math.round(prior)})});
+    /* a PR row keeps its own best set's figure, not the first set past the bar */
+    out.forEach(x=>{x.e=Math.round(Math.max(x.e,(function(){let t=0;h.log.forEach(l=>{if(gBase(l.ex)===x.ex&&l.w&&l.r&&!(l.rpe!=null&&l.rpe!==''&&+l.rpe<=6))t=Math.max(t,e1rm(l.w,l.r,l.rpe))});return t})()))});
+    if(out.length)m[String(h.id)]=out;
+    Object.keys(top).forEach(b=>{best[b]=Math.max(best[b]||0,top[b])})});
+  S._prMap={stamp,m};return m}
 function sessionPRs(s2){
   if(!s2)return[];
-  const out=[],seen={};
   /* the session's own history row is id=String(startedAt) — s2.id
      never existed, so the session compared against ITSELF and the
      completion screen never showed a best (owner-caught, 9 Sep:
      'said nothing about my 4 prs'). */
   const sid=String(s2.id||s2.startedAt||'');
-  s2.log.forEach(l=>{
-    if(!l.w||!l.r)return;
+  if((S.history||[]).some(h=>String(h.id)===sid))return (prMap()[sid]||[]).slice();
+  /* a session not in the record yet (the live one): every row so far is earlier */
+  const out=[],seen={};
+  (s2.log||[]).forEach(l=>{
+    if(!l.w||!l.r)return;if(l.rpe!=null&&l.rpe!==''&&+l.rpe<=6)return;
     const b=gBase(l.ex);if(seen[b])return;
     const e=e1rm(l.w,l.r,l.rpe);
     let prior=0;
-    S.history.forEach(h=>{if(String(h.id)===sid)return;
-      h.log.forEach(x=>{if(gBase(x.ex)===b&&x.w&&x.r)prior=Math.max(prior,e1rm(x.w,x.r,x.rpe))})});
+    (S.history||[]).forEach(h=>{(h.log||[]).forEach(x=>{if(gBase(x.ex)===b&&x.w&&x.r&&!(x.rpe!=null&&x.rpe!==''&&+x.rpe<=6))prior=Math.max(prior,e1rm(x.w,x.r,x.rpe))})});
     if(prior&&e>prior+0.5){seen[b]=1;out.push({ex:b,e:Math.round(e),prev:Math.round(prior)})}});
   return out}
 
@@ -30856,6 +31561,66 @@ function liftPts(ex){const raw=[];
     const last=m[m.length-1];
     if(last&&last.k===k)last.v=Math.max(last.v,p.v);else m.push({k:k,t:p.t,v:p.v})});
   return m}
+/* ══ ONE READER FOR "IS THIS LIFT MOVING?" (27 Sep 2026, crown research
+   track 3, research/crown-2026-09/03-lift-progress.md) ════════════════════
+   liftPts plots every session, so a heavy/light split draws a saw. The
+   trend reads ONE point per trained week: that week's best NEAR-LIMIT set
+   (RPE 7 or harder when RPE is logged, 10 reps or fewer when it is not).
+   A week where the lift was only done easy is kept as a hollow point and
+   left out of the maths. The headline is the median of the first three
+   and the last three weekly bests in the window, so one odd week cannot
+   swing it. Whether the move is real is judged against the lifter's OWN
+   week-to-week swing (the SD of consecutive weekly differences, the way
+   libNoise reads weight and HRV): band = 1.96·sd·√(2/3). Until eight
+   consecutive-week pairs exist there is no band and no verdict word, only
+   the two numbers (R19: cannot-say is not no). A tested 1RM repeats to
+   about 3-4% (Grgic 2020), which is why a smaller swing is never a change.
+   names: one lift name or an array of aliases (a goal's goalNames). */
+function liftTrend(names,opts){
+  opts=opts||{};const NM=Array.isArray(names)?names:[names];
+  const monKey=t=>{const d=new Date(t);d.setHours(12,0,0,0);const dow=(d.getDay()+6)%7;d.setDate(d.getDate()-dow);return dayKey(d)};
+  const wk={};let any=0;
+  (S.history||[]).forEach(h=>{if(h.run||!h.log)return;const t=new Date(h.date).getTime();if(!isFinite(t))return;
+    h.log.forEach(l=>{if(NM.indexOf(gBase(l.ex))<0||!l.w||!l.r)return;any++;
+      const k=monKey(t);const W=wk[k]||(wk[k]={k,t:new Date(k+'T12:00').getTime(),v:0,light:0,reps:[]});
+      const e=e1rm(+l.w,+l.r,l.rpe);
+      const hasR=l.rpe!=null&&l.rpe!=='';const near=hasR?(+l.rpe>=7):(+l.r<=10);
+      if(near){if(e>W.v)W.v=e;W.reps.push(+l.r)}else if(e>W.light)W.light=e})});
+  if(!any)return null;
+  const all=Object.keys(wk).sort().map(k=>wk[k]);
+  const pts=all.filter(w=>w.v>0).map(w=>({k:w.k,t:w.t,v:Math.round(w.v*10)/10,reps:w.reps}));
+  const hollow=all.filter(w=>!w.v&&w.light).map(w=>({k:w.k,t:w.t,v:Math.round(w.light*10)/10}));
+  const med=a=>{const b=a.slice().sort((x,y)=>x-y);const n=b.length;return n?(n%2?b[(n-1)/2]:(b[n/2-1]+b[n/2])/2):0};
+  const WEEK=7*864e5;
+  /* the lifter's own swing: consecutive calendar weeks only, a >15% jump is a logging error */
+  const diffs=[];for(let i=1;i<pts.length;i++){if(Math.round((pts[i].t-pts[i-1].t)/WEEK)!==1)continue;const d=pts[i].v-pts[i-1].v;if(Math.abs(d)>pts[i-1].v*0.15)continue;diffs.push(d)}
+  let sd=null;if(diffs.length>=8){const m=diffs.reduce((a,b)=>a+b,0)/diffs.length;sd=Math.sqrt(diffs.reduce((a,b)=>a+(b-m)*(b-m),0)/(diffs.length-1))}
+  const band=sd!=null?Math.max(0.5,1.96*sd*Math.sqrt(2/3)):null;
+  /* a break: 3+ calendar weeks without a near-limit week before the latest run of weeks */
+  let back=null;{let j=pts.length-1;while(j>0&&Math.round((pts[j].t-pts[j-1].t)/WEEK)<3)j--;
+    if(j>0&&Math.round((pts[j].t-pts[j-1].t)/WEEK)>=3&&pts.length-j<=3){const before=Math.max.apply(null,pts.slice(0,j).map(p=>p.v));back={gapW:Math.round((pts[j].t-pts[j-1].t)/WEEK)-1,weeksBack:pts.length-j,best:Math.round(before),now:Math.round(pts[pts.length-1].v)}}}
+  /* a rep-bracket switch that held 2+ weeks restarts the comparison from there */
+  const br=r=>r<=5?1:r<=10?2:3;const modal=p=>{const c={};(p.reps||[]).forEach(r=>{const b=br(r);c[b]=(c[b]||0)+1});let bb=0,bn=-1;Object.keys(c).forEach(b=>{if(c[b]>bn){bn=c[b];bb=+b}});return bb};
+  let from0=Math.max(0,pts.length-12),sw=null;
+  for(let i=pts.length-2;i>from0;i--){const bi=modal(pts[i]),bp=modal(pts[i-1]);if(bi&&bp&&bi!==bp&&modal(pts[i+1])===bi){if(pts.length-i>=3){sw={k:pts[i].k,from:bp,to:bi};from0=i}break}}
+  const win=pts.slice(from0);
+  const res={pts,hollow,win,sd,band,back,sw,n:pts.length,spanW:pts.length?Math.round((pts[pts.length-1].t-pts[0].t)/WEEK)+1:0,
+    best:pts.length?Math.round(Math.max.apply(null,pts.map(p=>p.v))):0,now:pts.length?Math.round(pts[pts.length-1].v):0};
+  if(pts.length<6||res.spanW<6){res.state='early';return res}
+  if(win.length<6){res.state=back?'back':'early';if(back)res.state='back';return res}
+  res.from=Math.round(med(win.slice(0,3).map(p=>p.v)));res.to=Math.round(med(win.slice(-3).map(p=>p.v)));
+  res.fromK=win[0].k;res.toK=win[win.length-1].k;res.weeks=Math.round((win[win.length-1].t-win[0].t)/WEEK)+1;
+  const d=res.to-res.from;
+  if(back)res.state='back';
+  else if(band==null)res.state='noband';
+  else res.state=d>band?'up':d<-band?'down':'level';
+  return res}
+function fmtDay(k){try{return new Date(k+'T12:00').toLocaleDateString(undefined,{day:'numeric',month:'short'})}catch(e){oops('fmtDay',e);return k}}
+/* the physio is named on a decline only when rehab is on or the check-ins carry a flag */
+function goalFlag(){try{return !!((S.acl&&S.acl.on)||(typeof activeProtocols==='function'&&activeProtocols().length)||painRecent())}catch(e){oops('goalFlag',e);return false}}
+/* a pain or swelling flag in the last 28 days of check-ins */
+function painRecent(){try{const cut=dayKey(new Date(Date.now()-28*864e5));const d=checkins();
+  return d.some(c=>c&&c.date>=cut&&((+c.pain||0)>=4||c.swell))}catch(e){oops('painRecent',e);return false}}
 function trendSlope(pts){const win=pts.filter(p=>p.t>=Date.now()-120*864e5);
   if(win.length<3||win[win.length-1].t-win[0].t<14*864e5)return null;
   const n=win.length;let mx=0,my=0;win.forEach(p=>{mx+=p.t;my+=p.v});mx/=n;my/=n;
@@ -31543,6 +32308,7 @@ function viewProgress(){
       if(g.done){sub='Done \u00b7 '+fmtDate(g.done)+'.';col='var(--green)'}
       else if(st.cur>=st.target){sub='Strength is there. Go take the set.';col='var(--amber)'}
       else if(wk9){sub='On trend for about '+wk9+' week'+(wk9===1?'':'s')+'.';col='var(--green)'}
+      else if(st.down){sub='Down about '+st.down+' kg over the last '+st.spanWk+' weeks.'+(goalFlag()?' Worth raising with your physio.':'');col='var(--amber)'}
       else if(st.flat){sub='Trend flat. Projection paused.';col='var(--amber)'}
       else sub='Too few sessions to call a trend yet.';
       h2+=(surfOn('chart')?'<button data-a="chartOpen" data-v="goal:'+esc(g.ex)+'"':'<div')+' class="card mt" style="width:100%;text-align:left;padding:18px;display:block">'+
@@ -32397,7 +33163,7 @@ function viewMe(){
 function sheetHtml(){
   if(!S.sheet)return '';
   if(S.sheet.t==='pod'&&typeof podSheet==='function')return podSheet();
-  if((S.sheet.t==='crownleaf'||S.sheet.t==='crownlink'||S.sheet.t==='crownread')&&typeof crownSheet==='function'){const cr9=crownSheet();if(cr9!=null)return cr9}
+  if((S.sheet.t==='crownleaf'||S.sheet.t==='crownlift'||S.sheet.t==='crownroot'||S.sheet.t==='crownread')&&typeof crownSheet==='function'){const cr9=crownSheet();if(cr9!=null)return cr9}
   if((S.sheet.t==='txsess'||S.sheet.t==='txset'||S.sheet.t==='txrun')&&typeof treeXSheet==='function'){const tx9=treeXSheet();if(tx9)return tx9}
   if(S.sheet.t==='discard')return wrapSheet('Discard session',
     '<p style="color:var(--dim);font-size:15px;line-height:1.55">Throws away everything from this session, including the '+
@@ -35006,6 +35772,10 @@ function render(){
      already uses — never the onboarding/system views, which are never
      gated. Read live, every render, never cached. */
   if(!surfOn(S.view)&&!SURF_NEVER_GATE[S.view])S.view='today';
+  /* TODAY LIVES ON THE TREE SCREEN (owner, 27 Sep 2026): every route to
+     Today — a notification tap, a fallback, a Back — lands on the crown,
+     which draws Today's body under the tree */
+  if(S.view==='today')S.view='crown';
   /* usage counters: once per view CHANGE, never once per render — a
      render fires on every keystroke and set logged */
   if(S.view!==S._lastView){S._lastView=S.view;
@@ -35015,7 +35785,7 @@ function render(){
   const pos=key&&ae.selectionStart!=null?ae.selectionStart:null;
   let body='';
   try{
-  if(S.view==='today'&&typeof arrivalDue==='function'&&arrivalDue()&&typeof viewArrival==='function')body=viewArrival();   // was below, unreachable (audit)
+  if(S.view==='crown'&&typeof arrivalDue==='function'&&arrivalDue()&&typeof viewArrival==='function')body=viewArrival();   // was below, unreachable (audit)
   else if(S.view==='today')body=viewToday();
   /* THE COLLECTION UNDER THE TREE (Phase 2a): findings never had its own
      door left (both doors now open the points page directly via
@@ -35028,6 +35798,7 @@ function render(){
   else if(S.view==='deep')body=viewDeep();
   else if(S.view==='tree')body=viewTree();
   else if(S.view==='crown')body=viewCrown();
+  else if(S.view==='crownx')body=viewCrownX();
   else if(S.view==='territory')body=viewTerritory();
   else if(S.view==='plans')body=viewPlans();
   else if(S.view==='sub')body=viewSub();
@@ -35064,7 +35835,6 @@ function render(){
   else if(S.view==='guide')body=viewGuide();
   else if(S.view==='acct')body=viewAcct();
   else if(S.view==='social')body=viewSocial();
-  else if(S.view==='today'&&typeof arrivalDue==='function'&&arrivalDue())body=viewArrival();
   else if(S.view==='sigdetail')body=viewSigDetail();
   else if(S.view==='ride')body=viewRide();
   else if(S.view==='chart')body=viewChart();
@@ -35217,6 +35987,7 @@ function render(){
 
   const tabBarHtml=()=>{
     if(S.sess&&S.view==='session')return '';
+    if(S.view==='crownx')return '';
     if(S.boot||S.view==='setup'||S.view==='welcome'||S.view==='day0'||S.view==='signup'||S.view==='obwait'||S.view==='obreveal')return '';
     const T9=tabBarTabs();
     /* the centre one is a different object, not a bigger version of the
@@ -35261,7 +36032,7 @@ function render(){
        still has its drawer row. */
     /* NO ROOM HAS TWO DOORS: Train and Race are on the bar (owner, 26 Sep
        2026), so their rows leave the drawer; everything else lives here */
-    const onBar={today:0,home:1,social:1,progress:0,acl:0,run:0};
+    const onBar={today:1,home:1,social:1,progress:0,acl:0,run:0};   // Today is the tree screen's own body now
     const DOT9={acl:unseenRehab(),run:unseenRun()};
     ['acl','run'].forEach(k9=>{if(!surfOn(k9))DOT9[k9]=0});
     const out=[];
@@ -35598,7 +36369,7 @@ function render(){
        whether the tour is starting THIS render. Nothing here is lost:
        S.signalReveal stays set and simply mounts on a later render, once
        the tour has appeared or finished — see the !S.tour guard below. */
-    try{if(!S.tour&&!S._tourChecked&&S.view==='today'&&S.boot==null&&!S.sheet&&!S.sess){
+    try{if(!S.tour&&!S._tourChecked&&S.view==='crown'&&S.boot==null&&!S.sheet&&!S.sess){
       /* THE TOUR WAITS FOR TODAY, NOT JUST S.view (18 Sep 2026): the
          "Your data arrived" screen (viewArrival) also renders while
          S.view==='today', and its own full-screen moment has nowhere
@@ -35708,6 +36479,7 @@ function render(){
     try{cuSweep()}catch(e){}
     try{if(S.tour)tourPosition()}catch(e){oops('tourPositionCall',e)}
     try{if(typeof treeXAfterRender==='function')treeXAfterRender()}catch(e){oops('treeXAfterRender',e)}
+    try{if(typeof crownAfterRender==='function')crownAfterRender()}catch(e){oops('crownAfterRender',e)}
     if(S.scrollTo)setTimeout(doScroll,30);
     try{const dr=document.getElementById('drawer');
       /* slide in only on a FRESH open — a re-render while the drawer is
@@ -37343,7 +38115,19 @@ function runAction(a,v,t,e){
       S.treeFocus=fid;S._txGoto=fid?txElId('find',fid):null;if(!fid)S._txScroll=null;
       setTimeout(function(){try{treeXMarkSeen()}catch(e9){oops('treeXMarkSeen',e9)}},2500);
       render();break}
-    case 'crownFocus':{S.crownFocus=(v==='all'||S.crownFocus===String(v))?null:String(v);render();break}
+    /* THE CROWN'S OWN PAGE (27 Sep 2026): opened from the first screen
+       with a zoom from where the tree sat; rungs, lenses and the panel */
+    case 'crownX':{try{if(String(v||'open')==='open'){const el=document.querySelector('[data-crowncv="home"]');if(el){const r=el.getBoundingClientRect();CRV.flip={left:r.left,top:r.top,w:r.width,h:r.height}}}}catch(e9){oops('crownFlip',e9)}
+      crownGo(v);if(S.view!=='crownx')S.crxBack=S.view;S._navQuiet=1;S.sheet=null;S.drawerOpen=false;S.view='crownx';render();break}
+    case 'crownBack':{if(!crownBackUp()){S.view=S.crxBack||'crown';S.crxBack=null;S._navQuiet=1}render();break}
+    case 'crownCrumb':{if(String(v)!=='leaf'){crownGo(v);render()}break}
+    case 'crownLens':{const X9=crownX();X9.lens=String(v||'all');X9.sel=null;render();break}
+    case 'crownReplay':{crownReplayGo();break}
+    case 'crownLeafOpen':{S.sheet={t:'crownleaf',id:String(v)};render();break}
+    case 'crownRootOpen':{S.sheet={t:'crownroot',id:String(v)};render();break}
+    case 'crownLift':{S.sheet={t:'crownlift',i:+v};render();break}
+    case 'crownBudNo':{S.prof=S.prof||{};S.prof.budNo=S.prof.budNo||{};S.prof.budNo[String(v)]=today();lset(K_PROF,S.prof);
+      if(S._crownM)S._crownM.buds=null;const X9=crownX();X9.sel=null;flash('Taken off the tree.');render();break}
     case 'crownOpen':{S._navQuiet=1;
       S.sheet=null;S.drawerOpen=false;S.view='crown';
       try{if(window.crownReset)window.crownReset()}catch(e9){oops('crownReset',e9)}
