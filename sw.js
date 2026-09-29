@@ -13,8 +13,16 @@
    the current one, so renaming is how a stale page already sitting in the shell
    cache is thrown away rather than kept. A fix can be live, verified by curl, and
    still lose to a copy the phone is holding. */
-const CACHE='allena-shell-v2';
-self.addEventListener('install',e=>{self.skipWaiting()});
+/* v2 -> v3 (28 Sep 2026): throws away the query-string copies v2 kept.
+   The install below re-stores the page before the old cache goes. */
+const CACHE='allena-shell-v3';
+/* THE FIRST OPEN IS KEPT TOO (audit F-22, 28 Sep 2026). The page that
+   installed this worker loaded before the worker could see it, so it was
+   never stored, and someone whose next open was offline got nothing. The
+   page is fetched once at install; a failure here never blocks the
+   install, it only means the first copy arrives on the next open. */
+self.addEventListener('install',e=>{self.skipWaiting();
+  e.waitUntil(caches.open(CACHE).then(c=>fetch(new Request('./',{cache:'reload'})).then(r=>{if(r&&r.ok)return c.put('./',r)})).catch(()=>{}))});
 self.addEventListener('activate',e=>{
   e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim()))});
 function sameOrigin(req){try{return new URL(req.url).origin===self.location.origin}catch(e){return false}}
@@ -39,9 +47,19 @@ function pageFetch(req){
   if(req.mode!=='navigate')return fetch(req);
   try{return fetch(new Request(req,{cache:'reload'}))}catch(e){}
   return fetch(req)}                       // no Request constructor: behave exactly as before
+/* ONE COPY PER PAGE, NOT PER QUERY STRING (audit F-22). A Strava return
+   (?code=…&state=sv) or a ghost link (?ghost=…) was stored under its own
+   URL, one more copy each time; the copy is keyed by the path alone. */
+function keyOf(req){try{const u=new URL(req.url);const k=u.origin+u.pathname;return k===req.url?req:k}catch(e){return req}}
+function fallback(req){
+  return caches.match(keyOf(req)).then(hit=>hit||(req.mode==='navigate'?caches.match('./'):undefined))}
 self.addEventListener('fetch',e=>{
   const req=e.request;
   if(!cacheable(req))return;
   e.respondWith(pageFetch(req).then(res=>{
-    if(res&&res.ok){const copy=res.clone();caches.open(CACHE).then(c=>c.put(req,copy)).catch(()=>{})}
-    return res}).catch(()=>caches.match(req).then(hit=>hit||(req.mode==='navigate'?caches.match('./'):undefined)).then(hit=>hit||Response.error())))});
+    if(res&&res.ok){const copy=res.clone();caches.open(CACHE).then(c=>c.put(keyOf(req),copy)).catch(()=>{});return res}
+    /* a server that answers with an error is not a page: during a
+       deploy or an outage GitHub Pages returns a 404 or a 5xx, and
+       that used to win over the good copy held here (audit F-22) */
+    if(req.mode==='navigate')return fallback(req).then(hit=>hit||res);
+    return res}).catch(()=>fallback(req).then(hit=>hit||Response.error())))});
