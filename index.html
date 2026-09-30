@@ -1743,7 +1743,7 @@ if(S.sess){S.note=S.sess.note||S.note;
       if(c0&&(s0.log||[]).some(l=>l.ex===c0.ex&&l.setNo===c0.setNo)){const n0=sessAdv(s0);
         if(n0<0)s0.phase='done';else s0.idx=n0}}catch(e){oops('bootSess',e)}
     if(S.sess.phase!=='done')S.sess.phase='ready'}}
-const BUILD_ID='eb1bac';  // stamped by tools/build.py with the content hash
+const BUILD_ID='2ad777';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -9894,8 +9894,8 @@ function noticedPool(){
       const covered=fk.some(k=>FOC[k].some(m=>tl.indexOf(m)>=0));
       if(!covered){
         const want=fk.map(k=>k.charAt(0).toUpperCase()+k.slice(1)).join(', ');
-        add('Your sets go to '+top+' — your focus says '+want,
-          top+' has taken '+Math.round(ws[top])+' sets over four weeks, more than anything else, while the emphasis you asked for is '+want+'. Volume follows habit unless you point it.',1)}}}catch(e){}
+        out.push({t:'Your sets go to '+top+' — your focus says '+want,
+          d:top+' has taken '+Math.round(ws[top])+' sets over four weeks, more than anything else, while the emphasis you asked for is '+want+'. Move two of those sets to '+want+' next week.',tier:1,act:1})}}}catch(e){}
   // readiness
   try{const g=(S.gar&&S.gar.days)||{};
     const am=Object.keys(g).map(k=>g[k].am).filter(v=>v!=null);
@@ -10013,8 +10013,8 @@ function noticedPool(){
       (rehabDays[prev]?after:other).push(c.pain)});
     const avg=a=>a.reduce((x,y)=>x+y,0)/a.length;
     if(after.length>=6&&other.length>=6&&avg(after)<avg(other)-0.5)
-      add('Pain runs lower the day after rehab work',
-        'Average '+(Math.round(avg(after)*10)/10)+' vs '+(Math.round(avg(other)*10)/10)+' on other days, across '+(after.length+other.length)+' check-ins. The boring exercises are doing exactly what your physio said they would.',1)}}catch(e){}
+      out.push({t:'Pain runs lower the day after rehab work',
+        d:'Average '+(Math.round(avg(after)*10)/10)+' vs '+(Math.round(avg(other)*10)/10)+' on other days, across '+(after.length+other.length)+' check-ins. Keep the rehab sessions in the week, and show your physio this.',tier:1,act:1})}}catch(e){}
   // the quiet climber: up without a single headline set
   try{const cut=dayKey(new Date(Date.now()-30*864e5));const by={};
     H.filter(h=>!h.run).forEach(h=>h.log.forEach(l=>{if(!l.w||!l.r)return;
@@ -10050,7 +10050,7 @@ function noticedPool(){
         add('Session '+next+' lands around '+when.toLocaleDateString(undefined,{month:'long',year:'numeric'}),
           'You are at '+n+', averaging '+(Math.round(rate*10)/10)+' a week since '+fmtDate(first.date)+'. At your own pace — no deadline, just the shape of the road.',3)}}}catch(e){}
   try{if(typeof healthNoticed==='function')healthNoticed().forEach(x=>{if(x.t&&x.d)out.push({t:x.t,d:x.d,tier:1})})}catch(e){}
-  try{if(typeof correlationNoticed==='function')correlationNoticed().forEach(x=>{if(x.t&&x.d)out.push({t:x.t,d:x.d,tier:1})})}catch(e){}
+  try{if(typeof correlationNoticed==='function')correlationNoticed().forEach(x=>{if(x.t&&x.d)out.push({t:x.t,d:x.d,tier:1,act:1})})}catch(e){}
   /* ── the memory generators (owner call, 4 Sep: grow the pool) ── */
   // anniversaries: the same date, a year or six months ago
   try{const marks=[[365,'A year ago today'],[182,'Six months ago today']];
@@ -10097,7 +10097,12 @@ function noticedPool(){
          bookkeeping shelf: reached only when there is nothing else to say. */
       if(run>=4)add(run+' '+names[dw]+' in a row',
         'The same day, week after week \u2014 scheduling is the strongest predictor of long-term progress there is.',3)})}catch(e){}
-  return out}
+  /* ONLY WHAT YOU CAN ACT ON (owner, 30 Sep 2026). Everything above that
+     is not marked `act` is a win, a count or a calendar quirk; the pool
+     that feeds "Allena noticed" keeps only the findings that come with
+     something to do. The rest are left computed and unsaid (hide before
+     delete), so any one can come back as a win if it is ever wanted. */
+  return out.filter(x=>x.act)}
 function noticedToday(){
   /* the boredom fuse (owner call, 7 Sep: 'reps fade by the end' every
      day kills the moment): an observation shown three times sleeps for
@@ -10129,9 +10134,9 @@ function noticedToday(){
          The find-comes-to-you rule is for things the ENGINE found in the
          background. A read the user tapped for stays where it was made;
          the collection keeps it. */
-      .filter(x=>annIsToday(x)&&RANKF(x)<9&&x.tag!=='call'&&x.tag!=='insight'&&!x.contra)   // a backwards pattern never headlines
+      .filter(x=>annIsToday(x)&&RANKF(x)<9&&x.tag!=='call'&&x.tag!=='insight'&&findActionable(x))   // only something to act on headlines (30 Sep 2026)
       .sort((a,b)=>RANKF(a)-RANKF(b))
-      .map(f=>({t:f.t,d:f.d,tier:0,find:1,id:f.id}))}catch(e){oops('noticedFinds',e)}
+      .map(f=>({t:f.t,d:f.d+(f.act?' '+f.act:''),tier:0,find:1,id:f.id}))}catch(e){oops('noticedFinds',e)}
   /* S.daily carries the fuse counter, so it must EXIST before ntc points
      at it — a detached ntc counts into a throwaway object and the fuse
      silently stops counting (13 Sep review). */
@@ -19124,7 +19129,48 @@ function discoveries(){
   try{if(typeof libFindings==='function')libFindings().forEach(d9=>D.push(d9))}catch(e){oops('libFindings',e)}
   try{if(typeof correlationDiscoveries==='function')correlationDiscoveries().forEach(d9=>D.push(d9))}catch(e){oops('correlationDiscoveries',e)}
   try{if(typeof standingDiscoveries==='function')standingDiscoveries().forEach(d9=>D.push(d9))}catch(e){oops('standingDiscoveries',e)}
-  return D}
+  return D.filter(d=>!discFiller(d))}
+/* ═══ WINS, NOT FINDINGS (owner, 30 Sep 2026: records "still grow the tree
+   and points. They just stop being called findings and stop filling the
+   Found-today card. Filler like '250 sets logged' and 19 'momentum' cards
+   goes.") ═══════════════════════════════════════════════════════════════
+   One reader for what is filler, used on what the engines make AND on what
+   is already in the bank, so the two cannot disagree. Filler is anything
+   that is neither something to act on nor a real record: counts of sets,
+   sessions and days, streaks, the calendar, block-vs-block tonnage,
+   first-time bookkeeping, "momentum", and the heuristics a stricter engine
+   now owns (sleep and carbs against a lift, HRV after rest days, set fade,
+   time of day). What stays: records and new bests, round numbers, strength
+   rungs, running and riding records, body composition, rehab milestones,
+   the aerobic wins, and the actionable findings from the grid. */
+const DISC_FILLER_TAGS={milestone:1,streak:1,timing:1,block:1,first:1,obscure:1,session:1,reps:1};
+function discFiller(d){
+  try{if(!d)return false;
+    const id=String(d.id||''),t=String(d.t||''),tag=d.tag||'';
+    if(/^(corrup|corrback|corrgone):/.test(id))return true;
+    if(/^corr:/.test(id))return !!(d.contra||d.sched)||!corrIdActionable(id);
+    if(/^lib:(b2|b3|d1)$/.test(id))return true;   // the grid says these, once
+    if(DISC_FILLER_TAGS[tag])return true;
+    if(/^(sets|sessions|streak|timing|block|reps|first|obscure|record:30d|record:run30d|run:km|sess):/.test(id))return true;
+    if(/^(Momentum on |Biggest session yet|Longest session:|First |You came back|Three sessions in|25 sets in|A full week done|Three blood draws)/.test(t))return true;
+    /* the health heuristics: only the fitness wins stay */
+    if(/^hkd:/.test(id)||(tag==='signal'&&!/^(corr|lib):/.test(id)))
+      return !/^(Resting heart rate down|VO\u2082max up|VO₂max up|Your engine is showing)/.test(t);
+    return false}
+  catch(e){oops('discFiller',e);return false}}
+/* a banked correlation is still something to act on when some member of its
+   signal family is a lever for that outcome at that delay */
+function corrIdActionable(id){
+  try{const m=/^corr:([a-z0-9]+):(.+):(\d)$/.exec(String(id));if(!m)return false;
+    const fam=m[1],out=m[2],lag=+m[3];
+    const members=Object.keys(CORR_FAMILY).filter(k=>CORR_FAMILY[k]===fam).concat([fam]);
+    return members.some(s=>corrActPair(s,out,lag))}
+  catch(e){oops('corrIdActionable',e);return false}}
+/* THE OLD CARDS STAY (owner, 30 Sep 2026: "keep them"). Filler already in
+   somebody's collection was earned under the old rules, and its points ride
+   the collection board, so nothing deletes it: the engines stop making new
+   filler (discoveries() above) and findActionable() keeps what is banked
+   off every surface that calls something a finding. */
 (function(){try{
   if(lget('training-walkfix-v1',null))return;
   const bank=discBank();let dirty=false;
@@ -19251,7 +19297,15 @@ function archiveSweep(){
      and the daily rhythm starts honest at zero. Insights (tag
      'signal') and patterns are exempt: they are current truths about
      the body, few in number, and reveal paced. */
+  /* THE CATALOGUE IS FILED BEFORE THE DAY'S NEWS IS CHOSEN (30 Sep 2026).
+     bankDiscoveries ends by running the drip, which spends today's
+     allowance on the oldest backdated finds, so three archive records
+     from months ago were announced as today's news before the loop below
+     could file them. The day's filler used to eat that allowance first,
+     which hid it; with the filler gone it showed. The drip waits here. */
+  S._annHold=1;
   try{bankDiscoveries()}catch(e){oops('archiveSweep',e)}
+  finally{S._annHold=0}
   try{
     const seen=discoverySeen();let n=0;
     discoveries().forEach(d=>{if(d.tag==='signal')return;
@@ -19358,12 +19412,10 @@ function bootEnd(){
   try{const el=document.getElementById('boot');
     if(el&&el.classList){el.classList.add('out');
       setTimeout(function(){S.boot=null;render();
-        if(S.morningQueued){S.morningQueued=false;setTimeout(function(){morningAsk()},260)}
-        if(S.dfQueued){S.dfQueued=false;setTimeout(function(){dailyFindAsk()},900)}},380);return}}catch(e){oops('bootEnd',e)}
+        if(S.morningQueued){S.morningQueued=false;setTimeout(function(){morningAsk()},260)}},380);return}}catch(e){oops('bootEnd',e)}
   S.boot=null;render();
   // whatever was waiting behind the animation gets its turn now
-  if(S.morningQueued){S.morningQueued=false;setTimeout(function(){morningAsk()},260)}
-  if(S.dfQueued){S.dfQueued=false;setTimeout(function(){dailyFindAsk()},900)}}
+  if(S.morningQueued){S.morningQueued=false;setTimeout(function(){morningAsk()},260)}}
 
 /* ══ the tree ═══════════════════════════════════════════════
    Every number in this app is comparable — points, sets, weeks.
@@ -20334,6 +20386,14 @@ function corrSettled(f,k){
   try{if(k!==today())return true;
     if(CORR_CUMUL[f])return false;
     return (typeof hkdSettled==='function')?hkdSettled(f,k):true}catch(e){return true}}
+/* which of the three big lifts a logged name counts toward. One reader:
+   the grid files a day's bench top set with it, and today's line asks it
+   whether bench is on the plan, so "Barbell bench press" is bench in both. */
+const CORR_BIG={bench:/(^|\s)bench/,squat:/squat/,dead:/deadlift/};
+const CORR_VETO={bench:/dip|dumbbell|incline|decline|close|floor|machine/,
+  squat:/front|split|bulg|goblet|hack|box|jump/,dead:/romanian|rdl|stiff|single/};
+function corrBigOf(name){const b=String(name||'').toLowerCase();
+  return Object.keys(CORR_BIG).find(k=>CORR_BIG[k].test(b)&&!CORR_VETO[k].test(b))||null}
 function corrDayData(){
   /* one row per calendar day: the signals available that morning,
      and the training outcomes recorded that day */
@@ -20380,9 +20440,7 @@ function corrDayData(){
   const corrRehab=h=>{try{const p9=((S.lib&&S.lib.programs)||[]).find(x=>x.id===h.progId);
     return !!(p9&&(p9.acl||p9.rehabProto))}catch(e){oops('corr.rehabRow',e);return false}};
   try{const acc={};
-    const big={bench:/(^|\s)bench/,squat:/squat/,dead:/deadlift/};
-    const veto={bench:/dip|dumbbell|incline|decline|close|floor|machine/,
-      squat:/front|split|bulg|goblet|hack|box|jump/,dead:/romanian|rdl|stiff|single/};
+    const big=CORR_BIG,veto=CORR_VETO;
     (S.history||[]).forEach(h=>{if(!h.complete||h.run||corrRehab(h))return;
     const k=hKey(h);
     const a=acc[k]=acc[k]||{best:0,ton:0,rpes:[],tops:{},gaps:[],mins:0,logged:0,planned:0,fades:[],hour:null,hourAt:Infinity};
@@ -20612,6 +20670,13 @@ function corrMaps(days){
      ex: outcome present in the rows and the windowed signal variants */
   const sigs=Object.assign({},CORR_SIGNALS,CORR_SIGNALS3);
   const outs=Object.assign({},CORR_OUTCOMES);
+  /* the day's best set across lifts, total volume, rep fade, plan
+     adherence and bike efficiency are not things a lever acts on one lift
+     at a time (30 Sep 2026), so they leave BEFORE the twin collapse below.
+     Left in, a one-lift account's bench and "best set of the day" are the
+     same series, the collapse kept the mixed one, and the gate then
+     refused it: the bench finding vanished. */
+  ['topset','tonnage','fade','adher','rideeff'].forEach(k=>{delete outs[k]});
   const seenEx={};
   Object.keys(days).forEach(k=>Object.keys(days[k]).forEach(f=>{
     if(f.slice(0,3)==='ex:'&&!seenEx[f]){seenEx[f]=1;
@@ -20772,7 +20837,7 @@ function corrIdentity(c){
    the very first launch on a device pays the old cost once. */
 const K_CORRC='training-corrcache-v1';
 function corrStamp(){
-  return today()+':'+(S.history||[]).length+':'+(S.runs||[]).length+':'+
+  return 'a1:'+today()+':'+(S.history||[]).length+':'+(S.runs||[]).length+':'+
     (function(){try{return Object.keys(hkDailyStore().days).length}catch(e){return 0}})()}
 function corrCache(){
   if(S._corrDisk===undefined){try{S._corrDisk=lget(K_CORRC,null)}catch(e){S._corrDisk=null}}
@@ -20859,6 +20924,7 @@ function correlations(){
       Object.keys(M.outs).forEach(out=>{
         [0,1,2].forEach(lag=>{
           if(corrRefused(sig,out,lag,M))return;
+          if(!corrActPair(sig,out,lag))return;
           const pairs=[],pdays=[];
           keys.forEach(k=>{
             const s=days[k]&&days[k][sig];
@@ -20884,6 +20950,8 @@ function correlations(){
           {const half=Math.floor(pairs.length/2);
             const r1=spearman(pairs.slice(0,half)),r2=spearman(pairs.slice(half));
             if(!r1||!r2||r1.rho*r2.rho<=0||Math.abs(r1.rho)<0.25||Math.abs(r2.rho)<0.25)return}
+          /* a direction the science does not back is never said (owner, 30 Sep 2026) */
+          if(!corrExpectOk({sig:sig,out:out,rho:r.rho}))return;
           found.push({sig:sig,out:out,lag:lag,rho:r.rho,n:r.n,k:pdays[11]||pdays[pdays.length-1],   // the twelfth paired day: when it could first have cleared the bar
             score:Math.abs(r.rho)*Math.sqrt(r.n)})})})});
     found.sort((a,b)=>b.score-a.score);
@@ -20913,9 +20981,15 @@ function correlations(){
        "also seen as". Identity is family:outcome, so the id stays the
        same when the strongest member changes (see corrIdentity). */
     const byFam={};
-    const distinct=perSig.filter(f=>{const k=corrFamily(f.sig)+'|'+f.out;
+    const distinct0=perSig.filter(f=>{const k=corrFamily(f.sig)+'|'+f.out;
       if(byFam[k]){byFam[k].also=(byFam[k].also||[]).concat([f.sig]);return false}
       byFam[k]=f;f.fam=corrFamily(f.sig);return true});
+    /* ONE FACT, SAID ONCE (30 Sep 2026, the notes audit's #11): carbs and
+       total food are one lever seen twice, and run pace and heartbeats per
+       km are one run seen twice. The strongest speaks. */
+    const byGrp={};
+    const distinct=distinct0.filter(f=>{const k=corrSigGroup(f.sig)+'|'+corrOutGroup(f.out);
+      if(byGrp[k])return false;byGrp[k]=1;return true});
     /* THE RESERVOIR WIDENED AGAIN (owner, 13 Sep: "loving the top four
        findings, more of them please"). THREE per outcome, thirty-two
        kept. Not one gate moved to do it: |rho| >= 0.5, n >= 12,
@@ -20965,6 +21039,13 @@ function corrEffect(id){
     const live=correlations()||[];
     const f=live.find(c=>{try{return corrIdentity(c)===id}catch(e){oops('corrEffectId',e);return false}});
     if(!f)return null;
+    return corrEffectOf(f)}
+  catch(e){oops('corrEffect',e);return null}}
+/* the two halves of the user's own days for one live finding (split out
+   30 Sep 2026 so the finding's own words and the root sheet read the same
+   numbers) */
+function corrEffectOf(f){
+  try{
     const stamp=corrStamp();
     if(!S._corrDays||S._corrDays.stamp!==stamp)S._corrDays={stamp:stamp,d:corrDayData()};
     const days=S._corrDays.d;
@@ -20993,8 +21074,9 @@ function corrEffect(id){
       hiMean:ou[1](mean(hi)),loMean:ou[1](mean(lo)),hiN:hi.length,loN:lo.length,
       together:together,counted:counted,chance:Math.round(counted/2),
       first:pairs[0].k,last:pairs[pairs.length-1].k,
-      outDays:pairs.map(p=>p.ok),sigDays:pairs.map(p=>p.k)}}
-  catch(e){oops('corrEffect',e);return null}}
+      outDays:pairs.map(p=>p.ok),sigDays:pairs.map(p=>p.k),
+      hiRaw:mean(hi),loRaw:mean(lo),splitRaw:mid}}
+  catch(e){oops('corrEffectOf',e);return null}}
 /* the common-sense layer (beta-caught by Angus, 3 Sep: 'your incline
    bench increase is correlated to less sleep' — statistically real,
    physiologically backwards). Priors encode what exercise science
@@ -21009,6 +21091,168 @@ const CORR_PRIOR={sleep:1,sleep2:1,sleep3:1,hrv:1,hrvswing:1,rhr:1,rhr3:1,ready:
   wtemp:0,resp:0,cyc:0,spo2:1,msteps:0,eprot:0,ecarb:0,sldeep:1,slrem:1,
   flights:0,standmin:0,exmin:0,ambwalk:0,walkspeed:1,walkasym:1,dblsupport:1,
   stairup:1,stairdown:1,sixmwt:1,walksteady:1,hrr:1};
+/* ═══ A FINDING IS SOMETHING YOU CAN ACT ON (owner, 30 Sep 2026: "I think
+   we completely turn the findings engine into something the user can act
+   on exactly like athlytic. If it's a backwards pattern ie probably not true
+   according to the science and literature then we just don't say it.") ═══
+   Three rulings came with it: records are wins, not findings; the findings
+   live in the daily call and one page; and only LEVERS are kept — things a
+   person changes (sleep, protein, carbs, food, how much they lifted or ran
+   the day before, session length, rests) — plus the three MORNING READINGS
+   they can act on that day (HRV, resting heart rate, readiness), which
+   Athlytic's whole product is built on. Weekday, weekend, time of day,
+   weather, wrist temperature, breathing rate, steps and walking gait are
+   gone: there is nothing to do about them.
+   `bad:1` names a lever whose MORE end is expected to cost the outcome (a
+   bigger day before, more running before a leg day). Every other lever's
+   more end is expected to help. A finding that points the other way is
+   never said: the grid drops it before it can bank (corrExpectOk). */
+const CORR_ACT={
+  sleep:{k:'lever',f:'sleep'},sleep2:{k:'lever',f:'sleep'},sleep3:{k:'lever',f:'sleep'},
+  protein:{k:'lever',f:'protein'},protein3:{k:'lever',f:'protein'},
+  carb:{k:'lever',f:'carb'},carb3:{k:'lever',f:'carb'},
+  kcal:{k:'lever',f:'kcal'},kcal3:{k:'lever',f:'kcal'},
+  load:{k:'lever',f:'load',bad:1},load3:{k:'lever',f:'load',bad:1},
+  km:{k:'lever',f:'km',bad:1},km3:{k:'lever',f:'km',bad:1},
+  ridekm:{k:'lever',f:'ridekm',bad:1},sessmins:{k:'lever',f:'sessmins',bad:1},
+  resty:{k:'lever',f:'resty'},
+  hrv:{k:'state',f:'hrv'},rhr:{k:'state',f:'rhr'},rhr3:{k:'state',f:'rhr'},ready:{k:'state',f:'ready'}};
+const CORR_PERF={benchtop:1,squattop:1,deadtop:1,effort:1,pace:1,beatkm:1};
+const CORR_RECOV={sleepo:1,hrvo:1,rhro:1,readyo:1};
+const CORR_REHABO={pain:1,stiff:1,swell:1,conf:1};
+function corrSigGroup(sig){const f=(CORR_ACT[sig]||{}).f||corrFamily(sig);return (f==='carb'||f==='kcal')?'fuel':f}
+function corrOutGroup(out){return (out==='pace'||out==='beatkm')?'run':out}
+function corrSince(k){try{const d=new Date(k+'T12:00');
+  return d.toLocaleDateString(undefined,d.getFullYear()===new Date().getFullYear()?{day:'numeric',month:'short'}:{day:'numeric',month:'short',year:'numeric'})}
+  catch(e){oops('corrSince',e);return k}}
+function corrIsLift(out){return out==='benchtop'||out==='squattop'||out==='deadtop'||String(out).slice(0,3)==='ex:'}
+function corrActPair(sig,out,lag){
+  const a=CORR_ACT[sig];if(!a)return false;
+  const perf=!!CORR_PERF[out]||String(out).slice(0,3)==='ex:';
+  /* a morning reading is acted on that morning, about that day's work */
+  if(a.k==='state')return perf&&lag===0;
+  /* rests between sets are the same session's */
+  if(a.f==='resty')return perf&&lag===0;
+  if(perf)return true;
+  /* next night and next morning read off the day itself; a longer delay
+     cannot be phrased as something to do */
+  if(CORR_RECOV[out]){if(lag!==0)return false;
+    /* whether a big day helps or costs that night's sleep and the next
+       readiness is genuinely open in the literature, so it is not said */
+    if(a.bad&&(out==='sleepo'||out==='readyo'))return false;
+    return true}
+  /* the knee check-ins answer training load and sleep only, and always
+     send the reader to their physio */
+  if(CORR_REHABO[out])return a.f==='sleep'||a.bad===1;
+  return false}
+/* does the named good end of the signal move the outcome the good way.
+   One reader for the grid's gate and the words (was inline in corrPhrase). */
+function corrGood(c){
+  const M=S._corrMaps||{sigs:CORR_SIGNALS,outs:CORR_OUTCOMES};
+  const S9=M.sigs[c.sig]||CORR_SIGNALS[c.sig]||CORR_SIGNALS3[c.sig];
+  const O=M.outs[c.out]||CORR_OUTCOMES[c.out]||(String(c.out).slice(0,3)==='ex:'?{good:'up'}:null);
+  if(!S9||!O)return null;
+  const signalUp=S9.inv?-1:1;
+  const outcomeRises=(c.rho*signalUp)>0;
+  return O.pace?(!outcomeRises):((O.rpe||O.neg)?(!outcomeRises):outcomeRises)}
+function corrExpectOk(c){
+  const a=CORR_ACT[c.sig];if(!a)return false;
+  const g=corrGood(c);if(g==null)return false;
+  return a.bad?!g:g}
+/* ── the words ─────────────────────────────────────────────────────── */
+function corrSigVal(sig,v){
+  const f=(CORR_ACT[sig]||{}).f||sig;
+  if(v==null||!isFinite(v))return '';
+  if(f==='sleep')return (Math.round(v/6)/10)+' h';
+  if(f==='protein'||f==='carb')return Math.round(v)+' g';
+  if(f==='kcal')return (Math.round(v/10)*10).toLocaleString()+' kcal';
+  if(f==='load')return volStr(Math.round(v/100)*100);
+  if(f==='km'||f==='ridekm')return udStr(v);
+  if(f==='sessmins')return Math.round(v)+' min';
+  if(f==='resty')return Math.round(v)+' s';
+  if(f==='hrv')return Math.round(v)+' ms';
+  if(f==='rhr')return Math.round(v)+' bpm';
+  if(f==='ready')return String(Math.round(v));
+  return String(Math.round(v*10)/10)}
+function corrOutVal(out,v){
+  if(v==null||!isFinite(v))return '';
+  if(corrIsLift(out))return uwStr(Math.round(v));
+  if(out==='effort')return 'RPE '+(Math.round(v*10)/10);
+  if(out==='pace')return paceStr(v,1);
+  if(out==='beatkm')return String(Math.round(UNITS.d==='mi'?v/MI_KM:v));
+  if(out==='sleepo')return (Math.round(v/6)/10)+' h';
+  if(out==='hrvo')return Math.round(v)+' ms';
+  if(out==='rhro')return Math.round(v)+' bpm';
+  if(out==='readyo')return String(Math.round(v));
+  return (Math.round(v*10)/10)+' out of 10'}
+/* the smallest gap between the two halves worth saying, in the outcome's
+   own raw units (R19: a change inside the measure's noise is not a change) */
+function corrMinGap(out,ref){
+  if(corrIsLift(out))return Math.max(1,Math.abs(ref||0)*0.01);
+  return ({effort:0.4,pace:0.08,beatkm:8,sleepo:10,hrvo:2,rhro:1,readyo:3}[out])||0.5}
+function corrLiftName(out){
+  if(out==='benchtop')return 'bench';if(out==='squattop')return 'squat';if(out==='deadtop')return 'deadlift';
+  if(String(out).slice(0,3)==='ex:')return String(out).slice(3);return ''}
+function corrOutNoun(out){
+  if(corrIsLift(out))return corrLiftName(out)+' estimated max';
+  return ({effort:'session effort',pace:'run pace',beatkm:'heartbeats per '+udUnit()+' on runs',
+    sleepo:'sleep that night',hrvo:'next-morning HRV',rhro:'next-morning resting heart rate',readyo:'next-morning readiness',
+    pain:'knee pain score',stiff:'stiffness score',swell:'swelling score',conf:'knee confidence'}[out])||'outcome'}
+function corrTargetDays(out){
+  if(corrIsLift(out))return corrLiftName(out)+' days';
+  if(out==='effort')return 'training days';
+  if(out==='pace'||out==='beatkm')return 'runs';
+  if(CORR_REHABO[out])return 'check-ins';
+  return 'days'}
+const CORR_THING={protein:'protein',carb:'carbs',kcal:'food',load:'lifting volume',km:'running',ridekm:'riding',sessmins:'training'};
+/* the two halves as clauses: [above the split, at or below it] */
+function corrArms(c,s){
+  const a=CORR_ACT[c.sig]||{},f=a.f;
+  if(f==='sleep'){
+    const nn=c.sig==='sleep2'?'two nights averaging':c.sig==='sleep3'?'three nights averaging':'nights of';
+    if(c.lag===0)return['after '+nn.replace(' of','')+' over '+s,'after '+nn+' '+s+' or less'];
+    return['when the night before last ran over '+s,'when it ran '+s+' or less']}
+  if(a.k==='state'){const lab=f==='hrv'?'HRV':f==='rhr'?(c.sig==='rhr3'?'a three-morning resting heart rate':'resting heart rate'):'readiness';
+    return['on mornings with '+lab+' over '+s,'on mornings at '+s+' or less']}
+  if(f==='resty')return['in sessions resting over '+s+' between sets','in sessions with shorter rests'];
+  const th=CORR_THING[f]||f;
+  if(corrWindowed(c.sig)){
+    const base=c.lag===1?'the three days before':c.lag===2?'the three days ending two days before':'the three days up to it';
+    return['when '+base+' averaged more than '+s+' of '+th+' a day','when they averaged '+s+' or less']}
+  const base=c.lag===1?'the day before':c.lag===2?'two days before':'the day';
+  return['when '+base+' had more than '+s+' of '+th,'when it had '+s+' or less']}
+function corrWindowed(sig){return /3$/.test(sig)&&sig!=='sleep3'&&sig!=='rhr3'}
+/* the standing action. `hiBetter` says which half the outcome is better on. */
+function corrAction(c,s,hiBetter){
+  const a=CORR_ACT[c.sig]||{},f=a.f,out=c.out,td=corrTargetDays(out);
+  const lift=corrLiftName(out);
+  if(CORR_REHABO[out])return f==='sleep'?'Protect your sleep, and tell your physio what you are seeing.'
+    :'Keep '+(CORR_THING[f]||f)+' to '+s+' or less the day before, and tell your physio what you are seeing.';
+  if(a.k==='state'){const lab=f==='hrv'?'your HRV':f==='rhr'?'your resting heart rate':'your readiness';
+    const side=hiBetter?'reads '+s+' or less':'reads over '+s;
+    const doIt=lift?'keep '+lift+' at your working weight rather than going for a top set'
+      :out==='effort'?'plan to stop a rep earlier, because sessions feel harder'
+      :'keep the run easy';
+    return 'On mornings '+lab+' '+side+', '+doIt+'.'}
+  if(f==='sleep')return 'Aim for more than '+s+' of sleep before '+td+'.';
+  if(f==='resty')return 'Rest more than '+s+' between sets on '+td+'.';
+  const when=c.lag===1?'the day before ':c.lag===2?'two days before ':'on ';
+  if(corrWindowed(c.sig)){const th=CORR_THING[f];
+    const want=CORR_RECOV[out]?(out==='sleepo'?'when you want a better night':'when you want a better next morning'):'in the three days before '+td;
+    return a.bad?'Keep '+th+' to an average of '+s+' a day or less '+want+'.'
+      :'Average more than '+s+' of '+th+' a day '+want+'.'}
+  if(CORR_RECOV[out]){
+    const want=out==='sleepo'?'a better night':'a better next morning';
+    return a.bad?'Keep '+CORR_THING[f]+' to '+s+' or less on days you want '+want+'.'
+      :'Aim for more than '+s+' of '+CORR_THING[f]+' on days you want '+want+'.'}
+  return a.bad?'Keep '+CORR_THING[f]+' to '+s+' or less '+when+td+'.'
+    :'Aim for more than '+s+' of '+CORR_THING[f]+' '+when+td+'.'}
+function corrTitle(c){
+  const a=CORR_ACT[c.sig]||{},f=a.f;
+  const sn={sleep:'Sleep',protein:'Protein',carb:'Carbs',kcal:'Food',load:'Lifting volume',km:'Running',ridekm:'Riding',
+    sessmins:'Session length',resty:'Rest between sets',hrv:'Morning HRV',rhr:'Morning resting heart rate',ready:'Morning readiness'}[f]||'A lever';
+  const on=corrIsLift(c.out)?'your '+corrLiftName(c.out):corrOutNoun(c.out);
+  return sn+' and '+on}
 function corrNames(key){
   /* the plain words for a family|outcome state key, from the same maps
      the live finding reads. Null when either side cannot be named. */
@@ -21025,58 +21269,81 @@ function corrNames(key){
     return{sig:sg,out:on}}
   catch(e){oops('corrNames',e);return null}}
 function corrPhrase(c){
-  const M=S._corrMaps||{sigs:CORR_SIGNALS,outs:CORR_OUTCOMES};
-  /* NEITHER OPERAND CAN TRUST THE LIVE MAP (owner-caught, 19 Sep 2026,
-     twice — a live screenshot both days, same blank "A pattern" card).
-     S._corrMaps is only ever SET on the full-compute path through
-     correlations() — its three cache-hit shortcuts (memo, disk-stamp
-     match, cold-open warm) all return early without touching it. The
-     signal side falls back to CORR_SIGNALS3 for the three-day-window
-     variants (sleep3, rhr3, ...), which corrMaps only ever merged in
-     fresh and the static CORR_SIGNALS never had; the outcome side
-     falls back the same way for a per-lift "ex:" outcome, which
-     corrMaps(days) is the only place that ever built at all. Both
-     fallbacks are safe because neither is really account-dependent —
-     the window signals are fixed literals, and a lift's name comes
-     straight out of its own key — corrNames() already patched around
-     the same two gaps for its own callers (above). */
-  const S9=M.sigs[c.sig]||CORR_SIGNALS[c.sig]||CORR_SIGNALS3[c.sig];
-  const O=M.outs[c.out]||CORR_OUTCOMES[c.out]||
-    (String(c.out).slice(0,3)==='ex:'?{n:String(c.out).slice(3)+' top set',good:'up',dir:1,exo:1}:null);
-  if(!S9||!O)return{title:'A pattern',body:'',strong:false,good:true};
-  // does the signal RISING move the outcome UP or DOWN?
-  const signalUp=S9.inv?-1:1;
-  const outcomeRises=(c.rho*signalUp)>0;   // true = they move together
-  const good=O.pace?(!outcomeRises):(O.rpe||O.neg?(!outcomeRises):outcomeRises);
-  const contra=(CORR_PRIOR[c.sig]===1)&&!good;
-  /* "on the same day more sleep" had no connective (audit G-16), and
-     harder/easier only describes how a session felt: heartbeats per km,
-     rep fade and the knee score go higher and lower */
-  const when=c.lag===0?'on days with':c.lag===1?'the day after':'two days after';
-  const move=O.pace?(outcomeRises?'slower':'faster')
-    :(O.rpe&&c.out==='effort')?(outcomeRises?'harder':'easier')
-    :(outcomeRises?'higher':'lower');
-  /* 'your the stiffness check-in' (owner-caught, 11 Sep): outcome
-     names carry their own article; drop it after 'your' */
-  const on=O.n.replace(/^(a|an|the) /,'');
-  /* TWO SENTENCES ON THE CARD, the reasoning behind More (owner, 11
-     Sep: 'too much writing, should be 2 sentences and a more info
-     thing'). body = what was seen; x = why to read it carefully. */
-  if(contra){
-    const title='A backwards pattern: '+O.n+' vs '+S9.n.replace(/^(a|an|the) /,'');
-    const body='Across '+c.n+' days, your '+on+' tends to run '+move+' '+when+' '+S9.dir+
-      ' (correlation '+(Math.round(c.rho*100)/100)+'). Almost certainly a schedule thing, not '+S9.dir+' hurting, so it is filed as a curiosity and never as advice.';
-    const x='Read it with a raised eyebrow. Far more likely your schedule bunches things (hard sessions landing after short nights, say), or something else drives both. Allena will not coach against '+S9.n+'.';
-    return{title:title,body:body,x:x,strong:false,good:false,contra:true}}
-  const title=O.n.charAt(0).toUpperCase()+O.n.slice(1)+' runs '+move+' after '+S9.n;
-  const also=(c.also||[]).map(a=>(M.sigs[a]||CORR_SIGNALS[a]||CORR_SIGNALS3[a]||{}).n).filter(Boolean);
-  const body='Across '+c.n+' days, your '+on+' tends to be '+move+' '+when+' '+S9.dir+' '+
-    '(correlation '+(Math.round(c.rho*100)/100)+'). '+
-    (S9.sched?'A schedule pattern. The calendar is doing this, not your body, so it is filed as context.'
-      :'A pattern in your own data, not proof of cause. Worth watching.');
-  const x='Found by checking every signal against every outcome in your own days, keeping only links that hold on both halves of the data and clear a strict threshold. It says these two move together, not that one causes the other.'+
-    (also.length?' Also seen as '+also.join(', ')+' \u2014 the same fact through the same family of signals, counted once.':'');
-  return{title:title,body:body,x:x,strong:Math.abs(c.rho)>=0.65&&!S9.sched,good:good,sched:!!S9.sched}}
+  /* SAID AS SOMETHING TO DO (30 Sep 2026). A finding is three things now:
+     the rule in the user's own numbers — both halves, their counts, the
+     window (R1, R2, R9) — then what to do about it. No correlation
+     coefficient, no "worth watching" tail (R4), no backwards card: the grid
+     no longer keeps a direction the science does not back, and anything
+     that slips through here is refused rather than reframed. `skip` means
+     "do not say this"; every caller honours it. */
+  try{
+    if(!corrExpectOk(c))return{title:'',body:'',skip:1};
+    const e=corrEffectOf(c);if(!e)return{title:'',body:'',skip:1};
+    const lowerBetter=c.out==='effort'||c.out==='pace'||c.out==='beatkm'||c.out==='rhro'||c.out==='pain'||c.out==='stiff'||c.out==='swell';
+    const gap=e.hiRaw-e.loRaw;
+    if(Math.abs(gap)<corrMinGap(c.out,(e.hiRaw+e.loRaw)/2))return{title:'',body:'',skip:1};
+    const hiBetter=lowerBetter?gap<0:gap>0;
+    /* the halves must agree with the direction the science expects */
+    const a=CORR_ACT[c.sig]||{};
+    const inv=!!((CORR_SIGNALS[c.sig]||CORR_SIGNALS3[c.sig]||{}).inv);
+    const hiShouldBeBetter=a.bad?false:!inv;
+    if(hiBetter!==hiShouldBeBetter)return{title:'',body:'',skip:1};
+    const s=corrSigVal(c.sig,e.splitRaw);
+    const arms=corrArms(c,s);
+    const body='Over '+e.n+' '+corrTargetDays(c.out)+' since '+corrSince(e.first)+': '+
+      arms[0]+' ('+e.hiN+'), your '+corrOutNoun(c.out)+' averaged '+corrOutVal(c.out,e.hiRaw)+'; '+
+      arms[1]+' ('+e.loN+'), '+corrOutVal(c.out,e.loRaw)+'.';
+    const act=corrAction(c,s,hiBetter);
+    const x='Allena checks every lever against every outcome in your own days, and keeps a link only if it holds in both halves of your data, clears a strict bar, and points the way the science expects. Some links that clear the bar will still be chance, so treat this as a strong lead about you rather than a law.';
+    return{title:corrTitle(c),body:body,act:act,x:x,strong:Math.abs(c.rho)>=0.65,good:true,
+      split:e.splitRaw,hiBetter:hiBetter}}
+  catch(err){oops('corrPhrase',err);return{title:'',body:'',skip:1}}}
+/* TODAY'S LINE (30 Sep 2026): the finding applied to this morning, the way
+   Athlytic applies recovery to the day. Said only when today's reading is
+   known and the thing it moves is actually on today's plan — a line about
+   bench on a running day is noise. Null otherwise. */
+function corrTodayVal(c){
+  try{const a=CORR_ACT[c.sig]||{},tk=today();
+    if(a.k==='state'||(a.f==='sleep'&&c.lag===0)){
+      if(a.f==='ready'){const g=(S.gar&&S.gar.days&&S.gar.days[tk])||{};return g.am!=null?+g.am:null}
+      const d=(hkDailyStore().days||{})[tk]||{};
+      const raw=a.f==='sleep'?d.sleep:a.f==='hrv'?d.hrv:d.rhr;
+      if(raw==null||!isFinite(raw))return null;
+      if(c.sig==='sleep'||c.sig==='hrv'||c.sig==='rhr'||c.sig==='ready')return +raw;
+      /* a windowed variant needs its window; the plain reading stands in only when it is the signal */
+      return null}
+    if(c.lag>=1){const d0=new Date(tk+'T12:00');d0.setDate(d0.getDate()-c.lag);
+      const row=corrDayData()[dayKey(d0)];return (row&&row[c.sig]!=null)?+row[c.sig]:null}
+    return null}catch(e){oops('corrTodayVal',e);return null}}
+function corrTodayLifts(){
+  try{const rec=recommendToday();if(!rec||!rec.top)return null;
+    const p=activeProgSafe();if(!p)return null;
+    return buildSets(p,rec.top.i,S.week||1).map(s=>gBase(s.ex).toLowerCase())}
+  catch(e){oops('corrTodayLifts',e);return null}}
+function corrToday(c,ph){
+  try{ph=ph||corrPhrase(c);if(!ph||ph.skip)return null;
+    const a=CORR_ACT[c.sig]||{};
+    if(!(CORR_PERF[c.out]||String(c.out).slice(0,3)==='ex:'))return null;
+    const v=corrTodayVal(c);if(v==null)return null;
+    const lifts=corrTodayLifts();
+    const lift=corrLiftName(c.out);
+    if(corrIsLift(c.out)){
+      const big9={benchtop:'bench',squattop:'squat',deadtop:'dead'}[c.out];
+      if(!lifts||!lifts.some(x=>big9?corrBigOf(x)===big9:x===lift.toLowerCase()))return null}
+    else if(c.out==='effort'){if(!lifts||!lifts.length)return null}
+    else if(typeof runPlanDay!=='function'||!runPlanDay(0))return null;
+    const hi=v>ph.split,bad=hi!==ph.hiBetter;
+    const val=corrSigVal(c.sig,v);
+    const said=a.f==='sleep'?val+' of sleep last night'
+      :a.f==='hrv'?'HRV '+val+' this morning'
+      :a.f==='rhr'?'resting heart rate '+val+' this morning'
+      :a.f==='ready'?'readiness '+val+' this morning'
+      :val+' of '+(CORR_THING[a.f]||a.f)+(c.lag===1?' yesterday':' two days ago');
+    const doIt=bad?(lift?'Keep '+lift+' at your working weight today rather than going for a top set.'
+        :c.out==='effort'?'Expect today to feel harder, and stop a rep earlier.':'Keep today’s run easy.')
+      :(lift?'A good day to push '+lift+'.':c.out==='effort'?'A good day to train hard.':'A good day for the quality run.');
+    return{bad:bad,t:'Today: '+said+'. '+doIt}}
+  catch(e){oops('corrToday',e);return null}}
 /* THE FREE CAP HAS ONE READER (review, 19 Sep 2026): it used to live
    only inside correlationDiscoveries(), so deepProven() and the
    "since you last looked" counter both handed a free account MORE
@@ -21096,8 +21363,8 @@ function correlationDiscoveries(){
      result: see corrFreeCap() in 19c-premium.js. */
   const cur=corrVisible();
   cur.forEach(c=>{
-    const p=corrPhrase(c);
-    D.push({rar:(p.contra||p.sched)?'common':(p.strong?'epic':'rare'),t:p.title,d:p.body,x:p.x||'',tag:'signal',contra:p.contra?1:0,sched:p.sched?1:0,id:corrIdentity(c),k:c.k||null})});
+    const p=corrPhrase(c);if(p.skip)return;
+    D.push({rar:p.strong?'epic':'rare',t:p.title,d:p.body,act:p.act,x:p.x||'',tag:'signal',id:corrIdentity(c),k:c.k||null})});
   /* the second harvest (owner call, 3 Sep — more, all day, honestly):
      a known link STRENGTHENING on new evidence, or a once-solid link
      BREAKING, is genuinely new information. Tracked against the last
@@ -21149,10 +21416,7 @@ function correlationDiscoveries(){
         /* returned: sustained presence after a fade */
         if(!prev.back)prev.back=tk;
         if(daysBetween(prev.back,tk)>=14){
-          if(visible){const p=corrPhrase(c);
-            D.push({rar:'uncommon',t:'Back again: '+p.title.toLowerCase(),
-              d:'This link faded once and has cleared the bar again for two weeks running (correlation '+(Math.round(c.rho*100)/100)+' across '+c.n+' days).',
-              tag:'signal',id:'corrback:'+key+':'+prev.back})}
+          /* tracked, never said (30 Sep 2026): a link coming back is not something to do */
           delete prev.gone;delete prev.back;prev.rho=c.rho;prev.n=c.n;prev.base={rho:c.rho,n:c.n};dirty=true}
         return}
       if(prev&&prev.miss){delete prev.miss;dirty=true}
@@ -21163,10 +21427,7 @@ function correlationDiscoveries(){
       if(prev&&!prev.base){prev.base={rho:prev.rho,n:prev.n};dirty=true}
       if(prev&&(prev.vis?1:0)!==(visible?1:0)){prev.vis=visible?1:0;dirty=true}
       if(visible&&prev&&c.n>=prev.base.n+14&&Math.abs(c.rho)>=Math.abs(prev.base.rho)+0.1&&(!prev.upAt||daysBetween(prev.upAt,tk)>=28)){
-        const p=corrPhrase(c);
-        D.push({rar:'uncommon',t:'Holding stronger: '+p.title.toLowerCase(),
-          d:'Two more weeks of evidence and the link tightened (correlation '+(Math.round(c.rho*100)/100)+' across '+c.n+' days, from '+(Math.round(prev.base.rho*100)/100)+' across '+prev.base.n+').',
-          tag:'signal',id:'corrup:'+key+':'+tk});
+        /* tracked, never said (30 Sep 2026): a stronger link is not a new thing to do */
         st[key]={rho:c.rho,n:c.n,upAt:tk,base:{rho:c.rho,n:c.n},vis:1};dirty=true;return}
       if(!prev){st[key]={rho:c.rho,n:c.n,base:{rho:c.rho,n:c.n},vis:visible?1:0};dirty=true}
       else if(c.n>prev.n||Math.abs(c.rho-prev.rho)>0.02){prev.rho=c.rho;prev.n=c.n;dirty=true}});
@@ -21192,10 +21453,8 @@ function correlationDiscoveries(){
       /* a link this person was never shown is not announced as gone
          (audit G-14); state written before `vis` existed was visible,
          because everyone was premium then */
-      const lab=e9.vis===0?null:corrNames(key);
-      if(lab)D.push({rar:'uncommon',t:'A link faded: '+lab.out+' after '+lab.sig,
-        d:'This connection has not cleared the evidence bar for two weeks, so Allena stops claiming it.',
-        tag:'signal',id:'corrgone:'+key+':'+tk})});
+      /* a faded link simply stops being said; its finding leaves the live
+         list with it (30 Sep 2026), so nothing needs announcing */});
     if(dirty)lset('training-corrstate-v1',st)}catch(e){oops('corrState',e)}
   return D}
 /* ═══ A READ STAYS WHERE IT WAS MADE — THE GRAND REVEAL VERSION ═══════
@@ -21242,63 +21501,15 @@ function bankRevealedCorrelations(){
 function correlationNoticed(){
   /* the capped list: the tier-1 line may only name a link this person
      has been shown (audit G-33) */
-  return corrVisible().map(c=>corrPhrase(c)).filter(p=>!p.contra&&!p.sched).slice(0,1)
-    .map(p=>({t:p.title,d:p.body,tier:1}))}
+  return corrVisible().map(c=>corrPhrase(c)).filter(p=>!p.skip).slice(0,1)
+    .map(p=>({t:p.title,d:p.body+' '+p.act,tier:1}))}
 
-/* ── the reveal (owner call, 3 Sep: 'super super cool, dramatic, in
-   your face when found') ─────────────────────────────────────
-   A new correlation is the rarest thing the app makes — the 'how
-   did it know that' moment. When one banks fresh, a full-screen
-   SIGNAL takes over: constellation lines drawing between two
-   points, the title rising, one tap to keep. Mounts once outside
-   the render cycle (the replay disease), respects reduced-motion. */
-function signalDue(){
-  try{
-    const bank=discBank();
-    /* ═══ THE LOUDEST SURFACE ASKS THE SAME QUESTION AS THE QUIET ONES
-       (review, 15 Sep 2026) ══════════════════════════════════════════
-       `annToday()`'s own comment names the reveal ceremony as a surface
-       that asks it "and nothing else", and revealDue's second branch was
-       converted — but revealDue calls THIS first, and it still counted
-       its own `found===today()` with its own cap of eight. So on a
-       catch-up day a Garmin user could take six full-screen constellations
-       in six app opens while the Found-today card was holding itself to
-       five: the exact "very repetitive and frequent card pop ups" report,
-       at the loudest surface in the app. One budget, one reader. */
-    const room=Math.max(0,ANN_MAX-annToday().length);
-    if(!room)return null;
-    const fresh=correlationDiscoveries().find(d=>!bank[d.id]);
-    return fresh||null}catch(e){return null}}
-/* the ceremony, generalized (owner: 'more of it please', 4 Sep):
-   the constellation scene fires for every moment that has EARNED it —
-   a fresh insight first, else any epic banked today that has not had
-   its scene. One per app-open, real events only, marked kept forever. */
-const REVEAL_DRESS={
-  signal:{e:'\u2726 AN INSIGHT',c:'var(--green)'},
-  call:{e:'\u2726 THE CALL, ANSWERED',c:'var(--gold)'},
-  quest:{e:'\u2726 QUEST COMPLETE',c:'var(--gold)'},
-  rehab:{e:'\u2726 A GATE CLEARED',c:'var(--green)'},
-  ghost:{e:'\u2726 THE GHOST, BEATEN',c:'var(--gold)'},
-  record:{e:'\u2726 A RARE FIND',c:'var(--gold)'}};
-function revealDue(){
-  try{
-    const sg=signalDue();
-    if(sg)return Object.assign({kind:'signal'},REVEAL_DRESS.signal,sg);
-    const seen=lget('training-revealseen-v1',{})||{};
-    const bank=discBank();
-    const cand=Object.keys(bank).map(id=>Object.assign({id:id},bank[id]))
-      .filter(x=>annIsToday(x)&&!seen[x.id]&&x.tag!=='insight'&&(   /* a read is not a reveal (14 Sep); a batch sync is not a day of news (15 Sep) */
-        (x.rar==='epic'&&x.tag!=='signal')||
-        String(x.id).slice(0,5)==='corr:'||
-        String(x.id).slice(0,7)==='unlock:'))
-      .sort((a,b)=>String(a.id).localeCompare(String(b.id)));
-    if(!cand.length)return null;
-    const x=cand[0];
-    const dress=String(x.id).slice(0,5)==='corr:'?REVEAL_DRESS.signal
-      :String(x.id).slice(0,7)==='unlock:'?{e:'\u2726 UNLOCKED',c:'var(--green)'}
-      :(REVEAL_DRESS[x.tag]||REVEAL_DRESS.record);
-    return Object.assign({kind:x.rar==='epic'?'epic':'find'},dress,x)
-  }catch(e){return null}}
+/* ── the reveal scene ──────────────────────────────────────────
+   Full screen, one tap to keep. Since 30 Sep 2026 it is never queued on
+   its own (owner: "I hate them"): signalDue()/revealDue(), which picked a
+   fresh insight or an epic banked today to take the screen, were deleted
+   with their only caller. The scene remains for moments the user asked
+   for: a notification tapped, a week won. */
 function signalRevealHtml(){
   const sg=S.signalReveal;if(!sg)return '';
   return '<div id="signalReveal" data-a="signalKeep" style="position:fixed;inset:0;z-index:940;background:radial-gradient(circle at 50% 42%,#242b26,#141312 70%);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px;text-align:center;overflow:hidden">'+
@@ -21335,16 +21546,11 @@ function learnedProfile(){
     try{const sl=hkdSeries('sleep',30);if(sl.length>=7){const m=hkdMed(sl.map(x=>x.v));
       rows.push({k:'You normally sleep',v:Math.floor(m/60)+'h '+String(Math.round(m%60)).padStart(2,'0')+'m',
         s:'your own average across '+sl.length+' nights'})}}catch(e){oops('learnedProfile',e)}
-    // best training day
-    try{const byDow={};H.forEach(h=>{const r=(h.log||[]).filter(l=>l.rpe!=null).map(l=>l.rpe);
-      if(r.length)(byDow[new Date(h.date).getDay()]=byDow[new Date(h.date).getDay()]||[]).push(r.reduce((a,b)=>a+b,0)/r.length)});
-      const names=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
-      const rk=Object.keys(byDow).filter(k=>byDow[k].length>=3).map(k=>({k:k,v:byDow[k].reduce((a,b)=>a+b,0)/byDow[k].length}));
-      if(rk.length>=2){rk.sort((a,b)=>a.v-b.v);rows.push({k:'Your strongest day tends to be',v:names[rk[0].k],
-        s:'the same work costs less effort then'})}}catch(e){oops('learnedProfile',e)}
+    /* the "strongest weekday" row went 30 Sep 2026: a weekday is nothing
+       anyone can act on, and it averaged different sessions as "the same work" */
     // discovered correlations — the deepest learning
-    try{corrVisible().forEach(c=>{const p=corrPhrase(c);   // only links this person may see (audit G-33)
-      rows.push({k:'A pattern only in you:',v:p.title,s:'correlation '+(Math.round(c.rho*100)/100)+' across '+c.n+' days'})})}catch(e){oops('learnedProfile',e)}
+    try{corrVisible().forEach(c=>{const p=corrPhrase(c);if(p.skip)return;   // only links this person may see (audit G-33)
+      rows.push({k:'A lever that works for you:',v:p.title,s:p.act})})}catch(e){oops('learnedProfile',e)}
     // the measured burn
     try{const t9=(typeof tdeeLedger==='function')?tdeeLedger():null;
       if(t9)rows.push({k:'Your measured daily burn is',v:'~'+t9.tdee.toLocaleString()+' kcal',
@@ -21517,7 +21723,7 @@ function brewingQs(){
           if(M.outs[ot].exo)return;
           /* counted at every lag the grid will actually test, through the
              grid's own refusals, and the best lag is the one reported */
-          let n=0;[0,1,2].forEach(lag=>{if(corrRefused(sg,ot,lag,M))return;let n9=0;
+          let n=0;[0,1,2].forEach(lag=>{if(corrRefused(sg,ot,lag,M)||!corrActPair(sg,ot,lag))return;let n9=0;
             for(const k of ks){const d=days[k];if(d[sg]==null)continue;
               const d1=new Date(k+'T12:00');d1.setDate(d1.getDate()+lag);const o=days[dayKey(d1)];
               if(o&&o[ot]!=null)n9++}
@@ -21655,26 +21861,24 @@ function standingCard(){
   let h='<div class="card mt2" id="sec-standing" style="padding:16px">'+
     '<p class="eyebrow">Where you stand</p>';
   d.rows.forEach(r=>{
-    const top=Math.round(100-r.pct);
     const col=r.pct>=90?'#FFFFFF':r.pct>=75?'var(--green)':r.pct>=50?'#8FBF8A':'var(--dim)';
     h+='<div style="margin-top:12px">'+
       '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px">'+
       '<span style="font-size:13px;font-weight:600">'+r.label+'</span>'+
       '<span class="mono" style="font-size:11px;color:'+col+'">'+
-      (r.pct>=50?'TOP '+Math.max(1,top)+'%':Math.round(r.pct)+'TH PCTL')+'</span></div>'+
+      (r.pct>=50?'TOP '+standTop(r.pct)+'%':Math.round(r.pct)+'TH PCTL')+'</span></div>'+
       bar(r.pct,col)+
       '<p style="color:var(--faint);font-size:11px;line-height:1.5;margin-top:4px">'+
       uwNum(Math.round(r.e1))+' '+uwUnit()+' est 1RM · '+r.mult.toFixed(2)+'× bodyweight'+
       (r.pct<50?' — the median tested competitor at your weight lifts '+uwNum(Math.round(r.medKg))+' '+uwUnit()+'; '+uwNum(Math.round(r.medKg-r.e1))+' '+uwUnit()+' to go':'')+
       '</p></div>'});
   if(d.run){
-    const top=Math.round(100-d.run.pct);
     const col=d.run.pct>=90?'#FFFFFF':d.run.pct>=75?'var(--green)':d.run.pct>=50?'#8FBF8A':'var(--dim)';
     h+='<div style="margin-top:12px">'+
       '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px">'+
       '<span style="font-size:13px;font-weight:600">5K'+(d.run.approx?' <span class="mono" style="font-size:var(--t-caption);color:var(--faint)">~EQUIV</span>':'')+'</span>'+
       '<span class="mono" style="font-size:11px;color:'+col+'">'+
-      (d.run.pct>=50?'TOP '+Math.max(1,top)+'%':Math.round(d.run.pct)+'TH PCTL')+'</span></div>'+
+      (d.run.pct>=50?'TOP '+standTop(d.run.pct)+'%':Math.round(d.run.pct)+'TH PCTL')+'</span></div>'+
       bar(d.run.pct,col)+
       '<p style="color:var(--faint);font-size:11px;line-height:1.5;margin-top:4px">'+standMmss(d.run.t5)+
       (d.run.approx?' converted from a '+d.run.km.toFixed(1)+' km run':' best this year')+'</p></div>'}
@@ -22515,7 +22719,7 @@ function findMeaningHtml(f){
    nothing to beat and inventing a comparison would be worse than
    silence. Same for a first, a streak and a date. */
 const REF_EXEMPT=/\b(sets logged|sessions logged|first time|first ever|your first|streak|days running|logged since|crossed|longest|quickest|fastest|heaviest|biggest|most \w+ ever|best ever|personal best)\b/i;
-const REF_HAS=/(\bvs\b|\bagainst\b|\bcompared\b|% of|past about|normal for you|your usual|up from|down from|was |were |previous|last time|used to|now |gone from|from \d|next rung|away|median|average of your|of raw|threshold|target|baseline|either way|others|other nights|out of|of the \d)/i;
+const REF_HAS=/(\bvs\b|\bagainst\b|\bcompared\b|% of|past about|normal for you|your usual|up from|down from|was |were |previous|last time|used to|now |gone from|from \d|next rung|away|median|average of your|of raw|threshold|target|baseline|either way|others|other nights|out of|of the \d| or less)/i;   // a lever finding's second half is its reference (30 Sep 2026)
 /* a number a reader could reasonably ask "is that good?" about: a
    multiplier, a percentage, or a measured unit. Bare integers are not
    included — those are counts, and counts are odometers. */
@@ -22525,7 +22729,7 @@ function findRefAudit(){
   try{
     const L=[];
     try{if(typeof libFindings==='function')libFindings().forEach(f=>L.push(f))}catch(e){oops('raLib',e)}
-    try{if(typeof correlations==='function')correlations().forEach(c=>{const p=corrPhrase(c);L.push({t:p.title,d:p.body})})}catch(e){oops('raCorr',e)}
+    try{if(typeof correlations==='function')correlations().forEach(c=>{const p=corrPhrase(c);if(!p.skip)L.push({t:p.title,d:p.body+' '+p.act})})}catch(e){oops('raCorr',e)}
     try{if(typeof discoveries==='function')discoveries().forEach(f=>L.push(f))}catch(e){oops('raDisc',e)}
     L.forEach(f=>{
       const t=(f.t||'')+' '+(f.d||'');
@@ -22550,7 +22754,7 @@ function findGlossAudit(){
   try{
     const L=[];
     try{if(typeof libFindings==='function')libFindings().forEach(f=>L.push(f))}catch(e){oops('gaLib',e)}
-    try{if(typeof correlations==='function')correlations().forEach(c=>{const p=corrPhrase(c);L.push({t:p.title,d:p.body})})}catch(e){oops('gaCorr',e)}
+    try{if(typeof correlations==='function')correlations().forEach(c=>{const p=corrPhrase(c);if(!p.skip)L.push({t:p.title,d:p.body+' '+p.act})})}catch(e){oops('gaCorr',e)}
     try{if(typeof discoveries==='function')discoveries().forEach(f=>L.push(f))}catch(e){oops('gaDisc',e)}
     L.forEach(f=>{const t=(f.t||'')+' '+(f.d||'');
       if(BARE.test(t))out.push({t:f.t,term:(t.match(BARE)||[])[0]})});
@@ -28108,7 +28312,7 @@ function bankDiscoveries(){
          original found date. Only the words move; the date, the seen
          stamp and the rarity earned stay. */
       const b=bank[d.id];
-      if(b.t!==d.t||b.d!==d.d){b.t=d.t;b.d=d.d;if(d.x)b.x=d.x;touched++}
+      if(b.t!==d.t||b.d!==d.d||(d.act&&b.act!==d.act)){b.t=d.t;b.d=d.d;if(d.x)b.x=d.x;if(d.act)b.act=d.act;touched++}
       /* ═══ THE TIER MOVES WITH THE WORDS (review, 15 Sep 2026) ══════════
          Only the words were refreshed, so an entry could keep a rarity the
          engine no longer rates it at. A correlation banked at rho 0.70 is
@@ -28130,7 +28334,7 @@ function bankDiscoveries(){
     /* the backwards flag and the explainer ride into the bank — the
        flag was dropped here, so the hero exclusion and the nudge
        filter never saw it (owner-caught, 11 Sep) */
-    if(d.contra)bank[d.id].contra=1;if(d.x)bank[d.id].x=d.x;
+    if(d.contra)bank[d.id].contra=1;if(d.x)bank[d.id].x=d.x;if(d.act)bank[d.id].act=d.act;
     fresh.push(Object.assign({},d,{found:today()}))});
   if(fresh.length||touched)bankSave();
   /* the drip is decided the moment the bank changes, so nothing reaches a
@@ -28240,7 +28444,8 @@ function annFresh(){
      announced" on every surface and silently never arrive — this repo's own
      named disease. So the readers sweep too, memoized on the day and the
      size of the bank, which is the only thing that can change the answer. */
-  try{const n=Object.keys(discBank()).length,k=today()+':'+n;
+  try{if(S._annHold)return;   // a catalogue is being filed; its own sweep stamps it
+    const n=Object.keys(discBank()).length,k=today()+':'+n;
     if(S._annK!==k){S._annK=k;annSweep()}}
   catch(e){oops('annFresh',e)}}
 function annToday(){
@@ -28358,6 +28563,11 @@ function sessionReveal(){
    'recipe:' (the deterministic PR-recipe bank, 13c) are both tagged
    'insight' but were never model-written — only a model's own reading
    wears the read suit. */
+/* SOMETHING TO ACT ON (30 Sep 2026): the one reader for "is this banked
+   entry a finding rather than a win". Only a live-rule correlation from the
+   grid qualifies; records, rungs and milestones are wins and live on the
+   tree and in the collection. */
+function findActionable(d){try{return !!d&&/^corr:/.test(String(d.id||''))&&!(typeof discFiller==='function'&&discFiller(d))}catch(e){oops('findActionable',e);return false}}
 function findIsRead(d){return !!(d&&d.tag==='insight'&&!/^(exp|recipe):/.test(String(d.id||'')))}
 function findReadChrome(){
   return{col:'var(--blue)',label:'THE READ',
@@ -31541,7 +31751,7 @@ function newFindsCard(){
        repetitive. Engine finds still come to you. findIsRead is the one
        reader (review I-15): exp: and recipe: finds carry the insight tag
        and are engine finds, so they come to you too. */
-    const L=annToday().filter(x=>!findIsRead(x))
+    const L=annToday().filter(x=>!findIsRead(x)&&findActionable(x))
       .sort((a,b)=>(ORD[a.rar]??3)-(ORD[b.rar]??3));
     if(!L.length)return '';
     const show=L.slice(0,3);
@@ -31566,14 +31776,14 @@ function newFindsCard(){
         '<svg width="18" height="14" viewBox="0 0 18 14" fill="none" aria-hidden="true"><circle cx="6" cy="7" r="4.6" stroke="'+r[1]+'" stroke-width="1.5"/><circle cx="12" cy="7" r="4.6" stroke="'+r[1]+'" stroke-width="1.5"/></svg>'+
         '<span class="micro" style="flex:1;color:'+rarInk(r)+'">Found today'+(n>1?' \u00b7 '+esc(r[2]):'')+'</span></span>'+
         '<span class="disp" style="display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;overflow:hidden;font-size:22px;font-weight:600;line-height:1.14;letter-spacing:-.02em;max-width:17ch;margin-top:10px">'+esc(x.t)+'</span>'+
-        (x.d?'<span style="color:var(--faint);font-size:13px;line-height:1.5;margin-top:8px;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden">'+esc(String(x.d))+'</span>':'')+
+        ((x.act||x.d)?'<span style="color:var(--faint);font-size:13px;line-height:1.5;margin-top:8px;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden">'+esc(String(x.act||x.d))+'</span>':'')+
         '<span style="display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:36px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.16);margin-top:12px"><svg width="15" height="15" viewBox="0 0 15 15" fill="none"><path d="M2 7.5h10M8 3.5l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>'+
         '</button>'}).join('');
     /* the dots say how many are turning and let a reader stop on one */
     const dots=n>1?'<span class="ft-dots">'+show.map((x,i)=>'<button data-a="ftGo" data-v="'+i+'" class="ft-dot'+(i===cur?' on':'')+'" aria-label="Find '+(i+1)+' of '+n+'"></button>').join('')+'</span>':'';
     return '<div id="foundtodaycard" class="card mt find-glow" data-ftn="'+n+'" style="padding:18px;position:relative;overflow:hidden;border-radius:20px;border-color:'+hexA(r0[1],.24)+';background:linear-gradient(180deg,var(--pane-top),var(--pane-bottom));box-shadow:inset 0 1px 0 var(--edge-light),0 16px 36px rgba(0,0,0,.5)">'+washes+dustF(3)+
       '<div class="ft-deck">'+slides+'</div>'+
-      '<div style="position:relative;display:flex;align-items:center;gap:10px;padding-top:9px"><button data-a="collOpen" class="mono" style="display:block;flex:1;width:auto;min-width:0;text-align:left;color:var(--faint);font-size:11px">Take me to where it lives \u203a</button>'+dots+'</div>'+
+      '<div style="position:relative;display:flex;align-items:center;gap:10px;padding-top:9px"><button data-a="leversOpen" class="mono" style="display:block;flex:1;width:auto;min-width:0;text-align:left;color:var(--faint);font-size:11px">What moves your training \u203a</button>'+dots+'</div>'+
       '</div>'}catch(e){oops('newFindsCard',e);return ''}}
 /* the Found-today deck's turn: one find every six seconds, held while a
    finger is on the card, a sheet is up or the app is in the background.
@@ -31859,6 +32069,54 @@ function mergeCard(){
       '<p class="disp" style="font-size:17px;font-weight:600;margin-top:4px">Close the week in one honest session</p>'+
       '<p style="color:var(--dim);font-size:13px;line-height:1.55;margin-top:4px">'+esc(m.names[0])+' + '+esc(m.names[1])+', merged at real per-muscle ceilings — '+m.work+' sets, ~'+m.mins+' min, the overlap cut and named. \u203a</p></button>'
   }catch(e){oops('mergeCard',e);return ''}}
+/* ═══ WHAT MOVES YOUR TRAINING (owner, 30 Sep 2026: findings "in the daily
+   call + one page", like Athlytic) ════════════════════════════════════════
+   The one page: every live lever finding, each with the rule in the user's
+   own numbers, what to do, and today's line when today's reading is known
+   and the thing it moves is on today's plan. Nothing here is a record or a
+   count; those are wins and live on the tree. */
+function leversLive(){
+  try{return (typeof corrVisible==='function'?corrVisible():[]).map(c=>{const ph=corrPhrase(c);
+      return ph.skip?null:{c:c,ph:ph,td:corrToday(c,ph)}}).filter(Boolean)}
+  catch(e){oops('leversLive',e);return []}}
+/* the one line the daily call borrows: a reading that changes what you do
+   today first, then one that says go */
+function leversToday(){
+  try{const L=leversLive().filter(x=>x.td);if(!L.length)return null;
+    L.sort((a,b)=>((b.td.bad?1:0)-(a.td.bad?1:0))||(Math.abs(b.c.rho)-Math.abs(a.c.rho)));
+    return L[0]}catch(e){oops('leversToday',e);return null}}
+function leversTodayCard(){
+  try{const x=leversToday();if(!x)return '';
+    return '<button data-a="leversOpen" class="card mt" style="width:100%;text-align:left;padding:14px 16px;display:block'+(x.td.bad?';border-color:var(--amber)':'')+'">'+
+      '<p class="micro" style="color:'+(x.td.bad?'var(--amber)':'var(--green)')+'">Today, from your own data</p>'+
+      '<p style="font-size:15px;font-weight:600;line-height:1.4;margin-top:6px">'+esc(x.td.t)+'</p>'+
+      '<p style="color:var(--faint);font-size:13px;line-height:1.5;margin-top:6px">'+esc(x.ph.title)+' ›</p></button>'}
+  catch(e){oops('leversTodayCard',e);return ''}}
+function viewLevers(){
+  const L=leversLive();
+  let h='<div class="view pad stg phpad">'+pageHead('What moves your training','',{sub:L.length?L.length+' from your own data':'Nothing proven yet'});
+  h+='<p style="color:var(--dim);font-size:13px;line-height:1.6;margin-top:8px">Links in your own data between something you can change and how you train. Each one points the way the science does, holds in both halves of your data, and comes with what to do. Some will still turn out to be chance.</p>';
+  if(!L.length){
+    let near='';
+    try{const B=(typeof brewingQs==='function')?brewingQs():[];
+      if(B.length)near='<p style="color:var(--dim);font-size:13px;line-height:1.6;margin-top:8px">Closest to an answer: “'+esc(B[0].q)+'”, '+B[0].have+' of 12 days.</p>'}catch(e){oops('leversNear',e)}
+    h+='<div class="card mt" style="padding:14px 16px"><p style="font-size:15px;font-weight:600">Nothing to act on yet</p>'+
+      '<p style="color:var(--dim);font-size:13px;line-height:1.6;margin-top:6px">Allena needs about twelve days of a lever, like sleep, food or running, next to the thing it moves before it will say anything. Keep logging and syncing.</p>'+near+'</div>';
+    return h+'</div>'}
+  const today9=L.filter(x=>x.td).sort((a,b)=>(b.td.bad?1:0)-(a.td.bad?1:0));
+  if(today9.length){
+    h+='<p class="micro" style="margin-top:18px;color:var(--faint)">Today</p>';
+    today9.forEach(x=>{h+='<div class="card mt" style="padding:12px 16px'+(x.td.bad?';border-color:var(--amber)':'')+'"><p style="font-size:15px;font-weight:600;line-height:1.45">'+esc(x.td.t)+'</p>'+
+      '<p style="color:var(--faint);font-size:13px;margin-top:4px">'+esc(x.ph.title)+'</p></div>'})}
+  h+='<p class="micro" style="margin-top:18px;color:var(--faint)">What works for you</p>';
+  L.forEach(x=>{
+    h+='<div class="card mt" style="padding:14px 16px">'+
+      '<p style="font-size:17px;font-weight:600;line-height:1.3">'+esc(x.ph.title)+'</p>'+
+      '<p style="font-size:15px;line-height:1.5;margin-top:8px">'+esc(x.ph.act)+'</p>'+
+      '<p style="color:var(--dim);font-size:13px;line-height:1.55;margin-top:8px">'+esc(x.ph.body)+'</p></div>'});
+  try{const full=(typeof correlations==='function')?correlations().length:0;
+    if(full>L.length)h+='<p style="color:var(--faint);font-size:13px;line-height:1.55;margin-top:14px">'+(full-L.length)+' more found in your data. Premium shows them all.</p>'}catch(e){oops('leversMore',e)}
+  return h+'</div>'}
 
 /* ══ the deep read (prompt 19) ══════════════════════════════
    The rule engines can only find what was pre-imagined. The
@@ -31903,8 +32161,8 @@ function deepProven(){
      certainty word drifts from the number it described (R17, and the
      PI-RADS failure the research names). */
   const tierOf=c=>c.contra?'backwards':c.sched?'schedule':((c.n||0)>=30?'holds':'sofar');
-  try{(typeof corrVisible==='function'?corrVisible():correlations()).forEach(c=>{const p=corrPhrase(c);
-    const it={k:'corr',t:p.title,d:p.body,contra:!!p.contra,sched:!!p.sched,n:c.n||0,
+  try{(typeof corrVisible==='function'?corrVisible():correlations()).forEach(c=>{const p=corrPhrase(c);if(p.skip)return;
+    const it={k:'corr',t:p.title,d:p.body+' '+p.act,contra:!!p.contra,sched:!!p.sched,n:c.n||0,
       rar:p.contra||p.sched?'common':(p.strong?'epic':'rare')};
     it.tier=tierOf(it);L.push(it)})}catch(e){oops('deepProven.corr',e)}
   try{if(typeof libFindings==='function')libFindings().forEach(f=>L.push({k:'lib',t:f.t,d:f.d,rar:f.rar,tier:'holds'}))}catch(e){oops('deepProven.lib',e)}
@@ -33368,9 +33626,13 @@ function ceremonyHtml(c){
    only on a day something was found. The morning prompt still
    asks for itself (morningAsk), and the lifts live on the tree's own page. */
 function todayFoundRow(){
-  /* the daily reveal still queues from here, as it did from Today */
-  try{if(!S._peek&&!S.signalReveal&&!S.signalShownFor){const sg=(typeof revealDue==='function'?revealDue():signalDue());
-    if(sg){S.signalShownFor=sg.id;S.signalReveal=sg;setTimeout(function(){render()},400)}}}catch(e){oops('foundReveal',e)}
+  /* NO FINDING TAKES THE SCREEN BY ITSELF (owner, 30 Sep 2026: "can we
+     get rid of the insight pop up windows I hate them their annoying").
+     The full-screen reveal used to queue from here on every open with a
+     fresh find. The find is still banked the moment it is found and is
+     on this card, the tree and the collection; only the interruption is
+     gone. A notification tap still replays its own moment, because that
+     one was asked for. */
   /* full size, the same card Today always drew (owner, 27 Sep 2026:
      "should be able to see found today pill in full size like normal") */
   try{const c=newFindsCard();return c?'<div data-strip="found">'+c+'</div>':''}
@@ -33392,8 +33654,6 @@ function todayBody(){
     h+='<p style="color:var(--dim);font-size:13px;line-height:1.6;margin-top:14px">'+esc(OB_LINE1)+' '+esc(OB_LINE2)+'</p>';
     h+=obExampleCorrPills()}}catch(e){oops('obEmptyToday',e)}
   /* demo pills live in Settings now (owner, 10 Sep: 'i dont want to see that on today') */
-  try{if(!S._peek&&!S.signalReveal&&!S.signalShownFor){const sg=(typeof revealDue==='function'?revealDue():signalDue());
-    if(sg){S.signalShownFor=sg.id;S.signalReveal=sg;setTimeout(function(){render()},400)}}}catch(e){oops('signalReveal',e)}
   /* the Health link outranks everything — it is the one tap that
      unlocks the whole engine, so it is the FIRST thing a fresh
      account sees (owner call, 3 Sep) */
@@ -33809,6 +34069,8 @@ function viewHome(){
      its special states (week complete, already trained, the week closer)
      — only the plain suggestion moved. */
   h+=recCard(true);
+  /* the daily call's reason from the user's own data (30 Sep 2026) */
+  try{h+=leversTodayCard()}catch(e){oops('leversTodayCard.train',e)}
   /* the learned-adjustments ledger (8 Sep, after Dafydd's backup
      showed +12.5 on a skullcrusher and −5 on his key bench): what
      regulation has moved is VISIBLE and reversible in one place —
@@ -36240,6 +36502,123 @@ function meSourcesRows(){
     rows.push(navRow(I.save,'Account & sync',a&&a.refresh?(a.lastSync?'synced '+fmtDay(String(a.lastSync)):'signed in, not synced yet'):'not signed in','nav','acct'));
     return rows}
   catch(e){oops('meSources',e);return []}}
+/* ═══ STORY STICKERS (owner, 30 Sep 2026: "is there a way we can boast
+   about moving weight… some kind of metric that is measurable", after an
+   INTVL "1.7 km² of gained territory" story; he picked "rarer than" and
+   "weight moved as real-world objects"). A see-through card for somebody's
+   own story. These are BOASTS, never a ranking: the race still competes on
+   showing up (THE COLLECTION BOARD IS NOT THE RACE; output competition is
+   Group 2 and stays closed). One reader each, so the web canvas and the
+   native Skia sticker say exactly the same thing.
+   ════════════════════════════════════════════════════════════════════ */
+/* published round-number masses, heaviest last. "About" rounds these,
+   which R13 allows: it rounds a measurement and softens no claim. */
+const BOAST_OBJ=[
+  [300,'grizzly bear','grizzly bears'],[450,'grand piano','grand pianos'],
+  [1500,'car','cars'],[2300,'rhino','rhinos'],[6000,'bull elephant','bull elephants'],
+  [12000,'double-decker bus','double-decker buses'],[30000,'humpback whale','humpback whales'],
+  [41000,'Boeing 737','Boeing 737s'],[100000,'blue whale','blue whales'],
+  [420000,'International Space Station','International Space Stations'],
+  [10100000,'Eiffel Tower','Eiffel Towers']];
+/* the heaviest thing that fits at least once, and how many */
+function boastObject(kg){
+  if(!(kg>=BOAST_OBJ[0][0]))return null;
+  let o=BOAST_OBJ[0];BOAST_OBJ.forEach(x=>{if(kg>=x[0])o=x});
+  const n=Math.round(kg/o[0]);
+  return{n:n,kg:o[0],line:n<=1?(/^[aeiou]/i.test(o[1])?'an ':'a ')+o[1]:'about '+n.toLocaleString()+' '+o[2]}}
+/* weight moved: this week through weekStats(), all time through
+   lifetime() — the readers the You page and the week already use, so the
+   sticker can never quote a different total from the screen beside it */
+function boastTon(win){
+  try{const all=win==='all';
+    const kg=all?lifetime().ton:weekStats().ton;
+    if(!(kg>0))return{none:all?'Nothing lifted with weight yet.':'No weighted sets logged this week yet.'};
+    const o=boastObject(kg);
+    return{kg:kg,big:tonStr(kg).replace(/ /g,' '),
+      line:o?'That is '+o.line+'.':'',
+      label:all?'LIFTED, ALL TIME':'LIFTED THIS WEEK',
+      small:all?(function(){let f=null;(S.history||[]).forEach(h=>{const k=hKey(h);if(k&&(!f||k<f))f=k});
+          return f?'every set logged since '+new Date(f+'T12:00').toLocaleDateString(undefined,{month:'long',year:'numeric'}):'every set logged'})()
+        :'every set logged since Monday'}}
+  catch(e){oops('boastTon',e);return{none:'This number could not be worked out.'}}}
+/* the one reader of how a percentile is said at a glance */
+function standTop(pct){return Math.max(1,Math.round(100-pct))}
+/* the rarest thing you hold: your best lift or 5K against its named
+   population. Below the median it is not a boast, so the row says what
+   is left instead of offering a sticker. */
+function boastStand(){
+  try{const d=(typeof standingData==='function')?standingData():null;
+    if(!d)return{none:'Where you stand could not be worked out.'};
+    const C=d.rows.map(r=>({kind:'lift',r:r,pct:r.pct}));
+    if(d.run)C.push({kind:'run',r:d.run,pct:d.run.pct});
+    if(!C.length)return{none:d.needs.length?'Log a bodyweight to place your lifts.':'Log a bench, squat, deadlift or a 3–15 km run to place yourself.'};
+    C.sort((a,b)=>b.pct-a.pct);const top=C[0];
+    if(top.pct<50){
+      if(top.kind==='lift')return{none:'Your '+top.r.label.toLowerCase()+' is at the '+Math.round(top.pct)+'th percentile. The median competition lifter at your weight lifts '+uwNum(Math.round(top.r.medKg))+' '+uwUnit()+'.'};
+      return{none:'Your 5K is at the '+Math.round(top.pct)+'th percentile of parkrun-scale finishers.'}}
+    const out={big:'TOP '+standTop(top.pct)+'%',label:'WHERE I STAND'};
+    if(top.kind==='lift'){
+      out.line=top.r.label+' · '+uwNum(Math.round(top.r.e1))+' '+uwUnit()+' estimated max';
+      out.ref='of raw competition lifters at my bodyweight';
+      if(d.eq&&d.eq.lift.k===top.r.k)out.eq='Same rarity as a '+standMmss(d.eq.time)+' 5K'}
+    else{
+      out.line='5K · '+standMmss(top.r.t5)+(top.r.approx?' (from a '+top.r.km.toFixed(1)+' km run)':'');
+      out.ref='of parkrun-scale 5K finishers'}
+    out.small=top.kind==='lift'?'vs OpenPowerlifting raw entries, adjusted for bodyweight and age':'vs a parkrun-scale finisher curve, adjusted for age';
+    return out}
+  catch(e){oops('boastStand',e);return{none:'Where you stand could not be worked out.'}}}
+function boastData(kind){return kind==='stand'?boastStand():boastTon(kind==='ton-all'?'all':'week')}
+/* the web sticker: a transparent PNG, the card die-cut for free */
+function boastStickerRun(kind){
+ try{
+  const b=boastData(kind);if(!b||b.none){flash((b&&b.none)||'Nothing to put on a sticker yet.');return}
+  /* the card is as tall as its words: every line's y first, then the canvas */
+  const L=[];let y=338;
+  if(b.line){L.push([b.line,'700',44,'INK',y]);y+=58}
+  if(b.ref){L.push([b.ref,'500',32,'GREY',y]);y+=62}
+  if(b.eq){L.push([b.eq,'700',36,'INK',y]);y+=56}
+  const footY=y+8,W=1000,H=footY+52;
+  try{
+    const cv=document.createElement('canvas');cv.width=W;cv.height=H;
+    const x=cv.getContext('2d');
+    const COL={INK:'#0B0B0D',GREY:'#6B675F'},F='-apple-system,system-ui,sans-serif';
+    const fit=(t,wt,sz,max)=>{let z=sz;x.font=wt+' '+z+'px '+F;while(z>18&&x.measureText(t).width>max){z-=2;x.font=wt+' '+z+'px '+F}};
+    x.fillStyle='#F4F2EC';x.beginPath();x.roundRect(10,10,W-20,H-20,48);x.fill();
+    x.textBaseline='alphabetic';x.textAlign='left';
+    x.fillStyle=COL.INK;x.font='800 30px '+F;x.fillText('ALLENA',58,88);
+    x.fillStyle=COL.GREY;x.textAlign='right';x.font='700 24px '+F;x.fillText(b.label,W-58,88);
+    x.textAlign='left';x.fillStyle=COL.INK;fit(b.big,'800',150,W-116);x.fillText(b.big,56,262);
+    L.forEach(l=>{x.fillStyle=COL[l[3]];fit(l[0],l[1],l[2],W-116);x.fillText(l[0],58,l[4])});
+    x.fillStyle=COL.GREY;fit(b.small,'500',22,W-116);x.fillText(b.small,58,footY);
+    S.shareImg=cv.toDataURL('image/png');
+    S.shareTitle=kind==='stand'?'Where I stand':'Weight moved';
+    const openSheet=function(){S.sheet={t:'treeshare'};render()};
+    if(navigator.share&&navigator.canShare&&cv.toBlob){
+      cv.toBlob(function(bl){try{
+        const f=new File([bl],'allena-'+kind+'.png',{type:'image/png'});
+        if(navigator.canShare({files:[f]}))navigator.share({files:[f]}).catch(function(e2){if(!e2||e2.name!=='AbortError')oops('boastShare',e2)});
+        else openSheet()}catch(e2){oops('boastBlob',e2);openSheet()}},'image/png')}
+    else openSheet()}catch(e1){oops('boastDraw',e1);flash('Could not draw the sticker.')}}
+ catch(e){oops('boastStickerRun',e);flash('Could not draw the sticker.')}}
+/* the You page card: each row says what the sticker will say, so nobody
+   shares blind; a row with nothing to boast says why and offers no button */
+function boastCard(){
+  try{
+    const row=(title,b,btns)=>'<div style="padding:12px 0;border-top:1px solid var(--line)">'+
+      '<p style="font-size:15px;font-weight:600">'+esc(title)+'</p>'+
+      (b.none?'<p style="color:var(--faint);font-size:13px;line-height:1.5;margin-top:4px">'+esc(b.none)+'</p>'
+        :'<p style="color:var(--dim);font-size:13px;line-height:1.5;margin-top:4px">'+esc(b.big+(b.line?' · '+b.line:''))+(b.ref?' '+esc(b.ref)+'.':'')+'</p>'+
+         '<div class="row" style="gap:8px;margin-top:10px">'+btns+'</div>')+'</div>';
+    const btn=(v,l)=>'<button data-a="boastSticker" data-v="'+v+'" class="btn" style="flex:1;color:var(--amber);font-size:13px;padding:8px 10px">'+l+'</button>';
+    const st=boastStand(),wk=boastTon('week'),al=boastTon('all');
+    const tonB=wk.none&&al.none?wk:(wk.none?al:wk);
+    const tonBtns=(wk.none?'':btn('ton-week','This week'))+(al.none?'':btn('ton-all','All time'));
+    return '<div class="card mt2" style="padding:18px 18px 6px">'+
+      '<p class="disp" style="font-size:19px;font-weight:600;letter-spacing:-.02em">Stickers for your story</p>'+
+      '<p style="color:var(--faint);font-size:13px;line-height:1.5;margin-top:6px;margin-bottom:12px">A see-through card to put on a photo. It shows your own numbers and nobody else’s.</p>'+
+      row('Where you stand',st,btn('stand','Make the sticker'))+
+      row('Weight moved',tonB,tonBtns)+'</div>'}
+  catch(e){oops('boastCard',e);return ''}}
 function viewMe(){
   try{
     const name=String((S.prof&&S.prof.name)||'').split(' ')[0]||'You';
@@ -36272,6 +36651,7 @@ function viewMe(){
     h+=(typeof crestCard==='function')?crestCard():'';
     if(facts.length)h+='<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-top:12px">'+facts.join('')+'</div>'+
       '<p style="color:var(--faint);font-size:13px;margin-top:10px">Lifetime facts. These never go down.</p>';
+    h+=boastCard();
     h+=meBodyTiles();
     /* WHERE THE NUMBERS COME FROM, in a sentence (design system): what is
        typed, what Health sends, what the phone witnessed — and the last
@@ -37466,45 +37846,6 @@ function sheetHtml(){
     const body=dataChunks()[S.sheet.k];
     if(body==null)return '';
     return wrapSheet(S.sheet.k,'<div style="margin-top:-6px">'+body+'</div>')}
-  if(S.sheet.t==='dailyfind'){
-    if(S.dfExtra){const x=S.dfExtra,r=rarityOf(x.rar);
-      return wrapSheet('Allena found another',
-        '<p class="mono" style="font-size:var(--t-caption);color:'+rarInk(r)+';letter-spacing:.08em">\u2726 '+esc(r[2].toUpperCase())+' \u00b7 SURFACED JUST NOW</p>'+
-        '<p class="disp" style="font-size:20px;font-weight:600;line-height:1.25;margin-top:8px">'+esc(x.t)+'</p>'+
-        '<p style="color:var(--dim);font-size:13px;line-height:1.6;margin-top:8px">'+esc(x.d)+'</p>'+
-        '<p style="color:var(--faint);font-size:11px;line-height:1.55;margin-top:16px">Banked in the collection. The day keeps looking \u2014 up to five of these when the data genuinely produces them.</p>')}
-    const pr=todayProgress(),n=noticedToday(),t=todayState();
-    if(S.think&&S.think.key==='df'&&!S.think.done)
-      return wrapSheet('Allena found something',thinkPanel('Reading today back'));
-    if(t.revealed&&n)
-      return wrapSheet('Allena found something',
-        '<p class="mono" style="font-size:var(--t-caption);color:var(--amber);letter-spacing:.08em">✦ TODAY’S FIND</p>'+
-        '<p class="disp" style="font-size:20px;font-weight:600;line-height:1.25;margin-top:8px">'+esc(n.t)+'</p>'+
-        '<p style="color:var(--dim);font-size:13px;line-height:1.6;margin-top:8px">'+esc(n.d)+'</p>'+
-        '<p style="color:var(--faint);font-size:11px;line-height:1.55;margin-top:16px">It stays on your Today card until tomorrow, when there will be a different one.</p>');
-    /* A LOCK NEEDS A KEY (28 Sep 2026). With no core check-ins today
-       (no readiness, no rehab, no bodyweight, only the optional session
-       or nothing at all) `complete` can never turn true, and this sheet
-       said "0 check-ins left" over a find nobody could open. Nothing to
-       do means nothing to unlock: it opens. */
-    const left=pr.core-pr.coreDone;
-    if(!pr.complete&&left>0){
-      const next=pr.tasks.filter(x=>!x.done&&!x.optional)[0]||pr.tasks.filter(x=>!x.done)[0];
-      return wrapSheet('Allena found something',
-        '<div style="display:flex;align-items:center;gap:8px">'+
-        '<span class="mono" style="display:inline-flex;align-items:center;gap:8px;color:var(--amber);font-size:var(--t-caption);letter-spacing:.08em;border:1px solid color-mix(in srgb, var(--text) 50%, transparent);padding:4px 10px;border-radius:var(--r-full)">'+lockIcon(10)+'LOCKED</span></div>'+
-        '<p class="disp" style="font-size:20px;font-weight:600;line-height:1.25;margin-top:12px">Something new about you is ready</p>'+
-        '<p style="color:var(--dim);font-size:13px;line-height:1.6;margin-top:8px">Found in your numbers overnight. It unlocks when today’s loop is done — '+
-          left+' check-in'+(left===1?'':'s')+' left, each one earns points.</p>'+
-        '<div style="display:flex;gap:4px;margin-top:12px">'+
-        pr.tasks.map(x=>'<span style="width:9px;height:9px;border-radius:8px;background:'+(x.done?'var(--green)':'var(--line)')+'"></span>').join('')+'</div>'+
-        (next?'<button data-a="'+(next.go||'todayOpen')+'" class="big disp mt2" style="background:var(--amber);color:var(--bg)">'+esc(next.go?next.n:'Open today')+'</button>':'')+
-        '<button data-a="sheetClose" class="btn mt" style="color:var(--dim)">Later</button>');}
-    return wrapSheet('Allena found something',
-      '<p class="mono" style="font-size:var(--t-caption);color:var(--green);letter-spacing:.08em">'+(pr.core?'UNLOCKED · TODAY’S LOOP DONE':'UNLOCKED')+'</p>'+
-      '<p class="disp" style="font-size:20px;font-weight:600;line-height:1.25;margin-top:8px">Allena has something on you</p>'+
-      '<p style="color:var(--dim);font-size:13px;line-height:1.6;margin-top:8px">One observation, from your own numbers, different tomorrow.</p>'+
-      '<button data-a="dfReveal" class="big disp mt2" style="background:var(--amber);color:var(--bg)">Reveal it</button>');}
   if(S.sheet.t==='wrap'){
     if(S.think&&S.think.key==='wrap'&&!S.think.done)
       return wrapSheet('Month in review',thinkPanel('Reading the month back'));
@@ -39061,6 +39402,7 @@ function render(){
      (tests) and is exempt from the written-never-called gate — see
      tools/auditcheck.py ALLOW_UNCALLED. */
   else if(S.view==='findings')body=viewPoints();
+  else if(S.view==='levers')body=viewLevers();
   else if(S.view==='deep')body=viewDeep();
   else if(S.view==='tree')body=viewTree();
   else if(S.view==='crown')body=viewCrown();
@@ -39320,6 +39662,7 @@ function render(){
     if(hasRehab9)push('acl','Rehab',null,null,DOT9.acl);
     if(typeof rides==='function'&&rides().length>=1)push('ride','Cycling');
     if(!onBar.run&&hasRun9)push('run','Running',null,null,DOT9.run);
+    push('levers','What moves your training');
     push('importdata','Import your data','intakeOpen');
     push('data','Settings');
     /* THE RECENTS LIST LEFT THE DRAWER (Phase 2c, 20 Sep 2026): the chat
@@ -41346,7 +41689,6 @@ function runAction(a,v,t,e){
          underneath (owner-reported, Sep 2026) */
       if(S.sheet&&S.sheet.t==='cutplan'&&S.prev){
         S.cutPlan=null;S.sheet={t:'preview'};render();sheetScrollBack();break}
-      if(S.sheet&&S.sheet.t==='dailyfind')S.dfExtra=null;
       S.sheet=null;render();break}
     case 'exportXlsx':A.exportXlsx();break;
     case 'exportCsv':A.exportCsv();break;
@@ -41589,6 +41931,7 @@ function runAction(a,v,t,e){
     /* back goes to the page under the sheet: the crown, its explorer or the tree (review H-9) */
     case 'txOpenLog':{S.sheet=null;S.backTo=S.view||'tree';S.backDrawer=false;S.view='history';S.open=v;S.scrollTo='h'+v;render();break}
     case 'txOpenRun':{S.sheet=null;runAction('runEdit',v);break}   // runDetail has no page for one run; the run's own record is its Edit sheet (web explorer and native tree sheet both call this)
+    case 'leversOpen':{S._navQuiet=1;if(S.view!=='levers'){S.backTo=S.view;S.backDrawer=false}S.sheet=null;S.view='levers';render();break}
     case 'findingsGo':S._navQuiet=1;{if(S.view!=='findings'){S.backTo=S.view;S.backDrawer=false}S.sheet=null;S.view='findings';render();break}   // anRun marked patterns seen for a page that renders viewPoints (review J-21)
     case 'prioSet':{S.prof=Object.assign({},S.prof||{},{prio:v});lset(K_PROF,S.prof);render();
       flash(v==='run'?'Running leads — leg days ease around hard runs.':v==='lift'?'Lifting leads — one quality run goes easy.':'Balanced — hard days alternate weekly.');break}
@@ -41617,8 +41960,6 @@ function runAction(a,v,t,e){
     case 'questOpen':S.sheet={t:'quest'};render();break;
     case 'questAccept':{const Q=questCurrent();if(Q&&Q.state==='offered'){Q.state='on';questSave();vib(12)}render();break}
     case 'questPass':{const Q=questCurrent();if(Q&&Q.state==='offered'){Q.state='passed';questSave()}S.sheet=null;render();break}
-    case 'dfReveal':thinkStart('df',[['Reading last night'],['Lining it up against your history'],['Checking it is real']],
-      function(){const t2=todayState();t2.revealed=true;todaySave(t2)});render();break;
     case 'wrapGo':{const ym=v;S.sheet={t:'wrap',ym:ym};
       thinkStart('wrap',[['Reading '+ymName(ym)],['Comparing with '+ymName(prevYm(ym))],['Weighing what to say honestly']],function(){
         if(!wraps()[ym]){const r=wrapBuild(ym);if(r){wraps()[ym]=r;wrapSaveAll()}}
@@ -41631,6 +41972,7 @@ function runAction(a,v,t,e){
     case 'treeShare':S.shareTitle='Your tree';treeShareRun();break;
     case 'groundShare':groundShareRun();break;
     case 'groundSticker':groundStickerRun();break;
+    case 'boastSticker':boastStickerRun(v);break;   // story stickers on the You page (30 Sep 2026)
     case 'sigOpen':{if(v){
       /* a chart page remembers its door (owner-caught, 10 Sep: Back
          ping-ponged Health data ↔ the pill, because the pill's back
@@ -44200,62 +44542,11 @@ try{if(SANDBOX&&!lget('training-sandbox-v1',null))demoSeed();
   else if((typeof SANDBOX==='undefined'||!SANDBOX)&&localStorage.getItem('allena-demo-live')&&!lget('training-sandbox-v1',null))demoSeed()}catch(e){oops('demoSeed.boot',e)}
 
 /* ══ the daily find ═════════════════════════════════════════
-   Once a day, when there genuinely is one: Allena announces a
-   fresh observation. Locked until today's loop is done (the
-   check-ins that earn points), then revealed with the thinking
-   sequence. Never fabricated — a day with nothing real to show
-   stays quiet, which is what keeps the real days believable.
+   Was a sheet that slid up by itself, up to five times a day, to announce
+   a find. Deleted 30 Sep 2026 on the owner's word ("I hate them"). The
+   day's find still sits in the Found-today card and opens on a tap
+   (noticedOpen); nothing is withheld, only the interruption is gone.
    ══════════════════════════════════════════════════════════ */
-function dfRarestUnseen(){
-  try{
-    const seen=discoverySeen();
-    const RANK={epic:0,rare:1,uncommon:2,common:3};
-    return discoveries().filter(d=>!seen[d.id])
-      .sort((a,b)=>(RANK[a.rar]??3)-(RANK[b.rar]??3))[0]||null}catch(e){oops('dfRarest',e);return null}}
-function dailyFindDue(){
-  try{
-    if(!(S.history||[]).length&&!(S.runs||[]).length)return false;
-    const t=todayState();
-    if(!t.dfShown){
-      const n=noticedToday();
-      if(!n)return false;
-      return !todayState().noticedRepeat}
-    /* the day keeps finding (owner call, 3 Sep): up to five reveal
-       moments a day — but ONLY when a genuinely unseen discovery
-       exists, spaced at least 2.5 hours apart. Never fabricated,
-       never withheld: this releases what exists more eagerly, it
-       cannot invent what does not. */
-    /* "another" only after the first one is open (28 Sep 2026): the
-       extra path used to fire while today's find still sat LOCKED, so
-       the second find arrived in full and the first stayed shut */
-    if(!t.revealed)return false;
-    if((t.dfN||1)>=5)return false;
-    if(t.dfLast&&Date.now()-t.dfLast<2.5*3600e3)return false;
-    return !!dfRarestUnseen()}catch(e){oops('dfDue',e);return false}}
-function dailyFindAsk(){try{
-  if(!dailyFindDue())return false;
-  if(S.boot!=null){S.dfQueued=true;return false}
-  if(S.view==='setup'||S.view==='signup'||S.view==='coach'||S.view==='obwait'||S.view==='obreveal'||S.sess)return false;
-  if(S.sheet)return false;                 // never stack on another prompt
-  /* THE TOUR IS ONE-SHOT; THE POP-UPS CAN WAIT A RENDER (18 Sep 2026):
-     a guided-tour spotlight sequence that has just started should not
-     be interrupted by a sheet sliding up over it — dailyFindDue() stays
-     true, so this simply asks again on the next render once the tour
-     has been dismissed. */
-  if(S.tour)return false;
-  if(morningDue())return false;            // readiness goes first; we take the next open
-  const t=todayState();
-  if(t.dfShown){
-    const d=dfRarestUnseen();if(!d)return false;
-    S.dfExtra={t:d.t,d:d.d,rar:d.rar};
-    try{const seen=discoverySeen();seen[d.id]=today();lset('training-disc-v1',seen)}catch(e8){oops('dfSeen',e8)}}
-  else S.dfExtra=null;
-  t.dfShown=true;t.dfN=(t.dfN||1)+(t.dfLast?1:0);t.dfLast=Date.now();
-  if(!t.dfN)t.dfN=1;
-  todaySave(t);
-  S.sheet={t:'dailyfind'};try{hapticRun('find')}catch(e7){oops('dfHaptic',e7)};vib(12);render();return true}catch(e){oops('dfAsk',e);return false}}
-function lockIcon(sz){
-  return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" style="width:'+(sz||11)+'px;height:'+(sz||11)+'px;flex:none"><rect x="5.5" y="10.5" width="13" height="9" rx="2.5"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5"/></svg>'}
 
 function morningDue(){
   if(!S.gar||!S.gar.on||!S.gar.morning)return false;
@@ -44382,7 +44673,7 @@ function dayCheck(){
      reported". The app is resumed, not relaunched, so a flag set on
      Monday's read would let Tuesday's prompt beat Tuesday's read. */
   if(k!==lastDay){lastDay=k;S.garSkip=false;S._hkReadSeen=0;S._hkWait=0}
-  if(!morningAsk())dailyFindAsk()}
+  morningAsk()}
 // the app is suspended rather than closed, so re-check whenever it comes back
 try{document.addEventListener('visibilitychange',function(){if(document.visibilityState==='visible')dayCheck()})}catch(e){}
 try{window.addEventListener('pageshow',function(){dayCheck()})}catch(e){}
