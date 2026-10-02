@@ -1047,6 +1047,8 @@ h1.disp:not(.brand),.gradhead{letter-spacing:-.022em}
 .htile .htap{display:flex;flex-direction:column;align-items:flex-start;gap:4px;text-align:left;padding:0;width:100%}
 .htile .htag{margin-top:auto;padding-top:8px;text-align:left;min-height:32px}
 .htile .hsub.htag{color:var(--dim)}
+.hpods{display:flex;align-items:flex-end;justify-content:space-between;gap:6px;width:100%;margin-top:12px}
+.htile .hpline{margin-top:10px;padding-top:9px;border-top:1px solid var(--cardline);width:100%}
 .htree{padding-bottom:12px}
 .htreecv{position:relative;width:100%;aspect-ratio:1/1;max-height:150px;margin:-2px 0 4px}
 .htree .hbig{font-size:22px}
@@ -1867,7 +1869,7 @@ if(S.sess){S.note=S.sess.note||S.note;
       if(c0&&(s0.log||[]).some(l=>l.ex===c0.ex&&l.setNo===c0.setNo)){const n0=sessAdv(s0);
         if(n0<0)s0.phase='done';else s0.idx=n0}}catch(e){oops('bootSess',e)}
     if(S.sess.phase!=='done')S.sess.phase='ready'}}
-const BUILD_ID='8f5998';  // stamped by tools/build.py with the content hash
+const BUILD_ID='6d8f20';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -4892,6 +4894,34 @@ function raceEligible(pv){
   (S.crewRows||[]).forEach(m=>{const id=m&&m.user_id;const d9=raceDayOf(m&&m.joined_at);
     if(id&&id!==S.frMe&&d9&&d9<pv)el[id]=1});
   return el}
+/* ONE PODIUM PLACE, ONE DRAWING (owner, 2 Oct 2026: "I want the same podium
+   look that is in the social page"). The race page and the Home tile draw a
+   place through this, the tile at a smaller size: the ring (green for the
+   leader with its one glow, blue for you), the crown on last week's holder,
+   the name, the points, and a bar whose height is proportional to points.
+   x: {me,id,name,init,av,week,rank}. */
+function podColHtml(x,topPts,crowned,small){
+  const first=x.rank===1;
+  const size=small?(first?36:30):(first?58:52);
+  const barH=small?Math.max(20,Math.round(40*(x.week||0)/topPts)):Math.max(34,Math.round(64*(x.week||0)/topPts));
+  const ringCol=first?'var(--green)':x.me?'var(--blue)':'rgba(255,255,255,.20)';
+  const CROWN='<svg width="'+(small?14:18)+'" height="'+(small?9:12)+'" viewBox="0 0 18 12" fill="none" aria-hidden="true"><path d="M1 11L2.5 2l4 4L9 1l2.5 5 4-4L17 11z" stroke="var(--gold)" stroke-width="1.4" stroke-linejoin="round"/></svg>';
+  return '<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:'+(small?4:7)+'px;min-width:0">'+
+    (crowned?CROWN:'')+
+    '<div style="position:relative;z-index:1;width:'+size+'px;height:'+size+'px;border-radius:'+size+'px;border:2px solid '+avRing(x.av,ringCol)+';'+(first?'box-shadow:0 0 '+(small?12:18)+'px rgba(48,209,88,.35);':'')+'display:flex;align-items:center;justify-content:center;font-size:'+(small?(first?14:12):(first?19:17))+'px;font-weight:600;flex:none">'+avInner(x.av,x.init,first?'var(--green)':'var(--text)')+'</div>'+
+    '<span style="font-size:'+(small?11:15)+'px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(x.me?'You':x.name)+'</span>'+
+    '<span class="disp" data-cu="'+(small?'hpod-':'pod-')+esc(String(x.me?'me':x.id))+'" style="font-size:'+(small?(first?17:14):(first?23:20))+'px;font-weight:600;line-height:1.1;color:'+(first&&x.week>0?'var(--green)':'var(--text)')+'">'+x.week+'</span>'+
+    '<div style="width:100%;height:'+barH+'px;border-radius:'+(small?8:12)+'px '+(small?8:12)+'px 0 0;background:'+(first?'linear-gradient(180deg,rgba(48,209,88,.20),rgba(48,209,88,.05))':'linear-gradient(180deg,rgba(255,255,255,.10),rgba(255,255,255,.03))')+';border:1px solid '+(first?'rgba(48,209,88,.30)':'rgba(255,255,255,.10)')+';border-bottom:0;display:flex;align-items:center;justify-content:center">'+
+    '<span class="disp" style="font-size:'+(small?(first?13:12):(first?17:15))+'px;font-weight:600;color:'+(first?'var(--text)':'var(--dim)')+'">'+x.rank+'</span></div></div>'}
+/* the podium's one sentence about the gap, for the race page and the tile */
+function podLeadLine(pod,mine,plain){
+  /* escaped for the web's HTML; `plain` for the phone, which draws text, not markup */
+  const nm=n=>plain?String(n):esc(n);
+  try{const lead=pod[0];if(!lead)return '';
+    if(lead.me)return !pod[1]?'You lead.':mine===pod[1].week?'Level with '+nm(pod[1].name)+'.':'You lead by '+(mine-pod[1].week)+'.';
+    const gap=lead.week-mine;
+    return nm(lead.name)+' leads by '+gap+'.'+(gap>0&&gap<=45?' A session today overtakes.':'')}
+  catch(e){oops('podLeadLine',e);return ''}}
 function crownKeyNow(){
   try{
     const a9=acct()||{};
@@ -5490,20 +5520,8 @@ function friendsSection(){
            decorative), the leader's ring the one green glow on the page,
            a summary line that says the gap in a sentence */
         const topPts=Math.max(1,pod[0].week||1);
-        const col=x=>{const first=x.rank===1;const size=first?58:52;
-          const barH=Math.max(34,Math.round(64*(x.week||0)/topPts));
-          const ringCol=first?'var(--green)':x.me?'var(--blue)':'rgba(255,255,255,.20)';
-          return '<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:7px;min-width:0">'+
-            (hasCrown(x)?CROWN:'')+
-            '<div style="position:relative;z-index:1;width:'+size+'px;height:'+size+'px;border-radius:'+size+'px;border:2px solid '+avRing(x.av,ringCol)+';'+(first?'box-shadow:0 0 18px rgba(48,209,88,.35);':'')+'display:flex;align-items:center;justify-content:center;font-size:'+(first?19:17)+'px;font-weight:600">'+avInner(x.av,x.init,first?'var(--green)':'var(--text)')+'</div>'+
-            '<span style="font-size:15px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(x.me?'You':x.name)+'</span>'+
-            '<span class="disp" data-cu="pod-'+esc(String(x.me?'me':x.id))+'" style="font-size:'+(first?23:20)+'px;font-weight:600;color:'+(first&&x.week>0?'var(--green)':'var(--text)')+'">'+x.week+'</span>'+
-            '<div style="width:100%;height:'+barH+'px;border-radius:12px 12px 0 0;background:'+(first?'linear-gradient(180deg,rgba(48,209,88,.20),rgba(48,209,88,.05))':'linear-gradient(180deg,rgba(255,255,255,.10),rgba(255,255,255,.03))')+';border:1px solid '+(first?'rgba(48,209,88,.30)':'rgba(255,255,255,.10)')+';border-bottom:0;display:flex;align-items:center;justify-content:center">'+
-            '<span class="disp" style="font-size:'+(first?17:15)+'px;font-weight:600;color:'+(first?'var(--text)':'var(--dim)')+'">'+x.rank+'</span></div></div>'};
-        const leadLine=(function(){try{const lead=pod[0];if(!lead)return '';
-          if(lead.me)return !pod[1]?'You lead.':mine===pod[1].week?'Level with '+esc(pod[1].name)+'.':'You lead by '+(mine-pod[1].week)+'.';
-          const gap=lead.week-mine;
-          return esc(lead.name)+' leads by '+gap+'.'+(gap>0&&gap<=45?' A session today overtakes.':'')}catch(e9){return ''}})();
+        const col=x=>podColHtml(x,topPts,hasCrown(x));
+        const leadLine=podLeadLine(pod,mine);
         let h9='<div class="card mt" style="padding:20px 18px 18px;background:linear-gradient(180deg,var(--pane-top),var(--pane-bottom)),radial-gradient(120% 80% at 50% 0%,rgba(224,164,88,.12),transparent 62%)">'+
           '<p class="micro">The week\u2019s podium</p>'+
           '<div style="display:flex;align-items:flex-end;justify-content:space-between;gap:8px;margin-top:16px">'+order.map(col).join('')+'</div>'+
@@ -6924,7 +6942,7 @@ function coachAppMap(){
     '. The round avatar top right opens You (their profile and account).')}catch(e){oops('appMap.drawer',e)}
   const hasR=!!((S.acl&&S.acl.on)||(typeof activeProtocols==='function'&&activeProtocols().length));
   L.push('SCREENS:');
-  L.push('- Home (the first screen): five tiles. Their tree with their data points (tap it for the full tree, every session a leaf, PRs as white blossoms, findings as roots), readiness this morning with HRV beside it and \u201cWhat else happened?\u201d under it (one-tap day tags: drinks, caffeine after 2pm, ate late, a stressful day, which the findings test), today\u2019s session with Start, their place in this week\u2019s race, and one thing to do today from their own data.');
+  L.push('- Home (the first screen): five tiles. Their tree with their data points (tap it for the full tree, every session a leaf, PRs as white blossoms, findings as roots), readiness this morning with HRV beside it and \u201cWhat else happened?\u201d under it (one-tap day tags: drinks, caffeine after 2pm, ate late, a stressful day, which the findings test), today\u2019s session with Start, the week\u2019s race as a podium of the top three, and one thing to do today from their own data.');
   if(surfOn('home'))L.push('- Train: the programme. Title, the week (tap the subtitle for the week clock), "+ BUILD A PROGRAM", today’s suggested session glowing among "Week N sessions" (tap one to preview it, then Start), lift goals. "Rearrange this screen" at the bottom.');
   if(surfOn('social'))L.push('- Race: a weekly race on witnessed points (sessions this phone timed live). Friends, pods and last week’s podium. Weeks raced at the foot.');
   if(surfOn('progress'))L.push('- Progress (menu): goal lifts and their charts, with "More" holding the rest.');
@@ -10147,13 +10165,21 @@ function scanCard(plain){
     chip('weight',uwNum(d.w),' '+uwUnit(),d.w>0)+chip('muscle',uwNum(d.smm),' '+uwUnit(),d.smm>0)+chip('fat',uwNum(d.fm),' '+uwUnit(),d.fm<0)+chip('body fat',d.bf,'%',d.bf<0)+'</div>'+
     '<p style="color:var(--faint);font-size:11px;line-height:1.5;margin-top:8px">Since '+fmtDate(first.date+'T12:00')+'. Muscle up with fat flat or down is the recomp you want.'+(plain9?'':' Tap to explain.')+'</p>'+
     (plain9?'</div>':'</button>')}
+/* THE RECOVERY BODY'S STATE, ONE READER (2 Oct 2026): fresh under 75 glows
+   pale ("still recovering"), the rest is the dark plate ("recovered").
+   recoveryCard, the Home tile and the phone's section all draw this. */
+const REC_LOW=75;
+function recBodyState(F){
+  const st={};
+  try{(F||muscleFresh()).forEach(x=>{st[x.m]={s:x.fresh<REC_LOW?'fade':'open',days:null}})}catch(e){oops('recBodyState',e)}
+  return st}
 function recoveryCard(){
  /* recovery on the same glow mannequin as Your Ground — cooled slate
     glow = still recovering, dark plate = recovered. One body
     language across the whole app. */
  if(!S.history.length)return '';
  const F=muscleFresh();
- const st={};F.forEach(x=>{st[x.m]={s:x.fresh<75?'fade':'open',days:null}});
+ const st=recBodyState(F);
  const worked=F.filter(x=>x.fresh<100).sort((a,b)=>a.fresh-b.fresh);
  const panel=back=>'<div style="flex:1;min-width:0">'+
    groundSvg(st,back,{hit:false,idSuffix:'RC',attr:'style="width:100%;height:auto;display:block"'})+'</div>';
@@ -28278,8 +28304,21 @@ function homeTiles(){
     const rows=F.map(f=>({name:String(f.name||'A racer'),pts:Math.round(+f.week||0)}));
     const rank=1+rows.filter(x=>x.pts>me).length;
     const lead=rows.slice().sort((a,b)=>b.pts-a.pts)[0]||null;
-    T.race={on:on,me:me,field:rows.length,rank:rank,lead:(lead&&lead.pts>me)?lead:null}}
-  catch(e){oops('homeTiles.race',e);T.race={on:false,me:0,field:0,rank:1,lead:null}}
+    /* THE PODIUM (owner, 2 Oct 2026: "race pill should be the podium"):
+       the top three of the field with you in it, last week's crown on its
+       holder (crownKeyNow, the one reader the race page uses) */
+    let pod=[];
+    if(on&&F.length){
+      const nm=String((S.prof&&S.prof.name)||'').split(' ')[0];
+      const all=[{me:1,id:'me',name:'You',init:(nm||'Y').slice(0,1).toUpperCase(),pts:me,av:(acct()||{}).av||''}]
+        .concat(F.map(f=>({id:f.id,name:f.named?String(f.name):'A racer',init:(f.named?String(f.name).slice(0,1):'?').toUpperCase(),pts:Math.round(+f.week||0),av:f.av||''})));
+      all.forEach(x=>{x.week=x.pts});
+      /* the race page's own order: a tie keeps you first, then by name */
+      all.sort((a9,b9)=>b9.pts-a9.pts||(a9.me?-1:b9.me?1:String(a9.name).localeCompare(String(b9.name))));
+      const ck=(typeof crownKeyNow==='function')?crownKeyNow():null;
+      pod=all.slice(0,3).map((x,i)=>Object.assign(x,{rank:i+1,crown:!!ck&&(ck==='me'?!!x.me:x.id===ck)}))}
+    T.race={on:on,me:me,field:rows.length,rank:rank,lead:(lead&&lead.pts>me)?lead:null,pod:pod}}
+  catch(e){oops('homeTiles.race',e);T.race={on:false,me:0,field:0,rank:1,lead:null,pod:[]}}
 
   /* one thing to do today, from their own data (A FINDING IS SOMETHING YOU
      CAN ACT ON, 30 Sep); the day's brief when no lever speaks to today */
@@ -28326,12 +28365,19 @@ function homeGridHtml(){
    h+=tile(s.a,s.v,lab(s.kind==='live'?'In progress':'Today')+'<span class="hname">'+esc(s.name)+'</span><span class="hsub">'+esc(s.sub)+'</span>'+
      (s.run?'<span class="hsub">+ '+esc(s.run)+'</span>':'')+'<span class="hgo">'+esc(s.btn)+' ›</span>',
      s.kind==='plan'||s.kind==='live'?' style="border-color:var(--greensoft)"':'')}
-  /* the race */
+  /* the race: the race page's own podium, smaller (podColHtml is the one
+     drawing), in its gold wash, with its one sentence; your own place under
+     it when you are off it */
   {const r=T.race;
-   h+=tile('drawerNav','social',lab('Race')+
-     (r.on&&r.field?'<span class="hbig">#'+r.rank+'<span class="hof"> of '+(r.field+1)+'</span></span><span class="hsub">'+r.me+' points this week</span>'+
-       (r.lead?'<span class="hsub">'+esc(r.lead.name)+' leads on '+r.lead.pts+'</span>':'<span class="hsub" style="color:var(--green)">You lead</span>')
-      :'<span class="hbig">'+r.me+'</span><span class="hsub">points this week</span><span class="hgo">'+(r.on?'Add a friend':'Race your friends')+' ›</span>'))}
+   if(r.on&&r.pod&&r.pod.length>=2){
+     const topPts=Math.max(1,r.pod[0].week||1);
+     const ord=[r.pod[1],r.pod[0],r.pod[2]].filter(Boolean);
+     const meOn=r.pod.some(x=>x.me);
+     const line=meOn?podLeadLine(r.pod,r.me):'You: #'+r.rank+' of '+(r.field+1)+', '+r.me+' points';
+     h+=tile('drawerNav','social',lab('The week\u2019s podium')+
+       '<span class="hpods">'+ord.map(x=>podColHtml(x,topPts,x.crown,true)).join('')+'</span>'+
+       '<span class="hsub hpline">'+line+'</span>',' style="background:linear-gradient(180deg,var(--pane-top),var(--pane-bottom)),radial-gradient(120% 80% at 50% 0%,rgba(224,164,88,.12),transparent 62%)"')}
+   else h+=tile('drawerNav','social',lab('Race')+'<span class="hbig">'+r.me+'</span><span class="hsub">points this week</span><span class="hgo">'+(r.on?'Add a friend':'Race your friends')+' \u203a</span>')}
   /* one thing to do today, full width */
   {const x=T.act;
    h+=tile(x.a,x.v,lab('Do this today')+'<span class="hname" style="font-size:17px;line-height:1.35">'+esc(x.t)+'</span>'+
@@ -38968,7 +39014,14 @@ function sheetHtml(){
       '<button data-a="rehabToggle" style="width:100%;padding:12px;color:var(--faint);font-size:13px;margin-top:8px">Cancel — turn rehab back off</button>')}
   if(S.sheet.t==='acldate'){
     const surg=S.acl.mode==='aclr';
-    const inner='<p style="color:var(--dim);font-size:13px;line-height:1.6">'+
+    /* SURGERY OR NOT, ON THE DATE SCREEN ITSELF (owner, 2 Oct 2026: "no
+       option for non surgical rehabilitation date of injury"). The choice
+       lived only on the first pick, so anyone who chose reconstruction, or
+       landed here from onboarding, could only ever enter a surgery date. */
+    const mpill=(v9,l9)=>'<button data-a="aclModeSet" data-v="'+v9+'" class="pill" aria-pressed="'+(S.acl.mode===v9?'true':'false')+'" style="flex:1;padding:12px 0'+
+      (S.acl.mode===v9?';background:var(--text);color:var(--bg);border-color:var(--text);font-weight:600':'')+'">'+l9+'</button>';
+    const inner='<div class="row" style="margin-bottom:16px">'+mpill('aclr','Surgery')+mpill('deficient','No surgery')+'</div>'+
+      '<p style="color:var(--dim);font-size:13px;line-height:1.6">'+
       (surg?'When was your reconstruction? The nine-month gate before return to sport is counted from this date, and it is the one criterion that testing cannot shortcut — graft remodelling runs on its own biological clock.'
            :'When did you injure it? This is context rather than a gate: without a graft to heal, your timeline is set by how the knee behaves, not by the calendar.')+'</p>'+
       '<p class="eyebrow" style="margin-top:16px">'+(surg?'Surgery date':'Injury date')+'</p>'+
@@ -44078,6 +44131,12 @@ function runAction(a,v,t,e){
     /* which knee (audit P8) — stored on the pathway record, nowhere new */
     case 'aclSide':{S.acl.side=(v==='left'||v==='right')?v:null;aclSave();render();break}
     case 'aclDateOpen':S.adate={val:S.acl.date||''};S.sheet={t:'acldate'};render();break;
+    /* surgery or not, switched on the date screen (2 Oct 2026). The ticks
+       already made stay where they are; a pre-operative phase only exists
+       for a reconstruction, so a switch away from it starts at phase 1. */
+    case 'aclModeSet':{if(v!=='aclr'&&v!=='deficient')break;
+      if(S.acl.mode!==v){S.acl.mode=v;if(v==='deficient'&&+S.acl.phase===0)S.acl.phase=1;aclSave()}
+      render();break}
     case 'aclDateSave':{
       let v2=(S.adate&&S.adate.val||'').trim();
       if(!v2){const el2=document.querySelector('[data-acldate]');if(el2&&el2.value)v2=String(el2.value).trim()}
