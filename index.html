@@ -312,7 +312,11 @@ body.swiping{touch-action:none}
   transition:transform .28s var(--ease-spring)}
 .tabbar button span{font-size:var(--t-caption2);font-weight:600;letter-spacing:.01em;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
-.tabbar button.on{color:var(--text);background:none}
+/* the one you are on is lit, Athlytic's way (owner, 2 Oct 2026): a soft
+   pane behind the glyph and the label, never a colour */
+.tabbar button.on{color:var(--text);background:rgba(255,255,255,.09)}
+:root[data-theme="light"] .tabbar button.on{background:rgba(0,0,0,.06)}
+@media (prefers-color-scheme: light){:root:not([data-theme="dark"]) .tabbar button.on{background:rgba(0,0,0,.06)}}
 .tabbar button.on svg{transform:translateY(-1px) scale(1.04)}
 .tabbar button:active svg{transform:scale(.9)}
 /* the badge the drawer was hiding: a real count where the room is */
@@ -329,6 +333,9 @@ body.swiping{touch-action:none}
 .badge.q{background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.18);color:var(--text);font-weight:600}
 .badge.ring{box-shadow:0 0 0 2px var(--bg)}
 .badge-dot{display:inline-flex;width:9px;height:9px;border-radius:var(--r-full);background:var(--red);flex:none}
+.tabbar .tdot.q{background:rgba(255,255,255,.16);color:var(--text);font-weight:600}
+:root[data-theme="light"] .tabbar .tdot.q{background:rgba(0,0,0,.12)}
+@media (prefers-color-scheme: light){:root:not([data-theme="dark"]) .tabbar .tdot.q{background:rgba(0,0,0,.12)}}
 .tabbar .tdot{position:absolute;top:1px;left:50%;margin-left:5px;min-width:18px;height:18px;
   border-radius:var(--r-full);background:var(--red);color:#0B0B0D;font-size:11px;
   font-weight:700;font-variant-numeric:tabular-nums;line-height:1;display:flex;align-items:center;justify-content:center;padding:0 5px;
@@ -1024,6 +1031,25 @@ body:not(:has(.tabbar)) .txpop{bottom:calc(env(safe-area-inset-bottom, 10px) + 1
 h1.disp:not(.brand),.gradhead{letter-spacing:-.022em}
 .vh1{font-size:30px;font-weight:600;letter-spacing:-.025em;line-height:1.05}
 .vh2{font-size:var(--d-2);font-weight:600;letter-spacing:-.018em;line-height:1.12}
+/* THE HOME GRID (owner, 2 Oct 2026): two by two, then one wide card. A tile
+   is a card that says one thing large and one thing small, and is a door. */
+.hgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:14px}
+.htile{position:relative;display:flex;flex-direction:column;align-items:flex-start;gap:4px;text-align:left;width:100%;min-width:0;
+  padding:14px 14px 13px;margin:0;min-height:150px;cursor:pointer;color:var(--text)}
+.htile .htl{color:var(--faint);margin-bottom:4px}
+.htile .hbig{font-family:'Clash Grotesk',-apple-system,system-ui,sans-serif;font-weight:600;font-size:26px;line-height:1.05;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.htile .hbig.xl{font-size:44px}
+.htile .hbig .hof{font-size:15px;color:var(--dim);font-weight:500;letter-spacing:0}
+.htile .hname{font-family:'Clash Grotesk',-apple-system,system-ui,sans-serif;font-weight:600;font-size:19px;line-height:1.2;letter-spacing:-.01em;
+  display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.htile .hsub{font-size:13px;line-height:1.4;color:var(--dim)}
+.htile .hgo{margin-top:auto;padding-top:8px;font-size:13px;font-weight:600;color:var(--text)}
+.htile .htap{display:flex;flex-direction:column;align-items:flex-start;gap:4px;text-align:left;padding:0;width:100%}
+.htile .htag{margin-top:auto;padding-top:8px;text-align:left;min-height:32px}
+.htile .hsub.htag{color:var(--dim)}
+.htree{padding-bottom:12px}
+.htreecv{position:relative;width:100%;aspect-ratio:1/1;max-height:150px;margin:-2px 0 4px}
+.htree .hbig{font-size:22px}
 .card{background:linear-gradient(180deg,var(--pane-top),var(--pane-bottom));border:1px solid var(--cardline);border-radius:var(--r-5);max-width:100%;min-width:0;
   box-shadow:inset 0 1px 0 var(--edge-light)}
 /* the design system's small parts (Claude Design, 17 Sep 2026) */
@@ -1841,7 +1867,7 @@ if(S.sess){S.note=S.sess.note||S.note;
       if(c0&&(s0.log||[]).some(l=>l.ex===c0.ex&&l.setNo===c0.setNo)){const n0=sessAdv(s0);
         if(n0<0)s0.phase='done';else s0.idx=n0}}catch(e){oops('bootSess',e)}
     if(S.sess.phase!=='done')S.sess.phase='ready'}}
-const BUILD_ID='27c4ef';  // stamped by tools/build.py with the content hash
+const BUILD_ID='8f5998';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -3677,7 +3703,20 @@ function aiReady(){return !!(((S.ai&&S.ai.proxy)||'').trim()||(S.ai&&S.ai.key)||
    opposite ("what does not go: your whole history"). A yes to the old
    words is not a yes to the new ones, so the version rises and everyone
    who said yes before is asked once more, with what changed named. */
-const AI_CONSENT_V=2;
+/* THE YES IS VERSIONED (1 Oct 2026). 2: the chat reads the whole record.
+   3 (2 Oct 2026): it also reads the day tags (07c-day-tags.js), a new
+   kind of thing to send, so a yes to 2 is asked again with that named. */
+const AI_CONSENT_V=3;
+/* the words of the question, one reader for the web sheet and the phone's */
+function aiConsentCopy(){
+  const was=(S.ai&&+S.ai.ok)||0;
+  return {
+    title:was?'Allena\u2019s chat reads more now':'Before Allena asks the AI',
+    intro:was>=2?'You said yes before. Since then there is one more thing the chat can read: the day tags you add on Home (drinks, caffeine after 2pm, eating late, a stressful day). That is a new kind of thing to send, so Allena is asking again.'
+      :was?'You said yes before, when the chat only saw your recent training. Now it reads everything your app holds, including the day tags you add on Home, so you never have to explain your training to it. That is a bigger thing to send, so Allena is asking again.'
+      :'This part of Allena runs on Anthropic\u2019s models, which means it has to send them something. Everything else in the app \u2014 the statistics, the findings, the recovery model \u2014 runs on your phone and always will.',
+    sent:'For the chat: your training record, so it can answer without you explaining. That is your sessions with every set (exercise names, weights, reps, effort), runs, your programme and goals, readiness, the day tags you add (drinks, late caffeine, late meals, stressful days), Apple Health numbers like sleep and heart rate, body scan numbers and blood results, your rehab status, check-ins and pain flags, the notes you wrote, and the things you asked Allena to remember. Plus your question and the last eight messages of the chat, yours and Allena\u2019s, so it can follow the conversation. The deep read sends the patterns it reads. For a photo read, the picture you picked.',
+    not:'Your name or email, or your sign-in. It goes only when you ask something, it is not used to train models, and it is not kept for anything else.'}}
 function aiConsented(){try{return !!(S.ai&&(+S.ai.ok||0)>=AI_CONSENT_V)}catch(e){return false}}
 function aiConsentAsk(){try{S.sheet={t:'aiok'};render()}catch(e){oops('aiConsentAsk',e)}}
 async function claudeFetch(body){
@@ -3967,6 +4006,7 @@ async function askClaude(q){
     const msg={r:'a',t:P.text||t,act:act};
     if(P.go.length)msg.go=P.go;
     if(P.ask.length)msg.ask=P.ask.slice(0,2);
+    if(P.log)msg.log=P.log;   // a proposal only: coachLogGo opens it for them to check
     /* memory is written the moment it is said, and shown with its undo:
        remembering is visible, never silent (the "remembered" moment) */
     const saved=P.mem.map(coachMemAdd).filter(Boolean);
@@ -6637,6 +6677,9 @@ function coachDossierBody(U){
         (d28.length>=7?'; 28-day average '+cdN(cdAvg(d28),dp)+' ('+d28.length+' days)':''))});
     try{const ds=(S.gar&&S.gar.days)||{},ks=Object.keys(ds).filter(k=>k<td&&ds[k].am!=null).sort().slice(-14);
       if(ks.length)L.push('- Morning readiness they logged (0 to 100): '+ks.map(k=>k.slice(5)+' '+ds[k].am).join(', '))}catch(e9){oops('coachDossier.ready',e9)}
+    /* the day tags (07c-day-tags.js), only on days they answered */
+    try{const ds=(S.gar&&S.gar.days)||{},ks=Object.keys(ds).filter(k=>k<td&&dayTagsOf(k)).sort().slice(-28);
+      if(ks.length)L.push('- What else happened, on the days they answered (drinks, caffeine after 2pm, ate late, stressful day): '+ks.map(k=>k.slice(5)+' '+dayTagsLine(k)).join('; '))}catch(e9){oops('coachDossier.tags',e9)}
     try{const pt=proteinDayTarget();if(pt)L.push('- Their protein target: '+Math.round(pt)+' g a day')}catch(e9){oops('coachDossier.prot',e9)}
     return L.join('\n')});
 
@@ -6757,6 +6800,8 @@ const COACH_PLACES={
   import:{l:'Import your data',a:'intakeOpen'},
   logrun:{l:'Log a run',a:'runLog'},
   readiness:{l:'Morning check-in',a:'sigBb'},
+  tags:{l:'What else happened',a:'tagsOpen',v:'y'},
+  sources:{l:'Where your numbers come from',a:'sourcesOpen'},
   build:{l:'Build a programme',a:'setupOpen'},
   week:{l:'This week',a:'weekClockOpen',ok:()=>{const p=activeProgSafe();return !!(p&&!p.empty)}},
   goals:{l:'Lift goals',a:'goalsOpen'},
@@ -6789,9 +6834,13 @@ function coachPlaceOk(k){
    Read only at the start of a line, kept out of the shown text, capped,
    and checked: an unknown place is dropped, never drawn as a dead button. */
 function coachParse(text){
-  const res={text:'',go:[],mem:[],forget:[],ask:[]};
+  const res={text:'',go:[],mem:[],forget:[],ask:[],log:null};
   const keep=[];
   String(text||'').split('\n').forEach(line=>{
+    /* LOG carries one line of JSON; it is checked here, and a line that
+       does not check out is dropped, never shown as text */
+    const lg=/^[^\S\n]*\**\s*LOG\s*[|:]\s*(\{.*\})\s*\**\s*$/i.exec(line);
+    if(lg){if(!res.log)res.log=coachLogCheck(lg[1]);return}
     const m=/^[^\S\n]*\**\s*(OPEN|REMEMBER|FORGET|ASK)\s*[|:]\s*(.+?)\s*\**\s*$/i.exec(line);
     if(!m){keep.push(line);return}
     const kind=m[1].toUpperCase(),arg=m[2].replace(/\*+/g,'').trim();
@@ -6803,16 +6852,79 @@ function coachParse(text){
   res.text=keep.join('\n').replace(/\n{3,}/g,'\n\n').trim();
   return res}
 
+/* ═══ LOG BY TELLING (owner, 2 Oct 2026, from OxeAI: "no forms, just
+   conversation"). The chat may PROPOSE a session, a run or a bodyweight it
+   heard about. It never writes one. A session opens the ordinary "log a
+   past session" form already filled in, a run opens the run log, and a
+   bodyweight is one tap; each is saved by the same writer as a hand entry,
+   with the same duplicate check, PRs, sanity and "typed later, never
+   witnessed" mark. Effort is never guessed: an RPE rides only if they said
+   it, and the form shows the empty ones. Kilograms and kilometres, always. */
+function coachLogCheck(raw){
+  try{const o=JSON.parse(String(raw||''));if(!o||typeof o!=='object')return null;
+    const kind=String(o.kind||'').toLowerCase();
+    const td=today(),floor=dayKey(new Date(Date.now()-366*864e5));
+    const date=/^\d{4}-\d{2}-\d{2}$/.test(String(o.date||''))?String(o.date):td;
+    if(date>td||date<floor)return null;
+    const num=(v,lo,hi)=>{const n=+v;return isFinite(n)&&n>=lo&&n<=hi?n:null};
+    if(kind==='bw'){const kg=num(o.kg,20,400);return kg==null?null:{kind:'bw',kg:Math.round(kg*10)/10,date:td}}
+    if(kind==='run'){const km=num(o.km,0.2,200),mins=num(o.mins,1,1440);
+      if(km==null)return null;
+      return {kind:'run',date:date,km:Math.round(km*100)/100,mins:mins==null?0:Math.round(mins),rpe:num(o.rpe,1,10)}}
+    if(kind==='lift'){const sets=[];
+      (Array.isArray(o.sets)?o.sets:[]).slice(0,60).forEach(x=>{if(!x||typeof x!=='object')return;
+        const ex=String(x.ex||'').replace(/[\u0000-\u001f<>]/g,'').trim().slice(0,60);if(ex.length<2)return;
+        const secs=num(x.secs,1,3600);
+        if(secs!=null){sets.push({ex:ex,secs:Math.round(secs),rpe:num(x.rpe,1,10)});return}
+        const reps=num(x.reps,1,100);if(reps==null)return;
+        sets.push({ex:ex,kg:num(x.kg,0,500),reps:Math.round(reps),rpe:num(x.rpe,1,10)})});
+      if(!sets.length)return null;
+      return {kind:'lift',date:date,name:String(o.name||'').replace(/[\u0000-\u001f<>]/g,'').trim().slice(0,60),sets:sets}}
+    return null}
+  catch(e){oops('coachLogCheck',e);return null}}
+/* their own name for a lift the chat spelled differently: only a name the
+   alias resolver calls the SAME lift merges; anything else stays as said,
+   and the form shows it to them before anything is saved */
+function coachLogName(n){
+  try{const K=exKnownNames(),low=String(n).toLowerCase();
+    const hit=K.find(c=>String(c.n).toLowerCase()===low);if(hit)return hit.n;
+    const near=exNear(n,3).find(c=>c.same);return near?near.n:n}
+  catch(e){oops('coachLogName',e);return n}}
+function coachLogLine(L){
+  try{const day=fmtDate(L.date+'T12:00');
+    if(L.kind==='bw')return 'Bodyweight '+uwNum(L.kg)+' '+uwUnit()+' today';
+    if(L.kind==='run')return 'A run on '+day+': '+udNum(L.km)+' '+udUnit()+(L.mins?' in '+L.mins+' min':'');
+    const by={};L.sets.forEach(x=>{const k=coachLogName(x.ex);by[k]=(by[k]||0)+1});
+    return (L.name?L.name+' on ':'A session on ')+day+': '+Object.keys(by).map(k=>k+' \u00d7 '+by[k]).join(', ')}
+  catch(e){oops('coachLogLine',e);return 'A log'}}
+/* the tap: a form to check, never a silent write (bodyweight is its own confirm) */
+function coachLogOpen(L){
+  if(!L)return false;
+  if(L.kind==='bw'){const okd=bwLog(L.kg);if(okd)flash('Bodyweight saved for today.');return !!okd}
+  if(L.kind==='run'){S.runOn=true;lset('training-runon-v1',true);
+    S.rform={type:'easy',km:udNum(L.km),mins:L.mins||0,rpe:L.rpe||5,hr:0,elev:0,note:'',paste:'',date:L.date};
+    S.sheet={t:'runlog'};return true}
+  const rows=[],exNo={};let n=0;
+  L.sets.forEach(x=>{const ex=coachLogName(x.ex);
+    if(!exNo[ex])exNo[ex]=++n;
+    const of=L.sets.filter(y=>coachLogName(y.ex)===ex).length;
+    const setNo=rows.filter(r=>r.ex===ex).length+1;
+    rows.push(x.secs!=null
+      ?{ex:ex,setNo:setNo,of:of,exNo:exNo[ex],secs:x.secs,perSide:false,targetW:null,targetReps:null,targetRpe:null,w:'',r:'',s:x.secs,rpe:x.rpe}
+      :{ex:ex,setNo:setNo,of:of,exNo:exNo[ex],secs:null,perSide:false,targetW:null,targetReps:x.reps,targetRpe:null,w:x.kg>0?uwNum(x.kg):'',r:x.reps,s:'',rpe:x.rpe})});
+  S.quick={progId:'freeform',dayIdx:-1,dayName:L.name||'',block:'Logged by hand',week:null,date:L.date,rows:rows,note:{sleep:'',fatigue:'',knee:''},fromChat:1};
+  S.sheet=null;S.view='quick';return true}
+
 /* ── the user's own app, as they see it ───────────────────────────── */
 function coachAppMap(){
   const L=[];
   try{const T=tabBarTabs();L.push('BOTTOM BAR (left to right): '+T.map(t=>t[1]+(t[0]!=='crown'&&!surfOn(t[0])?' (greyed out)':'')).join(' · ')+
-    '. The centre is the tree icon. A sideways swipe moves between these three.')}catch(e){oops('appMap.tabs',e)}
-  try{const D=drawerRows();L.push('MENU (the ☰ button top left of every main page): '+D.map(r=>r.label).join(' · ')+
+    '. More opens the menu. A sideways swipe moves between Home, Train and Race.')}catch(e){oops('appMap.tabs',e)}
+  try{const D=drawerRows();L.push('MENU (More, on the bottom bar): '+D.map(r=>r.label).join(' · ')+
     '. The round avatar top right opens You (their profile and account).')}catch(e){oops('appMap.drawer',e)}
   const hasR=!!((S.acl&&S.acl.on)||(typeof activeProtocols==='function'&&activeProtocols().length));
   L.push('SCREENS:');
-  L.push('- Tree (the first screen): their training drawn as a tree, every session a leaf, PRs as white blossoms, findings as roots. Under the tree: their data points, then a line counting sessions and PRs, then what was found today. Tap a limb or leaf to look closer; pinch to zoom.');
+  L.push('- Home (the first screen): five tiles. Their tree with their data points (tap it for the full tree, every session a leaf, PRs as white blossoms, findings as roots), readiness this morning with HRV beside it and \u201cWhat else happened?\u201d under it (one-tap day tags: drinks, caffeine after 2pm, ate late, a stressful day, which the findings test), today\u2019s session with Start, their place in this week\u2019s race, and one thing to do today from their own data.');
   if(surfOn('home'))L.push('- Train: the programme. Title, the week (tap the subtitle for the week clock), "+ BUILD A PROGRAM", today’s suggested session glowing among "Week N sessions" (tap one to preview it, then Start), lift goals. "Rearrange this screen" at the bottom.');
   if(surfOn('social'))L.push('- Race: a weekly race on witnessed points (sessions this phone timed live). Friends, pods and last week’s podium. Weeks raced at the foot.');
   if(surfOn('progress'))L.push('- Progress (menu): goal lifts and their charts, with "More" holding the rest.');
@@ -6821,7 +6933,7 @@ function coachAppMap(){
   if(surfOn('levers'))L.push('- What moves your training (menu): links found in their own data between something they can change (sleep, food, running load, rest) and how they lift, each with what to do.');
   L.push('- Settings (menu): Program (library, personalised program, your own block) · Tracking (rehab pathway, running, daily check-in, connect wearables & apps) · Appearance · Equipment (bar & plates, what you can train on, units) · Allena chat · Your data (workout log, export a backup, restore, start fresh) · Help (How Allena decides, get help).');
   L.push('THE SESSION SCREEN: one exercise at a time as a table, one row per set, filled in from the plan. Type over the weight or reps, then tap the tick; Allena asks how hard it was (RPE, with reps left beside each) and that logs it and starts the rest clock. Tap a set number to skip that set (it stays, greyed, with Undo); "+ Add set" adds one. Move between exercises with a sideways swipe, the arrows at the bottom, or the bars across the top. A logged row opens its fix sheet. A timed row’s button starts its clock. The ≡ menu top right: exercise notes, Ask Allena, Modify (tune the load, swap, skip, superset), What is left, Save and exit, Discard.');
-  L.push('HOW TO: import a programme, a spreadsheet, Apple Health, Strava, Garmin or Hevy files → menu → Import your data. Change kg/lb → Settings → Units. Back up → Settings → Export a backup (and sign in under You for the automatic cloud backup). New programme → Train → + BUILD A PROGRAM. Morning readiness → the check-in Allena asks for in the morning. Ask about one session → a new chat → "Ask about a session". What Allena remembers → the Memory button at the top of this chat.');
+  L.push('HOW TO: import a programme, a spreadsheet, Apple Health, Strava, Garmin or Hevy files → menu → Import your data. Change kg/lb → Settings → Units. Why a number shows nothing, or when Health last sent it → You → Apple Health (Where your numbers come from). Back up → Settings → Export a backup (and sign in under You for the automatic cloud backup). New programme → Train → + BUILD A PROGRAM. Morning readiness → the check-in Allena asks for in the morning. Ask about one session → a new chat → "Ask about a session". What Allena remembers → the Memory button at the top of this chat.');
   return L.join('\n')}
 
 /* ── starter questions from their own data ────────────────────────── */
@@ -6861,7 +6973,8 @@ function coachSys2(){
     'REMEMBER|<one plain sentence> — saves a lasting fact about them to Allena’s memory: an injury, a preference, a schedule, an event, how their body responds, a goal. Use it whenever they tell you something worth knowing next time, or ask you to remember. Write it so it reads right months later, with a date if it matters ("Has a wedding on 14 Nov 2026"). Never for things the app already records (sets, runs, check-ins).\n'+
     'FORGET|<the fact, in words> — removes a memory that is no longer true or that they ask you to drop.\n'+
     'ASK|<a follow-up question they might tap next> — up to two, short, in their voice.\n'+
-    'WHAT YOU CANNOT DO: log or delete sets, runs or check-ins, change their programme beyond ADJUST, message their friends, or see anyone else’s data. If they ask, say so plainly and OPEN the place where they can do it themselves.');
+    'LOG|<one line of JSON> — when they tell you about a session, a run or their bodyweight that is not in the record, propose it so they can save it. The app shows it to them to check; nothing is saved until they tap. Forms: {"kind":"lift","date":"YYYY-MM-DD","name":"Push day","sets":[{"ex":"Bench press","kg":80,"reps":5,"rpe":8},{"ex":"Plank","secs":60}]} (one object per set, their own exercise names from the record), {"kind":"run","date":"YYYY-MM-DD","km":5,"mins":27}, {"kind":"bw","kg":80.5} (today only). Kilograms and kilometres. Put rpe only if they told you how hard it was; never guess it. Leave out anything they did not say. At most one, and say in your reply that they can check it before saving.\n'+
+    'WHAT YOU CANNOT DO: save or delete anything yourself, change their programme beyond ADJUST, message their friends, or see anyone else’s data. If they ask, say so plainly and OPEN the place where they can do it themselves.');
   if(coachToolsOn())P.push('LOOKING THINGS UP: the record carries every set for the last six weeks and summaries before that. For anything older or more detailed (a session in March, every run in a month, one whole day, a lift’s full history), call a tool rather than guess. Tool results are the app’s own record.');
   return P.join('\n\n')+COACH_TONE}
 
@@ -6915,7 +7028,7 @@ const COACH_TOOLS=[
    input_schema:{type:'object',properties:{from:{type:'string',description:'YYYY-MM-DD'},to:{type:'string',description:'YYYY-MM-DD'},exercise:{type:'string',description:'part of an exercise name, e.g. bench'},limit:{type:'integer',description:'at most 40'}},additionalProperties:false}},
   {name:'find_runs',description:'Runs and other cardio between two dates (inclusive): distance, time, pace, type, heart rate, effort where they recorded one.',
    input_schema:{type:'object',properties:{from:{type:'string'},to:{type:'string'},limit:{type:'integer'}},additionalProperties:false}},
-  {name:'day_detail',description:'Everything the record holds for one date: sessions with every set, runs, health signals (sleep, HRV, resting heart rate, steps, food, bodyweight), morning readiness, knee check-in and notes.',
+  {name:'day_detail',description:'Everything the record holds for one date: sessions with every set, runs, health signals (sleep, HRV, resting heart rate, steps, food, bodyweight), morning readiness, the day tags they answered, knee check-in and notes.',
    input_schema:{type:'object',properties:{date:{type:'string',description:'YYYY-MM-DD'}},required:['date'],additionalProperties:false}},
   {name:'lift_history',description:'One lift over its whole history: the best estimated max each week it was trained near its limit, and the top set of every session.',
    input_schema:{type:'object',properties:{exercise:{type:'string'}},required:['exercise'],additionalProperties:false}}];
@@ -6955,6 +7068,7 @@ function coachToolBody(name,I){
       SIG_KINDS.forEach(k=>{const p=sigSeries(k,{partial:true}).find(x=>x.t===t);if(p)L.push(k.k+': '+cdN(p.v,Math.abs(p.v)<20?1:0)+(k.u||''))})}}
     catch(e9){oops('coachTool.sig',e9)}
     try{const g=(S.gar&&S.gar.days&&S.gar.days[d])||{};if(g.am!=null)L.push('Morning readiness: '+g.am)}catch(e9){oops('coachTool.ready',e9)}
+    try{const tl=dayTagsLine(d);if(tl)L.push('What else happened: '+tl)}catch(e9){oops('coachTool.tags',e9)}
     try{const c=checkins().find(x=>x.date===d);if(c)L.push('Knee check-in: pain '+c.pain+(c.stiff!=null?', stiffness '+c.stiff:'')+(c.conf!=null?', confidence '+c.conf:'')+(c.swell===true||+c.swell>0?', swollen':', no swelling'))}
     catch(e9){oops('coachTool.chk',e9)}
     return L.length>1?L.join('\n'):L[0]+': nothing recorded that day.'}
@@ -9803,7 +9917,6 @@ function recoveryMod(){
  try{
   let m=1;
   const hk=hkDailyStore().days||{};
-  const ks=Object.keys(hk).filter(k=>hk[k].sleep>0).sort();
   /* ═══ "LAST NIGHT" HAS TO BE LAST NIGHT (engine audit, 14 Sep 2026) ═══
      ks is the days that HAVE a sleep figure, so ks[last] was simply the
      most recent one — a fortnight ago if the watch came off, and it was
@@ -9812,12 +9925,11 @@ function recoveryMod(){
      had the same fault on the baseline: twenty-eight readings, not
      twenty-eight nights. The term is silent unless there is a night from
      last night or this morning, and the median is the last 28 days. */
-  const dAgo=n=>dayKey(new Date(Date.now()-n*864e5));
-  const recentK=ks.length?ks[ks.length-1]:null;
-  const month=ks.filter(k=>k>=dAgo(27));
-  if(month.length>=7&&recentK&&recentK>=dAgo(1)){
-   const last=hk[recentK].sleep;
-   const pool=month.map(k=>hk[k].sleep).sort((a,b)=>a-b);
+  /* the window itself is recSleepWindow() in 26c, the one reader (2 Oct 2026) */
+  const sw=recSleepWindow();
+  if(sw.on){
+   const last=hk[sw.recentK].sleep;
+   const pool=sw.month.map(k=>hk[k].sleep).sort((a,b)=>a-b);
    const med=pool[Math.floor(pool.length/2)];
    /* Health stores sleep in MINUTES; the -2%/hr rule needs hours
       (caught 10 Sep before it bit: a 90-minute-short night was read
@@ -10207,6 +10319,12 @@ function coachExtras(m,i,isLast){
       '<span style="flex:1;min-width:0">'+(x.undone?'<s>Remembered: '+esc(x.t)+'</s>':'Remembered: '+esc(x.t))+'</span>'+
       (x.undone?'':'<button data-a="memDel" data-v="'+esc(x.id)+'" class="mono" style="color:var(--amber);font-size:11px;flex:none">Undo</button>')+'</div>'});
     (m.forgot||[]).forEach(t=>{h+='<p style="margin-top:8px;font-size:13px;color:var(--faint)">Forgot: '+esc(t)+'</p>'});
+    /* LOG BY TELLING: a proposal with one door; nothing is saved until they check it */
+    if(m.log){h+='<div class="card" style="margin:12px 0 0;padding:12px 14px">'+
+      '<p class="eyebrow">'+(m.logDone?'Saved':'Ready to log')+'</p>'+
+      '<p style="font-size:15px;line-height:1.45;margin-top:4px">'+esc(coachLogLine(m.log))+'</p>'+
+      (m.logDone?'':'<button data-a="coachLogGo" data-v="'+i+'" class="pill" style="margin-top:10px;border-color:var(--amber);color:var(--amber);font-size:13px">'+
+        (m.log.kind==='bw'?'Save it':'Check it and save ›')+'</button>')+'</div>'}
     if(isLast&&(m.ask||[]).length)h+='<div style="display:flex;flex-direction:column;gap:6px;margin-top:12px">'+m.ask.map(q=>
       '<button data-a="coachChip" data-v="'+esc(q)+'" class="card" style="width:100%;text-align:left;padding:9px 13px;font-size:13px;color:var(--dim);margin:0">'+esc(q)+'</button>').join('')+'</div>'}
   catch(e){oops('coachExtras',e)}
@@ -12261,6 +12379,69 @@ const ACL_PREVENT={
         'Done before training and games, not instead of them — the guide says at least 10 minutes before every session, and 15 minutes in its return-to-sport criteria'],
   programs:[['Sportsmetrics',''],['The FIFA 11+ warm-up',''],['The PEP Program',''],
             ['The KNEE Program','Netball Australia'],['FootyFirst','AFL']]};
+/* ═══ WHAT ELSE HAPPENED (owner, 2 Oct 2026: "also consider oxeai…
+   copy what we should implement and improve") ══════════════════════════
+   OxeAI asks about life outside training and says nothing measurable back.
+   Allena already told people the recovery number "does not know about
+   stress or alcohol"; this is the one-tap way to tell it. Four tags, each a
+   thing a person can change or plan around, each about ONE DAY:
+
+     drinks · caffeine after 2pm · ate late · a stressful day
+
+   Stored on the day row of the morning record (`S.gar.days[k].tags`, the
+   training-garmin-v1 key — no new storage key). An ANSWERED day carries a
+   tags object even when nothing was ticked: `{}` means "none of these",
+   and only an answered day is a 0 to the findings engine. A day nobody
+   answered is missing, never a sober, calm day (the abandoned-log law, 15
+   Sep: an unknown is not a zero).
+   They feed the correlation grid as yes/no levers (13c), tested with the
+   same strict bar as sleep and food, and said with counts: "after the 6
+   days with drinks, your HRV next morning averaged…". Stress is a
+   self-rating, never a reading of anybody's mental health. Nothing here is
+   a streak and nothing nags: the door is one quiet line on Home. */
+const DAY_TAGS=[
+  {k:'alc',l:'Drinks',said:'drinks'},
+  {k:'caff',l:'Caffeine after 2pm',said:'caffeine after 2pm'},
+  {k:'late',l:'Ate late',said:'a late meal'},
+  {k:'stress',l:'Stressful day',said:'a stressful day'}];
+const DAY_TAG_KEYS=DAY_TAGS.map(x=>x.k);
+/* the tags answered for a day, or null when nobody answered */
+function dayTagsOf(k){
+  try{const g=S.gar&&S.gar.days&&S.gar.days[k];
+    return (g&&g.tags&&typeof g.tags==='object')?g.tags:null}
+  catch(e){oops('dayTagsOf',e);return null}}
+/* the one writer: keeps only known tags, and an empty pick is an answer */
+function dayTagsSet(k,picked){
+  S.gar=S.gar||{days:{}};S.gar.days=S.gar.days||{};
+  const d=S.gar.days[k]=S.gar.days[k]||{};
+  const t={};DAY_TAG_KEYS.forEach(x=>{if(picked&&picked[x])t[x]=1});
+  d.tags=t;garSave();return t}
+function dayTagsLine(k){
+  const t=dayTagsOf(k);if(!t)return null;
+  const on=DAY_TAGS.filter(x=>t[x.k]).map(x=>x.l);
+  return on.length?on.join(', '):'None of these'}
+/* how many answered days, for the engine's stamp and the "how far" line */
+function dayTagsAnswered(){
+  try{const g=(S.gar&&S.gar.days)||{};return Object.keys(g).filter(k=>g[k]&&g[k].tags&&typeof g[k].tags==='object').length}
+  catch(e){oops('dayTagsAnswered',e);return 0}}
+function dayTagsYesterday(){return dayKey(new Date(Date.now()-864e5))}
+/* the sheet. One form in view state: which day, and what is ticked. */
+function dayTagsForm(day){
+  const k=day==='t'?today():dayTagsYesterday();
+  const had=dayTagsOf(k);
+  return {day:day==='t'?'t':'y',t:Object.assign({},had||{})}}
+function dayTagsSheet(){
+  const f=S.tagForm||(S.tagForm=dayTagsForm('y'));
+  const pill=(on,a,v,lab)=>'<button data-a="'+a+'" data-v="'+esc(v)+'" class="pill" aria-pressed="'+(on?'true':'false')+'" style="padding:11px 14px;font-size:15px'+
+    (on?';background:var(--text);color:var(--bg);border-color:var(--text);font-weight:600':'')+'">'+esc(lab)+'</button>';
+  const n=dayTagsAnswered();
+  return wrapSheet('What else happened',
+    '<div style="display:flex;gap:8px">'+pill(f.day==='y','tagDay','y','Yesterday')+pill(f.day==='t','tagDay','t','Today')+'</div>'+
+    '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:16px">'+DAY_TAGS.map(x=>pill(!!f.t[x.k],'tagTog',x.k,x.l)).join('')+'</div>'+
+    '<button data-a="tagSave" class="big disp mt" style="background:var(--amber);color:var(--bg);font-size:17px">Save</button>'+
+    '<button data-a="tagNone" style="width:100%;padding:12px;color:var(--dim);font-size:13px;margin-top:4px">None of these</button>'+
+    '<p style="color:var(--faint);font-size:13px;line-height:1.55;margin-top:12px">Allena tests these against your lifts, runs, sleep and next-morning HRV, and says what it finds once it has enough days with and without each one. '+
+      (n?'You have answered on '+n+' day'+(n===1?'':'s')+'.':'')+' Stress is your own call, not a measurement.</p>')}
 function rehabAdherence(days){
   const window=days||28;
   const start=rehabStartKey();
@@ -13451,8 +13632,10 @@ function pageHead(title,right,opts){
     '<h1 class="disp vh1 ptitle" style="flex:1;min-width:0;line-height:1">'+esc(title)+
       (o.sub?(o.subA?'<button data-a="'+esc(o.subA)+'" class="psub" style="text-align:left;padding:0">'+esc(o.sub)+' \u203a</button>':'<span class="psub">'+esc(o.sub)+'</span>'):'')+'</h1>'+
     '<div class="pright">'+(right||'')+av+(o.noBtns?'':headBtns())+'</div></div>'}
-function drawerBtn(){return '<button data-a="drawerOpen" aria-label="Menu" style="width:44px;height:44px;margin-left:-10px;border-radius:var(--r-3);background:none;border:0;color:var(--dim);display:flex;align-items:center;justify-content:center;flex:none">'+
-  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" style="width:19px;height:19px"><path d="M4 7h16M4 12h16M4 17h10"/></svg></button>'}
+/* THE MENU LIVES ON THE BAR (owner, 2 Oct 2026): More opens it, so no page
+   header carries a menu button. Kept as a function so every header that
+   calls it draws nothing, in one place. */
+function drawerBtn(){return ''}
 function headBtns(){return ''}   // chips live in the drawer now — headers stay quiet
 /* THE LEVEL RING (17 Sep 2026). pointsChip — the points-and-level chip in
    the drawer header — was deleted on the owner's call: the ring it wore is
@@ -21656,6 +21839,11 @@ function corrDayData(){
           if(n>=0&&n<=45)days[k].cyc=n}})}}catch(e){oops('corrDayData',e)}
   try{const g=(S.gar&&S.gar.days)||{};Object.keys(g).forEach(k=>{
     if(g[k].am!=null)put(k,'ready',g[k].am)})}catch(e){oops('corrDayData',e)}
+  /* WHAT ELSE HAPPENED (2 Oct 2026, 07c-day-tags.js): an ANSWERED day is
+     a 1 or a 0 for each tag; a day nobody answered stays missing, never a 0 */
+  try{const g=(S.gar&&S.gar.days)||{};Object.keys(g).forEach(k=>{
+    const t=g[k]&&g[k].tags;if(!t||typeof t!=='object')return;
+    DAY_TAG_KEYS.forEach(x=>put(k,x,t[x]?1:0))})}catch(e){oops('corrDayData.tags',e)}
   try{const dd=(S.daily&&S.daily.days)||{};Object.keys(dd).forEach(k=>{
     if(dd[k].bw!=null)put(k,'bw',dd[k].bw);
     if(dd[k].pr!=null)put(k,'protein',dd[k].pr);
@@ -21852,7 +22040,12 @@ const CORR_SIGNALS={
   stairdown:{n:'faster stair descending',dir:'a faster stair-descent speed'},
   sixmwt:{n:'a longer six-minute walk distance',dir:'a longer six-minute walk distance'},
   walksteady:{n:'a steadier gait',dir:'higher walking steadiness'},
-  hrr:{n:'a quicker post-effort heart-rate drop',dir:'a faster heart-rate recovery'}};
+  hrr:{n:'a quicker post-effort heart-rate drop',dir:'a faster heart-rate recovery'},
+  /* the day tags: yes or no, never a reading (07c-day-tags.js) */
+  alc:{n:'a day with drinks',dir:'drinks',tag:1},
+  caff:{n:'caffeine after 2pm',dir:'late caffeine',tag:1},
+  late:{n:'a late meal',dir:'eating late',tag:1},
+  stress:{n:'a stressful day',dir:'a stressful day',tag:1}};
 const CORR_OUTCOMES={
   topset:{n:'top set',good:'up',dir:1},
   tonnage:{n:'session volume',good:'up',dir:1},
@@ -22071,7 +22264,11 @@ function corrIdentity(c){
 const K_CORRC='training-corrcache-v1';
 function corrStamp(){
   return 'a1:'+today()+':'+(S.history||[]).length+':'+(S.runs||[]).length+':'+
-    (function(){try{return Object.keys(hkDailyStore().days).length}catch(e){return 0}})()}
+    (function(){try{return Object.keys(hkDailyStore().days).length}catch(e){return 0}})()+
+    /* the day tags move the grid too: answered days and ticks, cheaply */
+    (function(){try{const g=(S.gar&&S.gar.days)||{};let a=0,t=0;
+      Object.keys(g).forEach(k=>{const x=g[k]&&g[k].tags;if(x&&typeof x==='object'){a++;t+=Object.keys(x).length}});
+      return a?':t'+a+'.'+t:''}catch(e){oops('corrStamp.tags',e);return ''}})()}
 function corrCache(){
   if(S._corrDisk===undefined){try{S._corrDisk=lget(K_CORRC,null)}catch(e){S._corrDisk=null}}
   return S._corrDisk}
@@ -22166,6 +22363,8 @@ function correlations(){
             const o=ok&&ok[out];
             if(o==null)return;
             pairs.push([s,o]);pdays.push(k)});
+          /* a tag needs real days on both sides: four with it, four without */
+          if((CORR_ACT[sig]||{}).tag){let y=0;pairs.forEach(p=>{if(p[0])y++});if(y<4||pairs.length-y<4)return}
           const r=spearman(pairs);
           if(!r)return;
           /* the strict gate — big effect, real sample, past the t-cut;
@@ -22288,7 +22487,9 @@ function corrEffectOf(f){
       const o=days[ok]&&days[ok][f.out];if(o==null)return;pairs.push({k:k,ok:ok,s:s,o:o})});
     if(pairs.length<6)return null;
     const sv=pairs.map(p=>p.s).sort((a,b)=>a-b);
-    const mid=sv.length%2?sv[(sv.length-1)/2]:(sv[sv.length/2-1]+sv[sv.length/2])/2;
+    const tag=!!(CORR_ACT[f.sig]||{}).tag;
+    /* a tag splits on itself: the days with it and the days without */
+    const mid=tag?0.5:sv.length%2?sv[(sv.length-1)/2]:(sv[sv.length/2-1]+sv[sv.length/2])/2;
     let hi=pairs.filter(p=>p.s>mid),lo=pairs.filter(p=>p.s<mid);
     /* a signal that sits on its median most days (weekend, hour) splits on the value itself */
     if(hi.length<3||lo.length<3){hi=pairs.filter(p=>p.s>=mid);lo=pairs.filter(p=>p.s<mid);
@@ -22302,7 +22503,7 @@ function corrEffectOf(f){
       if((p.s>mid)===(p.o>omid))together++});
     if(f.rho<0)together=counted-together;
     const su=corrUnit(f.sig),ou=corrUnit(f.out);
-    return{sig:f.sig,out:f.out,lag:f.lag,rho:f.rho,n:pairs.length,
+    return{sig:f.sig,out:f.out,lag:f.lag,rho:f.rho,n:pairs.length,tag:tag,
       split:su[1](mid),sigUnit:su[0],outUnit:ou[0],
       hiMean:ou[1](mean(hi)),loMean:ou[1](mean(lo)),hiN:hi.length,loN:lo.length,
       together:together,counted:counted,chance:Math.round(counted/2),
@@ -22323,7 +22524,9 @@ const CORR_PRIOR={sleep:1,sleep2:1,sleep3:1,hrv:1,hrvswing:1,rhr:1,rhr3:1,ready:
   km:0,km3:0,walkkm:0,ridekm:0,sessmins:0,resty:0,hour:0,weekend:0,
   wtemp:0,resp:0,cyc:0,spo2:1,msteps:0,eprot:0,ecarb:0,sldeep:1,slrem:1,
   flights:0,standmin:0,exmin:0,ambwalk:0,walkspeed:1,walkasym:1,dblsupport:1,
-  stairup:1,stairdown:1,sixmwt:1,walksteady:1,hrr:1};
+  stairup:1,stairdown:1,sixmwt:1,walksteady:1,hrr:1,
+  /* the day tags have no good end to name: CORR_ACT's bad:1 says a yes is expected to cost */
+  alc:0,caff:0,late:0,stress:0};
 /* ═══ A FINDING IS SOMETHING YOU CAN ACT ON (owner, 30 Sep 2026: "I think
    we completely turn the findings engine into something the user can act
    on exactly like athlytic. If it's a backwards pattern ie probably not true
@@ -22349,7 +22552,17 @@ const CORR_ACT={
   km:{k:'lever',f:'km',bad:1},km3:{k:'lever',f:'km',bad:1},
   ridekm:{k:'lever',f:'ridekm',bad:1},sessmins:{k:'lever',f:'sessmins',bad:1},
   resty:{k:'lever',f:'resty'},
-  hrv:{k:'state',f:'hrv'},rhr:{k:'state',f:'rhr'},rhr3:{k:'state',f:'rhr'},ready:{k:'state',f:'ready'}};
+  hrv:{k:'state',f:'hrv'},rhr:{k:'state',f:'rhr'},rhr3:{k:'state',f:'rhr'},ready:{k:'state',f:'ready'},
+  /* the day tags (2 Oct 2026): yes-or-no levers whose YES is expected to cost */
+  alc:{k:'lever',f:'alc',bad:1,tag:1},caff:{k:'lever',f:'caff',bad:1,tag:1},
+  late:{k:'lever',f:'late',bad:1,tag:1},stress:{k:'lever',f:'stress',bad:1,tag:1}};
+/* the words for a tag, by where it sits: the same day's night and next
+   morning, the next day's training, or (stress) the same day's training */
+const CORR_TAGW={
+  alc:{rec:['on days with drinks','on days without'],next:['the day after drinks','after a day without'],title:'Drinks',today:'drinks yesterday'},
+  caff:{rec:['on days with caffeine after 2pm','on days without'],next:['the day after late caffeine','after a day without'],title:'Late caffeine',today:'caffeine after 2pm yesterday'},
+  late:{rec:['on days you ate late','on days you did not'],next:['the day after a late meal','after a day without one'],title:'Late meals',today:'a late meal yesterday'},
+  stress:{rec:['on stressful days','on the other days'],same:['on stressful days','on the other days'],title:'Stressful days',today:'a stressful day'}};
 const CORR_PERF={benchtop:1,squattop:1,deadtop:1,effort:1,pace:1,beatkm:1};
 const CORR_RECOV={sleepo:1,hrvo:1,rhro:1,readyo:1};
 const CORR_REHABO={pain:1,stiff:1,swell:1,conf:1};
@@ -22362,6 +22575,12 @@ function corrIsLift(out){return out==='benchtop'||out==='squattop'||out==='deadt
 function corrActPair(sig,out,lag){
   const a=CORR_ACT[sig];if(!a)return false;
   const perf=!!CORR_PERF[out]||String(out).slice(0,3)==='ex:';
+  /* a tag answers that night and the next morning, and the training it can
+     reach: stress the same day's, the evening ones the next day's. Never the
+     knee check-ins, which go to the physio and nowhere else. */
+  if(a.tag){if(CORR_RECOV[out])return lag===0;
+    if(perf)return a.f==='stress'?lag===0:lag===1;
+    return false}
   /* a morning reading is acted on that morning, about that day's work */
   if(a.k==='state')return perf&&lag===0;
   /* rests between sets are the same session's */
@@ -22441,6 +22660,7 @@ const CORR_THING={protein:'protein',carb:'carbs',kcal:'food',load:'lifting volum
 /* the two halves as clauses: [above the split, at or below it] */
 function corrArms(c,s){
   const a=CORR_ACT[c.sig]||{},f=a.f;
+  if(a.tag){const w=CORR_TAGW[f]||{};return (CORR_RECOV[c.out]?w.rec:f==='stress'?w.same:w.next)||['with it','without']}
   if(f==='sleep'){
     const nn=c.sig==='sleep2'?'two nights averaging':c.sig==='sleep3'?'three nights averaging':'nights of';
     if(c.lag===0)return['after '+nn.replace(' of','')+' over '+s,'after '+nn+' '+s+' or less'];
@@ -22459,6 +22679,15 @@ function corrWindowed(sig){return /3$/.test(sig)&&sig!=='sleep3'&&sig!=='rhr3'}
 function corrAction(c,s,hiBetter){
   const a=CORR_ACT[c.sig]||{},f=a.f,out=c.out,td=corrTargetDays(out);
   const lift=corrLiftName(out);
+  if(a.tag){
+    const want=out==='sleepo'?'a better night':'a better next morning';
+    if(f==='stress'){
+      if(CORR_RECOV[out])return 'After a stressful day, plan the next session lighter, and give yourself an earlier night.';
+      return lift?'On stressful days, keep '+lift+' at your working weight rather than going for a top set.'
+        :out==='effort'?'On stressful days, expect the session to feel harder and stop a rep earlier.'
+        :'On stressful days, keep the run easy.'}
+    const doIt={alc:'Skip drinks',caff:'Keep caffeine before 2pm',late:'Eat earlier'}[f]||'Leave it out';
+    return CORR_RECOV[out]?doIt+' on days you want '+want+'.':doIt+' the day before '+td+'.'}
   if(CORR_REHABO[out])return f==='sleep'?'Protect your sleep, and tell your physio what you are seeing.'
     :'Keep '+(CORR_THING[f]||f)+' to '+s+' or less the day before, and tell your physio what you are seeing.';
   if(a.k==='state'){const lab=f==='hrv'?'your HRV':f==='rhr'?'your resting heart rate':'your readiness';
@@ -22483,7 +22712,7 @@ function corrAction(c,s,hiBetter){
 function corrTitle(c){
   const a=CORR_ACT[c.sig]||{},f=a.f;
   const sn={sleep:'Sleep',protein:'Protein',carb:'Carbs',kcal:'Food',load:'Lifting volume',km:'Running',ridekm:'Riding',
-    sessmins:'Session length',resty:'Rest between sets',hrv:'Morning HRV',rhr:'Morning resting heart rate',ready:'Morning readiness'}[f]||'A lever';
+    sessmins:'Session length',resty:'Rest between sets',hrv:'Morning HRV',rhr:'Morning resting heart rate',ready:'Morning readiness'}[f]||(CORR_TAGW[f]||{}).title||'A lever';
   const on=corrIsLift(c.out)?'your '+corrLiftName(c.out):corrOutNoun(c.out);
   return sn+' and '+on}
 function corrNames(key){
@@ -22537,6 +22766,9 @@ function corrPhrase(c){
    bench on a running day is noise. Null otherwise. */
 function corrTodayVal(c){
   try{const a=CORR_ACT[c.sig]||{},tk=today();
+    /* a tag reads the answer itself: today's for stress, yesterday's otherwise */
+    if(a.tag){const d9=new Date(tk+'T12:00');d9.setDate(d9.getDate()-c.lag);
+      const t9=dayTagsOf(dayKey(d9));return t9?(t9[a.f]?1:0):null}
     if(a.k==='state'||(a.f==='sleep'&&c.lag===0)){
       if(a.f==='ready'){const g=(S.gar&&S.gar.days&&S.gar.days[tk])||{};return g.am!=null?+g.am:null}
       const d=(hkDailyStore().days||{})[tk]||{};
@@ -22558,6 +22790,8 @@ function corrToday(c,ph){
     const a=CORR_ACT[c.sig]||{};
     if(!(CORR_PERF[c.out]||String(c.out).slice(0,3)==='ex:'))return null;
     const v=corrTodayVal(c);if(v==null)return null;
+    /* a tag only speaks on a day it happened: "no drinks yesterday" is not news */
+    if(a.tag&&!v)return null;
     const lifts=corrTodayLifts();
     const lift=corrLiftName(c.out);
     if(corrIsLift(c.out)){
@@ -22567,7 +22801,8 @@ function corrToday(c,ph){
     else if(typeof runPlanDay!=='function'||!runPlanDay(0))return null;
     const hi=v>ph.split,bad=hi!==ph.hiBetter;
     const val=corrSigVal(c.sig,v);
-    const said=a.f==='sleep'?val+' of sleep last night'
+    const said=a.tag?(CORR_TAGW[a.f]||{}).today||'it'
+      :a.f==='sleep'?val+' of sleep last night'
       :a.f==='hrv'?'HRV '+val+' this morning'
       :a.f==='rhr'?'resting heart rate '+val+' this morning'
       :a.f==='ready'?'readiness '+val+' this morning'
@@ -26990,7 +27225,7 @@ function crownM(){
   S._crownM={stamp:st,D,M,roots:null,buds:null};return S._crownM}
 
 /* ── ROOTS: what a finding is about, labelled (track 4) ─────────── */
-const CROWN_SIGW={sleep:'Sleep',hrv:'HRV',rhr:'Resting HR',steps:'Steps',ready:'Readiness',protein:'Protein',carb:'Carbs',fat:'Fat',kcal:'Calories',bw:'Bodyweight',
+const CROWN_SIGW={alc:'Drinks',caff:'Late caffeine',late:'Late meals',stress:'Stressful days',sleep:'Sleep',hrv:'HRV',rhr:'Resting HR',steps:'Steps',ready:'Readiness',protein:'Protein',carb:'Carbs',fat:'Fat',kcal:'Calories',bw:'Bodyweight',
   load:'Training load',resty:'Rest between sets',hour:'Time of day',vo2:'VO2max',bwtrend:'Weight trend',weekend:'Weekends',km:'Running',walkkm:'Walking',ridekm:'Riding',
   sessmins:'Session length',wtemp:'Wrist temp',resp:'Breathing rate',spo2:'Blood oxygen',cyc:'Cycle day',msteps:'Morning steps',eprot:'Late protein',ecarb:'Late carbs',
   flights:'Stairs',standmin:'Standing',exmin:'Exercise minutes',ambwalk:'Walking',walkspeed:'Walking pace',walkasym:'Gait',dblsupport:'Stride',stairup:'Stair speed',stairdown:'Stair speed',
@@ -27419,42 +27654,25 @@ function crownSpan(first){
   /* a first-week account said "0 weeks"; under a week, count the days */
   return days<=1?'one day':days+' days'}
 function viewCrown(){
-  /* THE TREE SCREEN IS ONE SCREEN (owner, 27 Sep 2026: "need to keep today
-     in the tree screen", then "it all has to be visible on that page
-     without having to scroll", then "just keep found today pill and that's
-     it"). The view is exactly the height between the notch and the bar: the
-     header, the tree taking whatever is left, one line of counts, and the
-     day's find when there is one. The page never scrolls; the tree's own
-     page is one tap in for everything else. */
+  /* THE FIRST SCREEN. It was the tree alone (27 Sep 2026); since 2 Oct it
+     is the home grid with the tree as one tile (see below). An empty
+     account keeps the getting-started Today. */
   try{
     const C=crownM();const D=C.D;
-    const w=D.weeks.length?crownWord(D):null;const first=D.first;const span=crownSpan(first);
+    const span=crownSpan(D.first);
     const name=String((S.prof&&S.prof.name)||'You').split(' ')[0];
-    const spanHtml=span?'<span style="font-size:15px;color:var(--dim)">'+esc(span)+'</span>':'';
     const has=D.weeks.length>0;
-    const head=pageHead(name,spanHtml,{noBtns:1,avatar:false,sub:new Date().toLocaleDateString(undefined,{weekday:'long',day:'numeric',month:'long'})});
+    const head=pageHead(name,'',{noBtns:1,sub:new Date().toLocaleDateString(undefined,{weekday:'long',day:'numeric',month:'long'})+(span?' \u00b7 '+span:'')});
     if(!has){
       /* an empty account keeps the full Today, which carries the getting-started door */
       let today='';try{today=todayBody()}catch(e){oops('crownToday',e)}
       return '<div class="view pad stg phpad" style="min-height:100vh;box-sizing:border-box;'+crownTok()+'">'+CROWN_CSS+head+
         '<p style="padding:16px 12px 4px;text-align:center;color:var(--dim);font-size:15px">Nothing logged yet. The crown grows a leaf for every session.</p>'+today+crownDots()+crownMoments()+'</div>'}
-    let prs=0,wins=0;D.sessions.forEach(s=>{if(s.pr)prs++;if(s.won)wins++});
-    const line='<p style="text-align:center;font-size:13px;color:var(--dim);margin-top:2px;flex:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+
-      '<b style="color:var(--text)">'+D.sessions.length+' sessions</b> · '+prs+' PR'+(prs===1?'':'s')+(wins?' · '+wins+' week'+(wins===1?'':'s')+' won':'')+' · '+esc(w.word)+'</p>';
-    /* THE POINTS LIVE UNDER THE TREE (owner, 1 Oct 2026): the figure the
-       centre button used to carry, at a size you read at a glance, whole
-       (R8: no decimals), counting up when it grows (data-cu) */
-    let pts='';try{const t9=Math.round(dataPoints().total);
-      pts='<p style="text-align:center;flex:none;margin-top:6px;line-height:1.1"><span class="disp" data-cu="ptscap" style="font-size:28px;font-weight:600;font-variant-numeric:tabular-nums">'+t9.toLocaleString()+'</span>'+
-        ' <span style="font-size:13px;color:var(--dim)">data point'+(t9===1?'':'s')+'</span></p>'}catch(e){oops('crownPts',e)}
-    let strip='';try{strip=todayFoundRow()}catch(e){oops('crownFound',e)}
-    return '<div class="view pad phpad crh" style="height:calc(100dvh - env(safe-area-inset-top) - 92px - env(safe-area-inset-bottom));display:flex;flex-direction:column;overflow:hidden;box-sizing:border-box;padding-top:16px;'+crownTok()+'">'+
-      CROWN_CSS+
-      '<div style="flex:none">'+head+'</div>'+
-      '<div data-crown="1" data-a="crownX" data-v="open" role="button" aria-label="Open your tree" style="position:relative;flex:1;min-height:120px;cursor:pointer">'+
-        crownHomeLayer()+'</div>'+
-      pts+line+'<div style="flex:none">'+strip+'</div>'+
-      '<div style="flex:none;margin-top:-4px">'+crownDots()+'</div>'+crownMoments()+'</div>'}
+    /* THE HOME PAGE (owner, 2 Oct 2026, from his sketch): the tree is one
+       tile of five now, beside readiness, today's session, the race and
+       one thing to do today (homeGridHtml in 14f-home.js). The tree's own
+       page is still one tap in, from the tile. */
+    return '<div class="view pad stg phpad" style="'+crownTok()+'">'+CROWN_CSS+head+homeGridHtml()+crownMoments()+'</div>'}
   catch(e){oops('viewCrown',e);return '<div class="view pad">'+pageHead('Crown','',{})+'</div>'}}
 
 /* ── ITS OWN PAGE (track 2) ────────────────────────────────────────
@@ -27503,12 +27721,16 @@ function crownSentence(C){
 function crownEffShort(E,r){
   const su=E.sigUnit,ou=E.outUnit;const hm=v=>{const m=Math.round(v*60);return Math.floor(m/60)+' h'+(m%60?' '+String(m%60).padStart(2,'0'):'')};
   const sp=v=>su==='h'?hm(v):su?v+' '+su:String(v);const op=v=>ou==='h'?hm(v):ou==='/10'?v+' out of 10':ou?v+' '+ou:String(v);
+  /* a day tag has no number to split on: it is the days with it and without */
+  if(E.tag){const w=corrArms({sig:E.sig,out:E.out,lag:E.lag},'');return (w[0]+', '+crownOutW(r.out).toLowerCase()+' averaged '+op(E.hiMean)+'; '+w[1]+', '+op(E.loMean)+'.').replace(/^./,c=>c.toUpperCase())}
   return 'With '+crownSigW(r.fam).toLowerCase()+' over '+sp(E.split)+', '+crownOutW(r.out).toLowerCase()+' averaged '+op(E.hiMean)+'. Under it, '+op(E.loMean)+'.'}
 function crownEffLine(E,r){
   /* the finding in the user's own units: both arms, their day counts,
      how often the pair moved together against half by chance */
   const su=E.sigUnit,ou=E.outUnit;const hm=v=>{const m=Math.round(v*60);return Math.floor(m/60)+' h'+(m%60?' '+String(m%60).padStart(2,'0'):'')};const sp=v=>su==='h'?hm(v):su?v+' '+su:String(v);const op=v=>ou==='h'?hm(v):ou==='/10'?v+' out of 10':ou?v+' '+ou:String(v);
   const lag=E.lag===0?'the same day':E.lag===1?'the next day':'two days later';
+  if(E.tag){const w=corrArms({sig:E.sig,out:E.out,lag:E.lag},'');
+    return (w[0]+' ('+E.hiN+'), '+crownOutW(r.out).toLowerCase()+' averaged '+op(E.hiMean)+'; '+w[1]+' ('+E.loN+'), '+op(E.loMean)+'. The two moved together on '+E.together+' of '+E.counted+' days, where chance would give about '+E.chance+'.').replace(/^./,c=>c.toUpperCase())}
   return 'On the '+E.hiN+' days with '+crownSigW(r.fam).toLowerCase()+' over '+sp(E.split)+', '+crownOutW(r.out).toLowerCase()+' '+lag+' averaged '+op(E.hiMean)+'. On the other '+E.loN+', '+op(E.loMean)+'. The two moved together on '+E.together+' of '+E.counted+' days, where chance would give about '+E.chance+'.'}
 function crownCrumbs(C){
   const X=crownX();const out=[['canopy','Crown']];
@@ -28002,6 +28224,119 @@ function crestShareRun(){
     img.onerror=function(e){oops('crestShareImg',e);flash('Could not draw the crest.')};
     img.src='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(svg)}
   catch(e){oops('crestShareRun',e);flash('Could not draw the crest.')}}
+/* ═══ THE HOME PAGE (owner, 2 Oct 2026, with a sketch and Athlytic's store
+   page: "their app looks so much cleaner... i want the homepage (tree page)
+   to be something like this": Tree · Readiness / today's session · the
+   race / something they can implement today) ════════════════════════════
+   Five tiles, one screen. homeTiles() is the ONE reader: the web draws it
+   here and the phone draws the same object (native Home.tsx), so the two
+   can never disagree about what today is. Each tile is a door to the room
+   that owns it; nothing here is a second copy of a room. */
+
+function homeTiles(){
+  const T={};
+  /* the tree: the drawing lives on the web tile; both sides get the counts */
+  try{const C=crownM(),D=C.D;let prs=0;D.sessions.forEach(s=>{if(s.pr)prs++});
+    T.tree={sessions:D.sessions.length,prs:prs,pts:Math.round(dataPoints().total),newN:(typeof treeXNewN==='function'?treeXNewN():0)}}
+  catch(e){oops('homeTiles.tree',e);T.tree={sessions:0,prs:0,pts:0,newN:0}}
+
+  /* readiness: the one number is the one they log (THE BODY LINE SAYS THE
+     NUMBER, 17 Sep); the watch's HRV only ever speaks beside it, in ms */
+  try{const g=(S.gar&&S.gar.days&&S.gar.days[today()])||{};
+    const r={am:g.am!=null?+g.am:null,skipped:!!g.amSkip,hrv:null};
+    const h=hrvGate();
+    if(h)r.hrv={low:!!h.low,ms:h.m7ms,lo:h.lo,hi:h.hi,n:h.n7};
+    /* what else happened yesterday (07c-day-tags.js): the answer, or null */
+    r.tags=dayTagsLine(dayTagsYesterday());
+    T.ready=r}
+  catch(e){oops('homeTiles.ready',e);T.ready={am:null,skipped:false,hrv:null,tags:null}}
+
+  /* today's session: a live one first, then the morning's answer */
+  try{
+    if(S.sess&&S.sess.phase!=='done'){const s=S.sess,done=s.log.filter(l=>l.w!=null||l.secs).length;
+      T.sess={kind:'live',name:s.dayName||'Your session',sub:done+' of '+s.sets.length+' sets done',a:'resume',v:'',btn:'Resume'}}
+    else{const p=activeProgSafe();
+      if(!p||p.empty)T.sess={kind:'none',name:'No programme yet',sub:'Allena builds one around your goal.',a:'setupOpen',v:'',btn:'Build one'};
+      else{const rc=recommendToday();
+        if(rc&&rc.top){/* top.sets is a count, not the sets */const sets=buildSets(p,rc.top.i,S.week||1)||[];const nEx={};sets.forEach(x=>{nEx[x.ex]=1});
+          const mins=(typeof estMins==='function')?estMins(sets):0;
+          T.sess={kind:'plan',name:String(rc.top.name||(p.days[rc.top.i]||{}).name||'Session'),
+            sub:Object.keys(nEx).length+' exercise'+(Object.keys(nEx).length===1?'':'s')+(mins?' · about '+mins+' min':''),
+            a:'prevOpen',v:p.id+':'+rc.top.i,btn:'Start'}}
+        else T.sess={kind:'rest',name:rc&&rc.taper?'Taper day':'Rest day',
+          sub:rc&&rc.taper?'Race week. Keep the legs fresh.':rc&&rc.rest?'Three hard days in a row. Recovery is training too.':'The week’s sessions are done.',
+          a:'drawerNav',v:'home',btn:'See the week'}}}
+    try{const rp=runPlanDay(0);if(rp&&T.sess.kind!=='live')T.sess.run=(rp.kind==='long'?'Long run':rp.kind==='easy'?'Easy run':'Run')+(rp.km?' · '+udNum(rp.km)+' '+udUnit():'')}
+    catch(e9){oops('homeTiles.run',e9)}}
+  catch(e){oops('homeTiles.sess',e);T.sess={kind:'none',name:'Train',sub:'',a:'drawerNav',v:'home',btn:'Open Train'}}
+
+  /* the race: this week's witnessed points against the field, never a
+     ratio that ranks (HOW THE RACE SCORES, 17 Sep) */
+  try{const me=Math.round(dataPoints().weekLive||0);
+    const on=(typeof acctOn==='function')&&acctOn();
+    const F=on?raceField():[];
+    const rows=F.map(f=>({name:String(f.name||'A racer'),pts:Math.round(+f.week||0)}));
+    const rank=1+rows.filter(x=>x.pts>me).length;
+    const lead=rows.slice().sort((a,b)=>b.pts-a.pts)[0]||null;
+    T.race={on:on,me:me,field:rows.length,rank:rank,lead:(lead&&lead.pts>me)?lead:null}}
+  catch(e){oops('homeTiles.race',e);T.race={on:false,me:0,field:0,rank:1,lead:null}}
+
+  /* one thing to do today, from their own data (A FINDING IS SOMETHING YOU
+     CAN ACT ON, 30 Sep); the day's brief when no lever speaks to today */
+  try{const x=leversToday();
+    if(x&&x.td)T.act={t:String(x.td.t),from:String(x.ph.title||''),bad:!!x.td.bad,a:'leversOpen',v:''};
+    else{
+      /* a find banked today that has a thing to do (the Found-today card's
+         own list, which lived under the tree until 2 Oct 2026) */
+      let f=null;try{const ORD={epic:0,rare:1,uncommon:2,common:3};
+        f=annToday().filter(y=>!findIsRead(y)&&findActionable(y)).sort((a9,b9)=>(ORD[a9.rar]??3)-(ORD[b9.rar]??3))[0]||null}
+      catch(e9){oops('homeTiles.found',e9)}
+      let b=null;if(!f)try{const L=dailyBrief(true)||[];b=L[0]||null}catch(e9){oops('homeTiles.brief',e9)}
+      T.act=f?{t:String(f.act||f.t),from:'Found today'+(f.act?': '+String(f.t):''),bad:false,a:'findOpen',v:String(f.id)}
+        :b?{t:String(b.line),from:'Today’s plan',bad:false,a:'leversOpen',v:''}
+        :{t:'Nothing in your data asks for a change today. Train as planned.',from:'',bad:false,a:'leversOpen',v:''}}}
+  catch(e){oops('homeTiles.act',e);T.act={t:'Train as planned.',from:'',bad:false,a:'leversOpen',v:''}}
+  return T}
+
+/* the web's drawing of homeTiles(): a two-by-two of tiles and one wide card */
+function homeGridHtml(){
+  const T=homeTiles();
+  const tile=(a,v,inner,extra)=>'<button data-a="'+a+'"'+(v?' data-v="'+esc(v)+'"':'')+' class="card htile"'+(extra||'')+'>'+inner+'</button>';
+  const lab=t=>'<span class="micro htl">'+esc(t)+'</span>';
+  let h='<div class="hgrid">';
+  /* the tree: its own drawing, the points under it */
+  {const t=T.tree;
+   h+='<div class="card htile htree" data-a="crownX" data-v="open" role="button" tabindex="0" aria-label="Open your tree">'+lab('Your tree')+
+     '<div data-crown="1" class="htreecv">'+crownHomeLayer()+'</div>'+
+     '<span class="hbig" data-cu="ptscap">'+t.pts.toLocaleString()+'</span>'+
+     '<span class="hsub">data point'+(t.pts===1?'':'s')+' · '+t.sessions+' session'+(t.sessions===1?'':'s')+'</span>'+
+     (t.newN?'<span class="badge q" style="position:absolute;top:12px;right:12px" aria-label="'+t.newN+' new on your tree">'+badgeN(t.newN)+'</span>':'')+'</div>'}
+  /* readiness: two doors in one tile, the check-in and what else happened
+     yesterday, so the tile is a card holding buttons, never a button */
+  {const r=T.ready;
+   const hrv=r.hrv?'<span class="hsub" style="color:'+(r.hrv.low?'var(--amber)':'var(--green)')+'">HRV '+r.hrv.ms+' ms, '+(r.hrv.low?'below':'inside')+' your normal '+r.hrv.lo+'–'+r.hrv.hi+'</span>':'';
+   const tags=r.tags?'<button data-a="tagsOpen" data-v="y" class="hsub htag">Yesterday: '+esc(r.tags)+'</button>'
+     :'<button data-a="tagsOpen" data-v="y" class="hgo htag">What else happened? ›</button>';
+   h+='<div class="card htile">'+lab('Readiness')+
+     (r.am!=null?'<span class="hbig xl">'+Math.round(r.am)+'</span><span class="hsub">out of 100, this morning</span>'+hrv
+       :'<button data-a="sigBb" class="htap"><span class="hbig xl" style="color:var(--faint)">?</span><span class="hsub">'+(r.skipped?'Skipped this morning':'How do you feel today?')+'</span><span class="hsub" style="color:var(--text);font-weight:600">Check in ›</span></button>'+hrv)+
+     tags+'</div>'}
+  /* today's session */
+  {const s=T.sess;
+   h+=tile(s.a,s.v,lab(s.kind==='live'?'In progress':'Today')+'<span class="hname">'+esc(s.name)+'</span><span class="hsub">'+esc(s.sub)+'</span>'+
+     (s.run?'<span class="hsub">+ '+esc(s.run)+'</span>':'')+'<span class="hgo">'+esc(s.btn)+' ›</span>',
+     s.kind==='plan'||s.kind==='live'?' style="border-color:var(--greensoft)"':'')}
+  /* the race */
+  {const r=T.race;
+   h+=tile('drawerNav','social',lab('Race')+
+     (r.on&&r.field?'<span class="hbig">#'+r.rank+'<span class="hof"> of '+(r.field+1)+'</span></span><span class="hsub">'+r.me+' points this week</span>'+
+       (r.lead?'<span class="hsub">'+esc(r.lead.name)+' leads on '+r.lead.pts+'</span>':'<span class="hsub" style="color:var(--green)">You lead</span>')
+      :'<span class="hbig">'+r.me+'</span><span class="hsub">points this week</span><span class="hgo">'+(r.on?'Add a friend':'Race your friends')+' ›</span>'))}
+  /* one thing to do today, full width */
+  {const x=T.act;
+   h+=tile(x.a,x.v,lab('Do this today')+'<span class="hname" style="font-size:17px;line-height:1.35">'+esc(x.t)+'</span>'+
+     (x.from?'<span class="hsub">From: '+esc(x.from)+'</span>':''),' style="grid-column:1 / -1;min-height:0'+(x.bad?';border-color:var(--amber)':'')+'"')}
+  return h+'</div>'}
 /* ══ rest-day content (prompt 2) ════════════════════════════
    Rest days were dead air: "week complete", nothing else. Now
    the verdict card serves one rotating piece of the user's own
@@ -34876,23 +35211,6 @@ function ceremonyHtml(c){
   ((c.me&&!c.pod)?'<p class="cerF" style="color:var(--text);font-size:15px;font-weight:600;margin-top:20px;animation:cerf .6s 1.9s both">You finished '+ordinal(c.me.rank)+' of '+c.me.total+' with '+c.me.pts+' point'+(c.me.pts===1?'':'s')+'.</p>':'')+
   (c.pod?'<p class="cerF" style="color:var(--faint);font-size:11px;margin-top:16px;animation:cerf .6s 2s both">Each bar is a pod\u2019s total, as of your last open. Nobody is named.</p>':'')+
   '<p class="cerF" style="color:var(--faint);font-size:13px;margin-top:24px;animation:cerf .6s 2.4s both">Fresh week. Tap to start it.</p></div>'}
-/* ONLY THE DAY'S FIND SITS UNDER THE TREE (owner, 27 Sep 2026: "get rid
-   of how you woke up pill, get rid of bench and the rest of the lift pills.
-   Just keep found today pill and that's it"). The full Found-today card,
-   only on a day something was found. The morning prompt still
-   asks for itself (morningAsk), and the lifts live on the tree's own page. */
-function todayFoundRow(){
-  /* NO FINDING TAKES THE SCREEN BY ITSELF (owner, 30 Sep 2026: "can we
-     get rid of the insight pop up windows I hate them their annoying").
-     The full-screen reveal used to queue from here on every open with a
-     fresh find. The find is still banked the moment it is found and is
-     on this card, the tree and the collection; only the interruption is
-     gone. A notification tap still replays its own moment, because that
-     one was asked for. */
-  /* full size, the same card Today always drew (owner, 27 Sep 2026:
-     "should be able to see found today pill in full size like normal") */
-  try{const c=newFindsCard();return c?'<div data-strip="found">'+c+'</div>':''}
-  catch(e){oops('todayFoundRow',e);return ''}}
 /* TODAY LIVES ON THE TREE SCREEN (owner, 27 Sep 2026: "need to keep
    today in the tree screen. needs to be all in one page"). The body is one
    function so the crown's first screen and the Today view draw the same
@@ -37788,7 +38106,7 @@ function meSourcesRows(){
     const fmtDay=k=>{try{return new Date(k+'T12:00').toLocaleDateString(undefined,{day:'numeric',month:'short'})}catch(e){return k}};
     const rows=[];
     const st=hkDailyStore().days||{};const ks=Object.keys(st).sort();
-    rows.push(navRow(I.heart,'Apple Health',ks.length?'last data '+fmtDay(ks[ks.length-1]):'nothing has arrived yet','nav','signals'));
+    rows.push(navRow(I.heart,'Apple Health',ks.length?'last data '+fmtDay(ks[ks.length-1]):'nothing has arrived yet','sourcesOpen',null));
     const wkKey=dayKey(new Date(Date.now()-((new Date().getDay()+6)%7)*864e5));
     /* what the watch sent: sessions it corroborated, gym sessions it
        recorded on its own, and the runs and rides that came in from
@@ -37801,7 +38119,7 @@ function meSourcesRows(){
     const hasWatch=(S.history||[]).some(fromWatch)||hkRuns.length>0;
     rows.push(navRow(I.spark,'Apple Watch',hasWatch?(wWatch+' workout'+(wWatch===1?'':'s')+' this week'):'no workouts have arrived','nav','history'));
     const sc=libScale();const lastW=sc.ks.length?sc.ks[sc.ks.length-1]:null;
-    rows.push(navRow(I.scale2,'Weight',lastW?ME_TILES[0][2](+sc.dd[lastW].bw)+' on '+fmtDay(lastW):'from Health, a scan, or typed','nav','signals'));
+    rows.push(navRow(I.scale2,'Weight',lastW?ME_TILES[0][2](+sc.dd[lastW].bw)+' on '+fmtDay(lastW):'from Health, a scan, or typed','sourcesOpen',null));
     const sv=lget('training-strava-v1',null);
     rows.push(navRow(I.trend,'Strava',sv&&sv.refresh?'connected':'not connected','nav','data'));
     const a=(typeof acct==='function')?acct():null;
@@ -37973,6 +38291,111 @@ function viewMe(){
     h+=setGroup('',[navRow(SET_ICONS.gear,'Settings','backup, units, notifications, the coach','nav','data')]).replace('<p class="eyebrow" style="margin-top:24px"></p>','');
     return h+'</div>'}
   catch(e){oops('viewMe',e);return '<div class="view pad stg phpad">'+pageHead('You','',{noBtns:1})+'<p style="color:var(--dim);font-size:13px;margin-top:16px">This page could not draw itself. Your data is safe.</p></div>'}}
+/* ═══ WHERE YOUR NUMBERS COME FROM (owner, 2 Oct 2026, from OxeAI's
+   "health sources" page: "copy what we should implement and improve") ═══
+   OxeAI lists each metric with its device and last sync. That answers
+   "is it connected"; it does not answer the question a Garmin wearer
+   actually has when a feature shows nothing, which is "is it broken, or
+   does it not have enough yet?". A feature that silently does nothing
+   looks exactly like a feature with no data (the failing-honestly law).
+   So each row says where the number comes from, when it last arrived, how
+   many of the last 28 days have it, and either what it is powering now or
+   exactly what it still needs, read from the engine that uses it, never a
+   second copy of the threshold.
+   HealthKit does not tell an app whether read permission was granted, so
+   no row claims "connected"; the only honest signal is when data last
+   arrived. A metric that was arriving and stopped says so. */
+
+/* THE RECOVERY CLOCK'S SLEEP WINDOW, ONE READER. recoveryMod() bills last
+   night against the month; the recovery sheet says whether it does; this
+   page says what it still needs. All three asked the same question in
+   their own words until 2 Oct 2026. */
+function recSleepWindow(){
+  try{const hk=hkDailyStore().days||{};
+    const dAgo=n=>dayKey(new Date(Date.now()-n*864e5));
+    const ks=Object.keys(hk).filter(k=>hk[k].sleep>0).sort();
+    const recentK=ks.length?ks[ks.length-1]:null;
+    const month=ks.filter(k=>k>=dAgo(27));
+    return {on:month.length>=7&&!!recentK&&recentK>=dAgo(1),month:month,recentK:recentK}}
+  catch(e){oops('recSleepWindow',e);return {on:false,month:[],recentK:null}}}
+function dataSources(){
+  const out=[];
+  const dAgo=n=>dayKey(new Date(Date.now()-n*864e5));
+  const c28=dAgo(27);
+  const hk=(function(){try{return hkDailyStore().days||{}}catch(e){oops('dataSources.hk',e);return {}}})();
+  const dd=(S.daily&&S.daily.days)||{};
+  /* one row: the days that carry the field, the last one, and whether it went quiet */
+  const row=(k,l,src,keys,extra)=>{
+    keys=keys.slice().sort();
+    const last=keys.length?keys[keys.length-1]:null;
+    const n28=keys.filter(x=>x>=c28).length;
+    /* quiet: it was arriving (a week of it in the month) and nothing for three days */
+    const quiet=!!(last&&n28>=7&&last<dAgo(3));
+    out.push(Object.assign({k:k,l:l,src:src,last:last,n28:n28,quiet:quiet},extra||{}))};
+  const hkKeys=f=>Object.keys(hk).filter(x=>hk[x]&&hk[x][f]!=null&&hk[x][f]>0);
+  try{const w=recSleepWindow();
+    row('sleep','Sleep','Apple Health',hkKeys('sleep'),
+      w.on?{powers:'The recovery clock reads last night against your own month of nights.'}
+        :{needs:w.month.length>=7?'The recovery clock needs last night, and it has not arrived.'
+          :'The recovery clock needs 7 nights in the last 28 and last night. You have '+w.month.length+'.'})}
+  catch(e){oops('dataSources.sleep',e)}
+  try{const g=hrvGate();const n35=hkdSeries('hrv',35).length;
+    row('hrv','HRV','Apple Health',hkKeys('hrv'),
+      g?{powers:'Home shows it beside readiness, against your normal band.'}
+        :{needs:'Home shows it once there are 28 mornings in the last 35 days, 4 of them this week. You have '+n35+'.'})}
+  catch(e){oops('dataSources.hrv',e)}
+  try{row('rhr','Resting heart rate','Apple Health',hkKeys('rhr'),{powers:'The findings test it against your training.'})}
+  catch(e){oops('dataSources.rhr',e)}
+  try{row('steps','Steps','Apple Health',hkKeys('steps'),{powers:'The findings test it against your training.'})}
+  catch(e){oops('dataSources.steps',e)}
+  try{const led=tdeeLedger();
+    const k21=Object.keys(dd).filter(x=>x>=dAgo(21)&&x<=today()&&dd[x].kcal>600).length;
+    row('kcal','Food','Health nutrition',Object.keys(dd).filter(x=>dd[x]&&dd[x].kcal>600),
+      led?{powers:'Your energy balance, from '+led.nK+' food days against the scale.'}
+        :{needs:'Energy balance needs 10 food days in the last 3 weeks and weigh-ins 10 days apart. You have '+k21+' food day'+(k21===1?'':'s')+'.'})}
+  catch(e){oops('dataSources.kcal',e)}
+  try{const tgt=(typeof proteinDayTarget==='function')?proteinDayTarget():null;
+    row('protein','Protein','Health nutrition, or typed',Object.keys(dd).filter(x=>dd[x]&&dd[x].pr>0),
+      tgt?{powers:'The recovery clock reads yesterday’s protein against your '+Math.round(tgt)+' g target, once the day is logged through.'}
+        :{needs:'The recovery clock reads protein once Allena knows your bodyweight.'})}
+  catch(e){oops('dataSources.protein',e)}
+  try{row('bw','Bodyweight','A smart scale through Health, or typed',Object.keys(dd).filter(x=>dd[x]&&dd[x].bw>0),
+      {powers:'Your energy balance, and the protein target.'})}
+  catch(e){oops('dataSources.bw',e)}
+  try{const g=(S.gar&&S.gar.days)||{};
+    row('ready','Readiness','Your morning check-in, or your watch',Object.keys(g).filter(x=>g[x]&&g[x].am!=null),
+      {powers:'Today’s call on Train, and how hard to go.'})}
+  catch(e){oops('dataSources.ready',e)}
+  try{const g=(S.gar&&S.gar.days)||{};const ans=Object.keys(g).filter(x=>dayTagsOf(x));
+    row('tags','What else happened','The tags you add on Home',ans,
+      {powers:'The findings test each tag once there are 4 days with it and 4 without.'})}
+  catch(e){oops('dataSources.tags',e)}
+  try{const ks=[];
+    (S.history||[]).forEach(h=>{if(h&&!h.run&&(h.watch||h.watchOnly))ks.push(hKey(h))});
+    (typeof runs==='function'?runs():[]).forEach(r=>{if(r&&/^hk/.test(String(r.id||'')))ks.push(String(r.date||'').slice(0,10))});   // auditcheck-allow: utc-day-key — a run row stores a local YYYY-MM-DD
+    row('workouts','Workouts','Your watch, through Health',ks.filter(Boolean),
+      {powers:'Sessions it saw count as witnessed in the race, and runs and rides land on their own.'})}
+  catch(e){oops('dataSources.workouts',e)}
+  return out}
+function sourcesSheet(){
+  const fmt=k=>{try{return new Date(k+'T12:00').toLocaleDateString(undefined,{weekday:'short',day:'numeric',month:'short'})}catch(e){return k}};
+  const R=dataSources();
+  const any=R.some(r=>r.last);
+  const wrapOn=(typeof inWrapper==='function')&&inWrapper();
+  const rows=R.map(r=>{
+    const when=!r.last?'Nothing has arrived yet.'
+      :r.quiet?'Has gone quiet. Last arrived '+fmt(r.last)+'.'
+      :'Last arrived '+fmt(r.last)+'. '+r.n28+' of the last 28 days.';
+    return '<div class="card" style="padding:13px 15px;margin:0">'+
+      '<div style="display:flex;align-items:baseline;gap:8px"><span style="font-size:15px;font-weight:600;flex:1;min-width:0">'+esc(r.l)+'</span>'+
+      '<span style="color:var(--faint);font-size:11px;text-align:right">'+esc(r.src)+'</span></div>'+
+      '<p style="font-size:13px;line-height:1.5;margin-top:4px;color:'+(r.quiet?'var(--amber)':'var(--dim)')+'">'+esc(when)+'</p>'+
+      '<p style="font-size:13px;line-height:1.5;margin-top:2px;color:'+(r.powers?'var(--text)':'var(--faint)')+'">'+esc(r.powers||r.needs||'')+'</p></div>'}).join('');
+  return wrapSheet('Where your numbers come from',
+    '<p style="color:var(--dim);font-size:13px;line-height:1.6">For each number: where it comes from, when it last arrived, and what it is doing for you or what it still needs. iOS does not tell apps what they are allowed to read, so arrival is the only honest sign that a connection works.</p>'+
+    '<div style="display:flex;flex-direction:column;gap:8px;margin-top:14px">'+rows+'</div>'+
+    (wrapOn?'<button data-a="healthConnectGo" class="btn mt2">Sync with Health now</button>'
+      :(!any?'<p style="color:var(--faint);font-size:13px;line-height:1.55;margin-top:12px">Health data arrives in the Allena app on iPhone. On the web, what you type still counts.</p>':'')))}
 function sheetHtml(){
   if(!S.sheet)return '';
   if(S.sheet.t==='pod'&&typeof podSheet==='function')return podSheet();
@@ -38493,14 +38916,13 @@ function sheetHtml(){
     /* the first-send question. Plain register: this is an everyday
        surface and the reader is standing in a gym. It names what goes,
        where it goes, what does not go, and gives a real no. */
-    const was9=!!(S.ai&&S.ai.ok);   // said yes to the narrower first version
-    return wrapSheet(was9?'Allena\u2019s chat now reads your whole record':'Before Allena asks the AI',
-      (was9?'<p style="color:var(--dim);font-size:13px;line-height:1.65">You said yes before, when the chat only saw your recent training. Now it reads everything your app holds, so you never have to explain your training to it. That is a bigger thing to send, so Allena is asking again.</p>':
-      '<p style="color:var(--dim);font-size:13px;line-height:1.65">This part of Allena runs on Anthropic\u2019s models, which means it has to send them something. Everything else in the app \u2014 the statistics, the findings, the recovery model \u2014 runs on your phone and always will.</p>')+
+    const cc=aiConsentCopy();
+    return wrapSheet(cc.title,
+      '<p style="color:var(--dim);font-size:13px;line-height:1.65">'+esc(cc.intro)+'</p>'+
       '<p class="eyebrow" style="margin-top:20px">What gets sent</p>'+
-      '<p style="color:var(--dim);font-size:13px;line-height:1.6;margin-top:4px">For the chat: your training record, so it can answer without you explaining. That is your sessions with every set (exercise names, weights, reps, effort), runs, your programme and goals, readiness and Apple Health numbers like sleep and heart rate, body scan numbers and blood results, your rehab status, check-ins and pain flags, the notes you wrote, and the things you asked Allena to remember. Plus your question and the last eight messages of the chat, yours and Allena\u2019s, so it can follow the conversation. The deep read sends the patterns it reads. For a photo read, the picture you picked.</p>'+
+      '<p style="color:var(--dim);font-size:13px;line-height:1.6;margin-top:4px">'+esc(cc.sent)+'</p>'+
       '<p class="eyebrow" style="margin-top:16px">What does not</p>'+
-      '<p style="color:var(--dim);font-size:13px;line-height:1.6;margin-top:4px">Your name or email, or your sign-in. It goes only when you ask something, it is not used to train models, and it is not kept for anything else.</p>'+
+      '<p style="color:var(--dim);font-size:13px;line-height:1.6;margin-top:4px">'+esc(cc.not)+'</p>'+
       '<button data-a="aiOkGo" class="big disp mt" style="background:var(--amber);color:var(--bg);font-size:15px">Yes, go ahead</button>'+
       '<button data-a="aiOkNo" class="btn mt" style="color:var(--dim);font-size:13px">Not now</button>'+
       '<p style="color:var(--faint);font-size:11px;line-height:1.5;margin-top:12px">Asked once. You can turn it back off in Settings, and every other part of Allena works either way.</p>')}
@@ -38580,6 +39002,8 @@ function sheetHtml(){
       navRow(I.target,'Lift goals',null,'goalsOpen',null,{sub:(S.goals.length?S.goals.length+' set':'None yet')+' · max 3 per block'})+
       navRow(I.prog,'Profile & program builder',null,'setupOpen',null,{sub:'Rebuild a program around your goals'})
       ).replace('border-top:1px solid var(--line)','border-top:none')+'</div>')}
+  if(S.sheet.t==='tags')return dayTagsSheet();
+  if(S.sheet.t==='sources')return sourcesSheet();
   if(S.sheet.t==='gam'){
     const f=S.gform||(S.gform={am:''});
     const base=bbBaseline();
@@ -38724,13 +39148,11 @@ function sheetHtml(){
         '<p style="color:var(--dim);font-size:13px;line-height:1.55;margin-top:4px">'+esc(p.d)+'</p></div>').join('')+'</div>'+
       (function(){
         const knows=[],unknown=['stress','alcohol','illness'];
-        try{const hk=hkDailyStore().days||{};
-          /* the same window the clock actually uses — a line claiming last
+        try{
+          /* the same window the clock actually uses (recSleepWindow, the one reader) — a line claiming last
              night when the watch has been off for a fortnight is a lie
              about what Allena knows (engine audit, 14 Sep 2026) */
-          const dA=n=>dayKey(new Date(Date.now()-n*864e5));
-          const sk=Object.keys(hk).filter(k=>hk[k].sleep>0).sort();
-          if(sk.filter(k=>k>=dA(27)).length>=7&&sk[sk.length-1]>=dA(1))
+          if(recSleepWindow().on)
             knows.push('last night’s sleep against your own month of nights');
           else unknown.unshift('sleep')}catch(e){unknown.unshift('sleep')}
         try{const tgt=(typeof proteinDayTarget==='function')?proteinDayTarget():null;
@@ -40841,7 +41263,10 @@ function render(){
     home:'<rect x=\"1.5\" y=\"8.5\" width=\"2.4\" height=\"7\" rx=\"1\"/><rect x=\"4.6\" y=\"7\" width=\"3.2\" height=\"10\" rx=\"1.2\"/><rect x=\"16.2\" y=\"7\" width=\"3.2\" height=\"10\" rx=\"1.2\"/><rect x=\"20.1\" y=\"8.5\" width=\"2.4\" height=\"7\" rx=\"1\"/><path d=\"M7.8 12h8.4\"/>',
     progress:'<path d=\"M4 20v-6M9.3 20V10M14.6 20V7M20 20V4\" stroke-width=\"2.4\"/>',
     social:'<circle cx=\"9.5\" cy=\"9.2\" r=\"3.3\"/><path d=\"M3.5 20c.4-3.8 2.8-6.2 6-6.2s5.6 2.4 6 6.2\"/><path d=\"M15 5.5a2.7 2.7 0 1 1 .3 5.4\"/><path d=\"M16.2 13.7c2.4.6 4 2.8 4.3 6.3\"/>',
-    today:'<path d=\"M19.24 10.06A7.5 7.5 0 1 1 13.94 4.76\"/><circle cx=\"17.3\" cy=\"6.7\" r=\"1.7\" fill=\"currentColor\" stroke=\"none\"/>'};
+    today:'<path d=\"M19.24 10.06A7.5 7.5 0 1 1 13.94 4.76\"/><circle cx=\"17.3\" cy=\"6.7\" r=\"1.7\" fill=\"currentColor\" stroke=\"none\"/>',
+    /* Lucide "house" and "ellipsis" (ISC), the bar's Home and More (2 Oct 2026) */
+    house:'<path d=\"M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8\"/><path d=\"M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z\"/>',
+    more:'<circle cx=\"5\" cy=\"12\" r=\"1.5\" fill=\"currentColor\" stroke=\"none\"/><circle cx=\"12\" cy=\"12\" r=\"1.5\" fill=\"currentColor\" stroke=\"none\"/><circle cx=\"19\" cy=\"12\" r=\"1.5\" fill=\"currentColor\" stroke=\"none\"/>'};
   const hasRehab=(S.acl&&S.acl.on)||activeProtocols().length;
   const hasRun=!!S.runOn;
   // the dot must sit on the row that actually holds the new thing —
@@ -40861,6 +41286,9 @@ function render(){
      Running's count (Running lives inside Train now); Progress wears the
      analysis rooms'. The same numbers the drawer rows read: one fact. */
   DOT.home=DOT.run;
+  /* Home wears the finds waiting on the tree, the count the centre capsule
+     used to carry (2 Oct 2026), in the quiet variant: nothing urgent */
+  DOT.crown=(typeof treeXNewN==='function')?treeXNewN():0;
   /* PROGRESS ONLY WEARS WHAT PROGRESS CAN CLEAR (phase-1 QA, 18 Sep 2026):
      this used to be signals+collection, but signals never had a door on
      Progress — landing there did nothing, and nothing on the page led to
@@ -40939,51 +41367,43 @@ function render(){
      through onBar, so nothing becomes unreachable. Social is labelled
      Race, which is what the page is. */
   tabBarTabs=function(){
-    /* THE BAR IS TRAIN · TREE · RACE (owner, 26 Sep 2026: "keep the bottom
-       menu bar but now it will just be train - tree - race. Everything
-       else goes into the hamburger"). The tree is the crown, the first
-       screen, and sits in the centre. Read live, never from a closure. */
-    const T9=[['home','Train',ICONS.home],
-            ['crown','Tree',null],
-            ['social','Race',ICONS.social]];
-    /* THE SURFACE TABLE (Phase 2a): a hidden room drops out, but the bar
-       is never allowed to break its own layout, so it keeps all three */
-    const T9f=T9.filter(t=>t[0]==='crown'||surfOn(t[0]));
-    return T9f.length>=3?T9f:T9};
-  /* THE SWIPE FOLLOWS THE BAR: left to right, Train, Tree, Race. From the
-     tree a finger moving left lands on Race and one moving right on Train. */
-  tabBarRooms=function(){try{return tabBarTabs().map(t=>t[0])}catch(e){oops('tabRooms',e);return ['home','crown','social']}};
+    /* THE BAR IS HOME · TRAIN · RACE · MORE (owner, 2 Oct 2026, from
+       Athlytic's: "their app looks so much cleaner... should we copy their
+       bottom menu bar?"; the pick was "their look, our rooms"). Four equal
+       tabs with labels, the one you are on lit, no raised centre. Home is
+       the crown (the first screen, now the home grid); More is not a room,
+       it opens the menu, which is why the menu button left every page
+       header. Read live, never from a closure. */
+    const T9=[['crown','Home',ICONS.house],
+            ['home','Train',ICONS.home],
+            ['social','Race',ICONS.social],
+            ['more','More',ICONS.more]];
+    /* THE SURFACE TABLE (Phase 2a): a hidden room is drawn inert, and the
+       bar keeps its shape */
+    return T9};
+  /* THE SWIPE FOLLOWS THE BAR: left to right, Home, Train, Race. More is a
+     door to the menu, not a room, so it is never swiped to. */
+  tabBarRooms=function(){try{return tabBarTabs().map(t=>t[0]).filter(k=>k!=='more')}catch(e){oops('tabRooms',e);return ['crown','home','social']}};
 
   const tabBarHtml=()=>{
     if(S.sess&&S.view==='session')return '';
     if(S.view==='crownx')return '';
     if(S.boot||S.view==='setup'||S.view==='welcome'||S.view==='day0'||S.view==='signup'||S.view==='obwait'||S.view==='obreveal'||S.view==='week')return '';
     const T9=tabBarTabs();
-    /* the centre one is a different object, not a bigger version of the
-       same one: a capsule inside the bar carrying the tree, no label, and
-       the count of finds not yet looked at. The points figure moved onto
-       the tree screen, under the tree (owner, 1 Oct 2026: "get rid of the
-       data points icon in the centre of the bottom menu and make it the
-       tree icon") */
-    const treeBtn=()=>{
-      const n9=(typeof treeXNewN==='function')?treeXNewN():0;
-      const lit=n9>0;
-      return '<button data-a="drawerNav" data-v="crown" class="tmid'+(isOn('crown')?' on':'')+(lit?' lit':'')+'"'+
-        ' aria-label="Your tree"'+(isOn('crown')?' aria-current="page"':'')+'>'+
-        '<span class="tmidr"><svg class="tmidt" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+ICONS.tree+'</svg></span>'+
-        (n9?'<span class="tdot">'+badgeN(n9)+'</span>':'')+'</button>'};
-    /* a room the surface table hides keeps its slot (the bar never drops
-       below three) but is drawn inert, never a door into the redirect to
-       the tree (review M-25) */
-    const btn=t=>t[0]==='crown'?treeBtn():!surfOn(t[0])?
-      '<button disabled aria-disabled="true" style="opacity:.35" aria-label="'+esc(t[1])+'">'+
-      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">'+t[2]+'</svg>'+
-      '<span>'+esc(t[1])+'</span></button>':
-      '<button data-a="drawerNav" data-v="'+t[0]+'" class="'+(isOn(t[0])?'on':'')+'"'+
-      ' aria-label="'+esc(t[1])+'"'+(isOn(t[0])?' aria-current="page"':'')+'>'+
-      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">'+t[2]+'</svg>'+
-      '<span>'+esc(t[1])+'</span>'+
-      (DOT[t[0]]?'<span class="tdot">'+badgeN(DOT[t[0]])+'</span>':'')+'</button>';
+    const btn=t=>{
+      const k=t[0];
+      if(k==='more')return '<button data-a="drawerOpen" class="'+(S.drawerOpen?'on':'')+'" aria-label="More"'+(S.drawerOpen?' aria-current="page"':'')+'>'+
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">'+t[2]+'</svg><span>More</span></button>';
+      /* a room the surface table hides keeps its slot but is drawn inert,
+         never a door into the redirect (review M-25) */
+      if(k!=='crown'&&!surfOn(k))return '<button disabled aria-disabled="true" style="opacity:.35" aria-label="'+esc(t[1])+'">'+
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">'+t[2]+'</svg>'+
+        '<span>'+esc(t[1])+'</span></button>';
+      const on=isOn(k)||(k==='crown'&&S.view==='today');
+      return '<button data-a="drawerNav" data-v="'+k+'" class="'+(on&&!S.drawerOpen?'on':'')+'" aria-label="'+esc(t[1])+'"'+(on?' aria-current="page"':'')+'>'+
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">'+t[2]+'</svg>'+
+        '<span>'+esc(t[1])+'</span>'+
+        (DOT[k]?'<span class="tdot'+(k==='crown'?' q':'')+'">'+badgeN(DOT[k])+'</span>':'')+'</button>'};
     return '<div class="tabbar"><nav>'+T9.map(btn).join('')+'</nav></div>'};
 
   /* ══ drawerRows() (Phase 2a amendment) ══════════════════════════════════════════════════
@@ -43774,6 +44194,15 @@ function runAction(a,v,t,e){
       /* a room is entered through nav, which stamps the chat as where Back
          goes; a sheet opens over the chat, so closing it lands back here */
       if(pl.a==='drawerNav')runAction('nav',pl.v);else runAction(pl.a,pl.v);break}
+    /* LOG BY TELLING (2 Oct 2026): open the proposal for them to check */
+    case 'coachLogGo':{const m9=((S.coach&&S.coach.thread)||[])[+v];
+      if(!m9||!m9.log||m9.logDone){flash('That one is already open.');break}
+      const L9=coachLogCheck(JSON.stringify(m9.log));
+      if(!L9){flash('That log could not be read. Log it by hand instead.');break}
+      /* a form stays reopenable until they save it; only a bodyweight is saved on this tap */
+      if(coachLogOpen(L9)){if(L9.kind==='bw'){m9.logDone=1;chatSaveCurrent()}
+        if(L9.kind==='lift'&&S.quick)S.quick.fromMsg=+v;render()}
+      else flash('That bodyweight is outside what Allena accepts.');break}
     case 'memOpen':{S.sheet={t:'chatmem'};render();break}
     case 'memDel':{if(coachMemDel(String(v||''))){
         /* the chip under the reply that saved it shows it was undone */
@@ -44204,6 +44633,18 @@ function runAction(a,v,t,e){
       else{d3.day=v2;d3.dayHr=hr2;garSave();S.sheet=null;
         flash('Logged — '+v2+'/100. Read as a '+(hr2<17?'afternoon':'evening')+' number, not a fresh baseline.')}
       break}
+    /* WHERE YOUR NUMBERS COME FROM (2 Oct 2026): 26c-sources.js */
+    case 'sourcesOpen':{S.sheet={t:'sources'};render();break}
+    /* WHAT ELSE HAPPENED (2 Oct 2026): the day tags, 07c-day-tags.js */
+    case 'tagsOpen':{S.tagForm=dayTagsForm(v==='t'?'t':'y');S.sheet={t:'tags'};render();break}
+    case 'tagDay':{S.tagForm=dayTagsForm(v==='t'?'t':'y');render();break}
+    case 'tagTog':{const f9=S.tagForm||(S.tagForm=dayTagsForm('y'));if(DAY_TAG_KEYS.indexOf(v)<0)break;
+      if(f9.t[v])delete f9.t[v];else f9.t[v]=1;render();break}
+    case 'tagSave':case 'tagNone':{const f9=S.tagForm||dayTagsForm('y');
+      const k9=f9.day==='t'?today():dayTagsYesterday();
+      const t9=dayTagsSet(k9,a==='tagNone'?{}:f9.t);
+      S.tagForm=null;S.sheet=null;
+      flash(Object.keys(t9).length?'Saved for '+(f9.day==='t'?'today':'yesterday')+'.':'Saved: none of these.');render();break}
     case 'gamSkip':{S.gar.days[today()]=S.gar.days[today()]||{};S.gar.days[today()].amSkip=1;garSave();S.sheet=null;render();break}
     case 'garAm':{garDay().am=+dv;garSave();vib(10);render();break}
     case 'prevKeep':{const e=S.prev.ex[+v];
@@ -45523,7 +45964,7 @@ function runAction(a,v,t,e){
     case 'quickFree':{S.quick={progId:'freeform',dayIdx:-1,dayName:'',block:'Logged by hand',
       week:null,date:today(),rows:[],note:{sleep:'',fatigue:'',knee:''}};
       S.sheet=null;S.view='quick';render();break}
-    case 'quickCancel':S.quick=null;S.view='home';render();break;
+    case 'quickCancel':{const back9=S.quick&&S.quick.fromChat?'coach':'home';S.quick=null;S.view=back9;render();break}
     case 'qDel':{const i=+t.dataset.i,rows=S.quick.rows,ex=rows[i].exNo;
       if(rows.filter(r=>r.exNo===ex).length<=1){rows.splice(i,1)}else{rows.splice(i,1)}
       let n=0;rows.forEach(r=>{if(r.exNo===ex){n++;r.setNo=n;r.of=0}});
@@ -45579,7 +46020,10 @@ function runAction(a,v,t,e){
       /* a past session typed in pairs with the watch's gym workout now,
          not at the next sync or open (review F-6) */
       try{if(typeof watchCorroborate==='function')watchCorroborate()}catch(e){oops('quickSave.wg',e)}
-      S.quick=null;S.view='home';render();
+      /* a session proposed in the chat goes back to the chat that proposed it, and its card says saved */
+      const back9=q.fromChat?'coach':'home';
+      try{const m9=q.fromChat&&S.coach&&S.coach.thread&&S.coach.thread[q.fromMsg];if(m9&&m9.log){m9.logDone=1;chatSaveCurrent()}}catch(e9){oops('quickSave.chat',e9)}
+      S.quick=null;S.view=back9;render();
       flash('Logged '+log.length+' sets for '+fmtDate(rec.date)+'.');
       if(S.autoBk.on)setTimeout(function(){A.backup(true)},400);try{acctSyncSoon()}catch(e){}break}
     case 'quickDupGo':{if(S.quick)S.quick.dupOk=true;S.sheet=null;runAction('quickSave');break}
