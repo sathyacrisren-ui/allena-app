@@ -1296,6 +1296,8 @@ pre{background:var(--surface);border:1px solid var(--line);border-radius:12px;pa
 .chatbody{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:18px 18px 8px;max-width:460px;width:100%;margin:0 auto}
 .chatbar{flex:none;padding:8px 14px calc(10px + env(safe-area-inset-bottom));background:var(--bg);border-top:1px solid var(--line);max-width:460px;width:100%;margin:0 auto}
 .chatwrap.kb .chatbar{padding-bottom:10px}
+/* the bar floats over the chat: the composer sits above it, the room #app reserves (1 Oct 2026); with the keyboard up the bar is under it */
+body:has(.tabbar) .chatwrap:not(.kb) .chatbar{padding-bottom:calc(92px + env(safe-area-inset-bottom))}
 /* the live-session banner: flush at the very top, into the status
    band like an iPhone call bar; the app body reserves its height so
    nothing is ever covered */
@@ -1839,7 +1841,7 @@ if(S.sess){S.note=S.sess.note||S.note;
       if(c0&&(s0.log||[]).some(l=>l.ex===c0.ex&&l.setNo===c0.setNo)){const n0=sessAdv(s0);
         if(n0<0)s0.phase='done';else s0.idx=n0}}catch(e){oops('bootSess',e)}
     if(S.sess.phase!=='done')S.sess.phase='ready'}}
-const BUILD_ID='ee6998';  // stamped by tools/build.py with the content hash
+const BUILD_ID='27c4ef';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -1990,7 +1992,6 @@ function prMag(e){
     return Math.max(0,Math.min(1,(rel-PR_MAG_LO)/(PR_MAG_HI-PR_MAG_LO)))}
   catch(e9){oops('prMag',e9);return 0}}
 const MODELS=[['claude-haiku-4-5-20251001','Haiku — fast, near-free'],['claude-sonnet-5','Sonnet — smarter']];
-const COACH_SYS="You are Allena, a strength coach inside a training app. Bench wave 5wk (100x4/102.5x3/105x2/100x5/102.5x4), +2.5kg per block; back-offs 90% of top set, top reps +2-3; volume bench 87.5x4x8 -> 90 when all four hit 8 @RPE<=8; accessories double progression; wk6 deload. Goal bench 100x8. ACL-deficient knee: any knee pain/swelling/instability -> stop, log, physio decides. Under 80 words. One concrete call (kg x reps) first, then one line why. No fluff. If a programmed load should change, end your reply with a line exactly like ADJUST|<exercise name as given>|<number in kg>, e.g. ADJUST|Bench — back-off|-2.5 (one only, nothing else on that line).";
 function repLow(t){if(typeof t==='number')return t;const m=String(t||'').match(/\d+/);return m?+m[0]:null}
 function repHigh(t){if(typeof t==='number')return t;const m=String(t||'').match(/(\d+)\D+(\d+)/);return m?+m[2]:repLow(t)}
 
@@ -3671,7 +3672,13 @@ function aiReady(){return !!(((S.ai&&S.ai.proxy)||'').trim()||(S.ai&&S.ai.key)||
    sites today and there will be more, and a gate on the doors is a gate
    somebody forgets. One yes per account, withdrawable in Settings,
    stored on the existing training-ai-v1 blob — no new storage key. */
-function aiConsented(){try{return !!(S.ai&&S.ai.ok)}catch(e){return false}}
+/* THE YES COVERS WHAT IS SENT NOW (1 Oct 2026). The chat reads the whole
+   record since "the chat knows you", and the first sheet promised the
+   opposite ("what does not go: your whole history"). A yes to the old
+   words is not a yes to the new ones, so the version rises and everyone
+   who said yes before is asked once more, with what changed named. */
+const AI_CONSENT_V=2;
+function aiConsented(){try{return !!(S.ai&&(+S.ai.ok||0)>=AI_CONSENT_V)}catch(e){return false}}
 function aiConsentAsk(){try{S.sheet={t:'aiok'};render()}catch(e){oops('aiConsentAsk',e)}}
 async function claudeFetch(body){
   if(!aiConsented()){
@@ -3745,13 +3752,16 @@ function coachMemory(){
    the one line that states the units is true; the model converts on
    the way out. Set lines are entryKg now (review A-17): they name the
    kilograms, and the effort once, not "@8 @ RPE 8". */
-function coachContext(){
+function coachContext(o){
   const U0=UNITS;
   if(U0&&(U0.w!=='kg'||U0.d!=='km')){
     UNITS={w:'kg',d:'km'};
-    try{return coachContextBody(U0)}finally{UNITS=U0}}
-  return coachContextBody(U0||{w:'kg',d:'km'})}
-function coachContextBody(U){
+    try{return coachContextBody(U0,o)}finally{UNITS=U0}}
+  return coachContextBody(U0||{w:'kg',d:'km'},o)}
+/* o.noMem: the chat sends earlier conversations inside its record
+   (coachDossier), so the NOW block leaves them out */
+function coachContextBody(U,o){
+  const mem=(o&&o.noMem)?'':coachMemory();
   const s=S.sess,p=activeProg(),out=[];
   try{if(S.hint&&S.hint.msg)out.push('ALLENA\u2019S OWN SET COMMENT (already shown to the user this set \u2014 build on it or gently supersede it, never contradict it without saying why): \u201c'+S.hint.msg+'\u201d')}catch(e){oops('coachContext',e)}
   try{if(s&&s.exNotes&&Object.keys(s.exNotes).length)
@@ -3901,8 +3911,8 @@ function coachContextBody(U){
           ' If logged RPEs and the signature disagree, note it gently as calibration info, never as an accusation.')}
     }catch(e){oops('coachContext',e)}
     fb.push('=== RULES: the user\u2019s questions are about THIS session unless they clearly say otherwise. Below is BACKGROUND — if you use any of it, name the date or session it comes from. ===');
-    return fb.join('\n')+'\n'+out.join('\n')+coachMemory()}
-  return out.join('\n')+coachMemory()}
+    return fb.join('\n')+'\n'+out.join('\n')+mem}
+  return out.join('\n')+mem}
 async function askClaude(q){
   /* one Allena, one voice (owner call, 3 Sep): once the user talks to
      the chat mid-session, the deterministic set comments stand down —
@@ -3918,30 +3928,52 @@ async function askClaude(q){
      the top — pin it back to the newest message immediately on send,
      not just when the reply lands (owner-caught, 3 Sep) */
   try{const el0=document.getElementById('coachThread');if(el0)el0.scrollTop=el0.scrollHeight}catch(e0){}
-  /* a failed turn is shown, never sent back as if the coach had said it */
-  const th=co.thread.filter(m=>!m.err).slice(-8);
-  const msgs=th.map((m,i)=>({role:m.r==='user'?'user':'assistant',content:m.t}));
-  // context is rebuilt fresh for EVERY message — the previous
-  // once-per-thread logic left the coach blind mid-session
-  if(msgs.length)msgs[msgs.length-1].content='CONTEXT (fresh as of this message — the only data you have; never state a number that is not here):\n'+coachContext()+'\n\nQUESTION: '+msgs[msgs.length-1].content;
   try{
-    if(!aiSpend('coach')){co.busy=false;return render()}
-    const res=await claudeFetch({model:S.ai.model,max_tokens:320,system:coachSys(),messages:msgs});
-    const d=await res.json();
+    /* nothing was sent (no yes yet, or the day's cap): the question goes
+       back in the box instead of sitting in the thread unanswered, so the
+       yes that resumes it does not ask it twice */
+    if(!aiSpend('coach')){co.thread.pop();co.input=q;co.busy=false;return render()}
+    /* the record, the app and memory ride every turn (coachRequest in
+       02d); look-ups loop up to three rounds on a path that returns them */
+    const body=coachRequest(co,q);
+    if(coachToolsOn())body.tools=COACH_TOOLS;
+    let d=null,res=null,txt9='';
+    for(let round=0;round<=COACH_TOOL_ROUNDS;round++){
+      /* the last round must answer. The tools stay (a conversation holding
+         look-ups is refused without them); the choice is taken away */
+      if(round===COACH_TOOL_ROUNDS&&body.tools)body.tool_choice={type:'none'};
+      res=await claudeFetch(body);d=await res.json();
+      if(d.error||!Array.isArray(d.content))break;
+      const uses=d.content.filter(b=>b&&b.type==='tool_use');
+      if(d.stop_reason==='tool_use'&&uses.length&&body.tools&&!body.tool_choice){
+        body.messages.push({role:'assistant',content:d.content});
+        body.messages.push({role:'user',content:uses.map(u=>({type:'tool_result',tool_use_id:u.id,content:coachTool(u.name,u.input)}))});
+        continue}
+      break}
     /* the error is checked BEFORE the text: the cloud link always hands
        back a content array, so a stream that failed arrived as an empty
        reply (review B-20) */
-    const txt9=Array.isArray(d.content)?d.content.map(x=>x.text||'').join(''):'';
-    if(d.error||!txt9.trim()){
-      if(d.error)oops('askClaude',new Error(String(d.error.type||'')+' '+String(d.error.message||'').slice(0,160)));
-      co.thread.push({r:'a',t:coachErrLine(d.error,res.status),err:1});
+    txt9=(d&&Array.isArray(d.content))?d.content.filter(x=>x&&x.type==='text').map(x=>x.text||'').join(''):'';
+    if(!d||d.error||!txt9.trim()){
+      if(d&&d.error)oops('askClaude',new Error(String(d.error.type||'')+' '+String(d.error.message||'').slice(0,160)));
+      co.thread.push({r:'a',t:coachErrLine(d&&d.error,res&&res.status),err:1});
       co.busy=false;render();return}
     let t=txt9;
     let act=null;
     t=t.replace(/^[^\S\n]*\**\s*ADJUST\s*[|:]\s*([^|:\n]+?)\s*[|:]\s*([+\u2212-]?\s*\d+(?:[.,]\d+)?)\s*(?:kg|kgs|lb|lbs)?\s*\**[^\S\n]*$/gmi,
       (m,ex,kg)=>{const n=parseFloat(String(kg).replace(/\s|,/g,'').replace('\u2212','-'));
         if(!isNaN(n))act={ex:ex.replace(/\*+/g,'').trim(),kg:n};return ''}).replace(/\n{3,}/g,'\n\n').trim();
-    co.thread.push({r:'a',t:t,act:act});chatSaveCurrent(co);
+    const P=coachParse(t);
+    const msg={r:'a',t:P.text||t,act:act};
+    if(P.go.length)msg.go=P.go;
+    if(P.ask.length)msg.ask=P.ask.slice(0,2);
+    /* memory is written the moment it is said, and shown with its undo:
+       remembering is visible, never silent (the "remembered" moment) */
+    const saved=P.mem.map(coachMemAdd).filter(Boolean);
+    if(saved.length)msg.mem=saved.map(m=>({id:m.id,t:m.t}));
+    const gone=P.forget.map(coachMemForget).filter(Boolean);
+    if(gone.length)msg.forgot=gone.map(m=>m.t);
+    co.thread.push(msg);chatSaveCurrent(co);
   }catch(e){oops('askClaude',e);co.thread.push({r:'a',t:"Couldn't reach Allena. Check your connection and try again.",err:1})}
   co.busy=false;render();
   const el2=document.getElementById('coachThread');if(el2)el2.scrollTop=el2.scrollHeight;
@@ -6419,6 +6451,526 @@ function podSheet(){
     '<p style="font-size:13px;line-height:1.6"><b>People in your pod will know '+(b.rehab?'you’re rehabbing, and roughly how far along':'roughly how often you train')+'.</b> Your bracket is <b>'+esc(b.label)+'</b>. They see that, your first name, your avatar, this week’s witnessed sessions and your tree. Never a set, a weight, a pain score or a note.</p></div>'+
     '<p style="color:var(--faint);font-size:11px;line-height:1.55;margin-top:12px">No pod is made with fewer than three real people. Leaving is one tap, any time, no penalty. Weeks raced only ever goes up.</p>'+
     '<button data-a="podOptIn" class="big disp mt" style="background:var(--amber);color:var(--bg);font-size:15px">Put me in the pool</button>')}
+/* ═══ THE CHAT KNOWS YOU (owner, 1 Oct 2026: "allena will have all the
+   users info and history at its disposal to give informed advice.
+   Shouldn't have to give context, allena should always remember and know
+   everything about them all the time and know exactly how their allena
+   app looks like and even help them within the app") ═══════════════════
+
+   Four parts, one reader each:
+   coachDossier()   everything the record holds from BEFORE today, written
+                    once per chat and sent as a cached block, so a long
+                    history costs a tenth of its size on every reply after
+                    the first. Today is the NOW block's (coachContext), so
+                    the dossier does not change during the day and the
+                    cache holds.
+   coachAppMap()    the user's own app, read live from the same readers the
+                    screens draw from (tabBarTabs, drawerRows, surfOn), so
+                    the chat never describes a room this person cannot see.
+   coachMem*()      what Allena remembers, on the profile (S.prof.mem). No
+                    new storage key: the profile already rides backup and
+                    restore, and memory is the user's own record.
+   coachParse()     the reply's action lines: OPEN a place, REMEMBER or
+                    FORGET a fact, ASK a follow-up. ADJUST stays in 02.
+
+   What never goes: the user's name or email (the consent sheet promises
+   it), sign-in tokens, anything from another account. */
+
+/* ── the dossier ───────────────────────────────────────────────────── */
+const COACH_DOS_MAX=100000;   // characters; the cloud function refuses a request over 200 KB, and look-up results ride the same request
+function coachDossier(){
+  const U0=UNITS;
+  if(U0&&(U0.w!=='kg'||U0.d!=='km')){
+    UNITS={w:'kg',d:'km'};
+    try{return coachDossierBody(U0)}finally{UNITS=U0}}
+  return coachDossierBody(U0||{w:'kg',d:'km'})}
+/* one round number for a figure read at a glance (R8) */
+function cdN(v,dp){const k=Math.pow(10,dp||0);return Math.round((+v||0)*k)/k}
+function cdAvg(a){return a.length?a.reduce((x,y)=>x+y,0)/a.length:null}
+function cdMon(t){const d=new Date(t);d.setHours(12,0,0,0);d.setDate(d.getDate()-((d.getDay()+6)%7));return dayKey(d)}
+function coachDossierBody(U){
+  const td=today(),out=[];
+  const before=h=>{try{return hKey(h)<td}catch(e){return false}};
+  const H=(S.history||[]).filter(h=>h&&!h.run&&Array.isArray(h.log)&&before(h))
+    .slice().sort((a,b)=>new Date(a.date).getTime()-new Date(b.date).getTime());
+  const lifted=H.filter(h=>h.log.length);
+  const R=(typeof runs==='function'?runs():[]).filter(r=>r&&String(r.date||'').slice(0,10)<td);
+  const isRun=r=>!r.type||isRunType(r.type);
+  const sec=(title,fn)=>{try{const body=fn();if(body&&String(body).trim())out.push('## '+title+'\n'+String(body).trim())}
+    catch(e){oops('coachDossier.'+title,e)}};
+
+  sec('About them',()=>{
+    const p=S.prof||{},L=[];
+    const bits=[];
+    if(p.sex)bits.push(p.sex);if(p.age)bits.push('age '+p.age);if(p.height)bits.push(p.height+' cm');
+    const bw=coachBodyweight();if(bw)bits.push('bodyweight '+bw.kg+' kg ('+bw.d+', '+bw.src+')');
+    if(bits.length)L.push(bits.join(', '));
+    if(p.exp)L.push('Lifting experience: '+p.exp);
+    if(p.goal)L.push('Goal they set: '+p.goal);
+    if(p.plan&&p.plan.goal){const g=(typeof HW_GOALS!=='undefined'?HW_GOALS.find(x=>x.id===p.plan.goal):null);
+      L.push('Training for: '+(g?g.t:p.plan.goal)+(p.plan.dist&&typeof HW_DIST!=='undefined'&&HW_DIST[p.plan.dist]?', '+HW_DIST[p.plan.dist].t:'')+
+        (p.plan.date?', race day '+p.plan.date:'')+(p.plan.runWait?' (running waits: '+p.plan.runWait+')':''))}
+    if(p.days)L.push('Wants to train '+p.days+' days a week'+(p.mins?', about '+p.mins+' min a session':''));
+    if(p.eq)L.push('Equipment: '+p.eq);
+    /* focus is a set of keys ({arms:1}) from onboarding; an older profile wrote a string */
+    {const f=p.focus,fk=!f?[]:typeof f==='string'?[f]:Array.isArray(f)?f:Object.keys(f).filter(k=>f[k]);
+     if(fk.length)L.push('Wants extra work on: '+fk.join(', '))}
+    const rs=(typeof restrList==='function')?restrList(p):'';if(rs)L.push('Restrictions to honour: '+rs);
+    if(p.aclSide)L.push('Injured side: '+p.aclSide);
+    if((p.notes||'').trim())L.push('Their own note on limits: “'+String(p.notes).trim()+'”');
+    L.push('They read weights in '+(U.w==='lb'?'POUNDS':'kg')+' and distances in '+(U.d==='mi'?'MILES':'km')+'.');
+    const first=[lifted[0]&&hKey(lifted[0]),R[0]&&String(R[0].date).slice(0,10)].filter(Boolean).sort()[0];
+    if(first)L.push('First thing logged: '+first+'. '+lifted.length+' lifting sessions and '+R.filter(isRun).length+' runs before today.');
+    else L.push('Nothing logged before today.');
+    return L.join('\n')});
+
+  sec('What Allena remembers (things they told you; newest last)',()=>coachMemList().map(m=>'- ('+m.d+') '+m.t).join('\n'));
+
+  sec('Their programme',()=>{
+    const p=activeProgSafe();if(!p||p.empty)return 'No programme set up.';
+    const L=['"'+(p.block||'Programme')+'", '+(p.weeks||1)+' week'+((p.weeks||1)===1?'':'s')+', now on week '+(S.week||1)+'.'];
+    (p.days||[]).forEach(d=>{
+      const ex=(d.exercises||[]).map(e=>{const ss=setsForWeek(e,S.week||1)||[];return e.name+' '+coachPrescr(ss)}).filter(Boolean);
+      L.push('- '+d.name+': '+ex.join('; '))});
+    if(p.adj&&Object.keys(p.adj).length)L.push('Loads Allena has moved from the written plan: '+Object.keys(p.adj).map(k=>k+' '+(p.adj[k]>0?'+':'')+p.adj[k]+' kg').join(', '));
+    const others=(S.lib.programs||[]).filter(x=>x.id!==p.id&&!x.archived).map(x=>x.block||x.name||x.id);
+    if(others.length)L.push('Also in their library: '+others.join(', '));
+    return L.join('\n')});
+
+  sec('Goals',()=>(S.goals||[]).map(g=>{let st=null;try{st=goalStats(g)}catch(e9){oops('coachDossier.goal',e9)}
+    return '- '+g.ex+' '+g.w+' kg × '+g.r+(g.done?' (DONE)':'')+(st?': estimated max now '+Math.round(st.cur)+' of '+Math.round(st.target)+' needed':'')}).join('\n'));
+
+  sec('Every lift they have logged (best by estimated max; easy sets at RPE 6 or under never count as a best)',()=>{
+    const by={};
+    lifted.forEach(h=>h.log.forEach(l=>{if(!l||!l.ex)return;const b=gBase(l.ex),k=hKey(h);
+      const o=by[b]||(by[b]={days:{},first:k,last:k,best:null,heavy:null,hold:0,top:null,topK:''});
+      o.days[k]=1;if(k<o.first)o.first=k;if(k>o.last)o.last=k;
+      if(l.secs){o.hold=Math.max(o.hold,+l.secs||0);return}
+      if(!(l.w>0&&l.r>0))return;
+      if(!(l.rpe!=null&&l.rpe!==''&&+l.rpe<=6)){const e=e1rm(+l.w,+l.r,l.rpe);if(!o.best||e>o.best.e)o.best={e:e,l:l,k:k}}
+      if(!o.heavy||+l.w>+o.heavy.l.w)o.heavy={l:l,k:k};
+      if(k>=o.topK){const e=e1rm(+l.w,+l.r,l.rpe);if(k>o.topK||!o.top||e>o.top.e){o.top={e:e,l:l};o.topK=k}}}));
+    const names=Object.keys(by).sort((a,b)=>Object.keys(by[b].days).length-Object.keys(by[a].days).length);
+    const L=[];
+    names.slice(0,45).forEach((b,i)=>{const o=by[b],n=Object.keys(o.days).length;
+      let line='- '+b+': '+n+' session'+(n===1?'':'s')+' ('+o.first+' to '+o.last+')';
+      if(o.hold&&!o.best)line+=', longest hold '+o.hold+' s';
+      if(o.best)line+=', best '+entryKg(o.best.l)+' on '+o.best.k+' (est. max '+Math.round(o.best.e)+' kg)';
+      if(o.heavy&&o.best&&o.heavy.l!==o.best.l)line+=', heaviest '+entryKg(o.heavy.l)+' on '+o.heavy.k;
+      if(o.top&&o.topK!==(o.best&&o.best.k))line+=', last time '+entryKg(o.top.l)+' on '+o.topK;
+      if(i<20&&o.best){try{const T=liftTrend(b);
+        if(T&&T.state==='up')line+='. TREND: up, '+T.from+' to '+T.to+' kg est. max over '+T.weeks+' weeks';
+        else if(T&&T.state==='down')line+='. TREND: DOWN, '+T.from+' to '+T.to+' over '+T.weeks+' weeks (a falling lift points at recovery or the physio, never at adding load)';
+        else if(T&&T.state==='level')line+='. TREND: level for '+T.weeks+' weeks'+(liftStall(b)===true?' (a stall by its own noise band)':'');
+        else if(T&&T.state==='back')line+='. Coming back after a '+(T.back&&T.back.gapW||'')+'-week break';}catch(e9){oops('coachDossier.trend',e9)}}
+      L.push(line)});
+    if(names.length>45)L.push('Also logged at least once: '+names.slice(45).join(', '));
+    return L.join('\n')});
+
+  sec('Personal records (judged against their earlier sessions only), newest last',()=>{
+    const m=prMap(),rows=[];
+    lifted.forEach(h=>{const x=m[String(h.id)];if(x)x.forEach(p=>rows.push(hKey(h)+' '+p.ex+' est. max '+p.e+' kg (was '+p.prev+')'))});
+    return rows.slice(-25).map(r=>'- '+r).join('\n')});
+
+  sec('Training log, last 6 weeks before today (every set, kg)',()=>{
+    const cut=dayKey(new Date(Date.now()-42*864e5));
+    const rows=H.filter(h=>hKey(h)>=cut);
+    return rows.slice(-45).map(h=>{
+      if(!h.log.length)return '- '+hKey(h)+' '+(h.dayTitle||'Session')+(h.minutes?' ('+Math.round(h.minutes)+' min, no sets logged)':' (no sets logged)');
+      let ln='- '+sessLine(h,true)+(h.minutes?' ['+Math.round(h.minutes)+' min]':'')+(h.complete?'':' [not finished]')+(h.eased?' [eased for low readiness]':'');
+      if(h.exNotes){const ks=Object.keys(h.exNotes);if(ks.length)ln+=' NOTES: '+ks.map(k=>k+': “'+h.exNotes[k]+'”').join('; ')}
+      return ln}).join('\n')});
+
+  sec('Older training, week by week',()=>{
+    const cut=dayKey(new Date(Date.now()-42*864e5));
+    const wk={};
+    H.filter(h=>hKey(h)<cut).forEach(h=>{const k=cdMon(new Date(h.date).getTime());
+      const o=wk[k]||(wk[k]={n:0,sets:0,t:{}});o.n++;o.sets+=h.log.filter(l=>l&&(l.w!=null||l.secs||l.r)).length;
+      o.t[h.dayTitle||'Session']=1});
+    const ks=Object.keys(wk).sort();
+    const L=ks.slice(-104).map(k=>'- w/c '+k+': '+wk[k].n+' session'+(wk[k].n===1?'':'s')+', '+wk[k].sets+' sets ('+Object.keys(wk[k].t).join(', ')+')');
+    if(ks.length>104)L.unshift('- '+(ks.length-104)+' earlier weeks with training, from '+ks[0]);
+    return L.join('\n')});
+
+  sec('Exercise notes they wrote, older than six weeks',()=>{
+    const cut=dayKey(new Date(Date.now()-42*864e5)),L=[];
+    H.forEach(h=>{if(h.exNotes&&hKey(h)<cut)Object.keys(h.exNotes).forEach(k=>L.push('- '+hKey(h)+' '+k+': “'+h.exNotes[k]+'”'))});
+    return L.slice(-30).join('\n')});
+
+  sec('Running',()=>{
+    const RR=R.filter(isRun);if(!RR.length&&!S.runOn)return '';
+    const L=[];
+    const km=RR.reduce((a,r)=>a+(+r.km||0),0);
+    L.push(RR.length+' runs, '+cdN(km)+' km in total'+(RR.length?' since '+String(RR[0].date).slice(0,10):'')+'.');
+    try{const wk=weeklyKm(16);if(wk&&wk.length)L.push('Kilometres a week, oldest first (the last is the current week so far): '+wk.map(w=>cdN(w.km,1)).join(', '))}
+    catch(e9){oops('coachDossier.km',e9)}
+    const best=(min)=>{let b=null;RR.forEach(r=>{if(+r.km>=min&&+r.mins>0){const p=r.mins/r.km;if(!b||p<b.p)b={p:p,r:r}}});return b};
+    [[5,'5 km or longer'],[10,'10 km or longer'],[21,'half marathon or longer']].forEach(x=>{const b=best(x[0]);
+      if(b)L.push('Fastest pace at '+x[1]+': '+paceStr(b.r.mins,b.r.km)+' over '+cdN(b.r.km,1)+' km on '+String(b.r.date).slice(0,10))});
+    const run=RR.reduce((a,r)=>(!a||+r.km>+a.km)?r:a,null);   // the longest
+    if(run)L.push('Longest run: '+cdN(run.km,1)+' km on '+String(run.date).slice(0,10));
+    L.push('Last runs:');
+    RR.slice(-12).forEach(r=>{const own=r.rpe&&!r.rpeEst&&!/^(imp|hk)/.test(String(r.id||''));
+      L.push('- '+String(r.date).slice(0,10)+' '+cdN(r.km,1)+' km'+(r.mins?' in '+Math.round(r.mins)+' min ('+paceStr(r.mins,r.km)+')':'')+
+        ' '+(r.type||'run')+(r.hr?' avg HR '+r.hr:'')+(own?' effort '+r.rpe:'')+(r.note?' note: “'+r.note+'”':''))});
+    try{const G=rgStore().list.filter(g=>!g.done);if(G.length)L.push('Running goals: '+G.map(g=>rgLabel(g)).join('; '))}catch(e9){oops('coachDossier.rg',e9)}
+    if(S.runplan&&Array.isArray(S.runplan.items)&&S.runplan.items.length)L.push('Imported running plan "'+(S.runplan.src||'')+'", started '+(S.runplan.started||'')+': '+
+      S.runplan.items.slice(0,16).map(x=>'week '+x.week+' '+x.desc).join('; '));
+    L.push('Imported runs carry no recorded effort; never state an effort for one.');
+    return L.join('\n')});
+
+  sec('Other cardio (not running; a walk is never a run)',()=>{
+    const by={};R.filter(r=>!isRun(r)).forEach(r=>{const o=by[r.type||'other']||(by[r.type||'other']={n:0,km:0,last:''});
+      o.n++;o.km+=+r.km||0;o.last=String(r.date).slice(0,10)});
+    return Object.keys(by).map(k=>'- '+k+': '+by[k].n+' times, '+cdN(by[k].km)+' km, last '+by[k].last).join('\n')});
+
+  sec('Body and health signals (from Apple Health, their own check-ins and logs; whole days only)',()=>{
+    if(typeof SIG_KINDS==='undefined')return '';
+    const t0=new Date(td+'T00:00').getTime(),L=[];
+    SIG_KINDS.forEach(kind=>{let pts=[];
+      try{pts=sigSeries(kind).filter(p=>p.t<t0)}catch(e9){oops('coachDossier.sig',e9);return}
+      if(!pts.length)return;
+      const last=pts[pts.length-1],d7=pts.filter(p=>p.t>=t0-7*864e5).map(p=>p.v),d28=pts.filter(p=>p.t>=t0-28*864e5).map(p=>p.v);
+      const dp=Math.abs(last.v)<20?1:0;
+      L.push('- '+kind.k+': last '+cdN(last.v,dp)+(kind.u||'')+' on '+dayKey(new Date(last.t))+
+        (d7.length?'; 7-day average '+cdN(cdAvg(d7),dp)+' ('+d7.length+' days)':'')+
+        (d28.length>=7?'; 28-day average '+cdN(cdAvg(d28),dp)+' ('+d28.length+' days)':''))});
+    try{const ds=(S.gar&&S.gar.days)||{},ks=Object.keys(ds).filter(k=>k<td&&ds[k].am!=null).sort().slice(-14);
+      if(ks.length)L.push('- Morning readiness they logged (0 to 100): '+ks.map(k=>k.slice(5)+' '+ds[k].am).join(', '))}catch(e9){oops('coachDossier.ready',e9)}
+    try{const pt=proteinDayTarget();if(pt)L.push('- Their protein target: '+Math.round(pt)+' g a day')}catch(e9){oops('coachDossier.prot',e9)}
+    return L.join('\n')});
+
+  sec('Body scans',()=>scansSorted().filter(s=>String(s.date)<td).slice(-12).map(s=>{const b=['weight '+s.w+' kg'];
+    if(s.bf!=null&&s.bf!=='')b.push('body fat '+s.bf+'%');if(s.smm!=null&&s.smm!=='')b.push('muscle '+s.smm+' kg');
+    if(s.legL&&s.legR)b.push('lean legs L '+s.legL+' / R '+s.legR+' kg');
+    return '- '+s.date+': '+b.join(', ')}).join('\n'));
+
+  sec('Blood tests (their lab, flagged against the adult reference band)',()=>{
+    const st=bloodStore();if(!st.list||!st.list.length)return '';
+    return st.list.slice(-2).map(dr=>{const fl=[],ok=[];
+      Object.keys(dr.m||{}).forEach(k=>{const R9=BLOOD_REF.find(x=>x[0]===k),e=dr.m[k];if(!R9||!e)return;
+        const f=bloodFlag(k,e.v,e.u);(f==='low'||f==='high'?fl:ok).push(R9[1]+' '+e.v+(e.u?' '+e.u:'')+(f==='low'||f==='high'?' '+f.toUpperCase():''))});
+      return '- '+dr.d+': '+(fl.length?fl.join(', ')+'; in range: ':'all in range: ')+ok.join(', ')}).join('\n')});
+
+  sec('Rehab',()=>{
+    const L=[];
+    if(S.acl&&S.acl.on){const ph=aclPhaseDef(S.acl.phase);
+      L.push('ACL '+(S.acl.mode==='deficient'?'without surgery':'reconstruction')+(S.acl.date?', '+(S.acl.mode==='deficient'?'injured':'surgery')+' '+S.acl.date:'')+
+        ', phase '+S.acl.phase+(ph?' ('+ph.name+')':'')+(aclMonths()!=null?', '+aclMonths().toFixed(1)+' months in':''));
+      try{const g=aclGateState(S.acl.phase);
+        L.push('Gate to the next phase: '+g.map(x=>(x.met?'MET ':'open ')+(x.label||x.key)).join('; '))}catch(e9){oops('coachDossier.gate',e9)}
+      try{const q=aclStrengthTests();if(q.length)L.push('Strength symmetry tests: '+q.slice(-6).map(x=>(x.date||'')+' '+Math.round(x.lsi)+'%').join(', '))}catch(e9){oops('coachDossier.str',e9)}
+      ['hop','rsi'].forEach(k=>{try{const t2=aclLatest(k);if(!t2)return;
+        L.push(k==='hop'?'Latest hop tests '+t2.date+': single '+Math.round(t2.single)+'%, triple '+Math.round(t2.triple)+'%, crossover '+Math.round(t2.cross)+'%, timed '+Math.round(t2.timed)+'%'
+          :'Latest ACL-RSI (confidence) '+t2.date+': '+Math.round(t2.score))}catch(e9){oops('coachDossier.acl',e9)}});
+      try{const F=(S.acl.flares||[]).slice(-6);if(F.length)L.push('Flare-ups logged: '+F.map(f=>(f.date||'')+(f.note?' “'+f.note+'”':'')).join('; '))}catch(e9){oops('coachDossier.flare',e9)}}
+    try{const C=checkins().filter(c=>c.date<td).slice(-21);
+      if(C.length)L.push('Daily knee check-ins (pain, stiffness and confidence out of 10): '+C.map(c=>c.date.slice(5)+' pain '+c.pain+(c.stiff!=null?' stiff '+c.stiff:'')+(c.conf!=null?' conf '+c.conf:'')+(c.swell===true||+c.swell>0?' SWOLLEN':'')).join('; '))}
+    catch(e9){oops('coachDossier.chk',e9)}
+    try{activeProtocols().forEach(p=>L.push('Rehab plan: '+(p.n||p.name||p.k)+(p.by?' from '+p.by:'')+(p.freq?', '+p.freq:'')+
+      ((p.routine||[]).length?': '+p.routine.map(e=>e.n+(e.secs?' '+e.secs+' s':(e.reps?' ×'+e.reps:''))).join(', '):'')))}catch(e9){oops('coachDossier.proto',e9)}
+    try{const nx=apptSorted().filter(a=>a.date>=td);if(nx.length)L.push('Physio appointments coming up: '+nx.slice(0,3).map(a=>a.date+(a.time?' '+a.time:'')+(a.who?' with '+a.who:'')).join('; '))}
+    catch(e9){oops('coachDossier.appt',e9)}
+    return L.join('\n')});
+
+  sec('What moves their training (links found in their own data, each with what to do)',()=>{
+    return leversLive().slice(0,12).map(x=>'- '+x.ph.title+(x.ph.act?' To do: '+x.ph.act:'')).join('\n')});
+
+  sec('Recent wins and finds on their tree',()=>{
+    const B=discBank(),ids=Object.keys(B).filter(k=>B[k]&&B[k].t&&String(B[k].found||'')<td)
+      .sort((a,b)=>String(B[a].found).localeCompare(String(B[b].found)));
+    return ids.slice(-20).map(k=>'- '+B[k].found+' '+B[k].t).join('\n')});
+
+  sec('Points',()=>{const d=dataPoints(),L9=dpLevel(d.total);
+    return Math.round(d.total).toLocaleString('en-AU')+' data points, level '+L9.lv+'; '+Math.round(d.live).toLocaleString('en-AU')+' witnessed live. Day streak '+dayStreak()+'.'});
+
+  sec('What they said in earlier chats',()=>coachMemory().replace(/^\s*WHAT YOU REMEMBER[^\n]*\n/,''));
+
+  let txt=out.join('\n\n');
+  /* a long record trims its oldest summaries first, never today or the
+     recent log: the newest data is the data a question is about */
+  if(txt.length>COACH_DOS_MAX){
+    const i=out.findIndex(x=>x.indexOf('## Older training')===0);
+    if(i>=0){const ls=out[i].split('\n');while(ls.length>12&&out.join('\n\n').length>COACH_DOS_MAX){ls.splice(1,1);out[i]=ls.join('\n')}}
+    txt=out.join('\n\n');
+    if(txt.length>COACH_DOS_MAX)txt=txt.slice(0,COACH_DOS_MAX)+'\n[the rest of the record is longer than one message can carry]'}
+  return txt}
+/* the latest bodyweight, wherever it was written: a typed check-in, a scan,
+   or the profile's own answer — newest wins */
+function coachBodyweight(){
+  try{const c=[];const dd=(S.daily&&S.daily.days)||{};
+    Object.keys(dd).forEach(k=>{if(dd[k]&&dd[k].bw!=null&&dd[k].bw!=='')c.push({d:k,kg:+dd[k].bw,src:'check-in'})});
+    (S.scans||[]).forEach(s=>{if(s&&+s.w>0)c.push({d:String(s.date),kg:+s.w,src:'scan'})});
+    c.sort((a,b)=>a.d.localeCompare(b.d));
+    const x=c[c.length-1];
+    if(x)return{kg:cdN(x.kg,1),d:x.d,src:x.src};
+    if(S.prof&&+S.prof.bw>0)return{kg:cdN(S.prof.bw,1),d:'from setup',src:'their answer'};
+    return null}catch(e){oops('coachBodyweight',e);return null}}
+/* a week's prescription in one short phrase: "3×5 @80kg RPE 8" */
+function coachPrescr(ss){
+  try{if(!ss||!ss.length)return '';
+    const k=x=>x.secs?(x.secs+' s'+(x.perSide?'/side':'')):((x.reps!=null?x.reps:'?')+(x.w?' @'+x.w+'kg':'')+(x.rpe!=null?' RPE '+x.rpe:''));
+    const g=[];ss.forEach(x=>{const kk=k(x);const last=g[g.length-1];if(last&&last.k===kk)last.n++;else g.push({k:kk,n:1})});
+    return g.map(x=>x.n+'×'+x.k).join(', ')}catch(e){oops('coachPrescr',e);return ''}}
+
+/* ── what Allena remembers ────────────────────────────────────────── */
+const COACH_MEM_MAX=60;
+function coachMemList(){try{const m=S.prof&&S.prof.mem;return Array.isArray(m)?m.filter(x=>x&&x.t):[]}catch(e){return []}}
+function coachMemSave(list){S.prof=Object.assign({},S.prof||{},{mem:list.slice(-COACH_MEM_MAX)});lset(K_PROF,S.prof)}
+/* a fact is one plain sentence; the same fact twice is kept once */
+function coachMemAdd(t){
+  t=String(t||'').replace(/\s+/g,' ').trim().replace(/^[-*•]\s*/,'').slice(0,200);
+  if(t.length<4)return null;
+  const L=coachMemList(),low=t.toLowerCase();
+  if(L.some(x=>String(x.t).toLowerCase()===low))return null;
+  const m={id:'m'+Date.now().toString(36)+Math.floor(Math.random()*1e4).toString(36),t:t,d:today()};
+  coachMemSave(L.concat([m]));return m}
+function coachMemDel(id){const L=coachMemList(),n=L.filter(x=>x.id!==id);if(n.length!==L.length){coachMemSave(n);return true}return false}
+/* FORGET names the fact in words, not an id the model never saw: the
+   closest stored fact by shared words, and only a clear match */
+function coachMemForget(t){
+  const STOP=['the','and','that','this','with','for','about','thing','they','their','them','was','are','has','have','not','any','more','longer','your','you','its','from','what','said','told'];
+  const w=s=>(String(s||'').toLowerCase().match(/[a-z0-9]{3,}/g)||[]).filter(x=>STOP.indexOf(x)<0);
+  const want=w(t);if(!want.length)return null;
+  let best=null,bs=0;
+  coachMemList().forEach(m=>{const have=w(m.t);const hit=want.filter(x=>have.indexOf(x)>=0).length/Math.max(want.length,1);if(hit>bs){bs=hit;best=m}});
+  if(best&&bs>=0.6){coachMemDel(best.id);return best}
+  return null}
+
+/* ── the places the chat can open ─────────────────────────────────────
+   One table. Every OPEN line is checked against it when the reply lands
+   AND again when the button is tapped (the gate goes where the thing
+   happens), so a place that is hidden for this person, or a session
+   place with no session running, is never a door. */
+const COACH_PLACES={
+  train:{l:'Train',a:'drawerNav',v:'home',ok:()=>surfOn('home')},
+  tree:{l:'Your tree',a:'drawerNav',v:'crown'},
+  race:{l:'Race',a:'drawerNav',v:'social',ok:()=>surfOn('social')},
+  progress:{l:'Progress',a:'drawerNav',v:'progress',ok:()=>surfOn('progress')},
+  rehab:{l:'Rehab',a:'drawerNav',v:'acl',ok:()=>surfOn('acl')&&!!((S.acl&&S.acl.on)||activeProtocols().length)},
+  running:{l:'Running',a:'drawerNav',v:'run',ok:()=>surfOn('run')&&!!(S.runOn||runs().length)},
+  levers:{l:'What moves your training',a:'drawerNav',v:'levers',ok:()=>surfOn('levers')},
+  points:{l:'Your tree and points',a:'drawerNav',v:'points',ok:()=>surfOn('points')},
+  log:{l:'Workout log',a:'drawerNav',v:'history',ok:()=>surfOn('history')&&(S.history||[]).some(h=>h.complete&&!h.run)},
+  you:{l:'You',a:'drawerNav',v:'me'},
+  settings:{l:'Settings',a:'drawerNav',v:'data'},
+  import:{l:'Import your data',a:'intakeOpen'},
+  logrun:{l:'Log a run',a:'runLog'},
+  readiness:{l:'Morning check-in',a:'sigBb'},
+  build:{l:'Build a programme',a:'setupOpen'},
+  week:{l:'This week',a:'weekClockOpen',ok:()=>{const p=activeProgSafe();return !!(p&&!p.empty)}},
+  goals:{l:'Lift goals',a:'goalsOpen'},
+  method:{l:'How Allena decides',a:'methodOpen'},
+  tour:{l:'The 60-second tour',a:'tourOpen'},
+  physio:{l:'A plan from your physio',a:'pplanOpen',ok:()=>surfOn('acl')},
+  appts:{l:'Appointments',a:'apptsOpen',ok:()=>surfOn('acl')},
+  units:{l:'Units',a:'dsetOpen',v:'Units',ok:()=>surfOn('set.Units')},
+  equipment:{l:'What you can train on',a:'dsetOpen',v:'Available equipment',ok:()=>surfOn('set.What you can train on')},
+  bar:{l:'Bar & plates',a:'dsetOpen',v:'Barbell weight',ok:()=>surfOn('set.Bar & plates')},
+  library:{l:'Program library',a:'dsetOpen',v:'Program library',ok:()=>surfOn('set.Program library')},
+  ownblock:{l:'Your own block',a:'dsetOpen',v:'Your own block',ok:()=>surfOn('set.Your own block')},
+  pathway:{l:'Rehab pathway',a:'dsetOpen',v:'Rehab pathway',ok:()=>surfOn('set.Rehab pathway')},
+  checkin:{l:'Daily check-in',a:'dsetOpen',v:'Daily check-in',ok:()=>surfOn('set.Daily check-in')},
+  health:{l:'Connect Apple Health',a:'dsetOpen',v:'__hguide',ok:()=>surfOn('set.Connect wearables & apps')},
+  backup:{l:'Export a backup',a:'dsetOpen',v:'Export',ok:()=>surfOn('set.Export a backup')},
+  restore:{l:'Restore from backup',a:'dsetOpen',v:'Restore',ok:()=>surfOn('set.Restore from backup')},
+  notifications:{l:'What Allena tells you',a:'dsetOpen',v:'Notifications',ok:()=>surfOn('set.What Allena tells you')&&typeof inWrapper==='function'&&inWrapper()},
+  memory:{l:'What Allena remembers',a:'memOpen'},
+  session:{l:'Back to your session',a:'resume',ok:()=>!!S.sess},
+  modify:{l:'Modify this session',a:'modifyOpen',ok:()=>!!S.sess},
+  left:{l:'What is left today',a:'planOpen',ok:()=>!!S.sess},
+  note:{l:'Note on this exercise',a:'exNoteOpen',ok:()=>!!S.sess},
+  flag:{l:'Flag this for your physio',a:'flagOpen',ok:()=>!!S.sess&&typeof isRehabSession==='function'&&isRehabSession()}};
+function coachPlaceOk(k){
+  try{const p=COACH_PLACES[k];if(!p)return false;return p.ok?!!p.ok():true}
+  catch(e){oops('coachPlaceOk',e);return false}}
+
+/* ── the action lines in a reply ──────────────────────────────────────
+   Read only at the start of a line, kept out of the shown text, capped,
+   and checked: an unknown place is dropped, never drawn as a dead button. */
+function coachParse(text){
+  const res={text:'',go:[],mem:[],forget:[],ask:[]};
+  const keep=[];
+  String(text||'').split('\n').forEach(line=>{
+    const m=/^[^\S\n]*\**\s*(OPEN|REMEMBER|FORGET|ASK)\s*[|:]\s*(.+?)\s*\**\s*$/i.exec(line);
+    if(!m){keep.push(line);return}
+    const kind=m[1].toUpperCase(),arg=m[2].replace(/\*+/g,'').trim();
+    if(kind==='OPEN'){const k=arg.toLowerCase().replace(/[^a-z]/g,'');
+      if(COACH_PLACES[k]&&coachPlaceOk(k)&&res.go.indexOf(k)<0&&res.go.length<3)res.go.push(k)}
+    else if(kind==='REMEMBER'){if(res.mem.length<3&&arg.length>=4)res.mem.push(arg.slice(0,200))}
+    else if(kind==='FORGET'){if(res.forget.length<3)res.forget.push(arg)}
+    else if(kind==='ASK'){if(res.ask.length<3&&arg.length>=4)res.ask.push(arg.replace(/^["“]|["”]$/g,'').slice(0,90))}});
+  res.text=keep.join('\n').replace(/\n{3,}/g,'\n\n').trim();
+  return res}
+
+/* ── the user's own app, as they see it ───────────────────────────── */
+function coachAppMap(){
+  const L=[];
+  try{const T=tabBarTabs();L.push('BOTTOM BAR (left to right): '+T.map(t=>t[1]+(t[0]!=='crown'&&!surfOn(t[0])?' (greyed out)':'')).join(' · ')+
+    '. The centre is the tree icon. A sideways swipe moves between these three.')}catch(e){oops('appMap.tabs',e)}
+  try{const D=drawerRows();L.push('MENU (the ☰ button top left of every main page): '+D.map(r=>r.label).join(' · ')+
+    '. The round avatar top right opens You (their profile and account).')}catch(e){oops('appMap.drawer',e)}
+  const hasR=!!((S.acl&&S.acl.on)||(typeof activeProtocols==='function'&&activeProtocols().length));
+  L.push('SCREENS:');
+  L.push('- Tree (the first screen): their training drawn as a tree, every session a leaf, PRs as white blossoms, findings as roots. Under the tree: their data points, then a line counting sessions and PRs, then what was found today. Tap a limb or leaf to look closer; pinch to zoom.');
+  if(surfOn('home'))L.push('- Train: the programme. Title, the week (tap the subtitle for the week clock), "+ BUILD A PROGRAM", today’s suggested session glowing among "Week N sessions" (tap one to preview it, then Start), lift goals. "Rearrange this screen" at the bottom.');
+  if(surfOn('social'))L.push('- Race: a weekly race on witnessed points (sessions this phone timed live). Friends, pods and last week’s podium. Weeks raced at the foot.');
+  if(surfOn('progress'))L.push('- Progress (menu): goal lifts and their charts, with "More" holding the rest.');
+  if(hasR&&surfOn('acl'))L.push('- Rehab (menu): appointment banner, daily check-in, the climb through the phases, The work, Your physio (a plan from your physio, appointments, the physio report).');
+  if(S.runOn||runs().length)L.push('- Running (Settings → Tracking → Your runs'+(surfOn('row.run')?', or the menu':'')+'): "Log a run", imports, this week’s numbers.');
+  if(surfOn('levers'))L.push('- What moves your training (menu): links found in their own data between something they can change (sleep, food, running load, rest) and how they lift, each with what to do.');
+  L.push('- Settings (menu): Program (library, personalised program, your own block) · Tracking (rehab pathway, running, daily check-in, connect wearables & apps) · Appearance · Equipment (bar & plates, what you can train on, units) · Allena chat · Your data (workout log, export a backup, restore, start fresh) · Help (How Allena decides, get help).');
+  L.push('THE SESSION SCREEN: one exercise at a time as a table, one row per set, filled in from the plan. Type over the weight or reps, then tap the tick; Allena asks how hard it was (RPE, with reps left beside each) and that logs it and starts the rest clock. Tap a set number to skip that set (it stays, greyed, with Undo); "+ Add set" adds one. Move between exercises with a sideways swipe, the arrows at the bottom, or the bars across the top. A logged row opens its fix sheet. A timed row’s button starts its clock. The ≡ menu top right: exercise notes, Ask Allena, Modify (tune the load, swap, skip, superset), What is left, Save and exit, Discard.');
+  L.push('HOW TO: import a programme, a spreadsheet, Apple Health, Strava, Garmin or Hevy files → menu → Import your data. Change kg/lb → Settings → Units. Back up → Settings → Export a backup (and sign in under You for the automatic cloud backup). New programme → Train → + BUILD A PROGRAM. Morning readiness → the check-in Allena asks for in the morning. Ask about one session → a new chat → "Ask about a session". What Allena remembers → the Memory button at the top of this chat.');
+  return L.join('\n')}
+
+/* ── starter questions from their own data ────────────────────────── */
+function coachStarters(){
+  const out=[],add=q=>{if(q&&out.indexOf(q)<0&&out.length<4)out.push(q)};
+  try{
+    if(S.sess){add('Missed my reps — what now?');add('Add weight or hold?');add('Something hurts');add('Feeling flat today');return out}
+    try{const dd=(S.gar&&S.gar.days&&S.gar.days[today()])||{};if(dd.am!=null&&+dd.am<45)add('I feel flat today — what should I do?')}catch(e9){oops('starters.ready',e9)}
+    if(S.acl&&S.acl.on)add('What is holding me back from phase '+(Math.min(6,(+S.acl.phase||1)+1))+'?');
+    try{const goals=(S.goals||[]).filter(x=>!x.done);
+      const st=goals.map(x=>gBase(x.ex)).find(b=>liftStall(b)===true);
+      if(st)add('Why has my '+st.toLowerCase()+' stalled?')}catch(e9){oops('starters.stall',e9)}
+    try{const m=prMap(),wk=dayKey(new Date(Date.now()-7*864e5));
+      const h=(S.history||[]).filter(x=>m[String(x.id)]&&hKey(x)>=wk).slice(-1)[0];
+      if(h)add('What made my '+String(m[String(h.id)][0].ex).toLowerCase()+' PR happen?')}catch(e9){oops('starters.pr',e9)}
+    if((S.history||[]).some(h=>h.log&&h.log.length))add('What should I train today?');
+    if(runs().some(r=>!r.type||isRunType(r.type)))add('Should I run or lift today?');
+    add('How am I progressing?');
+    add('What do you know about me?');
+    add('How do I use this app?')}
+  catch(e){oops('coachStarters',e)}
+  return out}
+
+/* ── the system prompt ────────────────────────────────────────────── */
+function coachSys2(){
+  const P=[];
+  P.push('You are Allena, the coach inside the Allena training app (lifting, running and injury rehab, one recovery model across all three). You know this person well: the RECORD in the first message is everything their app holds from before today, and the RIGHT NOW block in their latest message is today. They should never have to explain their training to you; you already know it. Use it.');
+  P.push('HOW TO ANSWER: lead with the answer in plain, everyday words. Short sentences. Usually two to five sentences; longer only when they ask for a plan or an explanation. Use a short list only for steps. Name the number and the date it comes from ("your 82.5 kg × 5 on the 14th"). Talk to them, not about them. Never use their name. No emoji. No hype.');
+  P.push('TRUTH: never state a number that is not in the record or RIGHT NOW. If something they ask about is not there, say what is missing and how to add it in the app. Attributing a number to the wrong day or exercise is the one unforgivable error; when a SESSION UNDER DISCUSSION is given, answer about that session. A falling lift is never "a plateau" and never a reason to add load. A walk is never a run. Imported runs have no recorded effort.');
+  P.push('SAFETY: pain, numbness, tingling, swelling or the knee giving way means stop that exercise and talk to their physio or doctor; never diagnose. A physio’s plan always outranks the app’s suggestions. Rehab swaps only come from their own rehab programme. Never conflict with their stated restrictions.');
+  P.push('THE RULES THE APP RUNS ON: double progression (top of the rep range at RPE 9 or under on every set, then add load); RPE targets are ranges; missing reps at an easy effort means they stopped early, so hold the load; deload in week 6; 10 to 20 hard sets per muscle a week. Recovery counts runs, lifting and rehab together.'+
+    ((S.lib&&(S.lib.programs||[]).some(p=>p.id==='bench-1'))?' Their bench programme: wave 5 weeks (100×4 / 102.5×3 / 105×2 / 100×5 / 102.5×4), +2.5 kg per block; back-offs 90% of the top set; volume bench 87.5×4×8, to 90 when all four hit 8 at RPE 8 or under.':''));
+  P.push('THEIR APP, exactly as it looks for them:\n'+coachAppMap());
+  P.push('ACTIONS: you can add lines at the very end of a reply, each on its own line, in exactly these forms. The app turns them into buttons and never shows the line itself.\n'+
+    'OPEN|<place> — a button that takes them there. Use it whenever you tell them where something is or they want to do something in the app. Places: '+Object.keys(COACH_PLACES).filter(coachPlaceOk).join(', ')+'. Only these; at most two.\n'+
+    'ADJUST|<exercise name exactly as in their programme>|<kilograms, e.g. -2.5> — offers to change a programmed load. Kilograms always. At most one.\n'+
+    'REMEMBER|<one plain sentence> — saves a lasting fact about them to Allena’s memory: an injury, a preference, a schedule, an event, how their body responds, a goal. Use it whenever they tell you something worth knowing next time, or ask you to remember. Write it so it reads right months later, with a date if it matters ("Has a wedding on 14 Nov 2026"). Never for things the app already records (sets, runs, check-ins).\n'+
+    'FORGET|<the fact, in words> — removes a memory that is no longer true or that they ask you to drop.\n'+
+    'ASK|<a follow-up question they might tap next> — up to two, short, in their voice.\n'+
+    'WHAT YOU CANNOT DO: log or delete sets, runs or check-ins, change their programme beyond ADJUST, message their friends, or see anyone else’s data. If they ask, say so plainly and OPEN the place where they can do it themselves.');
+  if(coachToolsOn())P.push('LOOKING THINGS UP: the record carries every set for the last six weeks and summaries before that. For anything older or more detailed (a session in March, every run in a month, one whole day, a lift’s full history), call a tool rather than guess. Tool results are the app’s own record.');
+  return P.join('\n\n')+COACH_TONE}
+
+/* ── the request ──────────────────────────────────────────────────── */
+/* the record stays byte-identical for the whole chat (and the whole day),
+   so every reply after the first reads it from the cache */
+function coachDossierFor(co){
+  try{const stamp=today()+'|'+(S.prof&&S.prof.mem?S.prof.mem.length:0);
+    if(co.dos&&co.dos.stamp===stamp&&co.dos.text)return co.dos.text;
+    const text=coachDossier();co.dos={stamp:stamp,text:text};return text}
+  catch(e){oops('coachDossierFor',e);return ''}}
+/* eight messages of conversation plus three look-up rounds (two messages
+   each) stays inside the cloud function's sixteen-message window, so the
+   record at the front is never the part that gets cut */
+const COACH_TURNS=8,COACH_TOOL_ROUNDS=3;
+function coachRequest(co,q){
+  const th=(co.thread||[]).filter(m=>!m.err&&m.t);
+  /* the question was pushed onto the thread before this runs: it is the
+     last message, and it rides once, as THEIR MESSAGE below */
+  let past=th.slice(0,-1).slice(-(COACH_TURNS-1));
+  while(past.length&&past[0].r!=='user')past.shift();
+  const doc='THE RECORD (everything their Allena app holds from before today, written '+today()+'. Read it as what you already know about them. All weights in kilograms, distances in kilometres, dates local):\n\n'+coachDossierFor(co);
+  const now='RIGHT NOW (fresh as of this message):\n'+coachContext({noMem:true})+
+    (co.from?'\nThey opened this chat from the '+co.from+' screen.':'');
+  /* a failed turn is never sent back, which can leave two of theirs in a
+     row: one message each side, always alternating */
+  const msgs=[];
+  past.forEach(m=>{const role=m.r==='user'?'user':'assistant',L=msgs[msgs.length-1];
+    if(L&&L.role===role)L.content+='\n\n'+m.t;else msgs.push({role:role,content:String(m.t)})});
+  if(msgs.length&&msgs[msgs.length-1].role==='user')msgs.push({role:'assistant',content:'(no reply)'});
+  const head={type:'text',text:doc,cache_control:{type:'ephemeral'}};
+  const last=[{type:'text',text:now},{type:'text',text:'THEIR MESSAGE: '+q}];
+  if(msgs.length){msgs[0]={role:'user',content:[head,{type:'text',text:String(msgs[0].content)}]};msgs.push({role:'user',content:last})}
+  else msgs.push({role:'user',content:[head].concat(last)});
+  return{max_tokens:1000,model:(S.ai&&S.ai.model)||'claude-haiku-4-5-20251001',system:coachSys2(),messages:msgs}}
+/* the screen they came from, in their words — the chat is often opened to
+   ask "what is this" about the page that was just on screen */
+const COACH_FROM={home:'Train',crown:'Tree',social:'Race',progress:'Progress',acl:'Rehab',run:'Running',levers:'What moves your training',
+  points:'Your tree and points',history:'Workout log',me:'You',data:'Settings',session:'live session',crownx:'tree explorer',today:'Tree'};
+function coachFromName(v){return COACH_FROM[v]||''}
+
+/* ── looking things up ────────────────────────────────────────────────
+   Read-only tools, answered from the same record on this phone. Sent only
+   on a path that hands tool calls back intact: the user's own key, and the
+   signed-in cloud function (which forwards them once its new version is
+   pasted; until then it drops them and the chat answers from the record).
+   The manual cloud link reassembles text only, so it never gets them. */
+function coachToolsOn(){try{return !((S.ai&&S.ai.proxy)||'').trim()}catch(e){return false}}
+const COACH_TOOLS=[
+  {name:'find_sessions',description:'Every set of the lifting sessions between two dates (inclusive), newest last. Optionally only sessions containing one exercise. Use for anything older than six weeks or to compare particular days. Dates are YYYY-MM-DD, local.',
+   input_schema:{type:'object',properties:{from:{type:'string',description:'YYYY-MM-DD'},to:{type:'string',description:'YYYY-MM-DD'},exercise:{type:'string',description:'part of an exercise name, e.g. bench'},limit:{type:'integer',description:'at most 40'}},additionalProperties:false}},
+  {name:'find_runs',description:'Runs and other cardio between two dates (inclusive): distance, time, pace, type, heart rate, effort where they recorded one.',
+   input_schema:{type:'object',properties:{from:{type:'string'},to:{type:'string'},limit:{type:'integer'}},additionalProperties:false}},
+  {name:'day_detail',description:'Everything the record holds for one date: sessions with every set, runs, health signals (sleep, HRV, resting heart rate, steps, food, bodyweight), morning readiness, knee check-in and notes.',
+   input_schema:{type:'object',properties:{date:{type:'string',description:'YYYY-MM-DD'}},required:['date'],additionalProperties:false}},
+  {name:'lift_history',description:'One lift over its whole history: the best estimated max each week it was trained near its limit, and the top set of every session.',
+   input_schema:{type:'object',properties:{exercise:{type:'string'}},required:['exercise'],additionalProperties:false}}];
+const COACH_TOOL_MAX=12000;
+function coachDay(v){const s=String(v||'').trim();return /^\d{4}-\d{2}-\d{2}$/.test(s)?s:null}
+function coachTool(name,inp){
+  const U0=UNITS;
+  try{if(U0&&(U0.w!=='kg'||U0.d!=='km'))UNITS={w:'kg',d:'km'};
+    const o=coachToolBody(name,inp||{});
+    return o.length>COACH_TOOL_MAX?o.slice(0,COACH_TOOL_MAX)+'\n[cut here: ask for a narrower range]':o}
+  catch(e){oops('coachTool.'+name,e);return 'That look-up failed on the phone. Answer from the record instead.'}
+  finally{UNITS=U0}}
+function coachToolBody(name,I){
+  const lim=Math.max(1,Math.min(40,+I.limit||40));
+  const from=coachDay(I.from)||'0000-01-01',to=coachDay(I.to)||'9999-12-31';
+  if(name==='find_sessions'){
+    const want=String(I.exercise||'').toLowerCase().trim();
+    const rows=(S.history||[]).filter(h=>h&&!h.run&&Array.isArray(h.log)&&hKey(h)>=from&&hKey(h)<=to&&
+      (!want||h.log.some(l=>l&&String(l.ex||'').toLowerCase().indexOf(want)>=0)))
+      .sort((a,b)=>new Date(a.date).getTime()-new Date(b.date).getTime()).slice(-lim);
+    if(!rows.length)return 'No lifting sessions match.';
+    return rows.map(h=>h.log.length?sessLine(h,true)+(h.minutes?' ['+Math.round(h.minutes)+' min]':'')+(h.complete?'':' [not finished]')
+      :hKey(h)+' '+(h.dayTitle||'Session')+' (no sets logged)').join('\n')}
+  if(name==='find_runs'){
+    const rows=runs().filter(r=>{const d=String(r.date||'').slice(0,10);return d>=from&&d<=to}).slice(-lim);
+    if(!rows.length)return 'No runs or cardio match.';
+    return rows.map(r=>String(r.date).slice(0,10)+' '+(r.type||'run')+' '+cdN(r.km,2)+' km'+(r.mins?' '+Math.round(r.mins)+' min ('+paceStr(r.mins,r.km)+')':'')+
+      (r.hr?' avg HR '+r.hr:'')+(r.rpe&&!r.rpeEst&&!/^(imp|hk)/.test(String(r.id||''))?' effort '+r.rpe:'')+(r.note?' “'+r.note+'”':'')).join('\n')}
+  if(name==='day_detail'){
+    const d=coachDay(I.date);if(!d)return 'Give the date as YYYY-MM-DD.';
+    const L=['Date '+d+' ('+new Date(d+'T12:00').toLocaleDateString('en-AU',{weekday:'long'})+')'];
+    (S.history||[]).filter(h=>h&&!h.run&&Array.isArray(h.log)&&hKey(h)===d).forEach(h=>{
+      L.push('Session: '+(h.log.length?sessLine(h,true):(h.dayTitle||'Session')+' (no sets logged)')+(h.minutes?' ['+Math.round(h.minutes)+' min]':''));
+      if(h.exNotes)Object.keys(h.exNotes).forEach(k=>L.push('Note on '+k+': “'+h.exNotes[k]+'”'))});
+    runs().filter(r=>String(r.date||'').slice(0,10)===d).forEach(r=>L.push((r.type||'Run')+': '+cdN(r.km,2)+' km'+(r.mins?' in '+Math.round(r.mins)+' min':'')+(r.hr?', avg HR '+r.hr:'')));
+    try{if(typeof SIG_KINDS!=='undefined'){const t=new Date(d+'T12:00').getTime();
+      SIG_KINDS.forEach(k=>{const p=sigSeries(k,{partial:true}).find(x=>x.t===t);if(p)L.push(k.k+': '+cdN(p.v,Math.abs(p.v)<20?1:0)+(k.u||''))})}}
+    catch(e9){oops('coachTool.sig',e9)}
+    try{const g=(S.gar&&S.gar.days&&S.gar.days[d])||{};if(g.am!=null)L.push('Morning readiness: '+g.am)}catch(e9){oops('coachTool.ready',e9)}
+    try{const c=checkins().find(x=>x.date===d);if(c)L.push('Knee check-in: pain '+c.pain+(c.stiff!=null?', stiffness '+c.stiff:'')+(c.conf!=null?', confidence '+c.conf:'')+(c.swell===true||+c.swell>0?', swollen':', no swelling'))}
+    catch(e9){oops('coachTool.chk',e9)}
+    return L.length>1?L.join('\n'):L[0]+': nothing recorded that day.'}
+  if(name==='lift_history'){
+    const want=String(I.exercise||'').toLowerCase().trim();if(!want)return 'Name the exercise.';
+    const bases={};(S.history||[]).forEach(h=>{if(h&&!h.run&&h.log)h.log.forEach(l=>{if(l&&l.ex&&String(l.ex).toLowerCase().indexOf(want)>=0)bases[gBase(l.ex)]=1})});
+    const B=Object.keys(bases);if(!B.length)return 'No sets of anything matching "'+I.exercise+'".';
+    const L=[];
+    B.slice(0,3).forEach(b=>{L.push('== '+b+' ==');
+      try{const T=liftTrend(b);if(T&&T.pts&&T.pts.length)L.push('Best estimated max by week: '+T.pts.map(p=>p.k+' '+Math.round(p.v)).join(', '))}catch(e9){oops('coachTool.trend',e9)}
+      const top=[];(S.history||[]).filter(h=>h&&!h.run&&h.log).sort((a,c)=>new Date(a.date).getTime()-new Date(c.date).getTime()).forEach(h=>{
+        let t=null;h.log.forEach(l=>{if(l&&gBase(l.ex)===b&&l.w>0&&l.r>0){const e=e1rm(+l.w,+l.r,l.rpe);if(!t||e>t.e)t={e:e,l:l}}});
+        if(t)top.push(hKey(h)+' '+entryKg(t.l))});
+      L.push('Top set each session: '+top.slice(-60).join('; '))});
+    return L.join('\n')}
+  return 'Unknown look-up.'}
 const A={};
 A.nav=v=>{if(v!=='session'&&S.sess&&S.sess.phase==='resting'){/* the timer keeps running; the beep is rescheduled on return */}
   if(v!=='findings')S.discLensShow=null;
@@ -7594,11 +8146,8 @@ function trunkProgram(){return {id:'trunk-1',kind:'posture',block:'Trunk & Low B
      sets:{'default':p.secs?hold(p.secs,3,p.perSide):reps(8,3,p.perSide)}})).concat([
      {name:'Walking',rest:0,cue:'Brisk, upright, arms swinging. The single best thing for a cranky back.',sets:{'default':hold(300,1)}}])}]}}
 const COACH_TONE=' TONE — intelligently motivating, never cheap: praise must be specific and earned, anchored to a real number, comparison or streak from the context ("that 62.5 was your first time past 60" beats "great work!"); generic hype, "crushing it", "beast mode" and exclamation marks doing the work of substance are banned. Read the room before you push: if the context shows low readiness, poor sleep, a pain note, missed days or a comeback, lead with permission and perspective — name what still counts and offer the smart smaller version — never a rally cry. Never shame a gap or a miss. Effort at low readiness deserves more credit, not less. The strongest motivation you can give is evidence: show them their own data moving.'
-function coachSys(){
-  if(S.prof&&S.prof.goal){const p=S.prof;
-    return 'You are Allena, the coach inside this training app. User: '+(p.name||'user')+', '+(p.sex||'')+', age '+p.age+', experience '+p.exp+'. Goal: '+p.goal+'. Equipment: '+p.eq+'. Restrictions: '+(restrList(p)||'none')+(p.notes?'; notes: '+p.notes:'')+'. Double progression: top of rep range @RPE<=9 on all sets -> add load; wk6 deload. Never conflict with the restrictions. Pain/numbness/tingling -> stop, see a professional. Under 80 words; one concrete call first, then one line why. If a programmed load should change, end with a line exactly like ADJUST|<exercise name>|<number> where the number is kilograms, e.g. ADJUST|Bench — back-off|-2.5. When the context contains A SESSION UNDER DISCUSSION, every answer is about that session unless the user clearly asks otherwise; background data may only be used by naming its date, and attributing a number to the wrong day or exercise is the one unforgivable error. Questions about the app itself — points, levels, the witnessed/live system, discoveries, the tree, quests — are IN SCOPE: answer them plainly from the POINTS line in the context, and if someone asks how to game the points, tell them the honest truth (implausible data earns nothing, the day cap makes grinding pointless, and only witnessed work will ever compete).'+COACH_TONE}
-  if(S.lib.programs.some(p=>p.id==='bench-1'))return COACH_SYS+' Questions about the app itself — points, levels, the witnessed/live system, discoveries, the tree, quests — are IN SCOPE: answer them plainly from the POINTS line in the context, and if someone asks how to game the points, tell them the honest truth (implausible data earns nothing, the day cap makes grinding pointless, and only witnessed work will ever compete).'+COACH_TONE;
-  return 'You are Allena, an evidence-based strength coach inside a training app. NEVER state a number you were not given — if it is not in the CONTEXT block, say what is missing instead of estimating. Ground calls in the strongest research (progressive overload, 10-20 hard sets/muscle/wk, RPE proximity-to-failure, 48-72h recovery) and the lifter\'s own logged data; admit when evidence is weak - never invent citations. Encourage balance across muscles. Double progression: top of range @RPE<=9 on all sets -> add load; wk6 deload. Pain/numbness/tingling -> stop, see a professional. Under 80 words; one concrete call first, then one line why. If a programmed load should change, end with ADJUST|<exercise>|<+/-kg>. When the context contains A SESSION UNDER DISCUSSION, every answer is about that session unless the user clearly asks otherwise; background data may only be used by naming its date, and attributing a number to the wrong day or exercise is the one unforgivable error. Questions about the app itself — points, levels, the witnessed/live system, discoveries, the tree, quests — are IN SCOPE: answer them plainly from the POINTS line in the context, and if someone asks how to game the points, tell them the honest truth (implausible data earns nothing, the day cap makes grinding pointless, and only witnessed work will ever compete).'+COACH_TONE}
+/* the chat's system prompt is coachSys2() in 02d-coach-brain.js (1 Oct 2026):
+   one prompt for every account, with the bench programme's wave folded in */
 function profDeduce(){
   /* the first flex: Allena reads the imported history and fills the
      questionnaire from evidence — frequency from real weeks, style
@@ -9645,6 +10194,23 @@ function actChip(m,i){
   return '<div style="margin-top:8px">'+
     (done?'<span class="mono" style="color:var(--green);font-size:11px">✓ '+(m.act.kg>0?'+':'')+uwNum(m.act.kg)+' '+uwUnit()+' applied to '+esc(m.act.ex)+'</span>'
          :'<button data-a="coachApply" data-v="'+i+'" class="pill" style="border-color:var(--amber);color:var(--amber);font-size:13px">Apply '+(m.act.kg>0?'+':'')+uwNum(m.act.kg)+' '+uwUnit()+' to '+esc(m.act.ex.replace(/ — .*/,''))+'</button>')+'</div>'}
+/* what a reply carries besides its words (1 Oct 2026): doors into the app,
+   what it just remembered (with an undo), and follow-ups to tap. The
+   follow-ups ride only the newest reply; an old one is history. */
+function coachExtras(m,i,isLast){
+  let h='';
+  try{
+    const go=(m.go||[]).filter(k=>COACH_PLACES[k]);
+    if(go.length)h+='<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:10px">'+go.map(k=>
+      '<button data-a="coachGo" data-v="'+esc(k)+'" class="pill" style="border-color:var(--amber);color:var(--amber);font-size:13px">'+esc(COACH_PLACES[k].l)+' \u203a</button>').join('')+'</div>';
+    (m.mem||[]).forEach(x=>{h+='<div style="display:flex;align-items:center;gap:8px;margin-top:8px;font-size:13px;color:var(--faint)">'+
+      '<span style="flex:1;min-width:0">'+(x.undone?'<s>Remembered: '+esc(x.t)+'</s>':'Remembered: '+esc(x.t))+'</span>'+
+      (x.undone?'':'<button data-a="memDel" data-v="'+esc(x.id)+'" class="mono" style="color:var(--amber);font-size:11px;flex:none">Undo</button>')+'</div>'});
+    (m.forgot||[]).forEach(t=>{h+='<p style="margin-top:8px;font-size:13px;color:var(--faint)">Forgot: '+esc(t)+'</p>'});
+    if(isLast&&(m.ask||[]).length)h+='<div style="display:flex;flex-direction:column;gap:6px;margin-top:12px">'+m.ask.map(q=>
+      '<button data-a="coachChip" data-v="'+esc(q)+'" class="card" style="width:100%;text-align:left;padding:9px 13px;font-size:13px;color:var(--dim);margin:0">'+esc(q)+'</button>').join('')+'</div>'}
+  catch(e){oops('coachExtras',e)}
+  return h}
 function wordFlow(html){
   /* wrap the text nodes of rendered markdown in staggered spans so the
      reply reads out word by word; tags stay intact. Delay is capped so
@@ -9664,11 +10230,15 @@ function viewCoach(){
   h+='<div class="chathead"><div style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 18px">'+
    '<div style="min-width:0;display:flex;align-items:center;gap:8px"><img class="mk" src="'+MARK+'" alt="" style="width:22px;height:22px;object-fit:contain">'+
    '<span class="disp brand" style="font-size:20px;font-weight:600">Allena</span>'+
-   '<span class="mono" style="color:var(--faint);font-size:var(--t-caption);letter-spacing:.06em;text-transform:uppercase">'+(aiReady()?((S.ai.proxy||'').trim()?'Allena cloud':(S.ai.model.indexOf('haiku')>=0?'Haiku':'Sonnet')):'Claude app')+'</span></div>'+
+   /* which model answers is said before the first message; once a chat is
+      open its buttons need the room (the name was being cut to "Alle") */
+   (th.length?'':'<span class="mono" style="color:var(--faint);font-size:var(--t-caption);letter-spacing:.06em;text-transform:uppercase">'+(aiReady()?((S.ai.proxy||'').trim()?'Allena cloud':(S.ai.model.indexOf('haiku')>=0?'Haiku':'Sonnet')):'Claude app')+'</span>')+'</div>'+
    '<div style="display:flex;gap:8px;flex:none">'+
    /* THE ONE DOOR TO DELETE A SAVED CHAT (Phase 2c, 20 Sep 2026): the
       drawer's Recents list — and its own ✕ per row — left with the
       hide list; a chat you have reopened still needs a way to go. */
+   /* memory is an icon: four words of buttons already crowd the name off the header */
+   '<button data-a="memOpen" class="chatbtn" aria-label="What Allena remembers" style="padding:7px 10px"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="display:block"><path d="M12 5a3 3 0 1 0-5.997.125 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z"/><path d="M12 5a3 3 0 1 1 5.997.125 4 4 0 0 1 2.526 5.77 4 4 0 0 1-.556 6.588A4 4 0 1 1 12 18Z"/><path d="M15 13a4.5 4.5 0 0 1-3-4 4.5 4.5 0 0 1-3 4"/></svg></button>'+
    (S.coach.chatId?'<button data-a="chatDelAsk" data-v="'+esc(S.coach.chatId)+'" class="chatbtn" style="color:var(--faint)">Delete</button>':'')+
    (th.length?'<button data-a="coachClear" class="chatbtn">New</button>':'')+
    '<button data-a="coachClose" class="chatbtn">Close</button></div></div></div>';
@@ -9680,18 +10250,15 @@ function viewCoach(){
   if(!th.length){
     const topic=S.coachTopic||'program';
     const recent=(topic==='program')?S.history.filter(x=>x.log.length).slice(-6).reverse():[];
-    const CHIPS={
-      progress:['Am I actually progressing?','Which lift is stalling and why?','Is my body composition going the right way?','What should I change next block?'],
-      rehab:['What is holding me back from the next phase?','How do I train to pass the quad test?','Is my knee reacting too much?','What does this test actually measure?'],
-      program:['What should I train today?','Should I run today?','Am I recovered enough for this?','I missed a session — what now?'],
-      session:['Missed my reps — what now?','Feeling flat today','Something hurts','Add weight or hold?']};
+    /* the openers come from their own data (coachStarters in 02d): a
+       stalled lift, a PR this week, the next rehab phase, today's flat
+       morning; the topic only decides the line above them */
+    const starters=coachStarters();
     h+='<p style="color:var(--dim);font-size:15px;line-height:1.6">'+
-      (topic==='progress'?'Ask me about your progress — I can see your trends, goals and scans.'
-       :topic==='rehab'?'Ask me about your rehab — I can see your phase, gate and test results.'
-       :topic==='session'?'Ask me about this session.'
-       :'Ask me about your program — I can see this week, your recovery and what is left.')+'</p>'+
+      (topic==='session'?'Ask me about this session. I can see every set so far.'
+       :'Ask me anything about your training. I already know your record, so you never have to explain it.')+'</p>'+
       '<div style="display:flex;flex-direction:column;gap:8px;margin-top:12px">'+
-      (CHIPS[topic]||CHIPS.program).map((q,qi)=>'<button data-a="askChip" data-v="'+esc(q)+'" class="card msg-in" style="width:100%;text-align:left;padding:11px 14px;font-size:13px;color:var(--dim);animation-delay:'+(qi*0.06).toFixed(2)+'s">'+esc(q)+'</button>').join('')+'</div>';
+      starters.map((q,qi)=>'<button data-a="coachChip" data-v="'+esc(q)+'" class="card msg-in" style="width:100%;text-align:left;padding:11px 14px;font-size:13px;color:var(--dim);animation-delay:'+(qi*0.06).toFixed(2)+'s">'+esc(q)+'</button>').join('')+'</div>';
     if(recent.length){
       h+='<button data-a="coachSessToggle" class="card" style="width:100%;text-align:left;padding:12px 14px;margin-top:16px;display:flex;align-items:center;gap:12px">'+
         '<span style="flex:1;font-size:13px;font-weight:600">Ask about a session</span>'+
@@ -9720,7 +10287,7 @@ function viewCoach(){
       if(speak)render.__spokeId=(S.coach.id||'c')+':'+i;
       return m.r==='user'
       ?'<div class="msg-u'+inn+'">'+esc(m.t)+'</div>'
-      :'<div class="msg-a'+inn+'">'+(speak?wordFlow(md(m.t)):md(m.t))+actChip(m,i)+'</div>'}).join('')+
+      :'<div class="msg-a'+inn+'">'+(speak?wordFlow(md(m.t)):md(m.t))+actChip(m,i)+coachExtras(m,i,i===th.length-1&&!S.coach.busy)+'</div>'}).join('')+
      (S.coach.busy?'<div class="tdots msg-in"><span></span><span></span><span></span></div>':'');
   h+='</div>';
   h+='<div class="chatbar"><div class="composer">'+
@@ -37007,7 +37574,7 @@ function dataRaw(){
      return '<div class="card mt" style="padding:13px 15px'+(on?';border-color:var(--greensoft)':'')+'">'+
        '<p style="font-size:13px;font-weight:600">Sending to the AI: '+(on?'allowed':'not allowed yet')+'</p>'+
        '<p style="color:var(--dim);font-size:13px;line-height:1.55;margin-top:4px">'+
-       (on?'The coach, the deep read and photo reads may send your question and the training behind it. Nothing else in Allena sends anything.'
+       (on?'The chat sends your training record with each question, the deep read the patterns it reads, a photo read the picture. Nothing else in Allena sends anything.'
          :'Allena will ask before it sends anything the first time you use the coach, a deep read or a photo read.')+'</p>'+
        (on?'<button data-a="aiOkOff" class="btn mt" style="color:var(--dim);font-size:13px">Stop sending — ask me again</button>':'')+
        '</div>'})()+'</div>'+
@@ -37926,15 +38493,31 @@ function sheetHtml(){
     /* the first-send question. Plain register: this is an everyday
        surface and the reader is standing in a gym. It names what goes,
        where it goes, what does not go, and gives a real no. */
-    return wrapSheet('Before Allena asks the AI',
-      '<p style="color:var(--dim);font-size:13px;line-height:1.65">This part of Allena runs on Anthropic\u2019s models, which means it has to send them something. Everything else in the app \u2014 the statistics, the findings, the recovery model \u2014 runs on your phone and always will.</p>'+
+    const was9=!!(S.ai&&S.ai.ok);   // said yes to the narrower first version
+    return wrapSheet(was9?'Allena\u2019s chat now reads your whole record':'Before Allena asks the AI',
+      (was9?'<p style="color:var(--dim);font-size:13px;line-height:1.65">You said yes before, when the chat only saw your recent training. Now it reads everything your app holds, so you never have to explain your training to it. That is a bigger thing to send, so Allena is asking again.</p>':
+      '<p style="color:var(--dim);font-size:13px;line-height:1.65">This part of Allena runs on Anthropic\u2019s models, which means it has to send them something. Everything else in the app \u2014 the statistics, the findings, the recovery model \u2014 runs on your phone and always will.</p>')+
       '<p class="eyebrow" style="margin-top:20px">What gets sent</p>'+
-      '<p style="color:var(--dim);font-size:13px;line-height:1.6;margin-top:4px">Your question, and a summary of your recent training and body to answer it: exercise names, weights, reps, effort, recent sessions and runs, your readiness, body scan numbers, your rehab status and pain flags, and the notes you wrote on exercises and limitations. For a photo read, the picture you picked. The last eight messages of the chat, yours and Allena’s, so it can follow the conversation.</p>'+
+      '<p style="color:var(--dim);font-size:13px;line-height:1.6;margin-top:4px">For the chat: your training record, so it can answer without you explaining. That is your sessions with every set (exercise names, weights, reps, effort), runs, your programme and goals, readiness and Apple Health numbers like sleep and heart rate, body scan numbers and blood results, your rehab status, check-ins and pain flags, the notes you wrote, and the things you asked Allena to remember. Plus your question and the last eight messages of the chat, yours and Allena\u2019s, so it can follow the conversation. The deep read sends the patterns it reads. For a photo read, the picture you picked.</p>'+
       '<p class="eyebrow" style="margin-top:16px">What does not</p>'+
-      '<p style="color:var(--dim);font-size:13px;line-height:1.6;margin-top:4px">Your whole history. Your name or email. It is not used to train models, and it is not kept for anything else.</p>'+
+      '<p style="color:var(--dim);font-size:13px;line-height:1.6;margin-top:4px">Your name or email, or your sign-in. It goes only when you ask something, it is not used to train models, and it is not kept for anything else.</p>'+
       '<button data-a="aiOkGo" class="big disp mt" style="background:var(--amber);color:var(--bg);font-size:15px">Yes, go ahead</button>'+
       '<button data-a="aiOkNo" class="btn mt" style="color:var(--dim);font-size:13px">Not now</button>'+
       '<p style="color:var(--faint);font-size:11px;line-height:1.5;margin-top:12px">Asked once. You can turn it back off in Settings, and every other part of Allena works either way.</p>')}
+  /* WHAT ALLENA REMEMBERS (1 Oct 2026): every fact the chat saved, with
+     the day it was said and a delete on each. Memory that cannot be seen
+     and removed is surveillance, not memory. */
+  if(S.sheet.t==='chatmem'){
+    const M=coachMemList().slice().reverse();
+    let inner='<p style="color:var(--dim);font-size:13px;line-height:1.6">Things you told Allena that are worth knowing next time. Your training record is separate: Allena always reads that.</p>';
+    inner+=M.length?'<div style="margin-top:14px;display:flex;flex-direction:column;gap:8px">'+M.map(m=>
+      '<div class="card" style="padding:12px 14px;display:flex;align-items:flex-start;gap:12px;margin:0">'+
+      '<span style="flex:1;min-width:0"><span style="display:block;font-size:15px;line-height:1.45">'+esc(m.t)+'</span>'+
+      '<span class="mono" style="display:block;color:var(--faint);font-size:11px;margin-top:4px">'+esc(fmtDate(m.d+'T12:00'))+'</span></span>'+
+      '<button data-a="memDel" data-v="'+esc(m.id)+'" aria-label="Forget this" style="color:var(--faint);font-size:17px;padding:0 4px;flex:none;min-width:32px;min-height:32px">\u00d7</button></div>').join('')+'</div>'+
+      '<button data-a="memClearAsk" class="btn mt2" style="color:var(--dim);font-size:13px">Forget everything</button>'
+      :'<p style="color:var(--faint);font-size:13px;line-height:1.6;margin-top:14px">Nothing yet. Tell Allena something worth knowing, like an injury, a schedule or how you like to train, and it keeps it here. You can delete any of it.</p>';
+    return wrapSheet('What Allena remembers',inner)}
   if(S.sheet.t==='aclgate')return aclGateSheet();
   if(S.sheet.t==='flares'){
     const list=(S.acl.flares||[]).slice().reverse();
@@ -41429,6 +42012,84 @@ tickEvery(function(){try{
     if(live&&layer&&!settling)end();else clear()},{passive:true});
 })();
 
+/* ── SWIPE BETWEEN EXERCISES (owner, 1 Oct 2026: "should be able to
+   swipe through the session pages as well") ──────────────────────
+   A sideways swipe on the session table is the arrow at the foot,
+   nothing more: it calls sessExStep, so the pin, the rest clock and
+   the set in play behave exactly as a tap on the arrow would. The
+   table follows the finger; the header and the bar at the foot stay
+   put (the fixed instrument law). Nothing that way resists instead of
+   travelling. Width is read once, on touchstart; a scroll wins ties,
+   the same 1.5x rule as the page pager. A hold, an open sheet or the
+   open effort list never swipes, and reduced motion jumps. */
+(function(){
+  let x0=null,y0=null,live=false,dx=0,W=375,t0=0,body=null,ends=[false,false],pending=0,settling=false;
+  const reduced=()=>{try{return !!(window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches)}catch(e){return false}};
+  function clear(){
+    try{if(pending){cancelAnimationFrame(pending);pending=0}}catch(e){oops('sxRaf',e)}
+    try{if(body){body.style.transition='';body.style.transform='';body.style.willChange=''}}catch(e){oops('sxClear',e)}
+    x0=null;live=false;dx=0;body=null}
+  document.addEventListener('touchstart',e=>{
+    if(settling)return;
+    clear();
+    const s=S.sess;
+    if(S.view!=='session'||!s||s.phase==='hold'||S.sheet||S.drawerOpen||S.rpeAsk!=null)return;
+    const b=e.target.closest&&e.target.closest('.sessbody');if(!b)return;
+    if(e.target.closest('[data-scrub],[data-draglist],select,textarea'))return;
+    let plan=[],k=-1;
+    try{plan=A.exPlan();k=plan.findIndex(x=>x.exNo===sessShownEx(s))}catch(e9){oops('sxPlan',e9);return}
+    if(plan.length<2||k<0)return;
+    ends=[k>0,k<plan.length-1];   /* [has previous, has next] */
+    const t=e.touches[0];
+    x0=t.clientX;y0=t.clientY;t0=Date.now();body=b;
+    W=window.innerWidth||375},{passive:true});
+  document.addEventListener('touchmove',e=>{
+    if(live&&e.cancelable)e.preventDefault()},{passive:false});
+  document.addEventListener('touchmove',e=>{
+    if(x0==null||settling)return;
+    const t=e.touches[0],ddx=t.clientX-x0,ddy=t.clientY-y0;
+    if(!live){
+      if(Math.abs(ddy)>16||Math.abs(ddx)<Math.abs(ddy)*1.5){x0=null;return}
+      if(Math.abs(ddx)<18)return;
+      live=true;
+      /* a swipe is not a tap on the field it started on */
+      try{const a=document.activeElement;if(a&&a.blur&&body&&body.contains(a))a.blur()}catch(e9){oops('sxBlur',e9)}
+      if(!reduced()&&body){body.style.transition='none';body.style.willChange='transform'}}
+    dx=ddx;
+    if(reduced())return;
+    const can=dx<0?ends[1]:ends[0];
+    const v=can?dx:dx*0.32;
+    if(!pending)pending=requestAnimationFrame(()=>{pending=0;if(body)body.style.transform='translate3d('+v+'px,0,0)'})},{passive:true});
+  function end(){
+    if(!live){clear();return}
+    const d=dx<0?1:-1,can=d>0?ends[1]:ends[0];
+    const dt=Math.max(1,Date.now()-t0);
+    const go=can&&(Math.abs(dx)>W*0.25||Math.abs(dx)/dt>0.45);
+    if(reduced()||!body){clear();if(go){try{vib(8)}catch(e){oops('sxVib',e)}runAction('sessExStep',d)}return}
+    const b=body,ease='cubic-bezier(.32,.72,0,1)';
+    try{if(pending){cancelAnimationFrame(pending);pending=0}}catch(e){oops('sxRaf2',e)}
+    settling=true;
+    if(!go){
+      b.style.transition='transform 220ms '+ease;b.style.transform='translate3d(0,0,0)';
+      setTimeout(()=>{settling=false;clear()},240);return}
+    const ms=Math.max(140,Math.min(260,Math.round((W-Math.abs(dx))*0.6)));
+    b.style.transition='transform '+ms+'ms '+ease;
+    b.style.transform='translate3d('+(d>0?-W:W)+'px,0,0)';
+    setTimeout(()=>{
+      settling=false;clear();
+      try{vib(8)}catch(e){oops('sxVib',e)}
+      runAction('sessExStep',d);
+      /* the next exercise arrives from the side the finger pushed toward */
+      try{const n=document.querySelector('.sessbody');
+        if(n){n.style.transition='none';n.style.transform='translate3d('+(d>0?W:-W)*0.35+'px,0,0)';n.style.opacity='0';
+          requestAnimationFrame(()=>requestAnimationFrame(()=>{
+            n.style.transition='transform 280ms '+ease+',opacity 200ms ease-out';n.style.transform='';n.style.opacity='';
+            setTimeout(()=>{n.style.transition=''},300)}))}}
+      catch(e){oops('sxIn',e)}},ms+10)}
+  document.addEventListener('touchend',end,{passive:true});
+  document.addEventListener('touchcancel',()=>{if(live&&!settling)end();else clear()},{passive:true});
+})();
+
 /* drag any bottom sheet down to close it (owner call, Sep 2026):
    once the sheet's own scroll is at the top it follows the finger,
    the scrim fades with it, and past the threshold it slides out —
@@ -43103,8 +43764,23 @@ function runAction(a,v,t,e){
     /* the read has its own room now (15 Sep) — it is no longer a scroll
        target on the second lens of another page */
     case 'deepGo':{const _f=S.view;S.drawerOpen=false;S.backTo=_f;S.backDrawer=true;S.view='deep';render();break}
-    case 'chatNew':{S.coachBack=S.view;S.drawerOpen=false;chatNew();render();break}
-    case 'chatOpen':{S.coachBack=S.view;S.drawerOpen=false;chatOpen(v);render();break}
+    case 'chatNew':{S.coachBack=S.view;S.drawerOpen=false;chatNew();S.coach.from=coachFromName(S.coachBack);render();break}
+    case 'chatOpen':{S.coachBack=S.view;S.drawerOpen=false;chatOpen(v);S.coach.from=coachFromName(S.coachBack);render();break}
+    /* a place the chat offered: checked again on the tap, since a reply can
+       outlive the session or the setting that made the place real */
+    case 'coachGo':{const k=String(v||'');
+      if(!coachPlaceOk(k)){flash('That part of the app is not open for you right now.');break}
+      const pl=COACH_PLACES[k];chatSaveCurrent();
+      /* a room is entered through nav, which stamps the chat as where Back
+         goes; a sheet opens over the chat, so closing it lands back here */
+      if(pl.a==='drawerNav')runAction('nav',pl.v);else runAction(pl.a,pl.v);break}
+    case 'memOpen':{S.sheet={t:'chatmem'};render();break}
+    case 'memDel':{if(coachMemDel(String(v||''))){
+        /* the chip under the reply that saved it shows it was undone */
+        (S.coach.thread||[]).forEach(m=>(m.mem||[]).forEach(x=>{if(x.id===v)x.undone=1}));chatSaveCurrent()}
+      render();break}
+    case 'memClearAsk':S.confirm={t:'Forget everything Allena remembers?',d:'Your training record stays. Only the things you told Allena in chats go.',ok:'Forget it all',no:'Keep it',go:'memClear',v:''};S.sheet={t:'confirm'};render();break;
+    case 'memClear':{coachMemSave([]);S.sheet=null;render();flash('Allena has forgotten what you told it. Your training record is untouched.');break}
     case 'coachSessToggle':{S.coachSessOpen=!S.coachSessOpen;render();break}
     case 'ibRuns':{const ib=S.intakeBoth;if(!ib)break;
       S.intakeBoth=null;
@@ -43280,7 +43956,7 @@ function runAction(a,v,t,e){
       const ex=S.lib.programs.findIndex(x=>x.id===pr.id);
       if(ex>=0)S.lib.programs[ex]=pr;else S.lib.programs.push(pr);
       saveLib();A.preview(0,pr.id);break}
-    case 'aiOkGo':{S.ai=S.ai||{};S.ai.ok=1;lset(K_AI,S.ai);S.sheet=null;
+    case 'aiOkGo':{S.ai=S.ai||{};S.ai.ok=AI_CONSENT_V;lset(K_AI,S.ai);S.sheet=null;
       const la=S._lastAct,rs=S._aiResume;S._lastAct=null;S._aiResume=null;
       /* a file read asked for this, not a tap: resume the read itself (M-24) */
       if(typeof rs==='function'){render();try{rs()}catch(e9){oops('aiOkGo.resume',e9);flash('That didn’t work — Allena wrote down why, under Settings → Diagnostics.')}}
@@ -44499,11 +45175,10 @@ function runAction(a,v,t,e){
       while(n-->0&&A.moveEx(no,dir))moved=true;
       if(moved){vib(10);render()}break}
     case 'deferEx':S.sheet=null;A.deferEx();break;
-    case 'coachOpen':S.coachBack=S.view;
+    case 'coachOpen':S.coachBack=S.view;S.coach.from=coachFromName(S.view);
       S.coachTopic=(S.view==='progress'?'progress':(S.view==='acl'||S.view==='proto'||S.view==='aclpath')?'rehab':S.view==='session'?'session':'program');
       if(!S.coach.thread.length)S.coach.sent=false;
       S.sheet=null;S.view='coach';render();break;
-    case 'askChip':{S.coach.input=dv;render();break}
     case 'coachClose':S.view=(S.coachBack==='session'&&S.sess)?'session':(S.coachBack||'home');render();break;
     case 'coachApply':{const m=S.coach.thread[+v];if(!m||!m.act||m.act.applied)break;
       const prog=activeProg();let name=m.act.ex;
