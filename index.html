@@ -1869,7 +1869,7 @@ if(S.sess){S.note=S.sess.note||S.note;
       if(c0&&(s0.log||[]).some(l=>l.ex===c0.ex&&l.setNo===c0.setNo)){const n0=sessAdv(s0);
         if(n0<0)s0.phase='done';else s0.idx=n0}}catch(e){oops('bootSess',e)}
     if(S.sess.phase!=='done')S.sess.phase='ready'}}
-const BUILD_ID='6d8f20';  // stamped by tools/build.py with the content hash
+const BUILD_ID='d6f1f0';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -4009,6 +4009,7 @@ async function askClaude(q){
     if(P.go.length)msg.go=P.go;
     if(P.ask.length)msg.ask=P.ask.slice(0,2);
     if(P.log)msg.log=P.log;   // a proposal only: coachLogGo opens it for them to check
+    if(P.edit)msg.edit=P.edit;   // a plan change, replayed and waiting for their yes (02e)
     /* memory is written the moment it is said, and shown with its undo:
        remembering is visible, never silent (the "remembered" moment) */
     const saved=P.mem.map(coachMemAdd).filter(Boolean);
@@ -6529,7 +6530,8 @@ function podSheet(){
                     new storage key: the profile already rides backup and
                     restore, and memory is the user's own record.
    coachParse()     the reply's action lines: OPEN a place, REMEMBER or
-                    FORGET a fact, ASK a follow-up. ADJUST stays in 02.
+                    FORGET a fact, ASK a follow-up, LOG a session they
+                    told it about, EDIT their plan (02e). ADJUST stays in 02.
 
    What never goes: the user's name or email (the consent sheet promises
    it), sign-in tokens, anything from another account. */
@@ -6584,15 +6586,20 @@ function coachDossierBody(U){
 
   sec('What Allena remembers (things they told you; newest last)',()=>coachMemList().map(m=>'- ('+m.d+') '+m.t).join('\n'));
 
+  /* every session and every week of the block, by number and name, so a
+     plan change (EDIT) can name exactly what it touches */
   sec('Their programme',()=>{
     const p=activeProgSafe();if(!p||p.empty)return 'No programme set up.';
-    const L=['"'+(p.block||'Programme')+'", '+(p.weeks||1)+' week'+((p.weeks||1)===1?'':'s')+', now on week '+(S.week||1)+'.'];
-    (p.days||[]).forEach(d=>{
-      const ex=(d.exercises||[]).map(e=>{const ss=setsForWeek(e,S.week||1)||[];return e.name+' '+coachPrescr(ss)}).filter(Boolean);
-      L.push('- '+d.name+': '+ex.join('; '))});
+    const W=+p.weeks||1;
+    const L=['"'+(p.block||'Programme')+'", '+W+' week'+(W===1?'':'s')+', now on week '+(S.week||1)+'. Its sessions in order (written prescription; Allena\u2019s load changes are listed after):'];
+    (p.days||[]).forEach((d,i)=>{
+      L.push('- Session '+(i+1)+' "'+d.name+'":');
+      (d.exercises||[]).forEach(e=>L.push('    '+e.name+': '+ceWeekly(e,W)))});
     if(p.adj&&Object.keys(p.adj).length)L.push('Loads Allena has moved from the written plan: '+Object.keys(p.adj).map(k=>k+' '+(p.adj[k]>0?'+':'')+p.adj[k]+' kg').join(', '));
-    const others=(S.lib.programs||[]).filter(x=>x.id!==p.id&&!x.archived).map(x=>x.block||x.name||x.id);
-    if(others.length)L.push('Also in their library: '+others.join(', '));
+    try{mainProgs().filter(x=>x.id!==p.id).forEach(x=>L.push('Also in their library: "'+(x.block||x.id)+'", '+(+x.weeks||1)+' weeks, sessions: '+(x.days||[]).map((d,i)=>(i+1)+' "'+d.name+'"').join(', ')))}
+    catch(e){oops('coachDossier.lib',e)}
+    const sup=(S.lib.programs||[]).filter(x=>x.id!==p.id&&!x.archived&&mainProgs().indexOf(x)<0).map(x=>x.block||x.name||x.id);
+    if(sup.length)L.push('Rehab and support plans (yours to read, never to change): '+sup.join(', '));
     return L.join('\n')});
 
   sec('Goals',()=>(S.goals||[]).map(g=>{let st=null;try{st=goalStats(g)}catch(e9){oops('coachDossier.goal',e9)}
@@ -6852,13 +6859,16 @@ function coachPlaceOk(k){
    Read only at the start of a line, kept out of the shown text, capped,
    and checked: an unknown place is dropped, never drawn as a dead button. */
 function coachParse(text){
-  const res={text:'',go:[],mem:[],forget:[],ask:[],log:null};
+  const res={text:'',go:[],mem:[],forget:[],ask:[],log:null,edit:null};
   const keep=[];
   String(text||'').split('\n').forEach(line=>{
     /* LOG carries one line of JSON; it is checked here, and a line that
        does not check out is dropped, never shown as text */
     const lg=/^[^\S\n]*\**\s*LOG\s*[|:]\s*(\{.*\})\s*\**\s*$/i.exec(line);
     if(lg){if(!res.log)res.log=coachLogCheck(lg[1]);return}
+    /* EDIT carries the plan change; ceRun replays it on a copy before the card is drawn (02e) */
+    const ed=/^[^\S\n]*\**\s*EDIT\s*[|:]\s*(\{.*\})\s*\**\s*$/i.exec(line);
+    if(ed){if(!res.edit)res.edit=coachEditCheck(ed[1]);return}
     const m=/^[^\S\n]*\**\s*(OPEN|REMEMBER|FORGET|ASK)\s*[|:]\s*(.+?)\s*\**\s*$/i.exec(line);
     if(!m){keep.push(line);return}
     const kind=m[1].toUpperCase(),arg=m[2].replace(/\*+/g,'').trim();
@@ -6992,7 +7002,19 @@ function coachSys2(){
     'FORGET|<the fact, in words> — removes a memory that is no longer true or that they ask you to drop.\n'+
     'ASK|<a follow-up question they might tap next> — up to two, short, in their voice.\n'+
     'LOG|<one line of JSON> — when they tell you about a session, a run or their bodyweight that is not in the record, propose it so they can save it. The app shows it to them to check; nothing is saved until they tap. Forms: {"kind":"lift","date":"YYYY-MM-DD","name":"Push day","sets":[{"ex":"Bench press","kg":80,"reps":5,"rpe":8},{"ex":"Plank","secs":60}]} (one object per set, their own exercise names from the record), {"kind":"run","date":"YYYY-MM-DD","km":5,"mins":27}, {"kind":"bw","kg":80.5} (today only). Kilograms and kilometres. Put rpe only if they told you how hard it was; never guess it. Leave out anything they did not say. At most one, and say in your reply that they can check it before saving.\n'+
-    'WHAT YOU CANNOT DO: save or delete anything yourself, change their programme beyond ADJUST, message their friends, or see anyone else’s data. If they ask, say so plainly and OPEN the place where they can do it themselves.');
+    'EDIT|<one line of JSON> — changes their training plan when they ask: sets, exercises, prescriptions, whole sessions, the block\u2019s length. The app replays it on a copy, refuses what cannot be done, and shows them a card; nothing changes until they tap Make the change or reply yes. Form: {"block":"<block name; leave out for the active one>","changes":[ ...up to 8... ]}. Each change, "day" being the session\u2019s name or number from the record, and "weeks" left out for every week or given as [3,4] or "3-6":\n'+
+    '  {"do":"add_sets","day":"Push","ex":"Cable fly","n":2,"weeks":[3,4]} (copies that exercise\u2019s last set)\n'+
+    '  {"do":"remove_sets","day":"Push","ex":"Bench press","n":1}\n'+
+    '  {"do":"set","day":"Legs","ex":"Back squat","sets":4,"reps":"5","kg":100,"rpe":8,"weeks":"5-6"} (give only what changes; "secs" for a hold)\n'+
+    '  {"do":"add_ex","day":"Pull","ex":"Face pull","sets":3,"reps":"12-15","rpe":8,"after":"Barbell row"} (kg if they said a weight; "secs":30 for a hold)\n'+
+    '  {"do":"remove_ex","day":"Pull","ex":"Shrug","weeks":[6]}\n'+
+    '  {"do":"swap","day":"Push","ex":"Dips","to":"Close-grip bench press"}\n'+
+    '  {"do":"add_day","name":"Arms","exercises":[{"ex":"EZ-bar curl","sets":3,"reps":"10-12","rpe":8},{"ex":"Triceps pushdown","sets":3,"reps":"12-15","rpe":8}]} (always added as the last session)\n'+
+    '  {"do":"remove_day","day":"Arms"} (only the last session in a block)\n'+
+    '  {"do":"rename_day","day":"Day 4","name":"Arms"}\n'+
+    '  {"do":"weeks","n":8}\n'+
+    'Use their own exercise names from the record; a new exercise gets a sets count and reps (or secs), and an RPE range unless they gave one. Kilograms only. At most one EDIT per reply. HOW TO USE IT: if the request leaves the place open (which session, which weeks, how many sets, what reps), ask first in one short question and offer ASK lines for the likely answers; never guess where something goes. When it is clear, say in a sentence or two what you will change and what you think of it, then add the EDIT line; the card is the confirmation, so do not ask "shall I?" as well. Judge it on the evidence and say so plainly: hard sets per muscle a week (10 to 20 is the range the app runs on; past 20 the extra sets buy little and cost recovery), a clear day between sessions that hit the same muscles, the deload week, their goal lifts, their recovery and their injuries. If you would advise against it, say why in one line with the number, then still propose it if they asked; it is their plan. Two exceptions you refuse outright: anything their injury restrictions screen out, and any change to a rehab protocol or a physio\u2019s plan (that is their physio\u2019s to change; OPEN physio). Sessions are only added at the end of a block and only the last one can be removed; this keeps every logged session matched to its day. The plan has no fixed weekdays: sessions run in order and the week board places them, so if they name a weekday, say that and name the session after it if they want.\n'+
+    'WHAT YOU CANNOT DO: save or delete their logged training yourself, change a rehab or physio plan, message their friends, or see anyone else’s data. If they ask, say so plainly and OPEN the place where they can do it themselves.');
   if(coachToolsOn())P.push('LOOKING THINGS UP: the record carries every set for the last six weeks and summaries before that. For anything older or more detailed (a session in March, every run in a month, one whole day, a lift’s full history), call a tool rather than guess. Tool results are the app’s own record.');
   return P.join('\n\n')+COACH_TONE}
 
@@ -7000,7 +7022,8 @@ function coachSys2(){
 /* the record stays byte-identical for the whole chat (and the whole day),
    so every reply after the first reads it from the cache */
 function coachDossierFor(co){
-  try{const stamp=today()+'|'+(S.prof&&S.prof.mem?S.prof.mem.length:0);
+  /* the plan rides the stamp: a change made from the chat is in the record on the very next turn */
+  try{const stamp=today()+'|'+(S.prof&&S.prof.mem?S.prof.mem.length:0)+'|'+ceProgSig();
     if(co.dos&&co.dos.stamp===stamp&&co.dos.text)return co.dos.text;
     const text=coachDossier();co.dos={stamp:stamp,text:text};return text}
   catch(e){oops('coachDossierFor',e);return ''}}
@@ -7021,13 +7044,15 @@ function coachRequest(co,q){
      row: one message each side, always alternating */
   const msgs=[];
   past.forEach(m=>{const role=m.r==='user'?'user':'assistant',L=msgs[msgs.length-1];
-    if(L&&L.role===role)L.content+='\n\n'+m.t;else msgs.push({role:role,content:String(m.t)})});
+    /* a proposed plan change rides its reply, with what became of it */
+    const t=String(m.t)+(m.edit?coachEditMemo(m.edit):'');
+    if(L&&L.role===role)L.content+='\n\n'+t;else msgs.push({role:role,content:t})});
   if(msgs.length&&msgs[msgs.length-1].role==='user')msgs.push({role:'assistant',content:'(no reply)'});
   const head={type:'text',text:doc,cache_control:{type:'ephemeral'}};
   const last=[{type:'text',text:now},{type:'text',text:'THEIR MESSAGE: '+q}];
   if(msgs.length){msgs[0]={role:'user',content:[head,{type:'text',text:String(msgs[0].content)}]};msgs.push({role:'user',content:last})}
   else msgs.push({role:'user',content:[head].concat(last)});
-  return{max_tokens:1000,model:(S.ai&&S.ai.model)||'claude-haiku-4-5-20251001',system:coachSys2(),messages:msgs}}
+  return{max_tokens:1600,model:(S.ai&&S.ai.model)||'claude-haiku-4-5-20251001',system:coachSys2(),messages:msgs}}
 /* the screen they came from, in their words — the chat is often opened to
    ask "what is this" about the page that was just on screen */
 const COACH_FROM={home:'Train',crown:'Tree',social:'Race',progress:'Progress',acl:'Rehab',run:'Running',levers:'What moves your training',
@@ -7103,6 +7128,363 @@ function coachToolBody(name,I){
       L.push('Top set each session: '+top.slice(-60).join('; '))});
     return L.join('\n')}
   return 'Unknown look-up.'}
+/* ═══ THE CHAT CHANGES THE PLAN (owner, 3 Oct 2026: "I want the allena
+   chat to be able to manipulate the users program if a user requests a
+   change... allena will clarify where and they say yes and allena does
+   it... add in a whole session on a certain day in a certain block...
+   allena with her judgement can advise against or for it based on
+   science and evidence") ═════════════════════════════════════════════
+
+   The chat PROPOSES a change with one line, EDIT|{json}. The app never
+   trusts that line: ceRun() replays every change on a COPY of the block,
+   refuses what cannot be done (with the reason, in words), screens every
+   new exercise through the injury screen, and measures what the change
+   does to the week's hard sets per muscle. The card shows exactly that.
+   Nothing is written until the person says yes, by the button or by
+   typing a plain yes. On the yes, ceRun() runs AGAIN against the plan as
+   it is now (the gate goes where the thing happens), and only a replay
+   that still matches what they were shown is written. Undo restores the
+   block's days and length until they train on the changed plan.
+
+   What it may change: the user's own lifting blocks (mainProgs). Never a
+   rehab protocol or a physio's plan (the physio supremacy law), never
+   the history. Sessions are added and removed only at the END of a
+   block, because every logged session points at its day by index
+   (histDayOf), and a day pulled from the middle would repoint them all.
+
+   Change shapes (one object each, "do" names it; "day" is the session's
+   name or its number; "weeks" is omitted for every week, or [3,4], "3-6"):
+     add_sets    day, ex, n, weeks              copies the last set
+     remove_sets day, ex, n, weeks              from the end, never to 0
+     set         day, ex, sets?, reps?, kg?, rpe?, secs?, weeks
+     add_ex      day, ex, sets, reps|secs, kg?, rpe?, after?, weeks
+     remove_ex   day, ex, weeks
+     swap        day, ex, to, weeks
+     add_day     name, exercises:[{ex, sets, reps|secs, kg?, rpe?}]
+     remove_day  day                            the last one only
+     rename_day  day, name
+     weeks       n                              the block's length */
+const CE_MAX=8,CE_SET_MAX=12;
+const CE_YES=/^\s*(?:yes|yep|yeah|yup|ya|sure|ok|okay|k|do it|go ahead|go for it|please do|sounds good|perfect|great|let'?s do it|make it|make the change|make those changes|apply it|confirm|y)(?:[\s,]+(?:please|thanks|thank you|allena|do it|go))*[\s.!]*$/i;
+/* a refusal carries its reason up to the change that asked for it */
+function ceNo(why){const e=new Error(why);e.ce=1;return e}
+function ceClean(s,max){return String(s==null?'':s).replace(/[\u0000-\u001f<>]/g,'').replace(/\s+/g,' ').trim().slice(0,max||60)}
+/* weeks: 'all', or the sorted week numbers inside the block */
+function ceWeeksOf(v,W){
+  if(v==null||v===''||/^(all|every)/i.test(String(v)))return 'all';
+  const L=[];
+  const add=(a,b)=>{a=Math.max(1,Math.round(+a));b=Math.min(W,Math.round(+b));if(!isFinite(a)||!isFinite(b))return;for(let i=a;i<=b;i++)L.push(i)};
+  if(typeof v==='number')add(v,v);
+  else if(Array.isArray(v))v.slice(0,MAX_WEEKS).forEach(x=>add(+x,+x));
+  else if(typeof v==='object'&&v.from!=null)add(+v.from,v.to!=null?+v.to:W);
+  else String(v).split(/[,\s]+/).forEach(t=>{const m=/^(\d+)(?:-(\d+))?$/.exec(t);if(m)add(+m[1],+(m[2]||m[1]))});
+  const U=L.filter((x,i)=>L.indexOf(x)===i).sort((a,b)=>a-b);
+  if(!U.length)return null;
+  return U.length===W?'all':U}
+function ceWeeksSay(w){
+  if(w==='all')return 'every week';
+  if(w.length===1)return 'week '+w[0];
+  if(w[w.length-1]-w[0]===w.length-1)return 'weeks '+w[0]+'–'+w[w.length-1];
+  return 'weeks '+w.slice(0,-1).join(', ')+' and '+w[w.length-1]}
+/* the numbers a set may carry, each inside what Allena accepts */
+function ceReps(v){if(v==null||v==='')return null;
+  const m=/^\s*(\d{1,2})\s*(?:(?:-|–|to)\s*(\d{1,2}))?\s*$/.exec(String(v));if(!m)return undefined;
+  const a=+m[1],b=m[2]!=null?+m[2]:a;if(a<1||b>50||b<a)return undefined;
+  return a===b?a:a+'-'+b}
+function ceRpe(v){if(v==null||v==='')return null;
+  const m=/^\s*(\d{1,2}(?:\.5)?)\s*(?:(?:-|–|to)\s*(\d{1,2}(?:\.5)?))?\s*$/.exec(String(v));if(!m)return undefined;
+  const a=+m[1],b=m[2]!=null?+m[2]:a;if(a<1||b>10||b<a)return undefined;
+  return a===b?a:a+'-'+b}
+function ceNum(v,lo,hi,step){if(v==null||v==='')return null;const n=+v;if(!isFinite(n)||n<lo||n>hi)return undefined;return Math.round(n/step)*step}
+/* the prescription a change carries; undefined in a field means it was given and is out of range */
+function cePresc(c){
+  const P={n:ceNum(c.sets!=null?c.sets:c.n,1,10,1),reps:ceReps(c.reps),kg:ceNum(c.kg,0,500,0.25),rpe:ceRpe(c.rpe),secs:ceNum(c.secs,5,900,1),perSide:!!c.perSide};
+  if(P.n===undefined)throw ceNo('the number of sets is outside 1 to 10');
+  if(P.reps===undefined)throw ceNo('the reps are not a number Allena can use');
+  if(P.kg===undefined)throw ceNo('the weight is outside what Allena accepts');
+  if(P.rpe===undefined)throw ceNo('the effort is not an RPE between 1 and 10');
+  if(P.secs===undefined)throw ceNo('the hold is outside 5 seconds to 15 minutes');
+  return P}
+function ceSet(P){return P.secs!=null?{secs:P.secs,perSide:P.perSide}:{w:P.kg!=null?P.kg:null,reps:P.reps,rpe:P.rpe!=null?P.rpe:'7-8'}}
+function ceKgSay(kg){return uwNum(kg)+' '+uwUnit()}
+function cePrescSay(P,n){
+  if(P.secs!=null)return n+' × '+P.secs+' s'+(P.perSide?' each side':'');
+  return n+' × '+P.reps+(P.kg!=null&&P.kg>0?' @ '+ceKgSay(P.kg):'')+' RPE '+(P.rpe!=null?P.rpe:'7-8')}
+/* a session by its name or its number; a partial name only when it is the only match */
+function ceDay(days,d){
+  if(d==null||d==='')return -1;
+  const s=String(d).trim().toLowerCase();
+  let i=days.findIndex(x=>String(x.name||'').trim().toLowerCase()===s);if(i>=0)return i;
+  const m=/^(?:day|session)?\s*#?(\d{1,2})$/.exec(s);if(m){const k=+m[1]-1;if(k>=0&&k<days.length)return k}
+  const hit=days.map((x,j)=>j).filter(j=>String(days[j].name||'').toLowerCase().indexOf(s)>=0);
+  return hit.length===1?hit[0]:-1}
+/* an exercise in a session: the exact name, the same lift spelled differently, or the only partial match */
+function ceEx(day,n){
+  const s=String(n||'').trim().toLowerCase();if(!s)return -1;
+  const E=(day&&day.exercises)||[];
+  let i=E.findIndex(e=>String(e.name).toLowerCase()===s);if(i>=0)return i;
+  try{const near=exNear(n,6).filter(c=>c.same).map(c=>String(c.n).toLowerCase());
+    i=E.findIndex(e=>near.indexOf(String(e.name).toLowerCase())>=0);if(i>=0)return i}
+  catch(e){oops('ceEx',e)}
+  const hit=E.map((e,j)=>j).filter(j=>{const x=String(E[j].name).toLowerCase();return x.indexOf(s)>=0||s.indexOf(x)>=0});
+  return hit.length===1?hit[0]:-1}
+/* a new exercise takes the name they already use for that lift, so its
+   history and its loads stay one lift (the alias law, 15 Sep) */
+function ceName(n){
+  n=ceClean(n,60);if(n.length<2)return '';
+  try{const low=n.toLowerCase(),K=exKnownNames();
+    const hit=K.find(c=>String(c.n).toLowerCase()===low);if(hit)return hit.n;
+    const near=exNear(n,3).find(c=>c.same);if(near)return near.n}
+  catch(e){oops('ceName',e)}
+  return n.charAt(0).toUpperCase()+n.slice(1)}
+/* "anything offered to an injured user passes exBlocked" — the chat included */
+function ceScreen(name){
+  try{const r=restrEff();if(!Object.keys(r).some(k=>r[k]))return;
+    if(exBlocked(name,[],exclFor(r)))throw ceNo(name+' loads what your injury screen protects')}
+  catch(e){if(e&&e.ce)throw e;oops('ceScreen',e)}}
+/* change one exercise's sets in the named weeks; fn gets a copy of the list */
+function ceEach(ex,weeks,fn){
+  let hit=0;
+  const run=l=>{const out=fn((l||[]).map(x=>Object.assign({},x)));if(out!==null)hit++;return out===null?l:out};
+  if(weeks==='all'){
+    if(Array.isArray(ex.sets))ex.sets=run(ex.sets);
+    else if(ex.sets&&typeof ex.sets==='object')Object.keys(ex.sets).forEach(k=>{ex.sets[k]=run(ex.sets[k])});
+    return hit}
+  if(Array.isArray(ex.sets))ex.sets={'default':ex.sets};
+  ex.sets=ex.sets||{};
+  weeks.forEach(w=>{ex.sets[String(w)]=run(setsForWeek(ex,w)||[])});
+  return hit}
+/* the week's hard sets per muscle, prime movers only (the volume count) */
+function ceVolume(days,wk){
+  const out={};
+  (days||[]).forEach(d=>(d.exercises||[]).forEach(e=>{
+    const l=setsForWeek(e,wk)||[];const n=l.filter(x=>x&&x.secs==null).length;if(!n)return;
+    const h=muscleHits(e.name);Object.keys(h).forEach(m=>{if(h[m]===1)out[m]=(out[m]||0)+n})}));
+  return out}
+function ceUnique(days,name,skip){
+  const low=name.toLowerCase();
+  return !days.some((d,j)=>j!==skip&&String(d.name||'').toLowerCase()===low)}
+/* one change, replayed on the copy. Returns its line, or throws the reason. */
+function ceOne(c,W,live){
+  const days=W.days;
+  const op=String(c.do||c.op||'').toLowerCase().replace(/[\s-]/g,'_');
+  const dayAt=()=>{const i=ceDay(days,c.day);if(i<0)throw ceNo('there is no session called '+(ceClean(c.day,40)||'that')+' in '+W.block);return i};
+  const exAt=di=>{const i=ceEx(days[di],c.ex);if(i<0)throw ceNo('there is no '+(ceClean(c.ex,60)||'exercise by that name')+' in '+days[di].name);return i};
+  const wks=()=>{const w=ceWeeksOf(c.weeks,W.weeks);if(!w)throw ceNo('the block has weeks 1 to '+W.weeks+' only');return w};
+  const tag=(di,name)=>days[di].name+' · '+name;
+  if(op==='add_sets'){const di=dayAt(),ei=exAt(di),e=days[di].exercises[ei],w=wks();
+    const n=ceNum(c.n!=null?c.n:c.sets,1,6,1);if(!n)throw ceNo('add between 1 and 6 sets at a time');
+    const P=cePresc(Object.assign({},c,{sets:null,n:null}));
+    const hit=ceEach(e,w,l=>{
+      if(!l.length){if(w==='all')return null;if(P.reps==null&&P.secs==null)throw ceNo(e.name+' is not in that week, so say the reps');return Array.from({length:n},()=>ceSet(P))}
+      if(l.length+n>CE_SET_MAX)throw ceNo('that would be more than '+CE_SET_MAX+' sets of '+e.name);
+      const tpl=Object.assign({},l[l.length-1]);
+      if(P.reps!=null){tpl.reps=P.reps;delete tpl.secs}if(P.kg!=null)tpl.w=P.kg;if(P.rpe!=null)tpl.rpe=P.rpe;
+      return l.concat(Array.from({length:n},()=>Object.assign({},tpl)))});
+    if(!hit)throw ceNo(e.name+' has no sets in those weeks');
+    return tag(di,e.name)+': '+n+' more set'+(n===1?'':'s')+', '+ceWeeksSay(w)}
+  if(op==='remove_sets'){const di=dayAt(),ei=exAt(di),e=days[di].exercises[ei],w=wks();
+    const n=ceNum(c.n!=null?c.n:c.sets,1,10,1);if(!n)throw ceNo('remove between 1 and 10 sets at a time');
+    const hit=ceEach(e,w,l=>{if(!l.length)return null;
+      if(l.length-n<1)throw ceNo('that leaves no sets of '+e.name+'; remove the exercise instead');
+      return l.slice(0,l.length-n)});
+    if(!hit)throw ceNo(e.name+' has no sets in those weeks');
+    return tag(di,e.name)+': '+n+' set'+(n===1?'':'s')+' fewer, '+ceWeeksSay(w)}
+  if(op==='set'||op==='change'){const di=dayAt(),ei=exAt(di),e=days[di].exercises[ei],w=wks();
+    const P=cePresc(c);
+    if(P.n==null&&P.reps==null&&P.kg==null&&P.rpe==null&&P.secs==null)throw ceNo('say what to change: sets, reps, weight, effort or time');
+    const hit=ceEach(e,w,l=>{
+      if(!l.length){if(w==='all')return null;if(P.reps==null&&P.secs==null)throw ceNo(e.name+' is not in that week, so say the reps');return Array.from({length:P.n||3},()=>ceSet(P))}
+      const n=P.n||l.length,out=[];
+      for(let i=0;i<n;i++){const s=Object.assign({},l[Math.min(i,l.length-1)]);
+        if(P.secs!=null){s.secs=P.secs;s.perSide=P.perSide||!!s.perSide;delete s.reps;delete s.w;delete s.rpe}
+        else{if(P.reps!=null){s.reps=P.reps;delete s.secs;delete s.perSide;if(s.rpe==null)s.rpe='7-8'}
+          if(P.kg!=null&&s.secs==null)s.w=P.kg;
+          if(P.rpe!=null&&s.secs==null)s.rpe=P.rpe}
+        out.push(s)}
+      return out});
+    if(!hit)throw ceNo(e.name+' has no sets in those weeks');
+    const bits=[];if(P.n!=null)bits.push(P.n+' set'+(P.n===1?'':'s'));
+    if(P.secs!=null)bits.push(P.secs+' s'+(P.perSide?' each side':''));
+    if(P.reps!=null)bits.push(P.reps+' reps');if(P.kg!=null)bits.push(ceKgSay(P.kg));if(P.rpe!=null)bits.push('RPE '+P.rpe);
+    return tag(di,e.name)+': now '+bits.join(', ')+', '+ceWeeksSay(w)}
+  if(op==='add_ex'||op==='add_exercise'){const di=dayAt(),w=wks();
+    const name=ceName(c.ex);if(!name)throw ceNo('the new exercise needs a name');
+    ceScreen(name);
+    if(days[di].exercises.some(x=>String(x.name).toLowerCase()===name.toLowerCase()))
+      throw ceNo(name+' is already in '+days[di].name+'; add sets to it instead');
+    const P=cePresc(c);const n=P.n||3;
+    if(P.reps==null&&P.secs==null)throw ceNo(name+' needs its reps or its hold time');
+    const list=()=>Array.from({length:n},()=>ceSet(P));
+    let sets;if(w==='all')sets={'default':list()};else{sets={};w.forEach(k=>{sets[String(k)]=list()})}
+    const ex={name:name,rest:P.secs!=null?60:(isStation(name)?90:120),sets:sets};
+    let at=days[di].exercises.length;
+    if(c.after){const ai=ceEx(days[di],c.after);if(ai>=0)at=ai+1}
+    days[di].exercises.splice(at,0,ex);
+    return tag(di,'add '+name)+': '+cePrescSay(P,n)+', '+ceWeeksSay(w)+(c.after&&at<days[di].exercises.length-1?', after '+days[di].exercises[at-1].name:'')}
+  if(op==='remove_ex'||op==='remove_exercise'){const di=dayAt(),ei=exAt(di),e=days[di].exercises[ei],w=wks();
+    if(w==='all'){if(days[di].exercises.length<=1)throw ceNo('that leaves '+days[di].name+' empty; remove the session instead');
+      days[di].exercises.splice(ei,1)}
+    else{const hit=ceEach(e,w,()=>[]);if(!hit)throw ceNo(e.name+' has no sets in those weeks')}
+    return tag(di,'remove '+e.name)+', '+ceWeeksSay(w)}
+  if(op==='swap'||op==='replace'){const di=dayAt(),ei=exAt(di),e=days[di].exercises[ei],w=wks();
+    const to=ceName(c.to);if(!to)throw ceNo('say what '+e.name+' becomes');
+    ceScreen(to);
+    if(to.toLowerCase()===String(e.name).toLowerCase())throw ceNo(e.name+' is already that exercise');
+    if(days[di].exercises.some((x,j)=>j!==ei&&String(x.name).toLowerCase()===to.toLowerCase()))throw ceNo(to+' is already in '+days[di].name);
+    const was=e.name;
+    if(w==='all'){e.name=to;delete e.cue;delete e.warmup;if(e.bar&&!/barbell|\bbb\b|bench press|squat|deadlift|overhead press|military/i.test(to))delete e.bar}
+    else{const nx={name:to,rest:e.rest!=null?e.rest:120,sets:{}};
+      w.forEach(k=>{nx.sets[String(k)]=(setsForWeek(e,k)||[]).map(x=>Object.assign({},x))});
+      if(!w.some(k=>nx.sets[String(k)].length))throw ceNo(was+' has no sets in those weeks');
+      ceEach(e,w,()=>[]);days[di].exercises.splice(ei+1,0,nx)}
+    return tag(di,was+' becomes '+to)+', '+ceWeeksSay(w)}
+  if(op==='add_day'||op==='add_session'){
+    let name=ceClean(c.name,40)||'Day '+(days.length+1);
+    if(!ceUnique(days,name))name=dayCopyName({days:days},name);
+    const L=Array.isArray(c.exercises)?c.exercises.slice(0,12):[];
+    if(!L.length)throw ceNo('a new session needs at least one exercise');
+    const ex=[],said=[];
+    L.forEach(x=>{const nm=ceName(x&&x.ex);if(!nm)throw ceNo('every exercise in the new session needs a name');
+      ceScreen(nm);
+      if(ex.some(y=>y.name.toLowerCase()===nm.toLowerCase()))throw ceNo(nm+' is in the new session twice');
+      const P=cePresc(x||{});const n=P.n||3;
+      if(P.reps==null&&P.secs==null)throw ceNo(nm+' needs its reps or its hold time');
+      ex.push({name:nm,rest:P.secs!=null?60:(isStation(nm)?90:120),sets:{'default':Array.from({length:n},()=>ceSet(P))}});
+      said.push(nm+' '+cePrescSay(P,n))});
+    days.push({name:name,custom:1,exercises:ex});
+    return 'New session "'+name+'" at the end of '+W.block+': '+said.join('; ')}
+  if(op==='remove_day'||op==='remove_session'){const di=dayAt();
+    if(days.length<=1)throw ceNo(days[di].name+' is the only session in '+W.block);
+    if(di!==days.length-1)throw ceNo('only the last session in a block can be removed, so your logged sessions keep their day; '+days[di].name+' is not the last');
+    if(live&&live.di===di)throw ceNo(days[di].name+' is the session you have open');
+    const nm=days[di].name;days.pop();
+    return 'Remove the session "'+nm+'" (the last one in '+W.block+')'}
+  if(op==='rename_day'||op==='rename_session'){const di=dayAt();
+    const name=ceClean(c.name,40);if(!name)throw ceNo('say the new name');
+    if(!ceUnique(days,name,di))throw ceNo('another session is already called '+name);
+    const was=days[di].name;days[di].name=name;
+    return 'Rename "'+was+'" to "'+name+'"'}
+  if(op==='weeks'||op==='length'){
+    const n=ceNum(c.n!=null?c.n:c.weeks,1,MAX_WEEKS,1);if(!n)throw ceNo('a block runs 1 to '+MAX_WEEKS+' weeks');
+    if(live&&n<live.wk)throw ceNo('you are in week '+live.wk+', so the block cannot end before it');
+    if(n===W.weeks)throw ceNo(W.block+' is already '+n+' weeks');
+    const was=W.weeks;W.weeks=n;
+    return W.block+' runs '+n+' weeks instead of '+was}
+  throw ceNo('that is not a change Allena can make here')}
+/* the block a change names: their own lifting blocks only, the active one by default */
+function ceBlock(b){
+  const M=mainProgs();
+  if(b==null||b===''){const a=activeProgSafe();return (a&&!a.empty&&M.indexOf(a)>=0)?a:null}
+  const s=String(b).trim().toLowerCase();
+  return M.find(p=>String(p.id)===String(b))||M.find(p=>String(p.block||'').toLowerCase()===s)||
+    (function(){const h=M.filter(p=>String(p.block||'').toLowerCase().indexOf(s)>=0);return h.length===1?h[0]:null})()}
+/* THE ONE READER: replays the changes on a copy. Every line the card
+   shows, and every write the yes makes, comes from here. */
+function ceRun(raw){
+  try{const o=(typeof raw==='string')?JSON.parse(raw):raw;
+    if(!o||typeof o!=='object')return null;
+    const C=(Array.isArray(o.changes)?o.changes:Array.isArray(o)?o:[o]).filter(x=>x&&typeof x==='object').slice(0,CE_MAX);
+    if(!C.length)return null;
+    const p=ceBlock(o.block);
+    if(!p)return {err:o.block?'Allena can only change your own lifting blocks, and there is none called '+ceClean(o.block,40)+'.':'There is no lifting block to change yet.'};
+    const W={block:p.block||'your block',weeks:+p.weeks||1,days:JSON.parse(JSON.stringify(p.days||[]))};
+    const live=(S.sess&&S.sess.progId===p.id)?{di:+S.sess.dayIdx,wk:+S.sess.week||1}:{wk:weekFor(p.id)};
+    const lines=[],left=[],first=[];
+    C.forEach(c=>{
+      const snap=JSON.stringify(W);
+      try{lines.push(ceOne(c,W,live));
+        const w=ceWeeksOf(c.weeks,W.weeks);if(Array.isArray(w))first.push(w[0])}
+      catch(e){Object.assign(W,JSON.parse(snap));
+        if(e&&e.ce)left.push(String(e.message));else{oops('ceRun.one',e);left.push('one change could not be read')}}});
+    const errs=validateProgram({block:W.block,weeks:W.weeks,days:W.days});
+    if(lines.length&&errs.length)return {err:'That would leave the block unusable: '+errs[0]};
+    /* the volume line: the week the change names first, else the week they are on */
+    const wk=Math.min(W.weeks,first.length?Math.min.apply(null,first):(live.wk||1));
+    const A=ceVolume(p.days,wk),B=ceVolume(W.days,wk),vol=[];
+    Object.keys(Object.assign({},A,B)).map(m=>({m:m,a:A[m]||0,b:B[m]||0})).filter(x=>x.a!==x.b)
+      .sort((x,y)=>Math.abs(y.b-y.a)-Math.abs(x.b-x.a)).slice(0,3).forEach(x=>{
+        vol.push(x.m+': '+x.a+' → '+x.b+' hard sets in week '+wk+
+          (x.b>20?', over the 10 to 20 a week the app aims for':x.b<10&&x.a>=10?', under the 10 a week the app aims for':''))});
+    return {pid:p.id,block:W.block,days:W.days,weeks:W.weeks,lines:lines,left:left,vol:vol,
+      live:(S.sess&&S.sess.progId===p.id)?'The session you have open keeps its sets. The change is there next time.':''}}
+  catch(e){oops('ceRun',e);return null}}
+/* the reply's EDIT line, checked the moment it lands */
+function coachEditCheck(json){
+  let o=null;try{o=JSON.parse(String(json||''))}catch(e){oops('coachEditCheck.json',e);return null}
+  const R=ceRun(o);if(!R)return null;
+  const id='e'+Date.now().toString(36)+Math.floor(Math.random()*1e4).toString(36);
+  if(R.err)return {id:id,state:'no-go',err:R.err,lines:[],left:[],vol:[]};
+  /* what is kept is the request itself, so the yes can replay it */
+  const keep={block:o.block!=null?ceClean(o.block,60):undefined,changes:(Array.isArray(o.changes)?o.changes:Array.isArray(o)?o:[o]).slice(0,CE_MAX)};
+  return {id:id,pid:R.pid,block:R.block,req:JSON.parse(JSON.stringify(keep)),lines:R.lines,left:R.left,vol:R.vol,live:R.live,
+    state:R.lines.length?'pending':'no-go'}}
+/* the undo lives for this run of the app; after a restart the card says so */
+const CE_UNDO={};
+/* the yes, by the button or typed. Replays against the plan as it is NOW. */
+function coachEditDo(m){
+  const E=m&&m.edit;
+  if(!E||E.state!=='pending')return {ok:false,why:'That change is not waiting for a yes.'};
+  const R=ceRun(E.req);
+  if(!R||R.err||R.pid!==E.pid||R.lines.join('\n')!==E.lines.join('\n'))
+    return {ok:false,why:'Your plan has changed since Allena suggested this, so nothing was changed. Ask again and she will work from the plan as it is now.'};
+  const p=(S.lib.programs||[]).find(x=>x.id===R.pid);if(!p)return {ok:false,why:'That block is no longer in your library.'};
+  CE_UNDO[E.id]={pid:p.id,days:JSON.stringify(p.days||[]),weeks:p.weeks,baseWeeks:p.baseWeeks,at:Date.now()};
+  p.days=R.days;
+  if(R.weeks!==p.weeks){p.weeks=R.weeks;p.baseWeeks=R.weeks}
+  saveLib();S.patCache=null;
+  E.state='done';E.at=Date.now();
+  return {ok:true}}
+function coachEditUndo(m){
+  const E=m&&m.edit;if(!E||E.state!=='done')return {ok:false,why:'There is nothing to undo.'};
+  const U=CE_UNDO[E.id];
+  if(!U)return {ok:false,why:'Undo closes when the app restarts. Ask Allena to change it back.'};
+  /* a row's id is the moment its session started; a typed row is dated when it was saved */
+  const trained=(S.history||[]).some(h=>h&&h.progId===U.pid&&((/^\d{13}$/.test(String(h.id))&&+h.id>U.at)||Date.parse(h.date)>U.at))||
+    (S.sess&&S.sess.progId===U.pid&&+S.sess.startedAt>U.at);
+  if(trained)return {ok:false,why:'You have trained on the changed plan, so undo is closed. Ask Allena to change it back.'};
+  const p=(S.lib.programs||[]).find(x=>x.id===U.pid);if(!p)return {ok:false,why:'That block is no longer in your library.'};
+  p.days=JSON.parse(U.days);p.weeks=U.weeks;if(U.baseWeeks!=null)p.baseWeeks=U.baseWeeks;else delete p.baseWeeks;
+  saveLib();S.patCache=null;delete CE_UNDO[E.id];
+  E.state='undone';return {ok:true}}
+/* a plain typed yes to a change that is waiting makes it, without a round trip */
+function coachEditYes(co,q){
+  try{if(!CE_YES.test(String(q||'')))return false;
+    const th=(co&&co.thread)||[],last=th[th.length-1];
+    if(!last||last.r!=='a'||!last.edit||last.edit.state!=='pending')return false;
+    th.push({r:'user',t:String(q).trim()});co.input='';
+    const r=coachEditDo(last);
+    th.push({r:'a',t:r.ok?'Done. '+(last.edit.lines.length===1?'That change is':'Those '+last.edit.lines.length+' changes are')+' in '+last.edit.block+' now. Undo is on the card above.':r.why});
+    chatSaveCurrent(co);return true}
+  catch(e){oops('coachEditYes',e);return false}}
+/* what the card shows, for the web and the phone alike */
+function coachEditView(m){
+  const E=m&&m.edit;if(!E)return null;
+  const st=E.state;
+  return {state:st,
+    title:st==='done'?'Changed':st==='undone'?'Undone':st==='no'?'Not made':st==='no-go'?'Cannot change that':'Change to your plan',
+    block:E.block||'',lines:E.lines||[],vol:st==='pending'?(E.vol||[]):[],
+    left:(E.err?[E.err]:[]).concat((E.left||[]).map(x=>'Left out: '+x+'.')),
+    live:st==='pending'?(E.live||''):'',
+    canGo:st==='pending',canUndo:st==='done'&&!!CE_UNDO[E.id]}}
+/* the change as the model sees it on the next turn, with what became of it */
+function coachEditMemo(E){
+  if(!E)return '';
+  const st={pending:'They have not answered yet.',done:'They said yes and it is made.',undone:'They made it, then undid it.',no:'They said not now; nothing changed.','no-go':'The app could not make it.'}[E.state]||'';
+  return '\n[The plan change you proposed'+(E.block?' to '+E.block:'')+': '+((E.lines||[]).join('; ')||'none')+
+    ((E.left||[]).length?'. Refused by the app: '+E.left.join('; '):'')+(E.err?'. '+E.err:'')+'. '+st+']'}
+/* the dossier's picture of a block: every session, every exercise, each
+   run of weeks that share a prescription, so a change can name them */
+function ceWeekly(e,W){
+  const runs=[];
+  for(let w=1;w<=W;w++){const t=coachPrescr(setsForWeek(e,w)||[])||'not in this week';
+    const L=runs[runs.length-1];if(L&&L.t===t)L.b=w;else runs.push({a:w,b:w,t:t})}
+  if(runs.length===1)return runs[0].t+(W>1?' (every week)':'');
+  return runs.map(r=>'W'+r.a+(r.b>r.a?'-'+r.b:'')+' '+r.t).join('; ')}
+function ceProgSig(){
+  try{const s=JSON.stringify((mainProgs()||[]).map(p=>[p.id,p.weeks,p.days]))+'|'+(S.lib&&S.lib.activeId);
+    let h=0;for(let i=0;i<s.length;i++)h=(h*31+s.charCodeAt(i))|0;return String(h)}
+  catch(e){oops('ceProgSig',e);return ''}}
 const A={};
 A.nav=v=>{if(v!=='session'&&S.sess&&S.sess.phase==='resting'){/* the timer keeps running; the beep is rescheduled on return */}
   if(v!=='findings')S.discLensShow=null;
@@ -10351,6 +10733,20 @@ function coachExtras(m,i,isLast){
       '<p style="font-size:15px;line-height:1.45;margin-top:4px">'+esc(coachLogLine(m.log))+'</p>'+
       (m.logDone?'':'<button data-a="coachLogGo" data-v="'+i+'" class="pill" style="margin-top:10px;border-color:var(--amber);color:var(--amber);font-size:13px">'+
         (m.log.kind==='bw'?'Save it':'Check it and save ›')+'</button>')+'</div>'}
+    /* THE CHAT CHANGES THE PLAN: what the app checked, and the yes (coachEditView in 02e) */
+    const ev=m.edit?coachEditView(m):null;
+    if(ev){const tone=ev.state==='done'?'var(--green)':ev.state==='pending'?'var(--amber)':'var(--faint)';
+      h+='<div class="card" style="margin:12px 0 0;padding:12px 14px">'+
+      '<p class="micro" style="color:'+tone+'">'+esc(ev.title)+(ev.block?' \u00b7 '+esc(ev.block):'')+'</p>'+
+      ev.lines.map(x=>'<p style="font-size:15px;line-height:1.45;margin-top:6px'+(ev.state==='undone'||ev.state==='no'?';color:var(--faint)':'')+'">'+esc(x)+'</p>').join('')+
+      ev.vol.map(x=>'<p style="font-size:13px;line-height:1.45;margin-top:6px;color:var(--dim)">'+esc(x)+'</p>').join('')+
+      ev.left.map(x=>'<p style="font-size:13px;line-height:1.45;margin-top:6px;color:var(--faint)">'+esc(x)+'</p>').join('')+
+      (ev.live?'<p style="font-size:13px;line-height:1.45;margin-top:6px;color:var(--dim)">'+esc(ev.live)+'</p>':'')+
+      (ev.canGo?'<div style="display:flex;gap:8px;margin-top:10px">'+
+        '<button data-a="coachEditGo" data-v="'+i+'" class="pill" style="border-color:var(--amber);color:var(--amber);font-size:13px">Make the change</button>'+
+        '<button data-a="coachEditNo" data-v="'+i+'" class="pill" style="color:var(--dim);font-size:13px">Not now</button></div>':'')+
+      (ev.canUndo?'<button data-a="coachEditUndo" data-v="'+i+'" class="mono" style="color:var(--amber);font-size:11px;margin-top:10px">Undo</button>':'')+
+      '</div>'}
     if(isLast&&(m.ask||[]).length)h+='<div style="display:flex;flex-direction:column;gap:6px;margin-top:12px">'+m.ask.map(q=>
       '<button data-a="coachChip" data-v="'+esc(q)+'" class="card" style="width:100%;text-align:left;padding:9px 13px;font-size:13px;color:var(--dim);margin:0">'+esc(q)+'</button>').join('')+'</div>'}
   catch(e){oops('coachExtras',e)}
@@ -45693,8 +46089,22 @@ function runAction(a,v,t,e){
     case 'coachChip':{const q=dv;if(!q)break;
       if(aiReady()&&!S.coach.busy){S.coach.input='';askClaude(q)}
       else{S.coach.input=q;render()}break}
+    /* a plain yes to a plan change that is waiting makes it here, no round trip (02e) */
     case 'coachSend':if(!(S.coach.input||'').trim()){flash('Type something first.');break}
+      if(!S.coach.busy&&coachEditYes(S.coach,S.coach.input.trim())){render();break}
       if(!S.coach.busy&&aiReady())askClaude(S.coach.input.trim());break;
+    /* THE CHAT CHANGES THE PLAN (3 Oct 2026): the card's three doors */
+    case 'coachEditGo':{const m9=((S.coach&&S.coach.thread)||[])[+v];
+      const r9=coachEditDo(m9);
+      if(r9.ok){vib(14);flash('Changed. Undo is on the card.')}else flash(r9.why);
+      chatSaveCurrent();render();break}
+    case 'coachEditNo':{const m9=((S.coach&&S.coach.thread)||[])[+v];
+      if(m9&&m9.edit&&m9.edit.state==='pending'){m9.edit.state='no';chatSaveCurrent()}
+      render();break}
+    case 'coachEditUndo':{const m9=((S.coach&&S.coach.thread)||[])[+v];
+      const r9=coachEditUndo(m9);
+      flash(r9.ok?'Back to how it was.':r9.why);
+      chatSaveCurrent();render();break}
     case 'coachApp':{try{const q=coachContext()+'\n\nQuestion: '+(S.coach.input.trim()||'Coach me on my next set.');
       const url='https://claude.ai/new?q='+encodeURIComponent(q);
       if(typeof inWrapper==='function'&&inWrapper()){
