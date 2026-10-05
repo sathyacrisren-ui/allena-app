@@ -1909,7 +1909,7 @@ if(S.sess){S.note=S.sess.note||S.note;
       if(c0&&(s0.log||[]).some(l=>l.ex===c0.ex&&l.setNo===c0.setNo)){const n0=sessAdv(s0);
         if(n0<0)s0.phase='done';else s0.idx=n0}}catch(e){oops('bootSess',e)}
     if(S.sess.phase!=='done')S.sess.phase='ready'}}
-const BUILD_ID='5a710d';  // stamped by tools/build.py with the content hash
+const BUILD_ID='dbff29';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -7434,9 +7434,10 @@ function coachSys2(){
     '  {"do":"rename_day","day":"Day 4","name":"Arms"}\n'+
     '  {"do":"weeks","n":8}\n'+
     '  {"do":"new_block","name":"Bench Block 2","weeks":6,"days":[{"name":"Push","exercises":[{"ex":"Bench press","sets":4,"reps":"5","kg":82.5,"rpe":8},{"ex":"Cable fly","sets":3,"reps":"12-15","rpe":8}]},{"name":"Pull","exercises":[...]}]} (a WHOLE new block; the only other change that may ride with it is "clear"; up to 7 sessions; it becomes their active block at week 1 and a finished block is put away. Build it from the record: their goals, the loads they actually lift now, what progressed and what stalled, their days a week and their injuries. Keep the words before it to two or three sentences: the line is long and must finish.)\n'+
+    '  {"do":"start_block","block":"Bench Block 2"} (a block already in their library becomes the active one at week 1; a finished block is put away. On its own in the EDIT. Use it when the block they want is listed under "Also in their library"; never new_block for one that exists.)\n'+
     '  {"do":"clear","ex":"Leg extension"} (when the injury screen refused an exercise and they tell you their physio cleared it: this remembers the clearance, exactly as keeping it in a session preview does; it may ride in the same EDIT as the block or change that needs it. Only on their word about their physio, never on your own judgement.)\n'+
     'Use their own exercise names from the record; a new exercise gets a sets count and reps (or secs), and an RPE range unless they gave one. Kilograms only. At most one EDIT per reply. HOW TO USE IT: if the request leaves the place open (which session, which weeks, how many sets, what reps), ask first in one short question and offer ASK lines for the likely answers; never guess where something goes. When it is clear, say in a sentence or two what you will change and what you think of it, then add the EDIT line; the card is the confirmation, so do not ask "shall I?" as well. Judge it on the evidence and say so plainly: hard sets per muscle a week (10 to 20 is the range the app runs on; past 20 the extra sets buy little and cost recovery), a clear day between sessions that hit the same muscles, the deload week, their goal lifts, their recovery and their injuries. If you would advise against it, say why in one line with the number, then still propose it if they asked; it is their plan. Two exceptions you refuse outright: anything their injury restrictions screen out, and any change to a rehab protocol or a physio\u2019s plan (that is their physio\u2019s to change; OPEN physio). Sessions are only added at the end of a block and only the last one can be removed; this keeps every logged session matched to its day. The plan has no fixed weekdays: sessions run in order and the week board places them, so if they name a weekday, say that and name the session after it if they want.\n'+
-    'NOTHING YOU SAY CHANGES THE APP. Only an EDIT or LOG line, after they tap or reply yes, does. So never say you have built, saved, added, changed or set up anything; say what you propose, put the line, and the card does the rest. Never describe a block, session or change as done unless the record or the card says it is made; never write "Confirmed", "built" or "live" about anything you proposed, because the card is the only thing that confirms it. If they say a change is not there, it is not there: propose it again with the line, do not insist. When they ask you to build their programme or their next block, do it with new_block in that same reply, built from the record; a sentence or two on why, then the line. If their block is finished, the app also offers "Build block 2 from this data" on Train (OPEN|train), which carries every learned load forward; say so, and still propose yours if they asked you.\n'+
+    'NOTHING YOU SAY CHANGES THE APP. Only an EDIT or LOG line, after they tap or reply yes, does. So never say you have built, saved, added, changed or set up anything; say what you propose, put the line, and the card does the rest. Never describe a block, session or change as done unless the record or the card says it is made; never write "Confirmed", "built" or "live" about anything you proposed, because the card is the only thing that confirms it. If they say a change is not there, it is not there: propose it again with the line, do not insist. When they ask you to build their programme or their next block, do it with new_block in that same reply, built from the record; a sentence or two on why, then the line. When they ask you to build, start, send, confirm or "give me the card", the reply IS the EDIT line: a reply to that without one has failed them, whatever else it says. If the card refused something and they have answered the refusal (their physio cleared it, they chose the days), send the line again with that fixed, in the same reply. A block starts when they open Train and tap it; you never decide the day, never say "tomorrow", never hold a block back for a rest day or a rehab session; you may say in one sentence what you would do, then send the line. If their block is finished, the app also offers "Build block 2 from this data" on Train (OPEN|train), which carries every learned load forward; say so, and still propose yours if they asked you.\n'+
     'WHAT YOU CANNOT DO: save or delete their logged training yourself, change a rehab or physio plan, message their friends, or see anyone else’s data. If they ask, say so plainly and OPEN the place where they can do it themselves.');
   if(coachToolsOn())P.push('LOOKING THINGS UP: the record carries every set for the last six weeks and summaries before that. For anything older or more detailed (a session in March, every run in a month, one whole day, a lift’s full history), call a tool rather than guess. Tool results are the app’s own record.');
   return P.join('\n\n')+COACH_TONE}
@@ -7715,10 +7716,10 @@ function ceCleared(name){
   try{const low=String(name||'').toLowerCase();
     if(CE_ALLOW_TMP&&CE_ALLOW_TMP.has(low))return true;
     const base=gBase(name).toLowerCase();
-    const inBlock=mainProgs().some(p=>(p.days||[]).some(d=>(d.exercises||[]).some(e=>{const n=String(e.name||'').toLowerCase();return n===low||gBase(n)===base})));
-    if(!inBlock)return false;
+    /* logged in the last 90 days is enough: the app let them do it (the
+       block it sat in may be archived by now, 5 Oct 2026 evening) */
     const since=Date.now()-90*864e5;
-    return (S.history||[]).some(h=>h&&h.complete&&Date.parse(h.date)>since&&(h.log||[]).some(l=>{const n=String(l.ex||'').toLowerCase();return n===low||gBase(n)===base}))}
+    return (S.history||[]).some(h=>h&&Date.parse(h.date)>since&&(h.log||[]).some(l=>{const n=String(l.ex||'').toLowerCase();return n===low||gBase(n)===base}))}
   catch(e){oops('ceCleared',e);return false}}
 function ceScreen(name){
   try{const r=restrEff();if(!Object.keys(r).some(k=>r[k]))return;
@@ -7844,6 +7845,12 @@ function ceOne(c,W,live){
     if(n===W.weeks)throw ceNo(W.block+' is already '+n+' weeks');
     const was=W.weeks;W.weeks=n;
     return W.block+' runs '+n+' weeks instead of '+was}
+  if(op==='start_block'||op==='use_block'||op==='switch_block'||op==='activate'){
+    const b=c.block!=null?c.block:c.name;const p=ceBlock(b);
+    if(!p)throw ceNo('there is no block called '+(ceClean(b,40)||'that')+' in your library');
+    if(S.lib&&S.lib.activeId===p.id)throw ceNo(p.block+' is already your active block');
+    const cur=activeProgSafe();
+    return 'Start "'+p.block+'" at week 1 as your active block'+(cur&&!cur.empty&&cur.id!==p.id?(blockDone(cur)?', and put '+(cur.block||'the finished block')+' away':'; '+(cur.block||'your current block')+' stays in your library'):'')}
   if(op==='clear'||op==='allow'){
     const name=ceName(c.ex);if(!name)throw ceNo('say which exercise your physio cleared');
     if(isAllowed(name))throw ceNo(name+' is already remembered as cleared');
@@ -7911,6 +7918,13 @@ function ceRun(raw){
       Object.keys(B).sort((x,y)=>B[y]-B[x]).slice(0,4).forEach(m=>{vol.push(m+': '+B[m]+' hard sets in week 1'+(B[m]>20?', over the 10 to 20 a week the app aims for':''))});
       const live=(S.sess&&S.sess.progId)?'The session you have open stays on its block. The new block is there when it is done.':'';
       return {pid:null,newBlock:NB.prog,clears:NB.clears,block:NB.prog.block,days:NB.prog.days,weeks:NB.prog.weeks,lines:NB.lines,left:NB.cleft,vol:vol,live:live}}
+    const sbc=C.find(c=>/^(start|use|switch)[\s_-]?block$|^activate$/i.test(String(c.do||c.op||'')));
+    if(sbc){
+      if(C.length>1)return {err:'Starting a block is proposed on its own; put other changes in a second message.'};
+      let line;try{line=ceOne(sbc,{days:[],weeks:1,block:''},null)}catch(e){if(e&&e.ce)return {err:'Allena cannot start that: '+e.message+'.'};oops('ceRun.start',e);return null}
+      const p=ceBlock(sbc.block!=null?sbc.block:sbc.name);
+      return {pid:null,startBlock:p.id,block:p.block,days:p.days||[],weeks:+p.weeks||1,lines:[line],left:[],vol:[],clears:[],
+        live:(S.sess&&S.sess.progId)?'The session you have open stays on its block.':''}}
     if(C.every(isClear)){
       const lines=[],left=[];
       C.forEach(c=>{try{lines.push(ceOne(c,{days:[],weeks:1,block:''},null))}catch(e){if(e&&e.ce)left.push(String(e.message));else{oops('ceRun.clear',e);left.push('one change could not be read')}}});
@@ -7948,7 +7962,7 @@ function coachEditCheck(json){
   if(R.err)return {id:id,state:'no-go',nb:nb,err:R.err,lines:[],left:[],vol:[]};
   /* what is kept is the request itself, so the yes can replay it */
   const keep={block:o.block!=null?ceClean(o.block,60):undefined,changes:(Array.isArray(o.changes)?o.changes:Array.isArray(o)?o:[o]).slice(0,CE_MAX)};
-  return {id:id,pid:R.pid,nb:nb,clr:!!R.clearOnly,block:R.block,req:JSON.parse(JSON.stringify(keep)),lines:R.lines,left:R.left,vol:R.vol,live:R.live,
+  return {id:id,pid:R.pid,nb:nb,clr:!!R.clearOnly,sb:!!R.startBlock,block:R.block,req:JSON.parse(JSON.stringify(keep)),lines:R.lines,left:R.left,vol:R.vol,live:R.live,
     state:R.lines.length?'pending':'no-go'}}
 /* the undo lives for this run of the app; after a restart the card says so */
 const CE_UNDO={};
@@ -7959,6 +7973,13 @@ function coachEditDo(m){
   const R=ceRun(E.req);
   if(!R||R.err||R.pid!==E.pid||R.lines.join('\n')!==E.lines.join('\n'))
     return {ok:false,why:'Your plan has changed since Allena suggested this, so nothing was changed. Ask again and she will work from the plan as it is now.'};
+  if(R.startBlock){
+    const p=(S.lib.programs||[]).find(x=>x.id===R.startBlock);if(!p)return {ok:false,why:'That block is no longer in your library.'};
+    const old=activeProgSafe();const wasActive=S.lib.activeId;let archived=null;
+    if(old&&!old.empty&&old.id!==p.id&&blockDone(old)){old.archived=Date.now();archived=old.id}
+    S.lib.activeId=p.id;saveLib();setWeek(1,p.id);
+    CE_UNDO[E.id]={startBlock:p.id,wasActive:wasActive,wasWeek:weekFor(p.id),archived:archived,at:Date.now()};
+    S.patCache=null;E.pid=p.id;E.state='done';E.at=Date.now();return {ok:true}}
   if(R.clearOnly){
     const done=[];(R.clears||[]).forEach(low=>{const n=ceName(low);if(n&&!isAllowed(n)){S.allow=S.allow||{};S.allow[n]=1;done.push(n)}});
     if(done.length)lset(K_ALLOW,S.allow);
@@ -7991,6 +8012,12 @@ function coachEditUndo(m){
   const U=CE_UNDO[E.id];
   if(!U)return {ok:false,why:'Undo closes when the app restarts. Ask Allena to change it back.'};
   if(U.clearOnly){ceUnallow(U);delete CE_UNDO[E.id];E.state='undone';return {ok:true}}
+  if(U.startBlock){
+    const used=(S.history||[]).some(h=>h&&h.progId===U.startBlock&&((/^\d{13}$/.test(String(h.id))&&+h.id>U.at)||Date.parse(h.date)>U.at))||(S.sess&&S.sess.progId===U.startBlock&&+S.sess.startedAt>U.at);
+    if(used)return {ok:false,why:'You have trained on that block, so undo is closed. Switch blocks in Train instead.'};
+    if(U.archived){const o=S.lib.programs.find(x=>x.id===U.archived);if(o)delete o.archived}
+    if(U.wasActive&&S.lib.programs.some(x=>x.id===U.wasActive)){S.lib.activeId=U.wasActive;setWeek(weekFor(U.wasActive),U.wasActive)}
+    saveLib();S.patCache=null;delete CE_UNDO[E.id];E.state='undone';return {ok:true}}
   if(U.newId){
     const used=(S.history||[]).some(h=>h&&h.progId===U.newId)||(S.sess&&S.sess.progId===U.newId);
     if(used)return {ok:false,why:'You have trained on the new block, so undo is closed. Switch blocks in Train instead.'};
@@ -8017,7 +8044,7 @@ function coachEditYes(co,q){
     if(!last||last.r!=='a'||!last.edit||last.edit.state!=='pending')return false;
     th.push({r:'user',t:String(q).trim()});co.input='';
     const r=coachEditDo(last);
-    th.push({r:'a',t:r.ok?(last.edit.clr?'Done. That is remembered as cleared by your physio.':last.edit.nb?'Done. '+last.edit.block+' is built and is your active block, at week 1. Undo is on the card above.':'Done. '+(last.edit.lines.length===1?'That change is':'Those '+last.edit.lines.length+' changes are')+' in '+last.edit.block+' now. Undo is on the card above.'):r.why});
+    th.push({r:'a',t:r.ok?(last.edit.clr?'Done. That is remembered as cleared by your physio.':last.edit.sb?'Done. '+last.edit.block+' is your active block now, at week 1. Open Train to start it.':last.edit.nb?'Done. '+last.edit.block+' is built and is your active block, at week 1. Undo is on the card above.':'Done. '+(last.edit.lines.length===1?'That change is':'Those '+last.edit.lines.length+' changes are')+' in '+last.edit.block+' now. Undo is on the card above.'):r.why});
     chatSaveCurrent(co);return true}
   catch(e){oops('coachEditYes',e);return false}}
 /* what the card shows, for the web and the phone alike */
@@ -8025,7 +8052,7 @@ function coachEditView(m){
   const E=m&&m.edit;if(!E)return null;
   const st=E.state;
   return {state:st,
-    title:st==='done'?(E.nb?'Built':'Changed'):st==='undone'?'Undone':st==='no'?'Not made':st==='no-go'?(E.nb?'Cannot build that':'Cannot change that'):(E.nb?'New block':E.clr?'Clearance':'Change to your plan'),
+    title:st==='done'?(E.nb?'Built':E.sb?'Started':'Changed'):st==='undone'?'Undone':st==='no'?'Not made':st==='no-go'?(E.nb?'Cannot build that':'Cannot change that'):(E.nb?'New block':E.clr?'Clearance':E.sb?'Start a block':'Change to your plan'),
     block:E.block||'',lines:E.lines||[],vol:st==='pending'?(E.vol||[]):[],
     left:(E.err?[E.err]:[]).concat((E.left||[]).map(x=>'Left out: '+x+'.')),
     live:st==='pending'?(E.live||''):'',
@@ -8035,7 +8062,8 @@ function coachEditMemo(E){
   if(!E)return '';
   const st={pending:'They have not answered yet.',done:'They said yes and it is made.',undone:'They made it, then undid it.',no:'They said not now; nothing changed.','no-go':'The app could not make it.'}[E.state]||'';
   return '\n[The '+(E.nb?'new block':'plan change')+' you proposed'+(E.block&&!E.nb?' to '+E.block:'')+': '+((E.lines||[]).join('; ')||'none')+
-    ((E.left||[]).length?'. Refused by the app: '+E.left.join('; '):'')+(E.err?'. '+E.err:'')+'. '+st+']'}
+    ((E.left||[]).length?'. Refused by the app: '+E.left.join('; '):'')+(E.err?'. '+E.err:'')+'. '+st+
+    (/injury screen protects/.test(String(E.err||'')+(E.left||[]).join(' '))?' If they say their physio has cleared that exercise, put {"do":"clear","ex":"<its name>"} in the SAME EDIT as the block or change, and send it.':'')+']'}
 /* the dossier's picture of a block: every session, every exercise, each
    run of weeks that share a prescription, so a change can name them */
 function ceWeekly(e,W){
