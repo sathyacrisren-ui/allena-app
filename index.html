@@ -1061,6 +1061,7 @@ h1.disp:not(.brand),.gradhead{letter-spacing:-.022em}
 .dhero .dsub{color:var(--dim);font-size:13px;line-height:1.5;margin-top:4px}
 .dhero .dlad{color:var(--faint);font-size:11px;line-height:1.5;margin-top:6px}
 .rchip{display:inline-block;margin-top:6px;font-size:11px;letter-spacing:.06em;padding:2px 8px;border-radius:999px;border:1px solid currentColor;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+.dipage .dicard{margin-top:16px;padding:18px 16px;border-color:var(--tier);box-shadow:0 0 28px color-mix(in srgb, var(--tier) 22%, transparent)}
 .hyppane{padding:14px 16px;margin-top:14px;background:var(--raised)}
 .gtag{display:inline-block;padding:3px 9px;border-radius:999px;border:1px solid var(--amber);color:var(--amber)}
 .chkpane{display:flex;flex-direction:column;gap:4px;padding:14px 16px;margin-top:10px}
@@ -1900,7 +1901,7 @@ if(S.sess){S.note=S.sess.note||S.note;
       if(c0&&(s0.log||[]).some(l=>l.ex===c0.ex&&l.setNo===c0.setNo)){const n0=sessAdv(s0);
         if(n0<0)s0.phase='done';else s0.idx=n0}}catch(e){oops('bootSess',e)}
     if(S.sess.phase!=='done')S.sess.phase='ready'}}
-const BUILD_ID='6d07b9';  // stamped by tools/build.py with the content hash
+const BUILD_ID='1d607e';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -35614,6 +35615,77 @@ function deepRowChip(x){
     if(past)return '<span class="rchip" style="color:var(--dim)">TRIED \u00b7 '+esc((DEEP_STATE_SAY[past.verdict.state]||past.verdict.state).toUpperCase())+'</span>';
     return '<span class="rchip" style="color:var(--amber)">TRY IT</span>'}
   catch(e){oops('deepRowChip',e);return ''}}
+
+/* ═══ THIS WEEK'S READ IS A PAGE (owner, 5 Oct 2026: "deserves to be a
+   page not a pop up, it's significant and holds meaning, give it some
+   respect"). The finding's body is one reader for both homes
+   (deepItemInner): the page the row opens, and the sheet kept for the
+   phone's old route. The page wears the finding's tier at the top. */
+function deepItemInner(i,o){
+    const it=(deepStore().items||[])[i];if(!it)return '';
+    const rc=rarityOf(it.rar)[1];
+    /* older reads cite dates as MM-DD (the model's shorthand) — turn
+       them human at display time (owner-caught, 8 Sep: 'I don't
+       understand the dates it has listed') */
+    const MON9=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const humanD=t9=>String(t9||'').replace(/\b(0[1-9]|1[0-2])-([0-3]\d)\b/g,
+      (m9,mm,dd)=>{const d9=+dd,mo=+mm;return(d9>=1&&d9<=31)?(d9+' '+MON9[mo-1]):m9});
+    const bars=(pairs,unit)=>{if(pairs.length<2)return '';
+      const mx=Math.max.apply(null,pairs.map(p=>p[1]));if(!(mx>0))return '';
+      return '<div style="display:flex;align-items:flex-end;gap:4px;height:56px;margin-top:8px">'+
+        pairs.map(p=>'<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:3px">'+
+          '<div style="width:100%;border-radius:4px 4px 2px 2px;background:var(--blue);height:'+Math.max(3,Math.round(p[1]/mx*44))+'px"></div>'+
+          '<span class="mono" style="color:var(--faint);font-size:var(--t-caption)">'+p[0]+'</span></div>').join('')+'</div>'+
+        '<p class="mono" style="color:var(--faint);font-size:var(--t-caption);margin-top:4px">'+unit+', last '+pairs.length+' weeks</p>'};
+    const inline=r=>{try{
+      if(r.kind==='lift'&&r.ex){const c9=liftChart(r.ex,null);
+        return c9?'<div class="card" style="padding:12px 14px;margin-top:8px"><p class="mono" style="color:var(--faint);font-size:var(--t-caption);letter-spacing:.06em">'+esc(r.ex.toUpperCase())+'</p>'+c9+'</div>':''}
+      if(r.kind==='tonnage'){const wk={};S.history.forEach(h=>{if(h.run)return;const k=isoWeek(h.date);
+          wk[k]=(wk[k]||0)+(h.log||[]).reduce((a2,l)=>a2+(l.w||0)*(l.r||0),0)});
+        const ks=Object.keys(wk).sort().slice(-8);
+        return '<div class="card" style="padding:12px 14px;margin-top:8px"><p class="mono" style="color:var(--faint);font-size:var(--t-caption);letter-spacing:.06em">WEEKLY TONNAGE</p>'+
+          bars(ks.map(k=>[k.slice(6),Math.round(wk[k])]),'kg lifted')+'</div>'}
+      if(r.kind==='runs'){
+        const wks=weeklyKm(8);
+        let b9=bars(wks.map(w=>[String(w.end||'').slice(8,10),w.km]),'km run'),lab='WEEKLY KM';
+        if(!b9){
+          /* a walk-based finding: the run chart is empty — show the
+             walks instead of a dead labelled box */
+          const wk9={};(S.runs||[]).forEach(r2=>{if(r2.type!=='walk'||!(r2.km>0))return;
+            const k=isoWeek(r2.date);wk9[k]=(wk9[k]||0)+r2.km});
+          const ks=Object.keys(wk9).sort().slice(-8);
+          if(ks.length>=2){b9=bars(ks.map(k=>[k.slice(6),Math.round(wk9[k]*10)/10]),'km walked');lab='WEEKLY WALK KM'}}
+        return b9?'<div class="card" style="padding:12px 14px;margin-top:8px"><p class="mono" style="color:var(--faint);font-size:var(--t-caption);letter-spacing:.06em">'+lab+'</p>'+b9+'</div>':''}
+      if(r.kind==='bw')return '<div style="margin-top:8px">'+(bwCard()||'')+'</div>';
+      return ''}catch(e){oops('deepitem.inline',e);return ''}};
+    const head=(o&&o.page)?'':
+      '<p class="mono" style="color:'+rc+';font-size:var(--t-caption);letter-spacing:.06em">'+esc(it.rar.toUpperCase())+' \u00b7 MODEL READ \u00b7 INTERPRETATION, NOT MEASUREMENT</p>'+
+      '<p class="disp" style="font-size:17px;font-weight:600;margin-top:8px;line-height:1.3">'+esc(it.t)+'</p>';
+    return (head+
+      (it.plain?'<p class="eyebrow mt2">In plain words</p>'+
+        '<p style="font-size:13px;line-height:1.65;margin-top:8px">'+esc(humanD(it.plain))+'</p>':'')+
+      '<p class="eyebrow mt2">The numbers it stands on</p>'+
+      '<p style="color:var(--dim);font-size:13px;line-height:1.6;margin-top:8px">'+esc(humanD(it.d))+'</p>'+
+      ((it.refs||[]).length?'<p class="eyebrow mt2">See it yourself \u2014 the raw truth it read from</p>'+
+        it.refs.map(inline).join(''):'')+
+      /* THE ANALYST (4 Oct 2026): the hypothesis, the trial and the number
+         that would settle it; one reader with the phone (deepItemView) */
+      deepItemAnalystHtml(i)+
+      (function(){const watching=deepStore().watches.some(w=>w.t===it.t);
+        return '<button data-a="deepWatch" data-v="'+i+'" class="btn mt2" style="'+(watching?'border-color:var(--blue);color:var(--blue)':'color:var(--dim)')+'">'+
+          (watching?'Watching \u2014 the next read reports on it \u2713':'Watch this \u2014 make the next read follow it up')+'</button>'})()+
+      '<button data-a="deepAsk" data-v="'+i+'" class="btn mt" style="border-color:var(--amber);color:var(--amber)">Ask Allena about this finding</button>'+
+      '<p style="color:var(--faint);font-size:11px;line-height:1.5;margin-top:12px">A read is the model\u2019s interpretation of your own numbers \u2014 clearly labelled, never dressed up as a measurement. The charts are the raw truth it read from.</p>')}
+function viewDeepItem(){
+  const i=+S.deepItemI||0,it=(deepStore().items||[])[i];
+  const back='<button data-a="back" class="btn" style="width:auto;padding:8px 14px;color:var(--dim);font-size:13px;margin-bottom:14px">\u2039 Back</button>';
+  if(!it)return '<div class="view pad stg phpad">'+back+'<p style="color:var(--dim);font-size:13px">That finding is not on this read.</p></div>';
+  const rc=rarityOf(it.rar)[1];
+  return '<div class="view pad stg phpad dipage" style="--tier:'+rc+'">'+back+
+    '<p class="mono" style="color:'+rc+';font-size:var(--t-caption);letter-spacing:.08em">THIS WEEK\u2019S READ \u00b7 '+esc(it.rar.toUpperCase())+' \u00b7 MODEL READ</p>'+
+    '<h1 class="disp vh1" style="margin-top:8px">'+esc(it.t)+'</h1>'+
+    '<p style="color:var(--faint);font-size:11px;margin-top:6px">Interpretation, not measurement.</p>'+
+    '<div class="card dicard">'+deepItemInner(i,{page:true})+'</div></div>'}
 /* ══ PREMIUM ═══════════════════════════════════════════════════
    The paywall, built dark. Nothing in this file charges anyone and
    nothing talks to Apple: isPremium() reads a local flag until the
@@ -40009,60 +40081,7 @@ function sheetHtml(){
       '<button data-a="helpCopy" class="big disp mt" style="background:var(--amber);color:var(--bg);font-size:15px">Copy the address</button>'+
       '<button data-a="dsetOpen" data-v="__report" class="btn mt" style="color:var(--dim)">Report something broken instead</button>'+
       '<p style="color:var(--faint);font-size:11px;line-height:1.55;margin-top:16px">Your training data lives on this phone, and while you are signed in a backup of it is also kept on Allena’s server so you can restore it. Nothing is attached to an email unless you attach it yourself.</p>')}
-  if(S.sheet.t==='deepitem'){
-    const it=(deepStore().items||[])[S.sheet.i];if(!it)return '';
-    const rc=rarityOf(it.rar)[1];
-    /* older reads cite dates as MM-DD (the model's shorthand) — turn
-       them human at display time (owner-caught, 8 Sep: 'I don't
-       understand the dates it has listed') */
-    const MON9=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-    const humanD=t9=>String(t9||'').replace(/\b(0[1-9]|1[0-2])-([0-3]\d)\b/g,
-      (m9,mm,dd)=>{const d9=+dd,mo=+mm;return(d9>=1&&d9<=31)?(d9+' '+MON9[mo-1]):m9});
-    const bars=(pairs,unit)=>{if(pairs.length<2)return '';
-      const mx=Math.max.apply(null,pairs.map(p=>p[1]));if(!(mx>0))return '';
-      return '<div style="display:flex;align-items:flex-end;gap:4px;height:56px;margin-top:8px">'+
-        pairs.map(p=>'<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:3px">'+
-          '<div style="width:100%;border-radius:4px 4px 2px 2px;background:var(--blue);height:'+Math.max(3,Math.round(p[1]/mx*44))+'px"></div>'+
-          '<span class="mono" style="color:var(--faint);font-size:var(--t-caption)">'+p[0]+'</span></div>').join('')+'</div>'+
-        '<p class="mono" style="color:var(--faint);font-size:var(--t-caption);margin-top:4px">'+unit+', last '+pairs.length+' weeks</p>'};
-    const inline=r=>{try{
-      if(r.kind==='lift'&&r.ex){const c9=liftChart(r.ex,null);
-        return c9?'<div class="card" style="padding:12px 14px;margin-top:8px"><p class="mono" style="color:var(--faint);font-size:var(--t-caption);letter-spacing:.06em">'+esc(r.ex.toUpperCase())+'</p>'+c9+'</div>':''}
-      if(r.kind==='tonnage'){const wk={};S.history.forEach(h=>{if(h.run)return;const k=isoWeek(h.date);
-          wk[k]=(wk[k]||0)+(h.log||[]).reduce((a2,l)=>a2+(l.w||0)*(l.r||0),0)});
-        const ks=Object.keys(wk).sort().slice(-8);
-        return '<div class="card" style="padding:12px 14px;margin-top:8px"><p class="mono" style="color:var(--faint);font-size:var(--t-caption);letter-spacing:.06em">WEEKLY TONNAGE</p>'+
-          bars(ks.map(k=>[k.slice(6),Math.round(wk[k])]),'kg lifted')+'</div>'}
-      if(r.kind==='runs'){
-        const wks=weeklyKm(8);
-        let b9=bars(wks.map(w=>[String(w.end||'').slice(8,10),w.km]),'km run'),lab='WEEKLY KM';
-        if(!b9){
-          /* a walk-based finding: the run chart is empty — show the
-             walks instead of a dead labelled box */
-          const wk9={};(S.runs||[]).forEach(r2=>{if(r2.type!=='walk'||!(r2.km>0))return;
-            const k=isoWeek(r2.date);wk9[k]=(wk9[k]||0)+r2.km});
-          const ks=Object.keys(wk9).sort().slice(-8);
-          if(ks.length>=2){b9=bars(ks.map(k=>[k.slice(6),Math.round(wk9[k]*10)/10]),'km walked');lab='WEEKLY WALK KM'}}
-        return b9?'<div class="card" style="padding:12px 14px;margin-top:8px"><p class="mono" style="color:var(--faint);font-size:var(--t-caption);letter-spacing:.06em">'+lab+'</p>'+b9+'</div>':''}
-      if(r.kind==='bw')return '<div style="margin-top:8px">'+(bwCard()||'')+'</div>';
-      return ''}catch(e){oops('deepitem.inline',e);return ''}};
-    return wrapSheet('This week\u2019s read',
-      '<p class="mono" style="color:'+rc+';font-size:var(--t-caption);letter-spacing:.06em">'+esc(it.rar.toUpperCase())+' \u00b7 MODEL READ \u00b7 INTERPRETATION, NOT MEASUREMENT</p>'+
-      '<p class="disp" style="font-size:17px;font-weight:600;margin-top:8px;line-height:1.3">'+esc(it.t)+'</p>'+
-      (it.plain?'<p class="eyebrow mt2">In plain words</p>'+
-        '<p style="font-size:13px;line-height:1.65;margin-top:8px">'+esc(humanD(it.plain))+'</p>':'')+
-      '<p class="eyebrow mt2">The numbers it stands on</p>'+
-      '<p style="color:var(--dim);font-size:13px;line-height:1.6;margin-top:8px">'+esc(humanD(it.d))+'</p>'+
-      ((it.refs||[]).length?'<p class="eyebrow mt2">See it yourself \u2014 the raw truth it read from</p>'+
-        it.refs.map(inline).join(''):'')+
-      /* THE ANALYST (4 Oct 2026): the hypothesis, the trial and the number
-         that would settle it; one reader with the phone (deepItemView) */
-      deepItemAnalystHtml(S.sheet.i)+
-      (function(){const watching=deepStore().watches.some(w=>w.t===it.t);
-        return '<button data-a="deepWatch" data-v="'+S.sheet.i+'" class="btn mt2" style="'+(watching?'border-color:var(--blue);color:var(--blue)':'color:var(--dim)')+'">'+
-          (watching?'Watching \u2014 the next read reports on it \u2713':'Watch this \u2014 make the next read follow it up')+'</button>'})()+
-      '<button data-a="deepAsk" data-v="'+S.sheet.i+'" class="btn mt" style="border-color:var(--amber);color:var(--amber)">Ask Allena about this finding</button>'+
-      '<p style="color:var(--faint);font-size:11px;line-height:1.5;margin-top:12px">A read is the model\u2019s interpretation of your own numbers \u2014 clearly labelled, never dressed up as a measurement. The charts are the raw truth it read from.</p>')}
+  if(S.sheet.t==='deepitem')return wrapSheet('This week\u2019s read',deepItemInner(S.sheet.i));
   if(S.sheet.t==='pvsub'){
     const e=S.prev&&S.prev.ex[S.sheet.i];if(!e)return '';
     /* a rehab programme never sees the preset table (28 Sep 2026): the
@@ -42512,6 +42531,7 @@ function render(){
   else if(S.view==='findings')body=viewPoints();
   else if(S.view==='levers')body=viewLevers();
   else if(S.view==='deep')body=viewDeep();
+  else if(S.view==='deepitem')body=viewDeepItem();
   else if(S.view==='tree')body=viewTree();
   else if(S.view==='crown')body=viewCrown();
   else if(S.view==='crownx')body=viewCrownX();
@@ -46667,7 +46687,8 @@ function runAction(a,v,t,e){
       S.coachBack=S.view;S.sheet=null;chatNew();
       S.coach.input='About the deep-read finding \u201c'+it.t+'\u201d \u2014 '+(it.plain||it.d).slice(0,180)+' \u2026 what should I actually do with this?';
       render();break}
-    case 'deepItemOpen':S.sheet={t:'deepitem',i:+v};render();break;
+    /* a finding of the read opens as a PAGE (owner, 5 Oct 2026), not a sheet */
+    case 'deepItemOpen':{S.deepItemI=+v;S.sheet=null;S.backTo=S.view;S.backDrawer=false;S.view='deepitem';render();break}
     case 'pvSubOpen':S.sheet={t:'pvsub',i:+v};render();break;
     case 'pvSubBack':S.sheet={t:'preview'};render();break;
     case 'pvSubPick':{const sh=S.sheet,e=S.prev&&S.prev.ex[sh.i];if(!e)break;
