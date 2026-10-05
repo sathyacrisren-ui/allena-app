@@ -1909,7 +1909,7 @@ if(S.sess){S.note=S.sess.note||S.note;
       if(c0&&(s0.log||[]).some(l=>l.ex===c0.ex&&l.setNo===c0.setNo)){const n0=sessAdv(s0);
         if(n0<0)s0.phase='done';else s0.idx=n0}}catch(e){oops('bootSess',e)}
     if(S.sess.phase!=='done')S.sess.phase='ready'}}
-const BUILD_ID='659483';  // stamped by tools/build.py with the content hash
+const BUILD_ID='e4be04';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -7266,10 +7266,33 @@ function coachPlaceOk(k){
 /* ── the action lines in a reply ──────────────────────────────────────
    Read only at the start of a line, kept out of the shown text, capped,
    and checked: an unknown place is dropped, never drawn as a dead button. */
+/* THE JSON IS THE LINE, HOWEVER IT IS DRESSED (owner's third export,
+   5 Oct 2026: the model wrote <EDIT>{...}</EDIT> as a tag, no bar, and
+   the line-by-line parser never saw it). The marker is EDIT or LOG at a
+   line start, wearing any of < * | : > around it; the JSON starts at the
+   next brace and ends where the braces balance, across lines if the model
+   broke it up. The whole span leaves the words. */
+function coachPullJson(text,kind){
+  const out={text:String(text||''),json:null};
+  try{const re=new RegExp('(?:^|\\n)[^\\S\\n]*[<*\\s]*'+kind+'\\s*[|:>]*\\s*(?=\\{)','i');
+    const m=re.exec(out.text);if(!m)return out;
+    const start=m.index+m[0].length;let depth=0,i=start,inStr=false,esc=false;
+    for(;i<out.text.length;i++){const ch=out.text[i];
+      if(inStr){if(esc)esc=false;else if(ch==='\\')esc=true;else if(ch==='"')inStr=false;continue}
+      if(ch==='"')inStr=true;else if(ch==='{')depth++;else if(ch==='}'){depth--;if(!depth){i++;break}}}
+    if(depth)return out;   // never closed: the cut-off case, left for the words and the stub rule
+    out.json=out.text.slice(start,i);
+    const tail=/^[\s>*]*(?:<\/\s*[A-Za-z]+\s*>)?[^\S\n]*/.exec(out.text.slice(i));
+    out.text=(out.text.slice(0,m.index)+'\n'+out.text.slice(i+(tail?tail[0].length:0))).replace(/\n{3,}/g,'\n\n')}
+  catch(e){oops('coachPullJson',e)}
+  return out}
 function coachParse(text){
   const res={text:'',go:[],mem:[],forget:[],ask:[],log:null,edit:null};
   const keep=[];
-  String(text||'').split('\n').forEach(line=>{
+  let src=String(text||'');
+  const pe=coachPullJson(src,'EDIT');if(pe.json){res.edit=coachEditCheck(pe.json);src=pe.text}
+  const pl=coachPullJson(src,'LOG');if(pl.json){res.log=coachLogCheck(pl.json);src=pl.text}
+  src.split('\n').forEach(line=>{
     /* LOG carries one line of JSON; it is checked here, and a line that
        does not check out is dropped, never shown as text */
     /* the model sometimes wraps an action line in angle brackets or a
@@ -7437,7 +7460,7 @@ function coachSys2(){
     '  {"do":"start_block","block":"Bench Block 2"} (a block already in their library becomes the active one at week 1; a finished block is put away. On its own in the EDIT. Use it when the block they want is listed under "Also in their library"; never new_block for one that exists.)\n'+
     '  {"do":"clear","ex":"Leg extension"} (when the injury screen refused an exercise and they tell you their physio cleared it: this remembers the clearance, exactly as keeping it in a session preview does; it may ride in the same EDIT as the block or change that needs it. Only on their word about their physio, never on your own judgement.)\n'+
     'Use their own exercise names from the record; a new exercise gets a sets count and reps (or secs), and an RPE range unless they gave one. Kilograms only. At most one EDIT per reply. HOW TO USE IT: if the request leaves the place open (which session, which weeks, how many sets, what reps), ask first in one short question and offer ASK lines for the likely answers; never guess where something goes. When it is clear, say in a sentence or two what you will change and what you think of it, then add the EDIT line; the card is the confirmation, so do not ask "shall I?" as well. Judge it on the evidence and say so plainly: hard sets per muscle a week (10 to 20 is the range the app runs on; past 20 the extra sets buy little and cost recovery), a clear day between sessions that hit the same muscles, the deload week, their goal lifts, their recovery and their injuries. If you would advise against it, say why in one line with the number, then still propose it if they asked; it is their plan. Two exceptions you refuse outright: anything their injury restrictions screen out, and any change to a rehab protocol or a physio\u2019s plan (that is their physio\u2019s to change; OPEN physio). Sessions are only added at the end of a block and only the last one can be removed; this keeps every logged session matched to its day. The plan has no fixed weekdays: sessions run in order and the week board places them, so if they name a weekday, say that and name the session after it if they want.\n'+
-    'NOTHING YOU SAY CHANGES THE APP. Only an EDIT or LOG line, after they tap or reply yes, does. So never say you have built, saved, added, changed or set up anything; say what you propose, put the line, and the card does the rest. Never describe a block, session or change as done unless the record or the card says it is made; never write "Confirmed", "built" or "live" about anything you proposed, because the card is the only thing that confirms it. If they say a change is not there, it is not there: propose it again with the line, do not insist. When they ask you to build their programme or their next block, do it with new_block in that same reply, built from the record; a sentence or two on why, then the line. When they ask you to build, start, send, confirm or "give me the card", the reply IS the EDIT line: a reply to that without one has failed them, whatever else it says. If the card refused something and they have answered the refusal (their physio cleared it, they chose the days), send the line again with that fixed, in the same reply. A block starts when they open Train and tap it; you never decide the day, never say "tomorrow", never hold a block back for a rest day or a rehab session; you may say in one sentence what you would do, then send the line. If their block is finished, the app also offers "Build block 2 from this data" on Train (OPEN|train), which carries every learned load forward; say so, and still propose yours if they asked you.\n'+
+    'NOTHING YOU SAY CHANGES THE APP. Only an EDIT or LOG line, after they tap or reply yes, does. So never say you have built, saved, added, changed or set up anything; say what you propose, put the line, and the card does the rest. Never describe a block, session or change as done unless the record or the card says it is made; never write "Confirmed", "built" or "live" about anything you proposed, because the card is the only thing that confirms it. If they say a change is not there, it is not there: propose it again with the line, do not insist. When they ask you to build their programme or their next block, do it with new_block in that same reply, built from the record; a sentence or two on why, then the line. When they paste a block and ask for it, build EXACTLY what they pasted: their sessions, their exercises, their sets, reps, loads and effort, their number of days. You may say in one sentence what you would change, and then build theirs; never swap their block for yours. When they ask you to build, start, send, confirm or "give me the card", the reply IS the EDIT line: a reply to that without one has failed them, whatever else it says. If the card refused something and they have answered the refusal (their physio cleared it, they chose the days), send the line again with that fixed, in the same reply. A block starts when they open Train and tap it; you never decide the day, never say "tomorrow", never hold a block back for a rest day or a rehab session; you may say in one sentence what you would do, then send the line. If their block is finished, the app also offers "Build block 2 from this data" on Train (OPEN|train), which carries every learned load forward; say so, and still propose yours if they asked you.\n'+
     'WHAT YOU CANNOT DO: save or delete their logged training yourself, change a rehab or physio plan, message their friends, or see anyone else’s data. If they ask, say so plainly and OPEN the place where they can do it themselves.');
   if(coachToolsOn())P.push('LOOKING THINGS UP: the record carries every set for the last six weeks and summaries before that. For anything older or more detailed (a session in March, every run in a month, one whole day, a lift’s full history), call a tool rather than guess. Tool results are the app’s own record.');
   return P.join('\n\n')+COACH_TONE}
