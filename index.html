@@ -1909,7 +1909,7 @@ if(S.sess){S.note=S.sess.note||S.note;
       if(c0&&(s0.log||[]).some(l=>l.ex===c0.ex&&l.setNo===c0.setNo)){const n0=sessAdv(s0);
         if(n0<0)s0.phase='done';else s0.idx=n0}}catch(e){oops('bootSess',e)}
     if(S.sess.phase!=='done')S.sess.phase='ready'}}
-const BUILD_ID='e4be04';  // stamped by tools/build.py with the content hash
+const BUILD_ID='da2c64';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -4577,7 +4577,7 @@ function snapshotData(){
        friend's phone can age a card that has not been refreshed since
        Monday instead of showing the whole stake all week. social17.sql;
        self-detects. */
-    try{if(!S._snapNoStake&&d.stake&&d.stake.asked){const k9=d.stake;
+    try{if(!S._snapNoStake&&typeof STAKE_ON!=='undefined'&&STAKE_ON&&d.stake&&d.stake.asked){const k9=d.stake;
       out.stake={asked:+k9.asked||0,done:Math.min(50,+k9.done||0),kept:Math.min(105,Math.round(+k9.kept||0)),frozen:!!k9.prot}}}
     catch(e){oops('snapStake',e)}
     /* PODS (14 Sep): the stage bracket and the yes/no exemption ride
@@ -4929,6 +4929,15 @@ async function giftTake(){
     const ok=(await r.json())===true;
     giftRefresh();return ok}
   catch(e){oops('giftTake',e);return false}}
+/* a read that never reached the model hands the gift back (gift_refund,
+   social18.sql); self-detecting like the rest, a server without it is
+   simply a gift lost to a flat spot, never an error shown */
+async function giftBack(){
+  try{const h=await frHeaders();if(!h)return false;
+    const r=await fetch(CLOUD.url+'/rest/v1/rpc/gift_refund',{method:'POST',headers:Object.assign({'content-type':'application/json'},h),body:'{}'});
+    if(!r.ok)return false;
+    giftRefresh();return true}
+  catch(e){oops('giftBack',e);return false}}
 /* a code typed during sign-up waits for the sign-in, then joins once */
 function inviteRedeemPending(){
   try{const c=S.prof&&S.prof.inviteCode;if(!c||!S.frMe)return;
@@ -5120,6 +5129,9 @@ function snWeeks(sn){
     const aged=(wl,wk9,elapsedDays)=>{
       const k=sn&&sn.stake;
       if(!k||typeof k!=='object'||!(+k.asked>0))return wl;
+      /* the stake is off (5 Oct 2026): a card from an app that still
+         uploads one is read without it, so a Monday 75 reads as 0 */
+      if(typeof STAKE_ON!=='undefined'&&!STAKE_ON)return Math.max(0,wl-(+k.kept||0));
       if(k.frozen)return wl;
       const full=(+k.asked)*15;
       const missed=Math.max(0,Math.floor((+k.asked)*elapsedDays/7)-(+k.done||0));
@@ -5706,7 +5718,7 @@ function friendsSection(){
       /* THE STAKE (owner ruling, 25 Sep 2026, 07c-stakes): replaces the
          adherence line that ranked nothing. Same denominator the user
          cannot lower, the sessions Allena asked for, and now it costs. */
-      (function(){try{const l9=(typeof stakeLine==='function')?stakeLine():'';
+      (function(){try{const l9=(typeof stakeLine==='function'&&STAKE_ON)?stakeLine():'';
         return l9?'<p style="font-size:13px;color:var(--dim);margin-top:4px;line-height:1.5">'+esc(l9)+'</p>':''}catch(e9){oops('stakeLine.card',e9);return ''}})()+'</div>'+
       '<button data-a="raceMineOpen" style="text-align:right;flex:none;padding:0"><p class="disp" data-cu="me" style="font-size:28px;font-weight:600;letter-spacing:-.025em;color:'+(mine>0?'var(--green)':'var(--text)')+'">'+mine+'</p>'+
       '<p class="micro" style="letter-spacing:.12em">this week \u203a</p></button></div>';
@@ -6352,9 +6364,16 @@ async function cloudBkPull(){
    returns true. */
 function bkDeviceHasRecord(){
   try{
-    /* a Health or Strava run mirrors into history as h.run — it arrived
-       on its own too, and blocked the restore (audit D1) */
-    if((S.history||[]).some(h=>h&&!h.demo&&!h.run))return true;
+    /* THE MIRROR IS NOT THE RECORD EITHER (review, 3 Oct 2026). runAdd() mirrors every run
+       into S.history as a 'run-<id>' row, and hkImport writes a 'wgs<id>' row for a watch-only
+       gym session — so a phone that had only ever synced Health still held history rows, this
+       line said "the person's record is here", and the 22 Sep fix below never got to run. The
+       22 Sep test passed because it set S.history=[] beside the Health runs, a shape a real
+       phone never has. An auto-fetched row re-imports on the next sync; only what the person
+       logged can block a restore. */
+    const autoRow=h=>{const id=String((h&&h.id)||'');
+      return (h.run&&/^run-(hk|sv)/.test(id))||(h.watchOnly&&/^wgs/.test(id))};
+    if((S.history||[]).some(h=>h&&!h.demo&&!autoRow(h)))return true;
     /* 'hk…' is Health, 'sv…' is Strava — both arrive on their own. A hand-logged run
        has neither prefix, and that one IS the person's. */
     if((S.runs||[]).some(r=>!/^(hk|sv)/.test(String((r&&r.id)||''))))return true;
@@ -8430,7 +8449,13 @@ function sessNextOpen(s,from,notEx){
     if(notEx!=null&&st.exNo===notEx)continue;
     if(!logged(st))return i}
   return s.sets.length}
-A.skipSet=()=>{const s=S.sess;A.adv(sessNextOpen(s,sessNow(s)+1))};
+/* A SKIP MARKS WHAT IT SKIPS (review, 4 Oct 2026). The 28 Sep rewrite
+   only jumped forward; sessAdv (00-core) wraps around at the next commit,
+   so with any set still open behind it the skipped set came straight
+   back. st.skip is the flag the table and sessAdv both read. */
+A.skipSet=()=>{const s=S.sess;const i0=sessNow(s),st=s.sets[i0];
+  if(st&&!sessLogOf(s,st))st.skip=true;
+  A.adv(sessNextOpen(s,i0+1))};
 A.skipEx=()=>{const s=S.sess,i0=sessNow(s),no=s.sets[i0].exNo;
   s.skipped=(s.skipped||[]);if(s.skipped.indexOf(no)<0)s.skipped.push(no);
   A.adv(sessNextOpen(s,i0+1,no))};
@@ -13100,7 +13125,7 @@ function dataPoints(){
      the week's stake joins the witnessed points, so every reader of the
      race number (board, breakdown, score card, ceremony) sees one figure */
   let stake=null;
-  try{if(wkStart&&typeof raceStake==='function'){
+  try{if(wkStart&&typeof raceStake==='function'&&typeof STAKE_ON!=='undefined'&&STAKE_ON){
     stake=raceStake(wkStart,null,stDoneCur);
     weekLive+=stake.kept;
     if(pvStart)prevWeekLive+=raceStake(pvStart,null,stDonePrev).kept;
@@ -13569,6 +13594,14 @@ function dayTagsSheet(){
    week somebody chose to sit out, loses no stake and cannot drop a league.
    Sitting out is once in any four race weeks (a flare is a real event and
    is not rationed). No new storage key: league state rides K_ACCT. */
+/* THE STAKE IS OFF (owner, 5 Oct 2026: a Monday board of 75s and 90s
+   with nobody trained yet — "Why does everyone have points… no one has
+   done a session yet" — "Get rid of it"). The maths below is kept and
+   tested; STAKE_ON gates every seam it reached: dataPoints, the score
+   card, the breakdown line, the sit-out door, and a friend's card (an
+   older app still uploads a stake, and the reader strips it). The leagues
+   stay. Nothing is deleted; flip this to bring it back. */
+const STAKE_ON=false;
 const STAKE_PER=15;
 const LEAGUES=['Bronze','Silver','Gold','Platinum','Diamond'];
 /* did a racer show up this week? The stake puts up to 7 x STAKE_PER on a
@@ -35954,12 +35987,21 @@ async function deepRun(){
   /* A GIFTED READ IS SPENT ON THE SERVER, BEFORE THE CURTAIN (3 Oct 2026,
      02b): without a subscription the read runs only when gift_take() says
      one was really there */
-  if(!DEEP_CFG.beta&&!subEntitled()){
-    if(!(await giftTake())){S.sheet={t:'upgrade',v:'read'};render();return flash('That free read has already been used.')}}
+  /* A SERVER SPEND COMES AFTER EVERY LOCAL GATE THAT CAN REFUSE (review,
+     4 Oct 2026): aiSpend can still say no (consent not given yet, the
+     day's cap), and gift_take is irreversible on the server, so the local
+     gate runs first and the gift is spent last. */
   if(!aiSpend('deep'))return;
+  let gifted=false;
+  if(!DEEP_CFG.beta&&!subEntitled()){
+    if(!(await giftTake())){try{aiRefund('deep')}catch(e){oops('deepRefund',e)}
+      S.sheet={t:'upgrade',v:'read'};render();return flash('That free read has already been used.')}
+    gifted=true}
   /* a read that never reached the model must not cost one of the day's
-     two — the cap is there to stop a loop, not to punish a flat spot */
-  const giveBack=()=>{try{if(typeof aiRefund==='function')aiRefund('deep')}catch(e){oops('deepRefund',e)}};
+     two — the cap is there to stop a loop, not to punish a flat spot —
+     nor the gifted read it was going to use */
+  const giveBack=()=>{try{if(typeof aiRefund==='function')aiRefund('deep')}catch(e){oops('deepRefund',e)}
+    if(gifted){gifted=false;try{giftBack()}catch(e){oops('deepGiftBack',e)}}};
   { // the constellation: real sources, real counts, drawn while the model works
     const H9=(S.history||[]).filter(h=>h.complete&&!h.run);
     const R9=deepRuns();
@@ -42881,15 +42923,15 @@ function sheetHtml(){
       row('Witnessed only','Your phone ran the clock and the sets spread like a real session, or your watch recorded it. Typed-in history and imports never race.')+
       row('Runs and rides count by time','A witnessed run earns 0.8 points a minute, capped at 40. A ride earns 0.48 a minute, capped at 24. A walk never races.')+
       row('A day is capped at '+cap,'One honest day is nowhere near it. Nobody wins by logging more than they trained.')+
-      row('Fresh every Monday','The week resets at midnight on Sunday, your time, and opens with your stake. Last week\u2019s podium is kept and can be reopened here.')+
-      row('The stake','Each week opens with '+(typeof STAKE_PER!=='undefined'?STAKE_PER:15)+' points for every session Allena asked for. The sessions are spread evenly over the week, and each one that is due and not done takes its '+(typeof STAKE_PER!=='undefined'?STAKE_PER:15)+' back. A witnessed session or run counts as done, and so does any finished rehab session.')+
+      row('Fresh every Monday','The week resets at midnight on Sunday, your time'+(STAKE_ON?', and opens with your stake':', at zero')+'. Last week\u2019s podium is kept and can be reopened here.')+
+      (STAKE_ON?row('The stake','Each week opens with '+(typeof STAKE_PER!=='undefined'?STAKE_PER:15)+' points for every session Allena asked for. The sessions are spread evenly over the week, and each one that is due and not done takes its '+(typeof STAKE_PER!=='undefined'?STAKE_PER:15)+' back. A witnessed session or run counts as done, and so does any finished rehab session.'):'')+
       row('Leagues','Bronze, Silver, Gold, Platinum, Diamond. At the end of the week the top finisher on your board moves up a league and the last one moves down. From six racers it is the top two and the bottom two. Fewer than three racers and nobody moves. Your lifetime tier, your level and your tree never go down.')+
-      row('Protected weeks','From the day a flare-up is logged, the week cannot lose more stake, and its league holds where it is. You can also sit one week out in any four, for illness or a setback. Points already lost stay lost.')+
+      row('Protected weeks','From the day a flare-up is logged, the week\u2019s league holds where it is'+(STAKE_ON?', and it cannot lose more stake. You can also sit one week out in any four, for illness or a setback. Points already lost stay lost.':'.'))+
       row('The number is yours to claim','The race only sees the score card your phone sends, so it cannot recompute your week. A friend on a board of three would notice a week you did not train.')+
       '</div>'+
       /* the sit-out door lives beside the rule that explains it; disabled
          with its reason when it is not available (design rule 2) */
-      (function(){try{if(typeof sitOutAllowed!=='function')return '';
+      (function(){try{if(typeof sitOutAllowed!=='function'||!STAKE_ON)return '';
         const st9=raceStake();if(!st9.asked)return '';
         const g9=sitOutAllowed();
         if(st9.prot==='sitout')return '<p style="color:var(--dim);font-size:13px;line-height:1.55;margin-top:14px">You are sitting this week out. Nothing more can be lost and your league holds where it is.</p>';
@@ -42913,7 +42955,7 @@ function sheetHtml(){
     if(R.items.length)inner+='<div class="mt2">'+R.items.map(row).join('')+'</div>';
     else inner+='<div class="card mt2" style="padding:14px 16px"><p style="color:var(--dim);font-size:13px;line-height:1.6">Train with the phone or watch running and the session lands here with what it earned.</p></div>';
     inner+='<p style="color:var(--faint);font-size:11px;line-height:1.55;margin-top:16px">A lifting session earns for every honest number in it \u2014 each set\u2019s weight, reps and effort, plus one for finishing. A witnessed run earns by time on feet. Both are capped per day so one huge day cannot buy a week.</p>';
-    try{const l9=(typeof stakeLine==='function')?stakeLine():'';if(l9)inner+='<p style="color:var(--dim);font-size:13px;line-height:1.55;margin-top:10px">'+esc(l9)+'</p>'}catch(e9){oops('racemine.stake',e9)}
+    try{const l9=(typeof stakeLine==='function'&&STAKE_ON)?stakeLine():'';if(l9)inner+='<p style="color:var(--dim);font-size:13px;line-height:1.55;margin-top:10px">'+esc(l9)+'</p>'}catch(e9){oops('racemine.stake',e9)}
     return wrapSheet('Where your points came from',inner)}
   if(S.sheet.t==='nudge'){
     const id=S.sheet.id;
