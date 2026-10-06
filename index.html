@@ -1909,7 +1909,7 @@ if(S.sess){S.note=S.sess.note||S.note;
       if(c0&&(s0.log||[]).some(l=>l.ex===c0.ex&&l.setNo===c0.setNo)){const n0=sessAdv(s0);
         if(n0<0)s0.phase='done';else s0.idx=n0}}catch(e){oops('bootSess',e)}
     if(S.sess.phase!=='done')S.sess.phase='ready'}}
-const BUILD_ID='da2c64';  // stamped by tools/build.py with the content hash
+const BUILD_ID='6dc716';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -9789,6 +9789,35 @@ function checkGoals(e){
     if(!g.done&&goalNames(g,b9).indexOf(b9)>=0&&e.w>=g.w&&e.r>=g.r){
       g.done=new Date().toISOString();lset(K_GOALS,S.goals);return g}}
   return null}
+/* A GOAL IS ANY LIFT YOU CAN NAME (beta ask, 6 Oct 2026: "can you have it
+   so I can search an exercise here and add it as a goal... barbell
+   squat"). The picker was a dropdown of the program's lifts; it is a
+   type-to-search box now. Every token typed must start a word of the
+   name; the user's own history ranks first, then their program, then the
+   library (exKnownNames, 12b). Empty text shows the old list. */
+function goalExSearch(typed){
+  try{
+    const q=String(typed||'').trim().toLowerCase();
+    if(!q)return goalExOptions().map(n=>({n:n,tag:''}));
+    const toks=q.split(/\s+/).filter(Boolean);
+    const out=[];
+    exKnownNames().forEach(c=>{
+      const words=String(c.n).toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
+      if(!toks.every(t=>words.some(w=>w.indexOf(t)===0)))return;
+      out.push(c)});
+    out.sort((a,b)=>a.src-b.src||b.cnt-a.cnt||a.n.length-b.n.length);
+    return out.slice(0,6).map(c=>({n:gBase(c.n),tag:c.cnt?(c.cnt+' SET'+(c.cnt===1?'':'S')):(c.src===1?'IN YOUR PROGRAM':'IN THE LIBRARY')}))}
+  catch(e){oops('goalExSearch',e);return []}}
+function goalNearHtml(typed){
+  try{
+    const cur=String(typed||'').trim(),list=goalExSearch(cur);
+    if(!list.length)return cur?'<p style="color:var(--faint);font-size:11px;line-height:1.5;margin-top:8px">Nothing by that name yet. Add it as typed and the goal starts counting from your first logged set of it.</p>':'';
+    return '<div style="display:flex;flex-direction:column;gap:8px;margin-top:8px">'+
+      list.map(x=>'<button data-a="gNear" data-v="'+esc(x.n)+'" class="card" style="width:100%;text-align:left;padding:10px 13px;display:flex;align-items:center;gap:8px'+
+        (cur&&cur.toLowerCase()===x.n.toLowerCase()?';border-color:var(--amber)':'')+'">'+
+        '<span style="flex:1;min-width:0;font-size:13px;font-weight:600">'+esc(x.n)+'</span>'+
+        (x.tag?'<span class="mono" style="flex:none;color:var(--faint);font-size:var(--t-caption)">'+x.tag+'</span>':'')+'</button>').join('')+'</div>'}
+  catch(e){oops('goalNearHtml',e);return ''}}
 function goalExOptions(){const set=new Set();
   activeProg().days.forEach(d=>d.exercises.forEach(e=>{
     const st=setsForWeek(e,1);if(st&&st[0]&&st[0].secs)return;set.add(gBase(e.name))}));
@@ -40961,7 +40990,8 @@ function sheetHtml(){
        prompts, which leave {am:''} and the like behind; a leftover of
        theirs is not a goal form (28 Sep 2026: the steppers came up
        blank and Add refused) */
-    if(!S.gform||!('r' in S.gform)||!('ex' in S.gform))S.gform={ex:null,w:UNITS.w==='lb'?135:60,r:8};   // in the user's own unit (C-30)
+    if(!S.gform||!('r' in S.gform)||!('ex' in S.gform))S.gform={ex:'',w:UNITS.w==='lb'?135:60,r:8};   // in the user's own unit (C-30)
+    const gex=String(S.gform.ex||'').trim();
     let inner='';
     if(S.goals.length){inner+='<div style="display:flex;flex-direction:column;gap:8px">'+
       S.goals.map(g=>{const st=goalStats(g);
@@ -40971,12 +41001,13 @@ function sheetHtml(){
         '<button data-a="gDel" data-v="'+g.id+'" style="color:var(--red);font-size:13px;padding:6px">Remove</button></div>'}).join('')+'</div>'}
     if(S.goals.length<3){
       inner+='<p class="eyebrow" style="margin-top:'+(S.goals.length?'18':'0')+'px">Add a goal · lift</p>'+
-      '<select data-gex style="width:100%;margin-top:8px;background:var(--surface);border:1px solid var(--line);border-radius:12px;color:var(--text);padding:13px 14px;font-size:15px;outline:none;-webkit-appearance:none;appearance:none">'+
-      '<option value=""'+(S.gform.ex?'':' selected')+' disabled>Pick the lift\u2026</option>'+
-      goalExOptions().map(x=>'<option value="'+esc(x)+'"'+(S.gform.ex===x?' selected':'')+'>'+esc(x)+'</option>').join('')+'</select>'+
+      /* type-to-search, any lift (beta ask, 6 Oct 2026); the list under
+         it is rewritten as they type (29-scrub), never through render() */
+      '<input data-in="gform.ex" value="'+esc(S.gform.ex||'')+'" placeholder="Type any exercise" autocomplete="off" style="width:100%;margin-top:8px">'+
+      '<div id="gnear">'+goalNearHtml(S.gform.ex)+'</div>'+
       '<div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px;margin-top:16px">'+
       stepper('gform.w','Weight',S.gform.w,UNITS.w==='lb'?5:2.5,uwUnit())+stepper('gform.r','Reps',S.gform.r,1,'')+'</div>'+
-      '<button data-a="gAdd" class="big disp mt" style="background:'+(S.gform.ex?'var(--green)':'var(--raised)')+';color:'+(S.gform.ex?'var(--bg)':'var(--faint)')+';font-size:17px">Add goal</button>';
+      '<button data-a="gAdd" class="big disp mt" style="background:'+(gex?'var(--green)':'var(--raised)')+';color:'+(gex?'var(--bg)':'var(--faint)')+';font-size:17px">Add goal</button>';
     }else inner+='<p style="color:var(--dim);font-size:13px;line-height:1.55;margin-top:16px">Three goals is the cap for a block. Spreading focus further dilutes the volume each lift gets — finish or drop one to add another.</p>';
     inner+='<p style="color:var(--faint);font-size:11px;line-height:1.5;margin-top:16px">Progress and projections use estimated 1RM from every logged set of that lift. The projection fits a line through your last ~4 months — strength gain flattens over time, so treat dates as optimistic. A goal only counts as DONE when you log the actual set.</p>';
     return wrapSheet('Lift goals',inner)}
@@ -45102,8 +45133,7 @@ document.addEventListener('scroll',e=>{ // the findings carousel remembers its l
           if(S.lensIdx===0&&typeof discMarkSoon==='function')discMarkSoon();
           if(S.lensIdx===1&&typeof patMarkSoon==='function')patMarkSoon()}}catch(e8){}},160)}}catch(e2){}},true);
 document.addEventListener('change',e=>{ // the goal-lift dropdown
-  if(e.target&&e.target.dataset&&e.target.dataset.gex!=null){
-    S.gform.ex=e.target.value;try{render()}catch(e2){oops('gex.render',e2)}}},true);
+  },true);
 /* A FILE IS NOT A TAP (review M-24). The AI consent sheet's Yes re-runs
    the last tap, but a photo or file read starts from a picker's change
    event, so "the last tap" was whatever button came before — Yes reopened
@@ -45325,6 +45355,17 @@ document.addEventListener('input',e=>{const d=e.target.dataset;
       b9.style.background=on9?'var(--green)':'var(--raised)';
       b9.style.color=on9?'var(--bg)':'var(--faint)'}}
     catch(e9){oops('axNearLive',e9)}return}
+  if(k==='gform.ex'){try{const host=document.getElementById('gnear');
+    /* on the web the strip is written in place; the phone has no element
+       to write into (gnear is in the shim's no-element list), so it
+       re-renders after a short pause — its field keeps the keyboard */
+    if(host&&typeof goalNearHtml==='function')host.innerHTML=goalNearHtml(e.target.value);
+    else{clearTimeout(S._gnT);S._gnT=setTimeout(function(){try{render()}catch(e8){oops('gnear.render',e8)}},350)}
+    const b9=document.querySelector('[data-a="gAdd"]');
+    if(b9){const on9=String(e.target.value).trim();
+      b9.style.background=on9?'var(--green)':'var(--raised)';
+      b9.style.color=on9?'var(--bg)':'var(--faint)'}}
+    catch(e9){oops('gNearLive',e9)}return}
   if(k==='coach.input'){try{const b=document.querySelector('.sendbtn');
     if(b)b.style.opacity=String(e.target.value).trim()?'1':'.35';
     e.target.style.height='auto';
@@ -48165,13 +48206,22 @@ function runAction(a,v,t,e){
     case 'creaToggle':S.supp.on=!S.supp.on;lset(K_SUPP,S.supp);render();break;
     case 'goalsOpen':S.sheet={t:'goals'};render();break;
 
-    case 'gAdd':{const f=S.gform;if(!f||!f.ex||S.goals.length>=3)break;
+    case 'gNear':{if(!S.gform)break;S.gform.ex=String(v||'');render();break}
+    case 'gAdd':{const f=S.gform;if(!f||S.goals.length>=3)break;
+      /* typed or tapped: a known spelling of the same lift wins, so a goal
+         never splits a trend (exNear's SAME LIFT, 15 Sep) */
+      let ex=gBase(String(f.ex||'').trim());if(!ex)break;
+      try{const lo=ex.toLowerCase();
+        const known=(typeof exKnownNames==='function'?exKnownNames():[]).find(c=>String(c.n).toLowerCase()===lo);
+        if(known)ex=gBase(known.n);
+        else{const same=(typeof exNear==='function'?exNear(ex,3):[]).find(x=>x.same);if(same)ex=gBase(same.n)}}
+      catch(e){oops('gAdd.same',e)}
       if(!(+f.w>0)||!(+f.r>0)){flash('Set a weight and reps.');break}
-      if(S.goals.some(g=>g.ex===f.ex)){flash('One goal per lift — remove the existing one first.');break}
+      if(S.goals.some(g=>String(g.ex).toLowerCase()===ex.toLowerCase())){flash('One goal per lift — remove the existing one first.');break}
       /* typed in the user's unit, stored in kilograms like every weight
          (review C-30/L-11): each goal surface reads g.w through uwNum */
-      S.goals.push({id:'g'+Date.now().toString(36),ex:f.ex,w:Math.round(uwIn(+f.w)*4)/4,r:+f.r,created:Date.now(),done:null});
-      lset(K_GOALS,S.goals);f.ex=null;render();break}
+      S.goals.push({id:'g'+Date.now().toString(36),ex:ex,w:Math.round(uwIn(+f.w)*4)/4,r:+f.r,created:Date.now(),done:null});
+      lset(K_GOALS,S.goals);f.ex='';render();break}
     case 'gDel':S.goals=S.goals.filter(g=>g.id!==v);lset(K_GOALS,S.goals);render();break;
 
     case 'unitW':unitsSet('w',v);render();flash(v==='lb'?'Weights now read in pounds — stored metric underneath.':'Weights back to kilograms.');break;
