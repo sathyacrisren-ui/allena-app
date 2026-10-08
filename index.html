@@ -1909,7 +1909,7 @@ if(S.sess){S.note=S.sess.note||S.note;
       if(c0&&(s0.log||[]).some(l=>l.ex===c0.ex&&l.setNo===c0.setNo)){const n0=sessAdv(s0);
         if(n0<0)s0.phase='done';else s0.idx=n0}}catch(e){oops('bootSess',e)}
     if(S.sess.phase!=='done')S.sess.phase='ready'}}
-const BUILD_ID='e36b8f';  // stamped by tools/build.py with the content hash
+const BUILD_ID='d3e49c';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -13023,7 +13023,7 @@ function dataPoints(){
        lift that 'did not race' would read like a session was refused
        when it in fact scored */
     if(wkStart&&day>=wkStart&&!h.run)raceItems.push({k:'lift',id:String(h.id||''),date:day,
-      t:h.dayTitle||'Session',sub:h.watchOnly?((h.minutes||0)+' min from your watch'):((h.log||[]).length+' sets'),
+      t:h.dayTitle||'Session',sub:h.watchOnly?((h.minutes||0)+' min from your watch'):((h.log||[]).length+' sets'+(h.complete?'':' \u00b7 not saved yet')),
       live:!!lw8.live,why:lw8.why||'',pts:lw8.live?Math.round(raceEarn):0});
     B.sessions+=sess;B.sets+=sets;B.effort+=effort;B.notes+=notes});
   (S.runs||[]).forEach(r=>{
@@ -20534,7 +20534,7 @@ window.notifTapped=function(id){
     /* the native bg-wake discovery ping ('bgfind…') was born outside
        the web's plan — route it to the finds themselves (owner-caught,
        8 Sep: the tap 'just opened the app') */
-    if(/^bgfind/.test(id)){if(!surfOn('cards')){S.sheet=null;runAction('leversOpen');return}   // no finds list while the cards are off (30 Sep 2026)
+    if(/^bgfind/.test(id)){if(!surfOn('cards')){S.sheet=null;runAction('crownX','open');return}   // the ping counts what is new on the tree (8 Oct 2026), so the tap opens the tree, which marks it seen
       S.sheet={t:'recentfinds'};S.view='today';render();return}
     const P=notifPrefs();const x=(P.sched||[]).find(s9=>s9.id===id);
     if(!x){
@@ -29830,8 +29830,11 @@ function homeTiles(){
 
   /* today's session: a live one first, then the morning's answer */
   try{
-    if(S.sess&&S.sess.phase!=='done'){const s=S.sess,done=s.log.filter(l=>l.w!=null||l.secs).length;
-      T.sess={kind:'live',name:s.dayName||'Your session',sub:done+' of '+s.sets.length+' sets done',a:'resume',v:'',btn:'Resume'}}
+    /* a session on its finish screen, or saved unfinished today, is still
+       today's session (8 Oct 2026) — unsavedToday() is the one reader */
+    const u9=(typeof unsavedToday==='function')?unsavedToday():null;
+    if(u9){T.sess={kind:'live',name:u9.name||'Your session',sub:(u9.done||!u9.live)?unsavedWords(u9):u9.n+' of '+u9.of+' sets done',
+      a:u9.live?'resume':'resumeHist',v:u9.live?'':u9.id,btn:u9.done?'Finish and save':'Resume',unsaved:u9.done||!u9.live}}
     else{const p=activeProgSafe();
       if(!p||p.empty)T.sess={kind:'none',name:'No programme yet',sub:'Allena builds one around your goal.',a:'setupOpen',v:'',btn:'Build one'};
       /* the block is finished (4 Oct 2026): Home says so and opens the review */
@@ -29957,7 +29960,7 @@ function homeGridHtml(){
    else h+='<div class="card htile">'+lab('Tree read')+'<span class="hsub">The read could not be measured just now.</span>'+door+'</div>'}
   /* today's session */
   {const s=T.sess;
-   h+=tile(s.a,s.v,lab(s.kind==='live'?'In progress':s.kind==='block'?'Block complete':'Today')+'<span class="hname">'+esc(s.name)+'</span><span class="hsub">'+esc(s.sub)+'</span>'+
+   h+=tile(s.a,s.v,lab(s.kind==='live'?(s.unsaved?'Not saved yet':'In progress'):s.kind==='block'?'Block complete':'Today')+'<span class="hname">'+esc(s.name)+'</span><span class="hsub">'+esc(s.sub)+'</span>'+
      (s.run?'<span class="hsub">+ '+esc(s.run)+'</span>':'')+'<span class="hgo">'+esc(s.btn)+' ›</span>',
      s.kind==='plan'||s.kind==='live'?' style="border-color:var(--greensoft)"':s.kind==='block'?' style="border-color:var(--amber)"':'')}
   /* the race: the race page's own podium, smaller (podColHtml is the one
@@ -33682,6 +33685,43 @@ function weekDone(progId,wk){
   const rows=S.history.filter(h=>h.progId===progId&&h.week===wk&&h.complete);
   if(!p){const set=new Set();rows.forEach(h=>set.add(h.dayTitle));return set}
   return doneSetOf(p,rows)}
+/* ══ A SESSION LOGGED BUT NEVER SAVED IS STILL A SESSION (owner, 8 Oct 2026:
+   "I did technique session today, it's noted in social but doesn't show on
+   my train tab"). Every logged set upserts record(false), so the row sits
+   in history UNFINISHED until "Finish and save" is tapped. The race counts
+   its sets; weekDone() reads complete rows only; homeTiles() called S.sess
+   live only while phase!=='done' and the floating pill hid on 'done' too.
+   So a session parked on its own finish screen vanished from Home, Train
+   and the pill at once, while the race sheet still showed its 20 sets.
+   ONE READER for the three of them: the live session first, else the newest
+   unfinished row of that day and week (today's, when wk is null). */
+function unsavedFor(p,di,wk){
+  try{if(!p||!p.id)return null;
+    const s=S.sess;
+    if(s&&s.progId===p.id&&(di==null||+s.dayIdx===+di)&&(wk==null||+s.week===+wk))
+      return{live:true,id:s.recId||String(s.startedAt),n:(s.log||[]).length,of:(s.sets||[]).length,
+        done:s.phase==='done',name:s.dayName||''};
+    const t=today();
+    const rows=(S.history||[]).filter(h=>h&&!h.complete&&!h.run&&!h.watchOnly&&h.progId===p.id&&(h.log||[]).length&&
+      (di==null||histDayOf(p,h)===+di)&&(wk==null?hKey(h)===t:+h.week===+wk));
+    if(!rows.length)return null;
+    const h=rows[rows.length-1],of=Math.max(+h.planned||0,h.log.length);
+    return{live:false,id:String(h.id),n:h.log.length,of:of,done:h.log.length>=of,name:h.dayTitle||''}}
+  catch(e){oops('unsavedFor',e);return null}}
+/* Home's reader: the live session whatever its phase, else today's newest
+   unfinished row from any programme */
+function unsavedToday(){
+  try{const s=S.sess;
+    if(s)return{live:true,id:s.recId||String(s.startedAt),n:(s.log||[]).length,of:(s.sets||[]).length,done:s.phase==='done',name:s.dayName||''};
+    const t=today();
+    const rows=(S.history||[]).filter(h=>h&&!h.complete&&!h.run&&!h.watchOnly&&h.progId&&h.progId!=='imported'&&(h.log||[]).length&&hKey(h)===t&&
+      ((S.lib&&S.lib.programs)||[]).some(p=>p.id===h.progId));
+    if(!rows.length)return null;
+    const h=rows[rows.length-1],of=Math.max(+h.planned||0,h.log.length);
+    return{live:false,id:String(h.id),n:h.log.length,of:of,done:h.log.length>=of,name:h.dayTitle||''}}
+  catch(e){oops('unsavedToday',e);return null}}
+/* the words the three surfaces share */
+function unsavedWords(u){return u.done?'All '+u.of+' sets done. Not saved yet.':u.n?u.n+' of '+u.of+' sets done. Not saved yet.':'Opened, nothing logged yet.'}
 /* every exercise of this day was cut or moved off it this week, and
    nothing was moved onto it (J-1): there is nothing left to log, so the
    day is resolved, not open forever */
@@ -34803,7 +34843,10 @@ function dayCard(p,d,i,done,daily){
   /* THE SUGGESTION LIVES HERE NOW (owner call, 11 Sep). One place to
      look, and the tap is already on this card. */
   let sugg=false,suggWhy='';
-  try{if(!done){const r9=recommendToday();
+  /* an unsaved session on this day is the card's one fact (8 Oct 2026):
+     no suggestion to start it again, and the tap goes back to it */
+  const un=done?null:unsavedFor(p,i,daily?null:S.week);
+  try{if(!done&&!un){const r9=recommendToday();
     if(r9&&r9.top&&r9.top.i===i){sugg=true;suggWhy=String(r9.why||'').replace(/\.$/,'')}}}
   catch(e){oops('dayCard.suggest',e)}
   const sets=sessionSets(p,i,S.week);
@@ -34832,13 +34875,15 @@ function dayCard(p,d,i,done,daily){
      buttons ((i), the toggle) and HTML silently splits nested buttons
      — the stats row was landing OUTSIDE the card with a void where
      the card broke (beta-caught via Dafydd, 9 Sep) */
-  return '<div class="card'+(sugg?' an-glow':'')+'" data-a="'+(locked?'weekLockedInfo':gated?'weekGateOpen':'prevOpen')+'" data-v="'+p.id+':'+i+'" data-holdmenu="'+i+'" style="width:100%;text-align:left;padding:18px;display:block;cursor:pointer'+(sugg?';background:linear-gradient(180deg,rgba(255,255,255,.085),rgba(255,255,255,.03)),radial-gradient(125% 95% at 100% 0%,rgba(110,127,232,.17),transparent 62%);border-color:rgba(255,255,255,.12);box-shadow:inset 0 1px 0 var(--edge-light),var(--shadow-card)':'')+(sugg?';border-color:var(--amber)':'')+'">'+
+  const unA=un?(un.live?'resume':'resumeHist'):null,unV=un?(un.live?'':un.id):null;
+  return '<div class="card'+(sugg?' an-glow':'')+'" data-a="'+(un?unA:locked?'weekLockedInfo':gated?'weekGateOpen':'prevOpen')+'" data-v="'+(un?esc(unV):p.id+':'+i)+'" data-holdmenu="'+i+'" style="width:100%;text-align:left;padding:18px;display:block;cursor:pointer'+(sugg?';background:linear-gradient(180deg,rgba(255,255,255,.085),rgba(255,255,255,.03)),radial-gradient(125% 95% at 100% 0%,rgba(110,127,232,.17),transparent 62%);border-color:rgba(255,255,255,.12);box-shadow:inset 0 1px 0 var(--edge-light),var(--shadow-card)':'')+(sugg?';border-color:var(--amber)':'')+'">'+
     (sugg?'<p class="eyebrow" style="color:var(--amber);margin:0 0 6px">Allena suggests today</p>'+
       (suggWhy?'<p style="color:var(--dim);font-size:11px;line-height:1.5;margin:-2px 0 8px">Because '+esc(suggWhy)+'.</p>':''):'')+
     '<div style="display:flex;align-items:center;gap:8px">'+
     '<span style="width:9px;height:9px;border-radius:8px;background:'+dayCol(i)+';flex:none"></span>'+
     '<span class="eyebrow">'+(daily?'Daily':'Day '+(i+1))+'</span>'+
     (done?'<span class="mono" style="color:var(--green);font-size:11px">'+(daily?'✓ TODAY':'✓ DONE')+'</span>'
+         :un?'<span class="mono" style="color:var(--amber);font-size:11px">'+(un.done?'ALL SETS DONE · NOT SAVED':un.n?un.n+' OF '+un.of+' SETS · NOT SAVED':'OPEN · NOTHING LOGGED')+'</span>'
          :locked?'<span class="mono" style="color:var(--faint);font-size:11px">WEEK CLOSED</span>'
          :gated?'<span class="mono" style="color:var(--amber);font-size:11px">W'+(S.week-1)+' STILL OPEN</span>':'')+
     '<span style="flex:1"></span><span class="mono" style="color:var(--faint);font-size:15px">›</span></div>'+
@@ -34849,6 +34894,8 @@ function dayCard(p,d,i,done,daily){
       return ab.length?'<p class="mono" style="color:var(--green);font-size:11px;margin-top:4px">+ '+ab.reduce((a2,x)=>a2+(x.sets||1),0)+' set'+(ab.length===1?'':'s')+' added back: '+ab.map(x=>esc(String(x.ex).replace(/ — .*/,''))).join(', ')+'</p>':''})()+
     '<div class="mono" style="display:flex;gap:16px;margin-top:12px;color:var(--faint);font-size:11px">'+
     '<span>'+sets.length+' SETS</span><span>'+sets[sets.length-1].exNo+' EXERCISES</span><span>~'+Math.max(mins,5)+' MIN</span></div>'+
+    (un?'<p style="color:var(--dim);font-size:13px;line-height:1.5;margin-top:10px">'+esc(unsavedWords(un))+' The race sheet already lists it; the week marks it done once it is saved.</p>'+
+      '<button data-a="'+unA+'" data-v="'+esc(unV)+'" class="big disp mt" style="background:var(--amber);color:var(--bg);font-size:17px">'+(un.done?'Finish and save':'Pick it back up')+'</button>':'')+
     ((sugg&&!done&&!locked&&!gated)?'<button data-a="prevOpen" data-v="'+p.id+':'+i+'" class="big disp mt" style="background:var(--amber);color:var(--bg);font-size:17px">Start the session</button>':'')+'</div>'}
 function noteBrief(n){
   /* a day card carries one line of note; the full text lives inside the day */
@@ -35004,10 +35051,26 @@ function muscleChips(ex){
       sec.slice(0,3).map(m=>'<span class="mono" style="font-size:var(--t-caption);letter-spacing:.04em;padding:3px 8px;border-radius:var(--r-full);border:1px solid var(--line);color:var(--faint)">'+esc(m.toUpperCase())+'</span>').join('')+
       '</div>'}catch(e){oops('muscleChips',e);return ''}}
 
-function unseenFindings(){try{return unseenPatterns()+unseenDiscoveries()}catch(e){oops('unseenFindings',e);return 0}}
+/* A PING IS ONLY EVER ABOUT SOMETHING THE APP WILL SHOW (owner, 8 Oct 2026:
+   "I've been getting this same notification for days now, idek what it's
+   for, there's nothing in the app that wants me to open it"). The iOS
+   shell wakes on every Health landing, asks this number, and if it is
+   above zero says "your training just surfaced N new discoveries". It
+   counted unseen DISCOVERIES, and since the cards went off (30 Sep) no
+   surface shows a discovery and nothing marks one seen, so the same three
+   rang every 45 minutes for days with no bubble anywhere. Now this is the
+   Home tile's own badge (treeXNewN: finds and patterns nobody has looked
+   at, cleared by opening the tree) unless the cards are on, in which case
+   it is what the reveal shows. One reader for the badge, the ping and the
+   icon count, so a notification can never name something the app hides. */
+function unseenFindings(){try{
+    if(surfOn('cards'))return unseenPatterns()+unseenDiscoveries();
+    return (typeof treeXNewN==='function')?treeXNewN():unseenPatterns()}
+  catch(e){oops('unseenFindings',e);return 0}}
 function appBadgeN(){
-  /* the icon badge = everything genuinely unseen along the route */
-  try{return unseenFindings()+(typeof collFreshN==='function'?collFreshN():0)}catch(e){oops('appBadgeN',e);return 0}}
+  /* the icon badge = everything genuinely unseen along the route; with the
+     cards off the tree badge already counts the collection's fresh finds */
+  try{return surfOn('cards')?unseenFindings()+(typeof collFreshN==='function'?collFreshN():0):unseenFindings()}catch(e){oops('appBadgeN',e);return 0}}
 function aiLockHtml(what){
   /* the honest gate: greyed, locked, and one tap from the fix */
   return '<button data-a="drawerAi" style="width:100%;display:flex;align-items:center;gap:12px;margin-top:12px;padding:12px 14px;border-radius:12px;background:var(--surface);border:1px dashed var(--line);text-align:left">'+
@@ -44002,8 +44065,11 @@ function render(){
     /* the session, minimized (owner call, Sep 2026): browse anywhere,
        the clock keeps ticking, one tap returns. Ticks via #spTime
        without re-rendering. */
-    if(!S.sess||S.view==='session'||S.view==='coach'||S.sess.phase==='done')return '';  // never cover the composer
+    if(!S.sess||S.view==='session'||S.view==='coach')return '';  // never cover the composer
     const s2=S.sess,cur=s2.sets[Math.min(s2.idx,s2.sets.length-1)];
+    /* a session left on its finish screen used to hide the pill too, so
+       nothing on any page said it was still unsaved (8 Oct 2026) */
+    const unsaved=s2.phase==='done';
     const resting=s2.phase==='resting'&&S.restEnd;
     const left=resting?Math.max(0,Math.ceil((S.restEnd-Date.now())/1000)):0;
     /* the slim one-line capsule at the very top (owner call, Sep 2026):
@@ -44011,8 +44077,9 @@ function render(){
        because #app reserves the height */
     /* the SMALL pill (owner call, twice): just LIVE in green, or the
        rest countdown in blue — no exercise, no set count. Tap resumes. */
-    return '<button data-a="resume" id="sessBanner" style="border:1.5px solid '+(resting?'var(--chart)':'var(--green)')+';padding:4px 13px">'+
-      '<span class="mono" id="spTime" data-end="'+(resting?S.restEnd:'')+'" style="font-size:13px;font-weight:700;letter-spacing:.04em;color:'+(resting?'var(--chart)':'var(--green)')+';flex:none">'+(resting?mmss(left):'LIVE')+'</span></button>'};
+    const col=resting?'var(--chart)':unsaved?'var(--amber)':'var(--green)';
+    return '<button data-a="resume" id="sessBanner" style="border:1.5px solid '+col+';padding:4px 13px">'+
+      '<span class="mono" id="spTime" data-end="'+(resting?S.restEnd:'')+'" style="font-size:13px;font-weight:700;letter-spacing:.04em;color:'+col+';flex:none">'+(resting?mmss(left):unsaved?'NOT SAVED':'LIVE')+'</span></button>'};
   const tourHtml=()=>{
     if(!S.tour)return '';
     const st=TOUR_STEPS[Math.min(S.tour.i,TOUR_STEPS.length-1)];
@@ -46248,7 +46315,12 @@ function runAction(a,v,t,e){
     /* THE CROWN'S OWN PAGE (27 Sep 2026): opened from the first screen
        with a zoom from where the tree sat; rungs, lenses and the panel */
     case 'crownX':{try{if(String(v||'open')==='open'){const el=document.querySelector('[data-crowncv="home"]');if(el){const r=el.getBoundingClientRect();CRV.flip={left:r.left,top:r.top,w:r.width,h:r.height}}}}catch(e9){oops('crownFlip',e9)}
-      crownGo(v);if(S.view!=='crownx')S.crxBack=S.view;S._navQuiet=1;S.sheet=null;S.drawerOpen=false;S.view='crownx';render();break}
+      crownGo(v);if(S.view!=='crownx')S.crxBack=S.view;S._navQuiet=1;S.sheet=null;S.drawerOpen=false;S.view='crownx';
+      /* the crown is the tree (30 Sep 2026), so seeing it clears the tree's
+         badge the way the old explorer did: seen means looked at, and a user
+         who left inside the 2.5 s never saw them (review M-28) */
+      setTimeout(function(){try{if(S.view==='crownx'&&typeof treeXMarkSeen==='function')treeXMarkSeen()}catch(e9){oops('crownMarkSeen',e9)}},2500);
+      render();break}
     case 'crownBack':{if(!crownBackUp()){S.view=S.crxBack||'crown';S.crxBack=null;S._navQuiet=1}render();break}
     case 'crownCrumb':{if(String(v)!=='leaf'){crownGo(v);render()}break}
     case 'crownLens':{const X9=crownX();X9.lens=String(v||'all');X9.sel=null;render();break}
