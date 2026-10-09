@@ -1564,8 +1564,32 @@ const reps=(r,n,perSide)=>Array.from({length:n},()=>({reps:r,perSide:!!perSide})
    touched. */
 
 /* ══ program helpers ════════════════════════════════════ */
-function setsForWeek(ex,wk){const s=ex.sets;if(Array.isArray(s))return s;
-  if(s&&typeof s==='object')return s[String(wk)]||s.default||null;return null}
+/* THE DELOAD IS A PRESCRIPTION, NOT A SENTENCE (owner, 8 Oct 2026: the
+   chat rebuilt his block "and it doesn't even have a deload week at the
+   end"). Every block ever said "week N is a deload" in its note and no
+   week was ever lighter: the note was the whole deload. Now the last week
+   of any block of four weeks or more IS lighter, here, at the one place a
+   week's prescription is read: half the sets (rounded up, never below
+   one), two RPE points easier, the weight untouched, each set flagged
+   deload. A week the author wrote out explicitly (a per-week key) is
+   honoured as written. `deload:false` on a block switches it off. The
+   prog argument is optional: a reader without it gets the written week. */
+function isDeloadWeek(prog,wk){try{const W=+(prog&&prog.weeks)||1;return !!prog&&prog.deload!==false&&W>=4&&+wk===W}catch(e){return false}}
+function rpeEase(r,by){
+  if(r==null)return r;
+  if(typeof r==='number')return Math.max(1,r-by);
+  const m=/^\s*(\d+(?:\.\d+)?)\s*-\s*(\d+(?:\.\d+)?)\s*$/.exec(String(r));
+  if(m)return Math.max(1,+m[1]-by)+'-'+Math.max(1,+m[2]-by);
+  const n=parseFloat(r);return isNaN(n)?r:Math.max(1,n-by)}
+function deloadSets(l){
+  const n=Math.max(1,Math.ceil(l.length/2));
+  return l.slice(0,n).map(st=>{const c=Object.assign({},st,{deload:1});
+    if(c.secs==null&&c.rpe!=null)c.rpe=rpeEase(c.rpe,2);return c})}
+function setsForWeek(ex,wk,prog){const s=ex.sets;let l=null;
+  if(Array.isArray(s))l=s;
+  else if(s&&typeof s==='object'){if(s[String(wk)])return s[String(wk)];l=s.default||null}
+  if(l&&l.length&&prog&&isDeloadWeek(prog,wk))return deloadSets(l);
+  return l}
 function adjOf(prog,name){return (prog&&prog.adj&&prog.adj[name])||0}
 function sessAdv(s){
  /* the NEXT UNLOGGED set's index, scanning forward then wrapping —
@@ -1604,7 +1628,7 @@ function sessNow(s){
    the prescription, always — a long hold is logged in full but never
    becomes the next set's target. */
 function buildSets(prog,di,wk){const d=prog.days[di];if(!d)return[];const out=[];let n=0;
-  d.exercises.forEach(ex=>{const l=setsForWeek(ex,wk);if(!l||!l.length)return;n++;
+  d.exercises.forEach(ex=>{const l=setsForWeek(ex,wk,prog);if(!l||!l.length)return;n++;
     let a=adjOf(prog,ex.name);
     /* THE SAFETY NET, AT THE POINT THE PRESCRIPTION IS MADE (Dafydd's
        skullcrusher, 15 Sep 2026 — see adjCap in 01-rpe-regulation). The
@@ -1621,7 +1645,7 @@ function buildSets(prog,di,wk){const d=prog.days[di];if(!d)return[];const out=[]
       if(typeof adjCap==='function')a=adjCap(prog,ex.name,+w0||0,a)}catch(e9){oops('buildSets.cap',e9)}
     l.forEach((st,i)=>out.push({ex:ex.name,bar:!!ex.bar,rest:ex.rest??60,cue:ex.cue||null,
       exNo:n,setNo:i+1,of:l.length,targetW:st.w!=null?Math.max(0,st.w+a):null,targetReps:st.reps??null,
-      targetRpe:st.rpe??null,secs:st.secs!=null?st.secs:null,perSide:!!st.perSide,warmup:ex.warmup,adj:a}))});return out}
+      targetRpe:st.rpe??null,secs:st.secs!=null?st.secs:null,perSide:!!st.perSide,warmup:ex.warmup,adj:a,deload:st.deload?1:undefined}))});return out}
 function validateProgram(p){const e=[];if(!p||typeof p!=='object')return["That isn't a program object."];
   if(!p.block)e.push('Missing a "block" name.');
   if(!(typeof p.weeks==='number'&&p.weeks>=1))e.push('"weeks" must be a number of at least 1.');
@@ -1909,7 +1933,7 @@ if(S.sess){S.note=S.sess.note||S.note;
       if(c0&&(s0.log||[]).some(l=>l.ex===c0.ex&&l.setNo===c0.setNo)){const n0=sessAdv(s0);
         if(n0<0)s0.phase='done';else s0.idx=n0}}catch(e){oops('bootSess',e)}
     if(S.sess.phase!=='done')S.sess.phase='ready'}}
-const BUILD_ID='53c2cd';  // stamped by tools/build.py with the content hash
+const BUILD_ID='a960b5';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -1994,6 +2018,7 @@ function record(complete){const s=S.sess;return{id:s.recId||String(s.startedAt),
   block:s.block,progId:s.progId,dayIdx:s.dayIdx,dayTitle:s.dayName,week:s.week,
   minutes:sessMinutes(s.startedAt,s.log),
   log:s.log,note:S.note,exNotes:(s.exNotes&&Object.keys(s.exNotes).length?s.exNotes:null),complete:!!complete,planned:s.sets.length,
+  deload:(s.sets||[]).some(st=>st&&st.deload)?1:undefined,
   motion:(function(){try{const m=s.motion||{};
     const moved=Object.keys(m).filter(k=>m[k]>=3).length;
     return moved?{m:moved,of:s.sets.length}:null}catch(e){return null}})()}}
@@ -3497,6 +3522,10 @@ function autoProgress(e,c){
      barbell-increment logic on band work produced the "+2.5" that
      baffled a rehab user (owner ruling, 6 Sep) */
   try{if(isRehabSession())return null}catch(e9){}
+  /* a deload week is lighter on purpose: half the sets at an easier
+     effort is not evidence about the load, so nothing is learned from it
+     (8 Oct 2026) */
+  try{if((S.sess.sets||[]).some(st=>st&&st.deload))return null}catch(e9){}
   const rows=S.sess.log.filter(l=>l.ex===c.ex&&(FREE?l.r>0:l.w));
   if(rows.length<c.of)return null;
   const prog=S.lib.programs.find(p=>p.id===S.sess.progId);
@@ -3918,7 +3947,7 @@ function coachContextBody(U,o){
   if(others.length)out.push('Recent:\n'+others.map(h=>sessLine(h,false)).join('\n'));
   const g=S.goals.filter(x=>!x.done)[0];
   if(g){const st=goalStats(g);out.push('Goal '+g.ex+' '+g.w+'×'+g.r+' — now '+Math.round(st.cur)+'/'+Math.round(st.target)+'e1RM')}
-  {const p2=activeProg(),names=[];p2.days.forEach(d=>d.exercises.forEach(e=>{if(names.indexOf(e.name)<0&&setsForWeek(e,S.week))names.push(e.name)}));
+  {const p2=activeProg(),names=[];p2.days.forEach(d=>d.exercises.forEach(e=>{if(names.indexOf(e.name)<0&&setsForWeek(e,S.week,p2))names.push(e.name)}));
    if(names.length)out.push('Exercises: '+names.slice(0,12).join(', '))}
   if(S.gar.on){const d=S.gar.days[today()]||{},b=bbBaseline(),bits=[];
     if(d.am!=null)bits.push('am '+d.am);if(d.day!=null)bits.push((d.dayHr<17?'afternoon ':'evening ')+d.day);if(d.pre!=null)bits.push('pre '+d.pre);
@@ -4577,7 +4606,7 @@ function snapshotData(){
        friend's phone can age a card that has not been refreshed since
        Monday instead of showing the whole stake all week. social17.sql;
        self-detects. */
-    try{if(!S._snapNoStake&&d.stake&&d.stake.asked){const k9=d.stake;
+    try{if(!S._snapNoStake&&typeof STAKE_ON!=='undefined'&&STAKE_ON&&d.stake&&d.stake.asked){const k9=d.stake;
       out.stake={asked:+k9.asked||0,done:Math.min(50,+k9.done||0),kept:Math.min(105,Math.round(+k9.kept||0)),frozen:!!k9.prot}}}
     catch(e){oops('snapStake',e)}
     /* PODS (14 Sep): the stage bracket and the yes/no exemption ride
@@ -4953,6 +4982,15 @@ async function giftTake(){
     const ok=(await r.json())===true;
     giftRefresh();return ok}
   catch(e){oops('giftTake',e);return false}}
+/* a read that never reached the model hands the gift back (gift_refund,
+   social18.sql); self-detecting like the rest, a server without it is
+   simply a gift lost to a flat spot, never an error shown */
+async function giftBack(){
+  try{const h=await frHeaders();if(!h)return false;
+    const r=await fetch(CLOUD.url+'/rest/v1/rpc/gift_refund',{method:'POST',headers:Object.assign({'content-type':'application/json'},h),body:'{}'});
+    if(!r.ok)return false;
+    giftRefresh();return true}
+  catch(e){oops('giftBack',e);return false}}
 /* a code typed during sign-up waits for the sign-in, then joins once */
 function inviteRedeemPending(){
   try{const c=S.prof&&S.prof.inviteCode;if(!c||!S.frMe)return;
@@ -5144,6 +5182,9 @@ function snWeeks(sn){
     const aged=(wl,wk9,elapsedDays)=>{
       const k=sn&&sn.stake;
       if(!k||typeof k!=='object'||!(+k.asked>0))return wl;
+      /* the stake is off (5 Oct 2026): a card from an app that still
+         uploads one is read without it, so a Monday 75 reads as 0 */
+      if(typeof STAKE_ON!=='undefined'&&!STAKE_ON)return Math.max(0,wl-(+k.kept||0));
       if(k.frozen)return wl;
       const full=(+k.asked)*15;
       const missed=Math.max(0,Math.floor((+k.asked)*elapsedDays/7)-(+k.done||0));
@@ -5743,7 +5784,7 @@ function friendsSection(){
       /* THE STAKE (owner ruling, 25 Sep 2026, 07c-stakes): replaces the
          adherence line that ranked nothing. Same denominator the user
          cannot lower, the sessions Allena asked for, and now it costs. */
-      (function(){try{const l9=(typeof stakeLine==='function')?stakeLine():'';
+      (function(){try{const l9=(typeof stakeLine==='function'&&STAKE_ON)?stakeLine():'';
         return l9?'<p style="font-size:13px;color:var(--dim);margin-top:4px;line-height:1.5">'+esc(l9)+'</p>':''}catch(e9){oops('stakeLine.card',e9);return ''}})()+'</div>'+
       '<button data-a="raceMineOpen" style="text-align:right;flex:none;padding:0"><p class="disp" data-cu="me" style="font-size:28px;font-weight:600;letter-spacing:-.025em;color:'+(mine>0?'var(--green)':'var(--text)')+'">'+mine+'</p>'+
       '<p class="micro" style="letter-spacing:.12em">this week \u203a</p></button></div>';
@@ -6389,9 +6430,16 @@ async function cloudBkPull(){
    returns true. */
 function bkDeviceHasRecord(){
   try{
-    /* a Health or Strava run mirrors into history as h.run — it arrived
-       on its own too, and blocked the restore (audit D1) */
-    if((S.history||[]).some(h=>h&&!h.demo&&!h.run))return true;
+    /* THE MIRROR IS NOT THE RECORD EITHER (review, 3 Oct 2026). runAdd() mirrors every run
+       into S.history as a 'run-<id>' row, and hkImport writes a 'wgs<id>' row for a watch-only
+       gym session — so a phone that had only ever synced Health still held history rows, this
+       line said "the person's record is here", and the 22 Sep fix below never got to run. The
+       22 Sep test passed because it set S.history=[] beside the Health runs, a shape a real
+       phone never has. An auto-fetched row re-imports on the next sync; only what the person
+       logged can block a restore. */
+    const autoRow=h=>{const id=String((h&&h.id)||'');
+      return (h.run&&/^run-(hk|sv)/.test(id))||(h.watchOnly&&/^wgs/.test(id))};
+    if((S.history||[]).some(h=>h&&!h.demo&&!autoRow(h)))return true;
     /* 'hk…' is Health, 'sv…' is Strava — both arrive on their own. A hand-logged run
        has neither prefix, and that one IS the person's. */
     if((S.runs||[]).some(r=>!/^(hk|sv)/.test(String((r&&r.id)||''))))return true;
@@ -7039,7 +7087,7 @@ function coachDossierBody(U){
     const L=['"'+(p.block||'Programme')+'", '+W+' week'+(W===1?'':'s')+', '+(done?'FINISHED: every week is logged or closed, and no next block exists yet':'now on week '+(S.week||1))+'. Its sessions in order (written prescription; Allena\u2019s load changes are listed after):'];
     (p.days||[]).forEach((d,i)=>{
       L.push('- Session '+(i+1)+' "'+d.name+'":');
-      (d.exercises||[]).forEach(e=>L.push('    '+e.name+': '+ceWeekly(e,W)))});
+      (d.exercises||[]).forEach(e=>L.push('    '+e.name+': '+ceWeekly(e,W,p)))});
     if(p.adj&&Object.keys(p.adj).length)L.push('Loads Allena has moved from the written plan: '+Object.keys(p.adj).map(k=>k+' '+(p.adj[k]>0?'+':'')+p.adj[k]+' kg').join(', '));
     try{mainProgs().filter(x=>x.id!==p.id).forEach(x=>L.push('Also in their library: "'+(x.block||x.id)+'", '+(+x.weeks||1)+' weeks, sessions: '+(x.days||[]).map((d,i)=>(i+1)+' "'+d.name+'"').join(', ')))}
     catch(e){oops('coachDossier.lib',e)}
@@ -7472,7 +7520,7 @@ function coachSys2(){
   P.push('HOW TO ANSWER: lead with the answer in plain, everyday words. Short sentences. Usually two to five sentences; longer only when they ask for a plan or an explanation. Use a short list only for steps. Name the number and the date it comes from ("your 82.5 kg × 5 on the 14th"). Talk to them, not about them. Never use their name. No emoji. No hype.');
   P.push('TRUTH: never state a number that is not in the record or RIGHT NOW. If something they ask about is not there, say what is missing and how to add it in the app. Attributing a number to the wrong day or exercise is the one unforgivable error; when a SESSION UNDER DISCUSSION is given, answer about that session. A falling lift is never "a plateau" and never a reason to add load. A walk is never a run. Imported runs have no recorded effort.');
   P.push('SAFETY: pain, numbness, tingling, swelling or the knee giving way means stop that exercise and talk to their physio or doctor; never diagnose. A physio’s plan always outranks the app’s suggestions. Rehab swaps only come from their own rehab programme. Never conflict with their stated restrictions.');
-  P.push('THE RULES THE APP RUNS ON: double progression (top of the rep range at RPE 9 or under on every set, then add load); RPE targets are ranges; missing reps at an easy effort means they stopped early, so hold the load; deload in week 6; 10 to 20 hard sets per muscle a week. Recovery counts runs, lifting and rehab together.'+
+  P.push('THE RULES THE APP RUNS ON: double progression (top of the rep range at RPE 9 or under on every set, then add load); RPE targets are ranges; missing reps at an easy effort means they stopped early, so hold the load; the last week of any block of four weeks or more is a deload the app applies itself (half the sets, two RPE points easier, same weight), so a block is never written with its own deload week; 10 to 20 hard sets per muscle a week. Recovery counts runs, lifting and rehab together.'+
     ((S.lib&&(S.lib.programs||[]).some(p=>p.id==='bench-1'))?' Their bench programme: wave 5 weeks (100×4 / 102.5×3 / 105×2 / 100×5 / 102.5×4), +2.5 kg per block; back-offs 90% of the top set; volume bench 87.5×4×8, to 90 when all four hit 8 at RPE 8 or under.':''));
   P.push('THEIR APP, exactly as it looks for them:\n'+coachAppMap());
   P.push('ACTIONS: you can add lines at the very end of a reply, each on its own line, in exactly these forms. The app turns them into buttons and never shows the line itself.\n'+
@@ -7493,7 +7541,7 @@ function coachSys2(){
     '  {"do":"remove_day","day":"Arms"} (only the last session in a block)\n'+
     '  {"do":"rename_day","day":"Day 4","name":"Arms"}\n'+
     '  {"do":"weeks","n":8}\n'+
-    '  {"do":"new_block","name":"Bench Block 2","weeks":6,"days":[{"name":"Push","exercises":[{"ex":"Bench press","sets":4,"reps":"5","kg":82.5,"rpe":8},{"ex":"Cable fly","sets":3,"reps":"12-15","rpe":8}]},{"name":"Pull","exercises":[...]}]} (a WHOLE new block; the only other change that may ride with it is "clear"; up to 7 sessions; it becomes their active block at week 1 and a finished block is put away. Build it from the record: their goals, the loads they actually lift now, what progressed and what stalled, their days a week and their injuries. Keep the words before it to two or three sentences: the line is long and must finish.)\n'+
+    '  {"do":"new_block","name":"Bench Block 2","weeks":6,"days":[{"name":"Push","exercises":[{"ex":"Bench press","sets":4,"reps":"5","kg":82.5,"rpe":8},{"ex":"Cable fly","sets":3,"reps":"12-15","rpe":8}]},{"name":"Pull","exercises":[...]}]} (an exercise may carry "weeks" ([1,2,3] or "1-3") and appear again for other weeks, so a wave or a rep change across the block is written as it was: {"ex":"Bench press","sets":1,"reps":"4","kg":100,"rpe":8,"weeks":[1,4]},{"ex":"Bench press","sets":1,"reps":"3","kg":102.5,"rpe":8,"weeks":[2,5]}... — every week must be covered; when rebuilding from a finished block, carry its week-by-week shape over rather than flattening it; a WHOLE new block; the only other change that may ride with it is "clear"; up to 7 sessions; it becomes their active block at week 1 and a finished block is put away. Build it from the record: their goals, the loads they actually lift now, what progressed and what stalled, their days a week and their injuries. Keep the words before it to two or three sentences: the line is long and must finish.)\n'+
     '  {"do":"start_block","block":"Bench Block 2"} (a block already in their library becomes the active one at week 1; a finished block is put away. On its own in the EDIT. Use it when the block they want is listed under "Also in their library"; never new_block for one that exists.)\n'+
     '  {"do":"clear","ex":"Leg extension"} (when the injury screen refused an exercise and they tell you their physio cleared it: this remembers the clearance, exactly as keeping it in a session preview does; it may ride in the same EDIT as the block or change that needs it. Only on their word about their physio, never on your own judgement.)\n'+
     'Use their own exercise names from the record; a new exercise gets a sets count and reps (or secs), and an RPE range unless they gave one. Kilograms only. At most one EDIT per reply. HOW TO USE IT: if the request leaves the place open (which session, which weeks, how many sets, what reps), ask first in one short question and offer ASK lines for the likely answers; never guess where something goes. When it is clear, say in a sentence or two what you will change and what you think of it, then add the EDIT line; the card is the confirmation, so do not ask "shall I?" as well. Judge it on the evidence and say so plainly: hard sets per muscle a week (10 to 20 is the range the app runs on; past 20 the extra sets buy little and cost recovery), a clear day between sessions that hit the same muscles, the deload week, their goal lifts, their recovery and their injuries. If you would advise against it, say why in one line with the number, then still propose it if they asked; it is their plan. Two exceptions you refuse outright: anything their injury restrictions screen out, and any change to a rehab protocol or a physio\u2019s plan (that is their physio\u2019s to change; OPEN physio). Sessions are only added at the end of a block and only the last one can be removed; this keeps every logged session matched to its day. The plan has no fixed weekdays: sessions run in order and the week board places them, so if they name a weekday, say that and name the session after it if they want.\n'+
@@ -7885,7 +7933,7 @@ function ceOne(c,W,live){
   if(op==='add_day'||op==='add_session'){
     let name=ceClean(c.name,40)||'Day '+(days.length+1);
     if(!ceUnique(days,name))name=dayCopyName({days:days},name);
-    const d=ceDayBuild(c.exercises,'the new session');
+    const d=ceDayBuild(c.exercises,'the new session',W.weeks);
     days.push({name:name,custom:1,exercises:d.ex});
     return 'New session "'+name+'" at the end of '+W.block+': '+d.said.join('; ')}
   if(op==='remove_day'||op==='remove_session'){const di=dayAt();
@@ -7918,18 +7966,38 @@ function ceOne(c,W,live){
     return 'Remember '+name+' as cleared by your physio: the injury screen will not hold it again'}
   throw ceNo('that is not a change Allena can make here')}
 /* a session's exercises from the chat's list: named, screened, each with
-   its reps or its hold, no exercise twice. add_day and new_block share it. */
-function ceDayBuild(list,where){
-  const L=Array.isArray(list)?list.slice(0,12):[];
+   its reps or its hold. add_day and new_block share it.
+   WEEK BY WEEK (owner, 8 Oct 2026: the chat rebuilt a block whose bench
+   ran a wave across the weeks, and flattened it to one week six times
+   over, because this took one prescription per exercise). An entry may
+   carry "weeks" ([1,2,3] or "1-3"); the same exercise may then appear
+   again for other weeks, and the block stores a prescription per week
+   the way an imported programme does. Without "weeks" it is every week.
+   Two entries for the same exercise may never claim the same week. */
+function ceDayBuild(list,where,W){
+  W=Math.max(1,Math.round(+W||1));
+  const L=Array.isArray(list)?list.slice(0,24):[];
   if(!L.length)throw ceNo(where+' needs at least one exercise');
   const ex=[],said=[];
-  L.forEach(x=>{const nm=ceName(x&&(x.ex||x.name));if(!nm)throw ceNo('every exercise in '+where+' needs a name');
+  L.forEach(x=>{x=x&&typeof x==='object'?x:{};const nm=ceName(x.ex||x.name);if(!nm)throw ceNo('every exercise in '+where+' needs a name');
     ceScreen(nm);
-    if(ex.some(y=>y.name.toLowerCase()===nm.toLowerCase()))throw ceNo(nm+' is in '+where+' twice');
-    const P=cePresc(x||{});const n=P.n||3;
+    const P=cePresc(x);const n=P.n||3;
     if(P.reps==null&&P.secs==null)throw ceNo(nm+' needs its reps or its hold time');
-    ex.push({name:nm,rest:P.secs!=null?60:(isStation(nm)?90:120),sets:{'default':Array.from({length:n},()=>ceSet(P))}});
-    said.push(nm+' '+cePrescSay(P,n))});
+    const w=(x.weeks==null||x.weeks==='')?'all':ceWeeksOf(x.weeks,W);
+    if(w===null)throw ceNo(nm+' names weeks the block does not have (it runs '+W+' week'+(W===1?'':'s')+')');
+    const mk=()=>Array.from({length:n},()=>ceSet(P));
+    const cur=ex.find(y=>y.name.toLowerCase()===nm.toLowerCase());
+    if(cur){
+      if(w==='all'||cur.sets['default'])throw ceNo(nm+' is in '+where+' twice; give each entry its own weeks');
+      w.forEach(k=>{if(cur.sets[String(k)])throw ceNo(nm+' is given twice for week '+k);cur.sets[String(k)]=mk()});
+      said.push(nm+' '+cePrescSay(P,n)+' '+ceWeeksSay(w));return}
+    const sets={};if(w==='all')sets['default']=mk();else w.forEach(k=>{sets[String(k)]=mk()});
+    ex.push({name:nm,rest:P.secs!=null?60:(isStation(nm)?90:120),sets:sets});
+    said.push(nm+' '+cePrescSay(P,n)+(w==='all'?'':' '+ceWeeksSay(w)))});
+  /* a week-keyed exercise with weeks missing is a hole the user did not
+     ask for: it would read "not in this week" mid-block */
+  ex.forEach(e=>{if(e.sets['default'])return;const miss=[];for(let k=1;k<=W;k++)if(!e.sets[String(k)])miss.push(k);
+    if(miss.length)throw ceNo(e.name+' has nothing written for week'+(miss.length===1?' ':'s ')+miss.join(', '))});
   return {ex:ex,said:said}}
 /* a whole block from the chat: the shape the library stores, built the
    way the "add a program" door builds one (validateProgram judges it) */
@@ -7943,7 +8011,7 @@ function ceNewBlock(c){
   D.forEach((d,i)=>{d=d&&typeof d==='object'?d:{};
     let nm=ceClean(d.name||d.day,40)||'Day '+(i+1);
     if(!ceUnique(days,nm))nm=dayCopyName({days:days},nm);
-    const b=ceDayBuild(d.exercises,'session "'+nm+'"');
+    const b=ceDayBuild(d.exercises,'session "'+nm+'"',weeks);
     days.push({name:nm,custom:1,exercises:b.ex});
     said.push(nm+': '+b.said.join('; '))});
   if(mainProgs().some(p=>String(p.block||'').toLowerCase()===name.toLowerCase()))throw ceNo('you already have a block called '+name);
@@ -8126,9 +8194,9 @@ function coachEditMemo(E){
     (/injury screen protects/.test(String(E.err||'')+(E.left||[]).join(' '))?' If they say their physio has cleared that exercise, put {"do":"clear","ex":"<its name>"} in the SAME EDIT as the block or change, and send it.':'')+']'}
 /* the dossier's picture of a block: every session, every exercise, each
    run of weeks that share a prescription, so a change can name them */
-function ceWeekly(e,W){
+function ceWeekly(e,W,p){
   const runs=[];
-  for(let w=1;w<=W;w++){const t=coachPrescr(setsForWeek(e,w)||[])||'not in this week';
+  for(let w=1;w<=W;w++){const t=(coachPrescr(setsForWeek(e,w,p)||[])||'not in this week')+((p&&isDeloadWeek(p,w)&&!(e.sets&&e.sets[String(w)]))?' (deload)':'');
     const L=runs[runs.length-1];if(L&&L.t===t)L.b=w;else runs.push({a:w,b:w,t:t})}
   if(runs.length===1)return runs[0].t+(W>1?' (every week)':'');
   return runs.map(r=>'W'+r.a+(r.b>r.a?'-'+r.b:'')+' '+r.t).join('; ')}
@@ -8467,7 +8535,13 @@ function sessNextOpen(s,from,notEx){
     if(notEx!=null&&st.exNo===notEx)continue;
     if(!logged(st))return i}
   return s.sets.length}
-A.skipSet=()=>{const s=S.sess;A.adv(sessNextOpen(s,sessNow(s)+1))};
+/* A SKIP MARKS WHAT IT SKIPS (review, 4 Oct 2026). The 28 Sep rewrite
+   only jumped forward; sessAdv (00-core) wraps around at the next commit,
+   so with any set still open behind it the skipped set came straight
+   back. st.skip is the flag the table and sessAdv both read. */
+A.skipSet=()=>{const s=S.sess;const i0=sessNow(s),st=s.sets[i0];
+  if(st&&!sessLogOf(s,st))st.skip=true;
+  A.adv(sessNextOpen(s,i0+1))};
 A.skipEx=()=>{const s=S.sess,i0=sessNow(s),no=s.sets[i0].exNo;
   s.skipped=(s.skipped||[]);if(s.skipped.indexOf(no)<0)s.skipped.push(no);
   A.adv(sessNextOpen(s,i0+1,no))};
@@ -9801,6 +9875,35 @@ function checkGoals(e){
     if(!g.done&&goalNames(g,b9).indexOf(b9)>=0&&e.w>=g.w&&e.r>=g.r){
       g.done=new Date().toISOString();lset(K_GOALS,S.goals);return g}}
   return null}
+/* A GOAL IS ANY LIFT YOU CAN NAME (beta ask, 6 Oct 2026: "can you have it
+   so I can search an exercise here and add it as a goal... barbell
+   squat"). The picker was a dropdown of the program's lifts; it is a
+   type-to-search box now. Every token typed must start a word of the
+   name; the user's own history ranks first, then their program, then the
+   library (exKnownNames, 12b). Empty text shows the old list. */
+function goalExSearch(typed){
+  try{
+    const q=String(typed||'').trim().toLowerCase();
+    if(!q)return goalExOptions().map(n=>({n:n,tag:''}));
+    const toks=q.split(/\s+/).filter(Boolean);
+    const out=[];
+    exKnownNames().forEach(c=>{
+      const words=String(c.n).toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
+      if(!toks.every(t=>words.some(w=>w.indexOf(t)===0)))return;
+      out.push(c)});
+    out.sort((a,b)=>a.src-b.src||b.cnt-a.cnt||a.n.length-b.n.length);
+    return out.slice(0,6).map(c=>({n:gBase(c.n),tag:c.cnt?(c.cnt+' SET'+(c.cnt===1?'':'S')):(c.src===1?'IN YOUR PROGRAM':'IN THE LIBRARY')}))}
+  catch(e){oops('goalExSearch',e);return []}}
+function goalNearHtml(typed){
+  try{
+    const cur=String(typed||'').trim(),list=goalExSearch(cur);
+    if(!list.length)return cur?'<p style="color:var(--faint);font-size:11px;line-height:1.5;margin-top:8px">Nothing by that name yet. Add it as typed and the goal starts counting from your first logged set of it.</p>':'';
+    return '<div style="display:flex;flex-direction:column;gap:8px;margin-top:8px">'+
+      list.map(x=>'<button data-a="gNear" data-v="'+esc(x.n)+'" class="card" style="width:100%;text-align:left;padding:10px 13px;display:flex;align-items:center;gap:8px'+
+        (cur&&cur.toLowerCase()===x.n.toLowerCase()?';border-color:var(--amber)':'')+'">'+
+        '<span style="flex:1;min-width:0;font-size:13px;font-weight:600">'+esc(x.n)+'</span>'+
+        (x.tag?'<span class="mono" style="flex:none;color:var(--faint);font-size:var(--t-caption)">'+x.tag+'</span>':'')+'</button>').join('')+'</div>'}
+  catch(e){oops('goalNearHtml',e);return ''}}
 function goalExOptions(){const set=new Set();
   activeProg().days.forEach(d=>d.exercises.forEach(e=>{
     const st=setsForWeek(e,1);if(st&&st[0]&&st[0].secs)return;set.add(gBase(e.name))}));
@@ -13137,7 +13240,7 @@ function dataPoints(){
      the week's stake joins the witnessed points, so every reader of the
      race number (board, breakdown, score card, ceremony) sees one figure */
   let stake=null;
-  try{if(wkStart&&typeof raceStake==='function'){
+  try{if(wkStart&&typeof raceStake==='function'&&typeof STAKE_ON!=='undefined'&&STAKE_ON){
     stake=raceStake(wkStart,null,stDoneCur);
     weekLive+=stake.kept;
     if(pvStart)prevWeekLive+=raceStake(pvStart,null,stDonePrev).kept;
@@ -13606,6 +13709,14 @@ function dayTagsSheet(){
    week somebody chose to sit out, loses no stake and cannot drop a league.
    Sitting out is once in any four race weeks (a flare is a real event and
    is not rationed). No new storage key: league state rides K_ACCT. */
+/* THE STAKE IS OFF (owner, 5 Oct 2026: a Monday board of 75s and 90s
+   with nobody trained yet — "Why does everyone have points… no one has
+   done a session yet" — "Get rid of it"). The maths below is kept and
+   tested; STAKE_ON gates every seam it reached: dataPoints, the score
+   card, the breakdown line, the sit-out door, and a friend's card (an
+   older app still uploads a stake, and the reader strips it). The leagues
+   stay. Nothing is deleted; flip this to bring it back. */
+const STAKE_ON=false;
 const STAKE_PER=15;
 const LEAGUES=['Bronze','Silver','Gold','Platinum','Diamond'];
 /* did a racer show up this week? The stake puts up to 7 x STAKE_PER on a
@@ -28895,7 +29006,7 @@ function crownBuds(C){
       /* 2. work your own programme asks for that is not being done */
       try{const p=activeProg();if(p&&!p.empty&&!p.acl&&!p.rehabProto){
         const following=(S.history||[]).filter(h=>h.complete&&h.progId===p.id&&hKey(h)>=cut).length;
-        if(following>=4){const ask={};(p.days||[]).forEach(d=>(d.exercises||[]).forEach(e=>{const st=setsForWeek(e,S.week||1);const n=Array.isArray(st)?st.length:0;if(!n||(st[0]&&st[0].secs))return;const b=gBase(e.name);ask[b]=(ask[b]||0)+n}));
+        if(following>=4){const ask={};(p.days||[]).forEach(d=>(d.exercises||[]).forEach(e=>{const st=setsForWeek(e,S.week||1,p);const n=Array.isArray(st)?st.length:0;if(!n||(st[0]&&st[0].secs))return;const b=gBase(e.name);ask[b]=(ask[b]||0)+n}));
           const got={};(S.history||[]).forEach(h=>{if(!h.complete||h.run||hKey(h)<cut)return;(h.log||[]).forEach(l=>{if(l.r){const b=gBase(l.ex);got[b]=(got[b]||0)+1}})});
           let worst=null;Object.keys(ask).forEach(b=>{if(ask[b]<3||blocked(b))return;const per=(got[b]||0)/4;const ratio=per/ask[b];if(ratio<0.5&&(!worst||ratio<worst.ratio))worst={b,ratio,per,ask:ask[b]}});
           if(worst){const li=D.lifts.findIndex(L=>L.members.indexOf(worst.b)>=0);
@@ -36115,12 +36226,21 @@ async function deepRun(){
   /* A GIFTED READ IS SPENT ON THE SERVER, BEFORE THE CURTAIN (3 Oct 2026,
      02b): without a subscription the read runs only when gift_take() says
      one was really there */
-  if(!DEEP_CFG.beta&&!subEntitled()){
-    if(!(await giftTake())){S.sheet={t:'upgrade',v:'read'};render();return flash('That free read has already been used.')}}
+  /* A SERVER SPEND COMES AFTER EVERY LOCAL GATE THAT CAN REFUSE (review,
+     4 Oct 2026): aiSpend can still say no (consent not given yet, the
+     day's cap), and gift_take is irreversible on the server, so the local
+     gate runs first and the gift is spent last. */
   if(!aiSpend('deep'))return;
+  let gifted=false;
+  if(!DEEP_CFG.beta&&!subEntitled()){
+    if(!(await giftTake())){try{aiRefund('deep')}catch(e){oops('deepRefund',e)}
+      S.sheet={t:'upgrade',v:'read'};render();return flash('That free read has already been used.')}
+    gifted=true}
   /* a read that never reached the model must not cost one of the day's
-     two — the cap is there to stop a loop, not to punish a flat spot */
-  const giveBack=()=>{try{if(typeof aiRefund==='function')aiRefund('deep')}catch(e){oops('deepRefund',e)}};
+     two — the cap is there to stop a loop, not to punish a flat spot —
+     nor the gifted read it was going to use */
+  const giveBack=()=>{try{if(typeof aiRefund==='function')aiRefund('deep')}catch(e){oops('deepRefund',e)}
+    if(gifted){gifted=false;try{giftBack()}catch(e){oops('deepGiftBack',e)}}};
   { // the constellation: real sources, real counts, drawn while the model works
     const H9=(S.history||[]).filter(h=>h.complete&&!h.run);
     const R9=deepRuns();
@@ -38029,7 +38149,7 @@ function catchUpPlan(p){
     const out=[];const seen={};
     p.days.forEach(d=>(d.exercises||[]).forEach(ex=>{
       if(seen[ex.name])return;seen[ex.name]=1;
-      const l=setsForWeek(ex,(typeof weekFor==='function'?weekFor(p.id):S.week)||1);
+      const l=setsForWeek(ex,(typeof weekFor==='function'?weekFor(p.id):S.week)||1,p);
       /* TOP AGAINST TOP (audit A1, 2 Oct 2026): the logs below are each
          session's HEAVIEST set, so the written side must be the heaviest
          written set too — the first set of a 60/70/80 ramp read as "your
@@ -38465,7 +38585,7 @@ function viewSession(){
    '<button data-a="sessMin" aria-label="Minimise session" style="'+ib+';margin-left:-10px"><svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true"><path d="M4 4l10 10M14 4L4 14" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg></button>'+
    '<div style="min-width:0;flex:1;display:flex;flex-direction:column;align-items:center;gap:1px">'+
    '<p class="micro" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%">'+esc(s.dayName)+'</p>'+
-   '<p style="font-size:15px">exercise '+(exI+1)+' of '+plan0.length+'</p></div>'+
+   '<p style="font-size:15px">exercise '+(exI+1)+' of '+plan0.length+(((S.sess&&S.sess.sets)||[]).some(st=>st&&st.deload)?' \u00b7 deload week':'')+'</p></div>'+
    '<button data-a="sessMenuOpen" aria-label="Session menu" style="'+ib+';margin-right:-10px"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h10"/></svg></button>'+
    '</div>'+
    /* each segment is a door to its exercise (hidden during a hold, whose
@@ -41082,7 +41202,8 @@ function sheetHtml(){
        prompts, which leave {am:''} and the like behind; a leftover of
        theirs is not a goal form (28 Sep 2026: the steppers came up
        blank and Add refused) */
-    if(!S.gform||!('r' in S.gform)||!('ex' in S.gform))S.gform={ex:null,w:UNITS.w==='lb'?135:60,r:8};   // in the user's own unit (C-30)
+    if(!S.gform||!('r' in S.gform)||!('ex' in S.gform))S.gform={ex:'',w:UNITS.w==='lb'?135:60,r:8};   // in the user's own unit (C-30)
+    const gex=String(S.gform.ex||'').trim();
     let inner='';
     if(S.goals.length){inner+='<div style="display:flex;flex-direction:column;gap:8px">'+
       S.goals.map(g=>{const st=goalStats(g);
@@ -41092,12 +41213,13 @@ function sheetHtml(){
         '<button data-a="gDel" data-v="'+g.id+'" style="color:var(--red);font-size:13px;padding:6px">Remove</button></div>'}).join('')+'</div>'}
     if(S.goals.length<3){
       inner+='<p class="eyebrow" style="margin-top:'+(S.goals.length?'18':'0')+'px">Add a goal · lift</p>'+
-      '<select data-gex style="width:100%;margin-top:8px;background:var(--surface);border:1px solid var(--line);border-radius:12px;color:var(--text);padding:13px 14px;font-size:15px;outline:none;-webkit-appearance:none;appearance:none">'+
-      '<option value=""'+(S.gform.ex?'':' selected')+' disabled>Pick the lift\u2026</option>'+
-      goalExOptions().map(x=>'<option value="'+esc(x)+'"'+(S.gform.ex===x?' selected':'')+'>'+esc(x)+'</option>').join('')+'</select>'+
+      /* type-to-search, any lift (beta ask, 6 Oct 2026); the list under
+         it is rewritten as they type (29-scrub), never through render() */
+      '<input data-in="gform.ex" value="'+esc(S.gform.ex||'')+'" placeholder="Type any exercise" autocomplete="off" style="width:100%;margin-top:8px">'+
+      '<div id="gnear">'+goalNearHtml(S.gform.ex)+'</div>'+
       '<div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px;margin-top:16px">'+
       stepper('gform.w','Weight',S.gform.w,UNITS.w==='lb'?5:2.5,uwUnit())+stepper('gform.r','Reps',S.gform.r,1,'')+'</div>'+
-      '<button data-a="gAdd" class="big disp mt" style="background:'+(S.gform.ex?'var(--green)':'var(--raised)')+';color:'+(S.gform.ex?'var(--bg)':'var(--faint)')+';font-size:17px">Add goal</button>';
+      '<button data-a="gAdd" class="big disp mt" style="background:'+(gex?'var(--green)':'var(--raised)')+';color:'+(gex?'var(--bg)':'var(--faint)')+';font-size:17px">Add goal</button>';
     }else inner+='<p style="color:var(--dim);font-size:13px;line-height:1.55;margin-top:16px">Three goals is the cap for a block. Spreading focus further dilutes the volume each lift gets — finish or drop one to add another.</p>';
     inner+='<p style="color:var(--faint);font-size:11px;line-height:1.5;margin-top:16px">Progress and projections use estimated 1RM from every logged set of that lift. The projection fits a line through your last ~4 months — strength gain flattens over time, so treat dates as optimistic. A goal only counts as DONE when you log the actual set.</p>';
     return wrapSheet('Lift goals',inner)}
@@ -43044,15 +43166,15 @@ function sheetHtml(){
       row('Witnessed only','Your phone ran the clock and the sets spread like a real session, or your watch recorded it. Typed-in history and imports never race.')+
       row('Runs and rides count by time','A witnessed run earns 0.8 points a minute, capped at 40. A ride earns 0.48 a minute, capped at 24. A walk never races.')+
       row('A day is capped at '+cap,'One honest day is nowhere near it. Nobody wins by logging more than they trained.')+
-      row('Fresh every Monday','The week resets at midnight on Sunday, your time, and opens with your stake. Last week\u2019s podium is kept and can be reopened here.')+
-      row('The stake','Each week opens with '+(typeof STAKE_PER!=='undefined'?STAKE_PER:15)+' points for every session Allena asked for. The sessions are spread evenly over the week, and each one that is due and not done takes its '+(typeof STAKE_PER!=='undefined'?STAKE_PER:15)+' back. A witnessed session or run counts as done, and so does any finished rehab session.')+
+      row('Fresh every Monday','The week resets at midnight on Sunday, your time'+(STAKE_ON?', and opens with your stake':', at zero')+'. Last week\u2019s podium is kept and can be reopened here.')+
+      (STAKE_ON?row('The stake','Each week opens with '+(typeof STAKE_PER!=='undefined'?STAKE_PER:15)+' points for every session Allena asked for. The sessions are spread evenly over the week, and each one that is due and not done takes its '+(typeof STAKE_PER!=='undefined'?STAKE_PER:15)+' back. A witnessed session or run counts as done, and so does any finished rehab session.'):'')+
       row('Leagues','Bronze, Silver, Gold, Platinum, Diamond. At the end of the week the top finisher on your board moves up a league and the last one moves down. From six racers it is the top two and the bottom two. Fewer than three racers and nobody moves. Your lifetime tier, your level and your tree never go down.')+
-      row('Protected weeks','From the day a flare-up is logged, the week cannot lose more stake, and its league holds where it is. You can also sit one week out in any four, for illness or a setback. Points already lost stay lost.')+
+      row('Protected weeks','From the day a flare-up is logged, the week\u2019s league holds where it is'+(STAKE_ON?', and it cannot lose more stake. You can also sit one week out in any four, for illness or a setback. Points already lost stay lost.':'.'))+
       row('The number is yours to claim','The race only sees the score card your phone sends, so it cannot recompute your week. A friend on a board of three would notice a week you did not train.')+
       '</div>'+
       /* the sit-out door lives beside the rule that explains it; disabled
          with its reason when it is not available (design rule 2) */
-      (function(){try{if(typeof sitOutAllowed!=='function')return '';
+      (function(){try{if(typeof sitOutAllowed!=='function'||!STAKE_ON)return '';
         const st9=raceStake();if(!st9.asked)return '';
         const g9=sitOutAllowed();
         if(st9.prot==='sitout')return '<p style="color:var(--dim);font-size:13px;line-height:1.55;margin-top:14px">You are sitting this week out. Nothing more can be lost and your league holds where it is.</p>';
@@ -43076,7 +43198,7 @@ function sheetHtml(){
     if(R.items.length)inner+='<div class="mt2">'+R.items.map(row).join('')+'</div>';
     else inner+='<div class="card mt2" style="padding:14px 16px"><p style="color:var(--dim);font-size:13px;line-height:1.6">Train with the phone or watch running and the session lands here with what it earned.</p></div>';
     inner+='<p style="color:var(--faint);font-size:11px;line-height:1.55;margin-top:16px">A lifting session earns for every honest number in it \u2014 each set\u2019s weight, reps and effort, plus one for finishing. A witnessed run earns by time on feet. Both are capped per day so one huge day cannot buy a week.</p>';
-    try{const l9=(typeof stakeLine==='function')?stakeLine():'';if(l9)inner+='<p style="color:var(--dim);font-size:13px;line-height:1.55;margin-top:10px">'+esc(l9)+'</p>'}catch(e9){oops('racemine.stake',e9)}
+    try{const l9=(typeof stakeLine==='function'&&STAKE_ON)?stakeLine():'';if(l9)inner+='<p style="color:var(--dim);font-size:13px;line-height:1.55;margin-top:10px">'+esc(l9)+'</p>'}catch(e9){oops('racemine.stake',e9)}
     return wrapSheet('Where your points came from',inner)}
   if(S.sheet.t==='nudge'){
     const id=S.sheet.id;
@@ -45227,8 +45349,7 @@ document.addEventListener('scroll',e=>{ // the findings carousel remembers its l
           if(S.lensIdx===0&&typeof discMarkSoon==='function')discMarkSoon();
           if(S.lensIdx===1&&typeof patMarkSoon==='function')patMarkSoon()}}catch(e8){}},160)}}catch(e2){}},true);
 document.addEventListener('change',e=>{ // the goal-lift dropdown
-  if(e.target&&e.target.dataset&&e.target.dataset.gex!=null){
-    S.gform.ex=e.target.value;try{render()}catch(e2){oops('gex.render',e2)}}},true);
+  },true);
 /* A FILE IS NOT A TAP (review M-24). The AI consent sheet's Yes re-runs
    the last tap, but a photo or file read starts from a picker's change
    event, so "the last tap" was whatever button came before — Yes reopened
@@ -45450,6 +45571,17 @@ document.addEventListener('input',e=>{const d=e.target.dataset;
       b9.style.background=on9?'var(--green)':'var(--raised)';
       b9.style.color=on9?'var(--bg)':'var(--faint)'}}
     catch(e9){oops('axNearLive',e9)}return}
+  if(k==='gform.ex'){try{const host=document.getElementById('gnear');
+    /* on the web the strip is written in place; the phone has no element
+       to write into (gnear is in the shim's no-element list), so it
+       re-renders after a short pause — its field keeps the keyboard */
+    if(host&&typeof goalNearHtml==='function')host.innerHTML=goalNearHtml(e.target.value);
+    else{clearTimeout(S._gnT);S._gnT=setTimeout(function(){try{render()}catch(e8){oops('gnear.render',e8)}},350)}
+    const b9=document.querySelector('[data-a="gAdd"]');
+    if(b9){const on9=String(e.target.value).trim();
+      b9.style.background=on9?'var(--green)':'var(--raised)';
+      b9.style.color=on9?'var(--bg)':'var(--faint)'}}
+    catch(e9){oops('gNearLive',e9)}return}
   if(k==='coach.input'){try{const b=document.querySelector('.sendbtn');
     if(b)b.style.opacity=String(e.target.value).trim()?'1':'.35';
     e.target.style.height='auto';
@@ -47930,7 +48062,7 @@ function runAction(a,v,t,e){
       const day8=p8&&p8.days[S.prev.di];
       const ex8=day8&&day8.exercises.find(x=>x.name===orig);
       e.name=orig;e.sets.forEach((st,si)=>{st.ex=orig;
-        const tpl=ex8&&setsForWeek(ex8,S.week);if(tpl&&tpl[si])st.targetW=tpl[si].w!=null?tpl[si].w:null});
+        const tpl=ex8&&setsForWeek(ex8,S.week,p8);if(tpl&&tpl[si])st.targetW=tpl[si].w!=null?tpl[si].w:null});
       S.sheet={t:'preview'};render();flash('Back to '+orig+'.');break}
     case 'keyDrop':{const k=S.keyAsk;S.keyAsk=null;S.keyOk=false;
       const e=S.prev.ex[k.i];e.keep=false;
@@ -48229,7 +48361,7 @@ function runAction(a,v,t,e){
       let kg=m.act.kg;
       if(kg>0){try{
         let top=null;prog.days.forEach(d=>d.exercises.forEach(e=>{if(e.name!==name)return;
-          (setsForWeek(e,(typeof weekFor==='function'?weekFor(prog.id):S.week)||1)||[]).forEach(x=>{if(x&&x.w!=null&&(top==null||+x.w>top))top=+x.w})}));
+          (setsForWeek(e,(typeof weekFor==='function'?weekFor(prog.id):S.week)||1,prog)||[]).forEach(x=>{if(x&&x.w!=null&&(top==null||+x.w>top))top=+x.w})}));
         const cur=(prog.adj&&prog.adj[name])||0;
         if(top!=null){const capped=adjCap(prog,name,top,cur+kg);kg=Math.max(0,Math.round((capped-cur)*4)/4)}}
         catch(e9){oops('coachApply.cap',e9);kg=0}}
@@ -48296,13 +48428,22 @@ function runAction(a,v,t,e){
     case 'creaToggle':S.supp.on=!S.supp.on;lset(K_SUPP,S.supp);render();break;
     case 'goalsOpen':S.sheet={t:'goals'};render();break;
 
-    case 'gAdd':{const f=S.gform;if(!f||!f.ex||S.goals.length>=3)break;
+    case 'gNear':{if(!S.gform)break;S.gform.ex=String(v||'');render();break}
+    case 'gAdd':{const f=S.gform;if(!f||S.goals.length>=3)break;
+      /* typed or tapped: a known spelling of the same lift wins, so a goal
+         never splits a trend (exNear's SAME LIFT, 15 Sep) */
+      let ex=gBase(String(f.ex||'').trim());if(!ex)break;
+      try{const lo=ex.toLowerCase();
+        const known=(typeof exKnownNames==='function'?exKnownNames():[]).find(c=>String(c.n).toLowerCase()===lo);
+        if(known)ex=gBase(known.n);
+        else{const same=(typeof exNear==='function'?exNear(ex,3):[]).find(x=>x.same);if(same)ex=gBase(same.n)}}
+      catch(e){oops('gAdd.same',e)}
       if(!(+f.w>0)||!(+f.r>0)){flash('Set a weight and reps.');break}
-      if(S.goals.some(g=>g.ex===f.ex)){flash('One goal per lift — remove the existing one first.');break}
+      if(S.goals.some(g=>String(g.ex).toLowerCase()===ex.toLowerCase())){flash('One goal per lift — remove the existing one first.');break}
       /* typed in the user's unit, stored in kilograms like every weight
          (review C-30/L-11): each goal surface reads g.w through uwNum */
-      S.goals.push({id:'g'+Date.now().toString(36),ex:f.ex,w:Math.round(uwIn(+f.w)*4)/4,r:+f.r,created:Date.now(),done:null});
-      lset(K_GOALS,S.goals);f.ex=null;render();break}
+      S.goals.push({id:'g'+Date.now().toString(36),ex:ex,w:Math.round(uwIn(+f.w)*4)/4,r:+f.r,created:Date.now(),done:null});
+      lset(K_GOALS,S.goals);f.ex='';render();break}
     case 'gDel':S.goals=S.goals.filter(g=>g.id!==v);lset(K_GOALS,S.goals);render();break;
 
     case 'unitW':unitsSet('w',v);render();flash(v==='lb'?'Weights now read in pounds — stored metric underneath.':'Weights back to kilograms.');break;
