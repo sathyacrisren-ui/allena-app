@@ -1933,7 +1933,7 @@ if(S.sess){S.note=S.sess.note||S.note;
       if(c0&&(s0.log||[]).some(l=>l.ex===c0.ex&&l.setNo===c0.setNo)){const n0=sessAdv(s0);
         if(n0<0)s0.phase='done';else s0.idx=n0}}catch(e){oops('bootSess',e)}
     if(S.sess.phase!=='done')S.sess.phase='ready'}}
-const BUILD_ID='83340f';  // stamped by tools/build.py with the content hash
+const BUILD_ID='8c3ea3';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -3934,6 +3934,18 @@ function coachContextBody(U,o){
       ' · '+s.log.length+' of '+s.sets.length+' sets logged so far');
     const sameEx=s.log.filter(l=>l.ex===cur.ex);
     if(sameEx.length)out.push('This exercise today: '+sameEx.map(l=>entryKg(l)).join('; '));
+    /* THE REGULATOR'S READ IS THE ANSWER (owner's chat export, 10 Oct
+       2026: "Too easy" at RPE 5-6 on the written 6 reps, and the chat
+       said grind the same weight harder, citing a chest recovery number
+       this very session had produced). The app already knows what the
+       last set means; the model is handed that read and the lift's step
+       so it never invents a lever. */
+    try{const lastL=s.log[s.log.length-1];
+      if(lastL&&lastL.ex===cur.ex){const tpl=s.sets.find(x=>x.ex===lastL.ex&&x.setNo===lastL.setNo);
+        const v=tpl&&typeof autoReg==='function'?autoReg(lastL,tpl):null;
+        if(v&&v.msg)out.push('Allena\u2019s read of the last set (this is the answer to "was that right?"): '+v.msg)}
+      if(cur.targetW!=null&&typeof exStep==='function'){const st9=exStep(cur.ex,cur.targetW);if(st9>0)out.push('The load step for '+cur.ex+' is '+st9+' kg; "too easy" with the reps made means the next set goes up by one step, not the same weight done harder.')}}
+    catch(e){oops('coachContext.reg',e)}
     if(s.log.length)out.push('All sets today: '+s.log.slice(-10).map(l=>l.ex.replace(/ — /,' ')+' '+entryKg(l)).join('; '));
     try{const lp=lastFor(cur.ex,cur.setNo);
       if(lp)out.push('Same set last time: '+entryKg(lp)+' ('+dayKey(new Date(lp.date))+')')}catch(e){oops('coachContext',e)}
@@ -3964,8 +3976,10 @@ function coachContextBody(U,o){
       if(dd.fm!=null)ch.push('fat '+(dd.fm>0?'+':'')+dd.fm);
       if(ch.length)bits.push('since last scan: '+ch.join(', '))}
     out.push('Scan '+last.date+': '+bits.join(', '))}}
-  const rec=muscleFresh().filter(x=>x.fresh<65).slice(0,3);
-  if(rec.length)out.push('Recovery: '+rec.map(x=>x.m+' '+x.fresh+'%').join(', '));
+  /* during a session the live row is excluded, or the chest reads 30%
+     because of the bench sets just done (owner export, 10 Oct 2026) */
+  const rec=muscleFresh(s?{skipId:s.recId||String(s.startedAt)}:undefined).filter(x=>x.fresh<65).slice(0,3);
+  if(rec.length)out.push((s?'Recovery coming into this session (the muscles this session works are being worked now; that is never a reason to hold a set back): ':'Recovery: ')+rec.map(x=>x.m+' '+x.fresh+'%').join(', '));
   {/* recent running is load the coach must never miss — the one-model law.
       A walk, a ride or a swim is not a run (review B-18): a 42 km ride used
       to be told to the model as "a long run", and a Garmin wearer's daily
@@ -4607,7 +4621,15 @@ function snapshotData(){
        Monday instead of showing the whole stake all week. social17.sql;
        self-detects. */
     try{if(!S._snapNoStake&&typeof STAKE_ON!=='undefined'&&STAKE_ON&&d.stake&&d.stake.asked){const k9=d.stake;
-      out.stake={asked:+k9.asked||0,done:Math.min(50,+k9.done||0),kept:Math.min(105,Math.round(+k9.kept||0)),frozen:!!k9.prot}}}
+      out.stake={asked:+k9.asked||0,done:Math.min(50,+k9.done||0),kept:Math.min(105,Math.round(+k9.kept||0)),frozen:!!k9.prot}}
+      /* THE STALE STAKE (owner, 10 Oct 2026: "everyone's points just
+         dropped a bunch"). With the stake off the field was simply not
+         sent, so the column kept whatever the last stake-era upload
+         wrote, and every reader (snWeeks) subtracted that dead number
+         from a week_live that no longer contained it: 143 - 60 read as
+         83. A card from a stake-off build now says stake: null out loud,
+         so its row is cleared on the next sync. */
+      else if(!S._snapNoStake&&typeof STAKE_ON!=='undefined'&&!STAKE_ON)out.stake=null}
     catch(e){oops('snapStake',e)}
     /* PODS (14 Sep): the stage bracket and the yes/no exemption ride
        the score card — a bracket the opt-in sheet says out loud will
@@ -7520,7 +7542,7 @@ function coachSys2(){
   P.push('HOW TO ANSWER: lead with the answer in plain, everyday words. Short sentences. Usually two to five sentences; longer only when they ask for a plan or an explanation. Use a short list only for steps. Name the number and the date it comes from ("your 82.5 kg × 5 on the 14th"). Talk to them, not about them. Never use their name. No emoji. No hype.');
   P.push('TRUTH: never state a number that is not in the record or RIGHT NOW. If something they ask about is not there, say what is missing and how to add it in the app. Attributing a number to the wrong day or exercise is the one unforgivable error; when a SESSION UNDER DISCUSSION is given, answer about that session. A falling lift is never "a plateau" and never a reason to add load. A walk is never a run. Imported runs have no recorded effort.');
   P.push('SAFETY: pain, numbness, tingling, swelling or the knee giving way means stop that exercise and talk to their physio or doctor; never diagnose. A physio’s plan always outranks the app’s suggestions. Rehab swaps only come from their own rehab programme. Never conflict with their stated restrictions.');
-  P.push('THE RULES THE APP RUNS ON: double progression (top of the rep range at RPE 9 or under on every set, then add load); RPE targets are ranges; missing reps at an easy effort means they stopped early, so hold the load; the last week of any block of four weeks or more is a deload the app applies itself (half the sets, two RPE points easier, same weight), so a block is never written with its own deload week; 10 to 20 hard sets per muscle a week. Recovery counts runs, lifting and rehab together.'+
+  P.push('THE RULES THE APP RUNS ON: double progression (top of the rep range at RPE 9 or under on every set, then add load); RPE targets are ranges; missing reps at an easy effort means they stopped early, so hold the load; a set that MADE its reps under the target effort means more load on the next set, by the lift\u2019s step in the LIVE SESSION block, never the same weight done slower or harder, and a recovery number never argues against it inside the session; the last week of any block of four weeks or more is a deload the app applies itself (half the sets, two RPE points easier, same weight), so a block is never written with its own deload week; 10 to 20 hard sets per muscle a week. Recovery counts runs, lifting and rehab together.'+
     ((S.lib&&(S.lib.programs||[]).some(p=>p.id==='bench-1'))?' Their bench programme: wave 5 weeks (100×4 / 102.5×3 / 105×2 / 100×5 / 102.5×4), +2.5 kg per block; back-offs 90% of the top set; volume bench 87.5×4×8, to 90 when all four hit 8 at RPE 8 or under.':''));
   P.push('THEIR APP, exactly as it looks for them:\n'+coachAppMap());
   P.push('ACTIONS: you can add lines at the very end of a reply, each on its own line, in exactly these forms. The app turns them into buttons and never shows the line itself.\n'+
@@ -11133,10 +11155,16 @@ function recoveryMod(){
       ||S.history.some(h=>hKey(h)===yk&&(h.log||[]).filter(l=>l.r>0&&(l.rpe==null||l.rpe>=6)).length>=10);
     if(heavy&&bw>0&&cb<3*bw)m*=0.90}}catch(e3){oops('recoveryMod.carb',e3)}
   return Math.max(0.75,Math.min(1.15,m))}catch(e){oops('recoveryMod',e);return 1}}
-function muscleFresh(){
+function muscleFresh(opts){
  const now=Date.now(),L={},RM=recoveryMod();
+ /* skipId: the session in progress is in history from its first set
+    (persistActive), so mid-session the muscles being trained read as
+    tired FROM THIS SESSION. A reader asking "how recovered was this
+    person coming in" passes the live row's id (coach, 10 Oct 2026). */
+ const skip=opts&&opts.skipId!=null?String(opts.skipId):null;
  S.history.forEach(h=>{const hrs=(now-new Date(h.date).getTime())/36e5;
   if(hrs>168||hrs<-2)return;
+  if(skip&&String(h.id)===skip)return;
   /* a run's mirror row is billed by the run loop below; billing its log
      too charged every run a Calves set and a Health rowing workout the
      back, via "Row — cardio" (audit C-26) */
@@ -28636,6 +28664,22 @@ function crownKind(h){
   if(h.watchOnly&&typeof wgIsCond==='function'&&wgIsCond(h.watchAct))return 'ride';
   try{const p=((S.lib&&S.lib.programs)||[]).find(x=>x.id===h.progId);if(p&&(p.acl||p.rehabProto||p.kind==='rehab'))return 'rehab'}catch(e){oops('crownKind',e)}
   return 'lift'}
+/* ══ THE BLOCK CROWN (owner, 11 Oct 2026: "too cluttered and too many
+   things about lifts... make it so it shows the tree as being the block
+   instead and as you progress through the block it grows and if you have
+   hiccups along the way or a lift is stalling then the tree reveals it...
+   the tree as a whole is very unchanging day to day") ═══════════════
+   The same drawing engine on a different record: the radius is the
+   active block (week 1 at the centre, the last week at the rim, every
+   week a ring whether or not it was trained), the limbs are the block's
+   own lifts, the leaves are this block's sessions. A limb's thickness
+   follows liftTrend, the one reader for "is this lift moving?": up
+   thickens, level holds, down thins and its leaves wilt, so a stall is
+   drawn from the regulator's own verdict and never invented here. A week
+   closed early, a week with nothing logged, or a flare-up is a scar on
+   its ring. "All time" is one tap away and is the crown as it was. */
+function crownBlockProg(){try{const p=activeProgSafe();if(!p||p.empty||!(+p.weeks>=2))return null;if(p.acl||p.rehabProto||p.kind==='rehab')return null;return p}catch(e){oops('crownBlockProg',e);return null}}
+function crownMode(){try{const m=S.prof&&S.prof.crownMode;if(m==='all')return 'all';return crownBlockProg()?'block':'all'}catch(e){oops('crownMode',e);return 'all'}}
 function crownWeekMon(k){const d=new Date(k+'T12:00');const dow=(d.getDay()+6)%7;d.setDate(d.getDate()-dow);return dayKey(d)}
 /* the world the canvas fits: the canopy reaches 1.0, the root chips sit
    on a ring at 1.16, and their labels need the rest */
@@ -28669,18 +28713,49 @@ function crownLifts(sessions){
 function crownData(){
   /* the record as trained weeks: every completed session with a day, a
      kind, the PRs it set at the time; weeks counted from the first logged
-     day; a week with nothing is not a week here */
-  const first=crownFirstDay();if(!first)return {weeks:[],sessions:[],first:null,lifts:[],seed:7};
-  const t0=new Date(crownWeekMon(first)+'T12:00');
-  const wk=k=>Math.round((new Date(crownWeekMon(k)+'T12:00')-t0)/(7*864e5));
+     day; a week with nothing is not a week here. In BLOCK mode (above)
+     the weeks are the active block's, every one present, and the
+     sessions are the block's own plus the runs and rehab inside its span. */
+  const BP=crownMode()==='block'?crownBlockProg():null;
   let PRM={};try{PRM=prMap()}catch(e){oops('crownPRmap',e)}
-  const sessions=[];(S.history||[]).forEach(h=>{if(!h.complete)return;const k=hKey(h);if(!k)return;const kind=crownKind(h);if(!kind)return;
-    const prs=(!h.run&&PRM[String(h.id)])||[];
-    sessions.push({id:String(h.id),day:k,wi:wk(k),kind,rt:kind==='ride'?crownRunType(h):null,pr:prs.length>0,prs,mins:h.minutes||0,title:h.dayTitle||h.dayName||'',h})});
-  sessions.sort((a,b)=>a.day.localeCompare(b.day)||a.id.localeCompare(b.id));
-  const byW={};sessions.forEach(s=>{(byW[s.wi]=byW[s.wi]||[]).push(s)});
-  const weeks=Object.keys(byW).map(Number).sort((a,b)=>a-b).map((wi,i)=>({wi,i,ss:byW[wi]}));
-  const idx={};weeks.forEach(w=>idx[w.wi]=w.i);sessions.forEach(s=>{s.ti=idx[s.wi]});   // ti: trained-week index, the radius
+  let first,wk,weeks,block=null;const sessions=[];
+  if(BP){
+    const N=Math.max(2,Math.round(+BP.weeks||2));
+    const mine=(S.history||[]).filter(h=>h&&h.complete&&!h.run&&h.progId===BP.id&&hKey(h));
+    first=mine.map(h=>hKey(h)).sort()[0]||today();
+    /* a week's first day: the clock the app set when it opened, else the
+       first session logged against that week; a session with no week of
+       its own (a run, a rehab day) is placed by those dates */
+    const starts=[];for(let w=1;w<=N;w++){let st=(S.weekStarts||{})[BP.id+':'+w]||null;
+      mine.forEach(h=>{if((+h.week||0)===w){const k=hKey(h);if(!st||k<st)st=k}});starts.push(st)}
+    const byDate=k=>{let w=0;for(let i=0;i<N;i++){if(starts[i]&&starts[i]<=k)w=i}return w};
+    wk=h=>{if(!h.run&&h.progId===BP.id&&+h.week>=1)return Math.min(N-1,Math.round(+h.week)-1);return byDate(hKey(h))};
+    (S.history||[]).forEach(h=>{if(!h.complete)return;const k=hKey(h);if(!k)return;const kind=crownKind(h);if(!kind)return;
+      if(kind==='lift'){if(h.progId!==BP.id)return}else if(k<first)return;
+      const prs=(!h.run&&PRM[String(h.id)])||[];
+      sessions.push({id:String(h.id),day:k,wi:wk(h),kind,rt:kind==='ride'?crownRunType(h):null,pr:prs.length>0,prs,mins:h.minutes||0,title:h.dayTitle||h.dayName||'',h})});
+    sessions.sort((a,b)=>a.day.localeCompare(b.day)||a.id.localeCompare(b.id));
+    const byW={};sessions.forEach(s=>{(byW[s.wi]=byW[s.wi]||[]).push(s)});
+    weeks=[];for(let w=0;w<N;w++)weeks.push({wi:w,i:w,ss:byW[w]||[]});
+    sessions.forEach(s=>{s.ti=s.wi});
+    let cur=1;try{cur=Math.max(1,Math.min(N,weekFor(BP.id)||1))}catch(e){oops('crownBlockWeek',e)}
+    const closed=[],missed=[],flares=[];
+    for(let w=1;w<=N;w++){try{if(typeof weekClosed==='function'&&weekClosed(BP,w))closed.push(w)}catch(e){oops('crownClosed',e)}
+      if(w<cur&&!(byW[w-1]||[]).some(s=>s.kind==='lift'))missed.push(w)}
+    try{((S.acl&&S.acl.flares)||[]).forEach(f=>{const k=String((f&&f.date)||'').slice(0,10);if(k&&k>=first){const w=byDate(k)+1;if(flares.indexOf(w)<0)flares.push(w)}})}catch(e){oops('crownFlares',e)}
+    let deload=null;try{if(typeof isDeloadWeek==='function'&&isDeloadWeek(BP,N))deload=N}catch(e){oops('crownDeload',e)}
+    block={id:BP.id,name:String(BP.block||'Block'),N,week:cur,closed,missed,flares,deload,starts}}
+  else{
+    first=crownFirstDay();if(!first)return {weeks:[],sessions:[],first:null,lifts:[],seed:7};
+    const t0=new Date(crownWeekMon(first)+'T12:00');
+    wk=k=>Math.round((new Date(crownWeekMon(k)+'T12:00')-t0)/(7*864e5));
+    (S.history||[]).forEach(h=>{if(!h.complete)return;const k=hKey(h);if(!k)return;const kind=crownKind(h);if(!kind)return;
+      const prs=(!h.run&&PRM[String(h.id)])||[];
+      sessions.push({id:String(h.id),day:k,wi:wk(k),kind,rt:kind==='ride'?crownRunType(h):null,pr:prs.length>0,prs,mins:h.minutes||0,title:h.dayTitle||h.dayName||'',h})});
+    sessions.sort((a,b)=>a.day.localeCompare(b.day)||a.id.localeCompare(b.id));
+    const byW={};sessions.forEach(s=>{(byW[s.wi]=byW[s.wi]||[]).push(s)});
+    weeks=Object.keys(byW).map(Number).sort((a,b)=>a-b).map((wi,i)=>({wi,i,ss:byW[wi]}));
+    const idx={};weeks.forEach(w=>idx[w.wi]=w.i);sessions.forEach(s=>{s.ti=idx[s.wi]})}   // ti: trained-week index, the radius
   /* MAGNITUDE AT A GLANCE: a lift's tonnage, a run's distance, each
      against the athlete's own 90th percentile, so a big day is a big leaf */
   try{
@@ -28698,7 +28773,7 @@ function crownData(){
       s.mag=Math.max(0.35,Math.min(1,v))})}catch(e){oops('crownMag',e);sessions.forEach(s=>{if(s.mag==null)s.mag=0.6;if(!s.lab)s.lab=''})}
   /* weeks won: the race's own settled verdicts — one gold mark per week,
      on its last session; gold is only ever a week won */
-  try{const hist=(acct()||{}).duelHist||{};weeks.forEach(w=>{const mon=crownWeekMon(w.ss[0].day);if(hist[mon]==='w')w.ss[w.ss.length-1].won=true})}catch(e){oops('crownWon',e)}
+  try{const hist=(acct()||{}).duelHist||{};weeks.forEach(w=>{if(!w.ss.length)return;const mon=crownWeekMon(w.ss[0].day);if(hist[mon]==='w')w.ss[w.ss.length-1].won=true})}catch(e){oops('crownWon',e)}
   /* rehab gates: banked once by the climb, so a bead is a real event */
   try{const bank=discBank();Object.keys(bank).forEach(id=>{const b=bank[id];if(!b||!/^(aclgate|aclphase|lsi):/.test(id)||!b.found)return;const s=sessions.filter(x=>x.kind==='rehab'&&x.day<=b.found).pop();if(s)s.gate=true})}catch(e){oops('crownGate',e)}
   /* THE LEAVES: one per lift per day (owner, 7 Oct 2026). A lifting
@@ -28711,7 +28786,7 @@ function crownData(){
      its prototype (kind, day, id, h, ti...), so a leaf IS its session with
      the lift's own numbers on top. s.lift stays the lift it did the most
      sets of, for the readers that ask "what was this day mostly". */
-  const lifts=crownLifts(sessions);
+  const lifts=block?crownBlockLifts(BP,sessions):crownLifts(sessions);
   const marks=[];
   const p90=arr=>{const a=arr.filter(x=>x>0).sort((x,y)=>x-y);return a.length?a[Math.min(a.length-1,Math.floor(a.length*0.9))]:0};
   const tonOf=(s,L)=>(s.h.log||[]).reduce((a,l)=>a+((+l.w>0&&+l.r>0&&L.members.indexOf(gBase(l.ex))>=0)?(+l.w)*(+l.r):0),0);
@@ -28735,7 +28810,19 @@ function crownData(){
   /* the cardio sector is "Riding" only when every session in it is a ride */
   const rides=sessions.filter(s=>s.kind==='ride');
   const rideName=rides.length&&rides.every(s=>s.rt==='ride')?'Riding':'Other cardio';
-  return {weeks,sessions,marks,first,lifts,rideName,seed:crownSeed()}}
+  /* THE LIMB FOLLOWS THE LIFT: liftTrend's state, read once per limb,
+     never stored. up / level / down / back / early / noband / null. */
+  if(block)lifts.forEach(L=>{try{const T=liftTrend(L.members);L.vig=T?T.state:null}catch(e){oops('crownVig',e);L.vig=null}});
+  return {weeks,sessions,marks,first,lifts,rideName,block,seed:crownSeed()}}
+/* the block's own lifts, in the programme's order, goal lifts first;
+   only the ones trained at least once in this block get a limb */
+function crownBlockLifts(BP,sessions){
+  const out=[];const taken={};
+  const add=(name,members,goal)=>{if(out.length>=12)return;const m=members.filter(x=>x&&!taken[x]);if(!m.length)return;m.forEach(x=>taken[x]=1);out.push({name,members:m,goal:goal||null})};
+  const trained={};sessions.forEach(s=>{if(s.kind!=='lift')return;(s.h.log||[]).forEach(l=>{if(+l.w>0&&+l.r>0)trained[gBase(l.ex)]=1})});
+  try{(S.goals||[]).filter(g=>g&&!g.done&&g.ex).forEach(g=>{const nm=goalNames(g);if(nm.some(x=>trained[x]))add(String(nm[0]||g.ex),nm,g)})}catch(e){oops('crownBlockGoals',e)}
+  try{(BP.days||[]).forEach(d=>(d.exercises||[]).forEach(e=>{const b=gBase(e.name);if(b&&trained[b])add(b,[b],null)}))}catch(e){oops('crownBlockPick',e)}
+  return out}
 function crownGroup(s){return s.kind==='lift'?(s.li!=null?'L'+s.li:'Lx'):s.kind}
 function crownSectors(D){
   /* contiguous sectors with a narrow gap between domains, like the gaps
@@ -28822,6 +28909,9 @@ function crownModel(D){
   for(let i=nodes.length-1;i>0;i--)lb[nodes[i].p]+=lb[i];
   const tot=Math.max(1,lb[0]);const TR=0.02+0.016*Math.min(1,Math.sqrt(tot/300));
   nodes.forEach((n,i)=>{n.lb=lb[i];n.w=i===0?TR:Math.max(0.0032,TR*0.92*Math.pow(lb[i]/tot,1/2.05))});
+  /* block mode: a climbing lift's limb is thicker, a stalling one thinner */
+  if(D.block){const VF={up:1.18,level:1,down:0.66,back:0.85};
+    nodes.forEach(n=>{if(n.p<0||!n.g||n.g.charAt(0)!=='L'||n.g==='Lx')return;const L=D.lifts[+n.g.slice(1)];const f=L&&VF[L.vig];if(f)n.w*=f})}
   /* limbs: chains of single-child nodes, smoothed twice, one outline each */
   const kids=nodes.map(()=>[]);for(let i=1;i<nodes.length;i++)if(lb[i]>0)kids[nodes[i].p].push(i);
   const chains=[];const stack=kids[0].map(c=>[0,c]);
@@ -28839,8 +28929,17 @@ function crownModel(D){
     G.bb=[Math.min(G.bb[0],L.x),Math.min(G.bb[1],L.y),Math.max(G.bb[2],L.x),Math.max(G.bb[3],L.y)];G.rs.push(Math.hypot(L.x,L.y))});
   Object.keys(groups).forEach(g=>{const G=groups[g];const sc=SE.sect[g];G.a=sc?(sc[0]+sc[1])/2:0;
     G.rs.sort((a,b)=>a-b);G.rmax=G.rs[G.rs.length-1]||0.5;G.rmid=G.rs[Math.floor(G.rs.length*0.45)]||0.4;delete G.rs});
+  /* block mode: one ring per week of the block, labelled; a week closed
+     early, a week with nothing logged, or a flare-up carries a scar */
+  if(D.block){const K=D.block;const rings=[];
+    for(let w=2;w<=K.N;w++){const r=(rOf(w-2)+rOf(w-1))/2;const tags=[];
+      if(K.deload===w)tags.push('deload');if(K.closed.indexOf(w)>=0)tags.push('closed early');if(K.missed.indexOf(w)>=0)tags.push('nothing logged');if(K.flares.indexOf(w)>=0)tags.push('flare-up');
+      rings.push({r,label:'W'+w+(tags.length?' \u00b7 '+tags.join(', '):''),key:'w'+w,scar:K.closed.indexOf(w)>=0||K.missed.indexOf(w)>=0||K.flares.indexOf(w)>=0,w})}
+    /* week 1's own marks sit on the innermost ring edge */
+    if(K.closed.indexOf(1)>=0||K.flares.indexOf(1)>=0)rings.push({r:rOf(0)*0.5,label:'',key:'w1',scar:true,w:1});
+    return {nodes,leaves,chains,N,rOf,SE,groups,rings,TR}}
   /* a ring where the month turns, so the zoomed crown has a time axis */
-  const rings=[];try{let prev=null;D.weeks.forEach(w=>{const mo=new Date(crownWeekMon(w.ss[0].day)+'T12:00');const key=mo.getFullYear()+'-'+mo.getMonth();
+  const rings=[];try{let prev=null;D.weeks.forEach(w=>{if(!w.ss.length)return;const mo=new Date(crownWeekMon(w.ss[0].day)+'T12:00');const key=mo.getFullYear()+'-'+mo.getMonth();
     if(prev!==null&&key!==prev)rings.push({r:rOf(w.i)-0.5*(rOf(w.i)-rOf(Math.max(0,w.i-1))),label:mo.toLocaleDateString(undefined,{month:'short'})+(mo.getMonth()===0?' '+mo.getFullYear():''),key});prev=key})}catch(e){oops('crownRings',e)}
   return {nodes,leaves,chains,N,rOf,SE,groups,rings,TR}}
 /* THE STAMP READS CONTENT, NOT COUNTS (review, 28 Sep 2026). It used to
@@ -28864,7 +28963,8 @@ function crownStamp(){try{
   ((S.lib&&S.lib.programs)||[]).forEach(p=>{if(p&&(p.acl||p.rehabProto||p.kind==='rehab'))sh(p.id)});
   try{if(typeof annFresh==='function')annFresh()}catch(e9){oops('crownStampAnn',e9)}
   const bank=discBank()||{};let annN=0;Object.keys(bank).forEach(k=>{if(bank[k]&&bank[k].ann)annN++});
-  return nc+':'+(S.history||[]).length+':'+(h>>>0)+':'+Object.keys(bank).length+':'+annN+':'+crownFirstDay()+':'+Object.keys(((acct()||{}).duelHist)||{}).length+':'+(S.goals||[]).map(g=>g.ex+'@'+g.w+'x'+g.r+(g.done?'d':'')).join(',')}catch(e){oops('crownStamp',e);return '0'}}
+  let bk='';try{const BP=crownMode()==='block'?crownBlockProg():null;bk=BP?('B'+BP.id+'@'+BP.weeks+'@'+(weekFor(BP.id)||1)+'@'+Object.keys(S.weekStarts||{}).filter(k=>k.indexOf(BP.id+':')===0).join(',')+'@'+((S.acl&&S.acl.flares)||[]).length+'@'+today()):'A'}catch(e9){oops('crownStampBlock',e9)}
+  return bk+':'+nc+':'+(S.history||[]).length+':'+(h>>>0)+':'+Object.keys(bank).length+':'+annN+':'+crownFirstDay()+':'+Object.keys(((acct()||{}).duelHist)||{}).length+':'+(S.goals||[]).map(g=>g.ex+'@'+g.w+'x'+g.r+(g.done?'d':'')).join(',')}catch(e){oops('crownStamp',e);return '0'}}
 function crownM(){
   /* the model is cached on the record; focus, lens, zoom and theme are
      paint-time only, so none of them regrow the tree */
@@ -29073,6 +29173,12 @@ function crownPaint(c,C,V){
       const L1=[],L2=[];const n=24;for(let i=0;i<=n;i++){const t=i/n;const p=bz(t),q=bz(Math.min(1,t+0.01)),q0=bz(Math.max(0,t-0.01));let tx=q[0]-q0[0],ty=q[1]-q0[1];const tl=Math.hypot(tx,ty)||1;tx/=tl;ty/=tl;
         const w=(wm+(we-wm)*Math.pow(Math.abs(2*t-1),1.6))/2*(selR?1.5:1);L1.push([p[0]-ty*w,p[1]+tx*w]);L2.push([p[0]+ty*w,p[1]-tx*w])}
       c.beginPath();c.moveTo(L1[0][0],L1[0][1]);for(let i=1;i<L1.length;i++)c.lineTo(L1[i][0],L1[i][1]);for(let i=L2.length-1;i>=0;i--)c.lineTo(L2[i][0],L2[i][1]);c.closePath();c.fill()}});
+  /* 2b. block mode: the week rings, faint, under the wood; a scar where
+     a week was closed early, left empty, or carried a flare-up */
+  if(D.block&&(V.t==null||V.t>=1)){c.strokeStyle=crownRgba(PL.ink,0.11);c.lineWidth=1;c.setLineDash([2*u,4*u]);
+    M.rings.forEach(rg=>{const rp=rg.r*B;if(rp<10||!rg.label)return;c.beginPath();c.arc(cx,cy,rp,0,Math.PI*2);c.stroke()});c.setLineDash([]);
+    const ga=M.SE.gap;M.rings.forEach(rg=>{if(!rg.scar)return;const x=X(Math.cos(ga)*rg.r),y=Y(Math.sin(ga)*rg.r),s=3.2*u;
+      c.strokeStyle=crownRgba(PL.ink,0.55);c.lineWidth=1.4;c.beginPath();c.moveTo(x-s,y-s);c.lineTo(x+s,y+s);c.moveTo(x+s,y-s);c.lineTo(x-s,y+s);c.stroke()})}
   /* 3. the wood: one tapered outline per limb, warm grey from the trunk
      to the twigs, quieter than the leaves */
   const wmax=M.TR||0.03;
@@ -29099,10 +29205,15 @@ function crownPaint(c,C,V){
   const leafLen=L=>{let f=1;if(V.unf&&V.unf.id===L.s.id&&(V.unf.li==null||V.unf.li===L.s.li)){f=Math.max(0.05,Math.min(1,(now-V.unf.t0)/700));f=1-Math.pow(1-f,3)}return 3.7*u*sq*(0.72+0.55*L.s.mag)*f};
   const almond=(x,y,a,len)=>{const w=len/1.8,ca=Math.cos(a),sa=Math.sin(a);const ax=x-ca*len,ay=y-sa*len,bx=x+ca*len,by=y+sa*len;
     c.moveTo(ax,ay);c.quadraticCurveTo(x-sa*w*1.25,y+ca*w*1.25,bx,by);c.quadraticCurveTo(x+sa*w*1.25,y-ca*w*1.25,ax,ay)};
+  /* block mode: a stalling lift's leaves wilt (drawn pale) */
+  const wilt=L=>!!(D.block&&L.s.li!=null&&D.lifts[L.s.li]&&D.lifts[L.s.li].vig==='down');
   ['lift','rehab','run','ride'].forEach(k=>{[true,false].forEach(lit=>{let any=false;c.beginPath();
-    M.leaves.forEach(L=>{if(L.s.kind!==k||!inT(L))return;if(dimmed&&on(L)!==lit)return;if(!dimmed&&!lit)return;const x=X(L.x),y=Y(L.y);if(x<-12||x>W+12||y<-12||y>H+12)return;
+    M.leaves.forEach(L=>{if(L.s.kind!==k||!inT(L))return;if(dimmed&&on(L)!==lit)return;if(!dimmed&&!lit)return;if(!dimmed&&wilt(L))return;const x=X(L.x),y=Y(L.y);if(x<-12||x>W+12||y<-12||y>H+12)return;
       const len=leafLen(L);almond(x+Math.cos(L.ang)*len*0.6,y+Math.sin(L.ang)*len*0.6,L.ang,len);any=true});
     if(any){c.fillStyle=lit?PL[k]:crownRgba(PL[k],0.22);c.fill()}})});
+  if(!dimmed){let any=false;c.beginPath();M.leaves.forEach(L=>{if(!wilt(L)||!inT(L))return;const x=X(L.x),y=Y(L.y);if(x<-12||x>W+12||y<-12||y>H+12)return;
+      const len=leafLen(L)*0.85;almond(x+Math.cos(L.ang)*len*0.6,y+Math.sin(L.ang)*len*0.6,L.ang,len);any=true});
+    if(any){c.fillStyle=crownRgba(PL.lift,0.38);c.fill()}}
   /* 6. marks: a PR is a white blossom, gold is a week won, a gate a bead.
      Glow only on a PR set this week and on the selection. */
   const wkNow=crownWeekMon(today());
@@ -29161,8 +29272,8 @@ function crownPaint(c,C,V){
     ['run','ride','rehab'].forEach(k=>{const G9=M.groups[k];if(!G9)return;place(crownDName(k,D),X(Math.cos(G9.a)*G9.rmid),Y(Math.sin(G9.a)*G9.rmid),{fs:12,bold:true})});
     if(M.groups.Lx&&V.z>=1.6)place('Other lifting',X(Math.cos(M.groups.Lx.a)*M.groups.Lx.rmid),Y(Math.sin(M.groups.Lx.a)*M.groups.Lx.rmid),{fs:11});
     if(mode==='full'){
-      /* month rings once there is room to read them */
-      if(V.z>=1.5&&(V.t==null||V.t>=1)){const ga=M.SE.gap;
+      /* month rings once there is room to read them (block rings always) */
+      if((V.z>=1.5||D.block)&&(V.t==null||V.t>=1)){const ga=M.SE.gap;
         c.strokeStyle=crownRgba(PL.ink,0.13);c.lineWidth=1;c.setLineDash([2*u,4*u]);
         M.rings.forEach(rg=>{const rp=rg.r*B;if(rp<18)return;c.beginPath();c.arc(cx,cy,rp,0,Math.PI*2);c.stroke()});c.setLineDash([]);
         M.rings.forEach(rg=>{place(rg.label,X(Math.cos(ga)*rg.r),Y(Math.sin(ga)*rg.r),{fs:10,ring:1})})}
@@ -29291,13 +29402,32 @@ function crownCard(){
     const C=crownM();const D=C.D;if(!D.weeks.length)return '';
     const src=crownImage(900);if(!src)return '';
     const w=crownWord(D);const n=D.sessions.length;
+    /* the toggle, whenever a block could be drawn at all */
+    const canB=!!crownBlockProg();const mode=crownMode();
+    const pills=canB?'<div class="row" style="gap:8px;margin-top:12px;justify-content:center">'+[['block','This block'],['all','All time']].map(m=>
+      '<button data-a="crownMode" data-v="'+m[0]+'" class="pill" style="flex:none;padding:8px 14px;font-size:13px'+(mode===m[0]?';background:var(--text);color:var(--bg);border-color:var(--text);font-weight:600':'')+'"'+(mode===m[0]?' aria-pressed="true"':'')+'>'+m[1]+'</button>').join('')+'</div>':'';
+    if(D.block){const Wd=crownBlockWords(D);
+      return '<div class="card an-hero mt" style="padding:14px 14px 18px;text-align:center;'+crownTok()+'">'+
+        '<p class="micro" style="color:var(--faint);letter-spacing:.14em">'+esc(Wd.micro)+'</p>'+
+        '<div data-a="crownOpen" style="cursor:pointer;margin:6px auto 0;max-width:340px"><img src="'+src+'" alt="Your crown" style="display:block;width:100%;height:auto;border-radius:18px"></div>'+
+        '<p class="disp" style="font-size:40px;font-weight:600;letter-spacing:-.02em;line-height:1;margin-top:8px">'+n+' session'+(n===1?'':'s')+'</p>'+
+        '<p style="font-size:15px;color:var(--dim);margin-top:6px">'+esc(Wd.lifts)+'</p>'+
+        '<p style="font-size:13px;color:var(--dim);margin-top:10px">'+esc(Wd.rings)+'</p>'+pills+'</div>'}
     return '<div class="card an-hero mt" style="padding:14px 14px 18px;text-align:center;'+crownTok()+'">'+
       '<p class="micro" style="color:var(--faint);letter-spacing:.14em">SINCE '+esc(new Date(D.first+'T12:00').toLocaleDateString(undefined,{day:'numeric',month:'short',year:'numeric'}).toUpperCase())+'</p>'+
       '<div data-a="crownOpen" style="cursor:pointer;margin:6px auto 0;max-width:340px"><img src="'+src+'" alt="Your crown" style="display:block;width:100%;height:auto;border-radius:18px"></div>'+
       '<p class="disp" style="font-size:40px;font-weight:600;letter-spacing:-.02em;line-height:1;margin-top:8px">'+n+' session'+(n===1?'':'s')+'</p>'+
       '<p style="font-size:15px;color:var(--dim);margin-top:6px">'+esc(w.word)+' · '+w.S+'% strength · '+w.E+'% endurance</p>'+
-      '<p style="font-size:13px;color:var(--dim);margin-top:10px">'+D.weeks.length+' week'+(D.weeks.length===1?'':'s')+' of showing up. Each limb is one lift; each leaf on it is a day you trained it.</p></div>'}
+      '<p style="font-size:13px;color:var(--dim);margin-top:10px">'+D.weeks.length+' week'+(D.weeks.length===1?'':'s')+' of showing up. Each limb is one lift; each leaf on it is a day you trained it.</p>'+pills+'</div>'}
   catch(e){oops('crownCard',e);return ''}}
+/* the block card's words, one reader for the card and the tests */
+function crownBlockWords(D){
+  const K=D.block;const grp={up:[],level:[],down:[]};D.lifts.forEach(L=>{if(grp[L.vig])grp[L.vig].push(L.name)});
+  const bits=[];if(grp.up.length)bits.push('Climbing: '+grp.up.join(', '));if(grp.level.length)bits.push('Holding: '+grp.level.join(', '));if(grp.down.length)bits.push('Stalling: '+grp.down.join(', '));
+  const scars=[];if(K.closed.length)scars.push('week'+(K.closed.length===1?' ':'s ')+K.closed.join(', ')+' closed early');if(K.missed.length)scars.push('nothing logged in week'+(K.missed.length===1?' ':'s ')+K.missed.join(', '));if(K.flares.length)scars.push('a flare-up in week'+(K.flares.length===1?' ':'s ')+K.flares.join(', '));
+  return {micro:K.name.toUpperCase()+' \u00b7 WEEK '+K.week+' OF '+K.N+(K.deload===K.week?' \u00b7 DELOAD':''),
+    lifts:bits.length?bits.join(' \u00b7 '):'Each limb is one lift in this block.',
+    rings:(scars.length?scars.join('; ').replace(/^./,ch=>ch.toUpperCase())+'. ':'')+'Each ring is a week; every session pushes the tree outward. A limb thickens as its lift climbs and thins when it stalls.'}}
 function crownMoments(){
   /* overlay moments: goal ceremony, crest update, race ceremony, replay.
      Never inside a swipe preview: the peek is a snapshot beside the page
@@ -29390,6 +29520,7 @@ function crownSentence(C){
     if(X.lens==='roots'){const r=crownRoots(C);const nr=r.filter(q=>q.kind==='read').length;return {title:'Insights',lines:[r.length?'Each chip is a finding, rooted at what it is about'+(nr?': '+nr+' from your tree read'+(nr===1?'':'s')+', '+(r.length-nr)+' from your own numbers':'')+'. Tap one.':'None yet. Each insight you find, and each tree read, grows a root here.']}}
     if(X.lens==='pr'){let n=0;D.sessions.forEach(s=>{if(s.pr)n++});return {title:'PRs',big:String(n),lines:['Sessions that set a PR at the time. Each is a white blossom.']}}
     const w=crownWord(D);
+    if(D.block){const K=D.block;return {title:K.name,big:String(D.sessions.length),lines:['Week '+K.week+' of '+K.N+(K.deload===K.week?', the deload':'')+' \u00b7 '+w.word+'.','Each ring is a week. A limb thickens as its lift climbs and thins when it stalls.']}}
     return {title:'Your tree',big:String(D.sessions.length),lines:['Sessions since '+(D.first?fmtDay(D.first):'')+' \u00b7 '+w.word+'.','Tap a limb to look closer.']}}
   catch(e){oops('crownSentence',e);return {lines:[]}}}
 function crownEffShort(E,r){
@@ -29432,7 +29563,9 @@ function viewCrownX(){
         /* the replay is motion and nothing else, so with reduced motion on
            there is nothing for the button to do: it is not offered */
         (crownReduced()?'':'<button data-a="crownReplay" aria-label="Watch it grow" style="font-size:13px;color:var(--dim);width:auto;padding:0 6px">Watch it grow</button>')+'</div>'+
-      '<div class="crx-lens">'+lensB('all','Everything')+lensB('pr','PRs')+(rootsN?lensB('roots','Insights \u00b7 '+rootsN):'')+(budsN?lensB('grow','To grow \u00b7 '+budsN):'')+'</div>'+
+      /* the block / all-time switch rides the lens row, since the tile opens the explorer straight away */
+      '<div class="crx-lens">'+(crownBlockProg()?[['block','This block'],['all','All time']].map(m=>'<button data-a="crownMode" data-v="'+m[0]+'" class="'+(crownMode()===m[0]?'on':'')+'"'+(crownMode()===m[0]?' aria-pressed="true"':'')+'>'+m[1]+'</button>').join('')+'<span style="width:1px;align-self:stretch;background:var(--cr-line);margin:4px 2px;flex:none"></span>':'')+
+        lensB('all','Everything')+lensB('pr','PRs')+(rootsN?lensB('roots','Insights \u00b7 '+rootsN):'')+(budsN?lensB('grow','To grow \u00b7 '+budsN):'')+'</div>'+
       '<div class="crx-cv" data-crown="1"><canvas data-crowncv="x" role="img" aria-label="Your tree. Pinch to zoom, tap a limb or a leaf."></canvas></div>'+
       '<div class="crx-panel" aria-live="polite">'+panel+
       '</div></div>'}
@@ -35697,13 +35830,28 @@ function deepProven(){
      certainty word drifts from the number it described (R17, and the
      PI-RADS failure the research names). */
   const tierOf=c=>c.contra?'backwards':c.sched?'schedule':((c.n||0)>=30?'holds':'sofar');
+  /* THE READ IS ABOUT NOW (owner, 10 Oct 2026: "it's telling me about
+     logging food and my vo2max, nothing that I don't already know. I
+     haven't even logged food in weeks and it's telling me I have"). A
+     correlation whose last paired day is older than DEEP_STALE days has
+     had no new evidence this read and is left out; a single-signal fact
+     (a protein streak, a VO2max estimate moving) is a number the person
+     already sees in Health, so it is out of the read altogether unless it
+     is dated inside the window, and then it is one line, tagged as a
+     fact. The engine still banks all of them as discoveries; this is only
+     what the weekly read is handed. */
+  const fresh=k=>{try{if(!k)return false;return String(k).slice(0,10)>=dayKey(new Date(Date.now()-DEEP_STALE*864e5))}catch(e){return false}};
   try{(typeof corrVisible==='function'?corrVisible():correlations()).forEach(c=>{const p=corrPhrase(c);if(p.skip)return;
-    const it={k:'corr',t:p.title,d:p.body+' '+p.act,contra:!!p.contra,sched:!!p.sched,n:c.n||0,
+    if(c.last&&!fresh(c.last))return;
+    const it={k:'corr',t:p.title,d:p.body+' '+p.act+(c.last?' (last paired day '+String(c.last).slice(0,10)+')':''),contra:!!p.contra,sched:!!p.sched,n:c.n||0,
       rar:p.contra||p.sched?'common':(p.strong?'epic':'rare')};
     it.tier=tierOf(it);L.push(it)})}catch(e){oops('deepProven.corr',e)}
   try{if(typeof libFindings==='function')libFindings().forEach(f=>L.push({k:'lib',t:f.t,d:f.d,rar:f.rar,tier:'holds'}))}catch(e){oops('deepProven.lib',e)}
-  try{if(typeof healthDiscoveries==='function')healthDiscoveries().forEach(f=>{if(f.tag==='signal')L.push({k:'hkd',t:f.t,d:f.d,rar:f.rar,tier:'holds'})})}catch(e){oops('deepProven.hkd',e)}
+  try{if(typeof healthDiscoveries==='function')healthDiscoveries().forEach(f=>{if(f.tag!=='signal')return;
+    if(!fresh(f.k))return;
+    L.push({k:'hkd',t:f.t,d:f.d+' (dated '+String(f.k).slice(0,10)+')',rar:f.rar,tier:'holds',fact:true})})}catch(e){oops('deepProven.hkd',e)}
   return L}
+const DEEP_STALE=21;
 /* THE ARMING RULE HAS ONE READER (15 Sep 2026, when the read got its own
    icon with a ring that fills as the next one arms). The ring and the gate
    are the same question asked twice, and this repo has caught two readouts
@@ -35987,7 +36135,7 @@ function deepContext(){
      schedule:'[SCHEDULE PATTERN \u2014 the calendar, not the body] ',
      sofar:'[TIER: SO FAR \u2014 under 30 paired days. Direction and count ONLY; never a magnitude, never a percentage] ',
      holds:'[TIER: HOLDS \u2014 30+ paired days. A magnitude is allowed, with its count beside it] '};
-   P.forEach((p,i)=>L.push((i+1)+'. '+(TIERTAG[p.tier]||'')+p.t+' \u2014 '+p.d));
+   P.forEach((p,i)=>L.push((i+1)+'. '+(p.fact?'[A FACT, not a relationship \u2014 the person already sees this number; one line at most, only if it changes what they do this week, otherwise leave it out] ':'')+(TIERTAG[p.tier]||'')+p.t+' \u2014 '+p.d));
    const prev=deepStore().prevT||[];
    if(prev.length){L.push('ALREADY TRANSLATED IN EARLIER READS \u2014 if one of these still stands in the proven list, give it ONE line saying it still holds with its current count; never re-explain it:');
      prev.forEach(t=>L.push('- '+t))}}
@@ -36059,7 +36207,7 @@ function deepContext(){
   return L.join('\n')}
 const DEEP_SYS='You are the translator and the analyst inside a training app. A statistics engine has already PROVEN a list of findings in this user\u2019s own data (the PROVEN FINDINGS block). Your job is to translate up to four of them for a person who has never read a training log, to say what this week\u2019s numbers add, and, wherever the finding points at something they can CHANGE, to add a hypothesis and a small trial (THE ANALYST, below). '+
 'ABSOLUTE RULES: never state a relationship that is not in the proven block as a finding \u2014 you translate, the engine discovers; your own reasoning goes ONLY in the hypothesis field, labelled as a guess. Never restate a single statistic as if it were a finding. No motivation talk, no advice outside the trial fields, no INTENT STORIES \u2014 never infer strategy, motivation or a \u201cshift in approach\u201d from data shape; if a metric collapses or a window looks sparse, the first reading is missing or differently-logged data. Walk entries are not runs. A finding listed under ALREADY TRANSLATED gets one short line (\u201cstill holds, now across N days\u201d) unless the proven text says it strengthened or faded. Prefer the findings NOT yet translated. '+
-'Every item keeps the finding\u2019s own count (n) and window in the body, never says \u201ccauses\u201d, and where the weekly numbers show it happening THIS week, says so with the number. Dates are ALWAYS written out with day, month name and year (\u201c7 Sep 2025\u201d) \u2014 never MM-DD or numeric shorthand; the reader lives in d/m/y land. If fewer than four are worth a paragraph, return fewer \u2014 never pad. '+
+'Never say the person is logging or doing something NOW unless the item is dated inside the last two weeks; an item\u2019s date is its date, and a habit that stopped is said to have stopped. Every item keeps the finding\u2019s own count (n) and window in the body, never says \u201ccauses\u201d, and where the weekly numbers show it happening THIS week, says so with the number. Dates are ALWAYS written out with day, month name and year (\u201c7 Sep 2025\u201d) \u2014 never MM-DD or numeric shorthand; the reader lives in d/m/y land. If fewer than four are worth a paragraph, return fewer \u2014 never pad. '+
 /* THE VERB MATCHES THE TIER (16 Sep 2026). Two verbs used to be fixed for
    everything, so twelve days and eleven weeks read identically. */
 'THE VERB IS SET BY THE TIER TAG on each proven item, and you may never use a verb from a stronger tier: SO FAR \u2192 \u201ctends to\u201d, \u201cshows up on N of the M\u201d \u2014 give the DIRECTION and the COUNT and never a magnitude or a percentage. HOLDS \u2192 \u201cruns about\u201d, \u201clined up\u201d \u2014 a magnitude is allowed with its count beside it. BACKWARDS or SCHEDULE \u2192 \u201cappears alongside\u201d, and it is never advice. '+
@@ -46456,6 +46604,7 @@ function runAction(a,v,t,e){
     case 'crownBack':{if(!crownBackUp()){S.view=S.crxBack||'crown';S.crxBack=null;S._navQuiet=1}render();break}
     case 'crownCrumb':{if(String(v)!=='leaf'){crownGo(v);render()}break}
     case 'crownLens':{const X9=crownX();X9.lens=String(v||'all');X9.sel=null;render();break}
+    case 'crownMode':{S.prof=S.prof||{};S.prof.crownMode=String(v)==='all'?'all':'block';lset(K_PROF,S.prof);S._crownM=null;S._crownImg=null;render();break}
     case 'crownReplay':{crownReplayGo();break}
     case 'crownLeafOpen':{S.sheet={t:'crownleaf',id:String(v)};render();break}
     case 'crownRootOpen':{S.sheet={t:'crownroot',id:String(v)};render();break}
