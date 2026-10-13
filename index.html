@@ -1744,6 +1744,18 @@ function migrate(){
 function backupDays(){const t=lget(K_BK,null);if(!t)return null;
   return Math.floor((Date.now()-t)/864e5)}
 function backupDue(){const d=backupDays();return S.history.length>=1&&(d===null||d>=7)}
+/* A STALE BACKUP SHOUTS (13 Oct 2026). The owner's pushes were refused by the
+   server for 21 days and the only word of it was a sentence on the Account
+   page. A signed-in phone with sessions whose last successful push is more
+   than two days old, or was refused, owes a red line on Today, every open,
+   until a push lands. */
+function bkStale(){
+  try{if(!(S.history||[]).length)return null;
+    const a=(typeof acct==='function'?acct():null)||{};if(!a.refresh)return null;
+    if(a.bkRefused)return {why:'refused',days:backupDays()};
+    const d=backupDays();if(d===null)return {why:'never',days:null};
+    return d>=2?{why:'old',days:d}:null}
+  catch(e){return null}}
 const mmss=s=>{s=Math.max(0,Math.round(s));return Math.floor(s/60)+':'+String(s%60).padStart(2,'0')};
 /* 4:60 /km (owner-reported on his own Running page, 16 Sep 2026).
    ELEVEN separate places formatted a decimal-minutes pace or time the
@@ -1933,7 +1945,7 @@ if(S.sess){S.note=S.sess.note||S.note;
       if(c0&&(s0.log||[]).some(l=>l.ex===c0.ex&&l.setNo===c0.setNo)){const n0=sessAdv(s0);
         if(n0<0)s0.phase='done';else s0.idx=n0}}catch(e){oops('bootSess',e)}
     if(S.sess.phase!=='done')S.sess.phase='ready'}}
-const BUILD_ID='18b71b';  // stamped by tools/build.py with the content hash
+const BUILD_ID='e48421';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -6381,10 +6393,12 @@ async function cloudBkPush(loud,urgent){
        some other way is exactly what the guard is for. `forced` is sent
        every time, because the upsert merges and a true once sent would
        otherwise stay true for good. */
-    const was=+a.bkSessions||0;
-    const forced=!!(was>0&&pay.sessions>0&&pay.sessions<was&&(was-pay.sessions)<=Math.max(10,Math.floor(was*0.25)));
-    const rf=a.bkRefused;
-    if(!loud&&!forced&&rf&&pay.sessions<(+rf.srv||0)-2)return done(false);   // still smaller than the kept backup: the answer will not change
+    /* SUPERSEDED 13 Oct 2026 (the owner's 21 silent days): the trim rule above let a
+       cleanup that removed more than a quarter of the rows freeze the backup for good,
+       and this phone then stopped even trying. With backup2.sql's seven daily copies
+       under every push, a phone that holds ANY sessions pushes forced, every time; the
+       one push still refused, by the server and by nothing here, is an empty phone. */
+    const forced=pay.sessions>0;
     /* the stamp sent is the stamp kept: cloudBkReconcile compares it with
        the row's updated_at to know whether another device wrote since */
     const stamp=new Date().toISOString();
@@ -6474,6 +6488,52 @@ function bkDeviceHasRecord(){
     if((S.scans||[]).some(x=>x&&!x.demo))return true;
     return false}
   catch(e){oops('bkDeviceHasRecord',e);return true}}
+/* A RESTORE SETS THE RECORD ASIDE FIRST (13 Oct 2026, the night the owner's
+   phone came up empty and pulled a three-week-old copy over itself). Every
+   training-* key is copied under prerestore.* before any cloud restore
+   touches the phone, and Account offers "Undo the restore" while the copy
+   is there. The copy is replaced by the next restore and cleared by the
+   undo; it is never backed up (not a training-* key). */
+function restoreStash(){
+  try{const ls=localStorage,keys=[];
+    for(let i=0;i<ls.length;i++){const k=ls.key(i);if(/^training-/.test(k))keys.push(k)}
+    const old=[];for(let i=0;i<ls.length;i++){const k=ls.key(i);if(/^prerestore\./.test(k))old.push(k)}
+    old.forEach(k=>ls.removeItem(k));
+    keys.forEach(k=>ls.setItem('prerestore.'+k,ls.getItem(k)));
+    ls.setItem('prerestore.at',String(Date.now()));
+    return keys.length}
+  catch(e){oops('restoreStash',e);return 0}}
+function restoreStashAt(){try{const t=+localStorage.getItem('prerestore.at')||0;return t>0?t:null}catch(e){return null}}
+function restoreUndo(){
+  try{const ls=localStorage;if(!restoreStashAt())return false;
+    const kill=[];for(let i=0;i<ls.length;i++){const k=ls.key(i);if(/^training-/.test(k))kill.push(k)}
+    const back=[];for(let i=0;i<ls.length;i++){const k=ls.key(i);if(/^prerestore\.training-/.test(k))back.push(k)}
+    kill.forEach(k=>ls.removeItem(k));
+    back.forEach(k=>{ls.setItem(k.slice(11),ls.getItem(k));ls.removeItem(k)});
+    ls.removeItem('prerestore.at');
+    return true}
+  catch(e){oops('restoreUndo',e);return false}}
+/* THE SEVEN DAYS, FIVE A DAY (backup2.sql): the account's rolling copies, newest first; up to 35 */
+async function cloudBkDays(){
+  try{
+    if(!acctReady())return null;
+    const tok=await acctToken();if(!tok)return null;
+    const c=acctClaims(tok);if(!c||!c.sub)return null;
+    const r=await fetch(CLOUD.url+'/rest/v1/backup_days?select=day,slot,sessions,bytes,saved_at&user_id=eq.'+encodeURIComponent(c.sub)+'&order=saved_at.desc&limit=40',
+      {headers:{apikey:CLOUD.anon,Authorization:'Bearer '+tok}});
+    if(!r.ok){if(r.status===404)S._bkDaysCap=false;return null}
+    S._bkDaysCap=true;
+    const rows=await r.json();return Array.isArray(rows)?rows:null}
+  catch(e){oops('cloudBkDays',e);return null}}
+async function cloudBkDay(key){
+  try{
+    const tok=await acctToken();if(!tok)return null;
+    const c=acctClaims(tok);if(!c||!c.sub)return null;
+    const day=String(key||'').split('|')[0],slot=+String(key||'').split('|')[1]||0;
+    const r=await fetch(CLOUD.url+'/rest/v1/backup_days?select=blob,day,slot,sessions,bytes,saved_at&user_id=eq.'+encodeURIComponent(c.sub)+'&day=eq.'+encodeURIComponent(day)+'&slot=eq.'+slot,
+      {headers:{apikey:CLOUD.anon,Authorization:'Bearer '+tok}});
+    if(!r.ok)return null;const rows=await r.json();return (Array.isArray(rows)&&rows[0]&&rows[0].blob)?rows[0]:null}
+  catch(e){oops('cloudBkDay',e);return null}}
 async function cloudBkRecover(){
   /* AN EMPTY PHONE RESTORES ITSELF (owner, 18 Sep 2026: "automatic,
      without any need for user intervention"): signed in on a device with
@@ -6491,6 +6551,7 @@ async function cloudBkRecover(){
     if(bkDeviceHasRecord())return;
     const row=await cloudBkPull();if(!cloudBkPullOk)return;
     if(!row||!row.blob){lset(K_ACCT,Object.assign({},acct()||{},{bkSeen:true}));return}
+    restoreStash();
     doRestore(row.blob);
     lset(K_ACCT,Object.assign({},acct()||{},{bkAt:row.updated_at,bkSessions:row.sessions||0,bkRecovered:true,bkSeen:true,bkHeld:null}));
     lset(K_BK,Date.now())}
@@ -6533,6 +6594,8 @@ function accountSection(){
       ?'<button class="btn mt" style="color:var(--dim)" disabled>Backing up\u2026</button>'
       :'<div class="row mt" style="gap:8px"><button data-a="cloudBkNow" class="btn" style="flex:1;color:var(--amber)">Back up now</button>'+
        '<button data-a="cloudRestoreAsk" class="btn" style="flex:1;color:var(--dim)">Restore from the cloud</button></div>')+
+    (restoreStashAt()?'<button data-a="cloudRestoreUndo" class="btn mt" style="color:var(--amber)">Undo the restore from '+esc(fmtDate(restoreStashAt()))+'</button>':'')+
+    (S._bkDaysCap===false?'':'<button data-a="cloudDaysOpen" class="btn mt" style="color:var(--dim)">Earlier copies, up to five a day for seven days</button>')+
     (S.acctBusy
       ?'<button class="btn mt" style="color:var(--dim);display:flex;align-items:center;justify-content:center;gap:8px" disabled>'+
        '<span style="width:14px;height:14px;border-radius:16px;border:2px solid var(--line);border-top-color:var(--amber);display:inline-block;animation:spin .7s linear infinite"></span>Syncing\u2026</button>'
@@ -38122,7 +38185,16 @@ function todayOrder(){
   try{const st=holdStates();
     const soon=HOLD_MUSCLES.some(m=>st[m]&&st[m].s==='held'&&(st[m].days||0)>=6);
     bid('hold',holdCard(),soon?45:22)}catch(e){oops('holdBid',e)}
-  if(backupDue()&&backupDays()!==null)
+  /* a stale or refused backup is OWED, in red, above the story slot: it is never a card
+     that loses to a better story (13 Oct 2026, the owner's 21 silent days) */
+  const stale9=(typeof bkStale==='function')?bkStale():null;
+  if(stale9&&stale9.why!=='never')
+    out.push('<button data-a="nav" data-v="data" class="card" style="width:100%;text-align:left;padding:12px 16px;margin-top:16px;display:flex;align-items:center;gap:12px;border-color:var(--red)">'+
+      '<span style="width:8px;height:8px;border-radius:8px;background:var(--red);flex:none"></span>'+
+      '<span style="font-size:13px;color:var(--text)">'+(stale9.why==='refused'
+        ?'Your backup is not landing. The server kept an older copy and refused this phone\u2019s. Tap, then Back up now.'
+        :'Your backup is '+stale9.days+' days old. Nothing since then is on the server. Tap, then Back up now.')+'</span></button>');
+  if(backupDue()&&backupDays()!==null&&!stale9)
     bid('backup','<button data-a="nav" data-v="data" class="card" style="width:100%;text-align:left;padding:12px 16px;margin-top:16px;display:flex;align-items:center;gap:12px;border-color:var(--amber)">'+
       '<span style="width:8px;height:8px;border-radius:8px;background:var(--amber);flex:none"></span>'+
       '<span style="font-size:13px;color:var(--dim)">It\u2019s been '+backupDays()+' days since your last backup \u2014 tap to do it now.</span></button>',44);
@@ -41613,6 +41685,7 @@ function sheetHtml(){
       :'<p style="color:var(--dim);font-size:13px;line-height:1.55;margin-top:20px">Removing takes it out of the program from here on.'+(doneN9?' The '+doneN9+' session'+(doneN9===1?'':'s')+' you’ve already logged against it stay in History.':'')+'</p>'+
       '<button data-a="dayDelOpen" data-v="'+di9+'" class="big disp mt" style="background:var(--red);color:#fff;font-size:17px">Remove this day</button>'))}
   if(S.sheet.t==='garmin')return garminSheet();
+  if(S.sheet.t==='clouddays')return cloudDaysSheet();
   if(S.sheet.t==='goals'){
     /* S.gform is shared with the morning, pre, post and bodyweight
        prompts, which leave {am:''} and the like behind; a leftover of
@@ -44101,6 +44174,14 @@ function viewGuide(){
          :'<button data-a="impgStep" data-v="1" class="big disp" style="flex:2;background:var(--amber);color:var(--bg);font-size:15px">Next</button>')+'</div>'+
     '<p style="color:var(--faint);font-size:11px;text-align:center;margin-top:12px">Swipe between steps</p>'+
     '</div></div>'}
+
+/* THE SEVEN DAYS on Account: one copy a day, restore any of them, undoable */
+function cloudDaysSheet(){
+    const rows=S.cloudDays||[];
+    const when=r=>{try{return new Date(r.saved_at||r.day).toLocaleString(undefined,{weekday:'short',day:'numeric',month:'short',hour:'numeric',minute:'2-digit'})}catch(e){return String(r.day)}};
+    return wrapSheet('Earlier copies','<p style="color:var(--dim);font-size:13px;line-height:1.55">Up to five copies a day are kept on your account for seven days, and the newest is always current. Restoring one sets what is on this phone aside first, so it can be undone from Account.</p>'+
+      (rows.length?rows.map(r=>'<button data-a="cloudDayAsk" data-v="'+esc(r.day)+'|'+(+r.slot||0)+'" class="card" style="width:100%;text-align:left;padding:12px 16px;margin-top:8px;display:flex;justify-content:space-between;align-items:center"><span>'+esc(when(r))+'</span><span style="color:var(--dim);font-size:13px">'+(+r.sessions||0)+' session'+(+r.sessions===1?'':'s')+'</span></button>').join('')
+        :'<p style="color:var(--dim);font-size:13px;margin-top:12px">No daily copies yet. The first lands with the next backup.</p>'))}
 /* declared at module top so render()'s closure can publish them: the tab
    set is built where hasRehab/hasRun/ICONS live, and read by the swipe
    gesture in 29-scrub, which is a different module. An implicit global
@@ -49350,11 +49431,27 @@ function runAction(a,v,t,e){
           go:'cloudRestoreGo',v:'',soft:true,ok:'Restore it',no:'Not now'};
         S.sheet={t:'confirm'};render()})();break}
     case 'cloudRestoreGo':{const row=S.cloudRow;S.cloudRow=null;S.sheet=null;
-      if(row&&row.blob){try{doRestore(row.blob);
+      if(row&&row.blob){try{restoreStash();doRestore(row.blob);
           /* merged: this phone now holds what the row held, so it may push again */
           lset(K_ACCT,Object.assign({},acct()||{},{bkSeen:true,bkHeld:null,bkAt:null}));cloudBkSoon()}
         catch(e){oops('cloudRestore',e);flash('That backup could not be read.')}}
       render();break}
+    case 'cloudDaysOpen':{(async function(){
+        const rows=await cloudBkDays();
+        if(!rows){flash(S._bkDaysCap===false?'The daily copies are not live on the server yet.':'Could not reach your account just now.');return}
+        S.cloudDays=rows;S.sheet={t:'clouddays'};render()})();break}
+    case 'cloudDayAsk':{(async function(){
+        const row=await cloudBkDay(v);
+        if(!row){flash('That day\u2019s copy could not be read.');return}
+        S.cloudRow=row;
+        S.confirm={t:'Restore the copy from '+fmtDate(row.saved_at||row.day)+'?',
+          d:(row.sessions||0)+' session'+(row.sessions===1?'':'s')+'. What is on this phone now is set aside first, and Account offers to undo it afterwards.',
+          go:'cloudRestoreGo',v:'',soft:true,ok:'Restore it',no:'Not now'};
+        S.sheet={t:'confirm'};render()})();break}
+    case 'cloudRestoreUndo':{
+      S.confirm={t:'Undo the restore?',d:'This phone goes back to exactly what it held before the restore from '+fmtDate(restoreStashAt()||Date.now())+'. The app reloads.',
+        go:'cloudRestoreUndoGo',v:'',soft:true,ok:'Undo it',no:'Keep as is'};S.sheet={t:'confirm'};render();break}
+    case 'cloudRestoreUndoGo':{if(restoreUndo()){try{location.reload()}catch(e){oops('restoreUndo.reload',e)}}else flash('Nothing to undo.');break}
     case 'acctOut':lset(K_ACCT,null);S.acctPending=false;render();
       flash('Signed out. Your training stays on this phone. The cloud backup waits for your next sign-in.');break;
 
