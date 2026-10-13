@@ -1933,7 +1933,7 @@ if(S.sess){S.note=S.sess.note||S.note;
       if(c0&&(s0.log||[]).some(l=>l.ex===c0.ex&&l.setNo===c0.setNo)){const n0=sessAdv(s0);
         if(n0<0)s0.phase='done';else s0.idx=n0}}catch(e){oops('bootSess',e)}
     if(S.sess.phase!=='done')S.sess.phase='ready'}}
-const BUILD_ID='9cf359';  // stamped by tools/build.py with the content hash
+const BUILD_ID='e71704';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -20463,10 +20463,26 @@ window.watchAct=function(a,ts){
       if(s.phase==='hold'&&S.holdEnd&&+ts>0&&+ts<=Date.now())S.holdEnd+=(Date.now()-+ts);
       runAction('finish','')}
     else if(a==='skiprest'&&s.phase==='resting'){wristMark(a,'resting\u2192ready');runAction('skipRest','')}
+    else if(a==='restadj'&&s.phase==='resting'&&S.restEnd){
+      /* the crown adds or takes rest (what Strong does): +-15 s a notch, never below now */
+      const d=Math.max(-600,Math.min(600,Math.round(+ts||0)));S.restEnd=Math.max(Date.now()+1000,S.restEnd+d*1000);
+      wristMark(a,(d>0?'+':'')+d+' s');try{restNotifSync()}catch(e9){}render()}
     else if(a==='sanitykeep'&&S.sheet&&S.sheet.t==='sanity'){wristMark(a,'kept from the wrist');runAction('sanityKeep','')}
     else if(a==='sanityfix'&&S.sheet&&S.sheet.t==='sanity'){wristMark(a,'fixing on the phone');runAction('sanityFix','')}
     else wristMark(a,'DROPPED \u2014 phase was '+ph0+norm)
   }catch(e){try{wristMark(a,'THREW '+String(e&&e.message||e).slice(0,40))}catch(e9){}}};
+/* A SET FIXED FROM THE WRIST DURING ITS REST (13 Oct 2026, the Garmin
+   pattern: log at the finish tap, correct while resting). The last logged
+   row of the live session takes the corrected numbers; weight arrives in
+   display units like every wrist number. Nothing else moves. */
+window.watchFix=function(r,w,rpe){
+  try{const s=S.sess;if(!s||!Array.isArray(s.log)||!s.log.length){try{wristMark('fixset','nothing logged yet')}catch(e9){}return}
+    const row=s.log[s.log.length-1];if(row.secs!=null)return;
+    if(+r>0)row.r=Math.round(+r);
+    if(w!=null&&+w>=0)row.w=Math.round(uwIn(+w)*4)/4;
+    if(+rpe>=1&&+rpe<=10)row.rpe=Math.round(+rpe*2)/2;
+    try{wristMark('fixset',row.ex+' #'+row.setNo+' -> '+row.w+'x'+row.r+'@'+row.rpe)}catch(e9){}
+    persistActive();render()}catch(e){oops('watchFix',e)}};
 window.watchLog=function(r,w,rpe,finTs,begTs){
   try{
     const s=S.sess;
@@ -20550,8 +20566,11 @@ function watchStatePush(){
          walk the session itself while the phone sleeps — 'loading
          from your phone' dead-ends were the locked-phone reality
          (owner-caught, 8 Sep: 'can't load it') */
+      const lt9={},pr9={};const ltOf=(ex,no)=>{const k=ex+'|'+no;if(!(k in lt9))lt9[k]=(typeof wristLastStr==='function')?wristLastStr(ex,no):'';return lt9[k]};
+      const prOf=ex=>{if(!(ex in pr9)){const b=(typeof liftBest==='function')?liftBest(ex,s.recId||String(s.startedAt)):0;pr9[ex]=b>0?Math.round(uwNum(b)*2)/2:0}return pr9[ex]};
       try{st.plan=(s.sets||[]).slice(ni,ni+40).map((x9,i9)=>({
         e:String(x9.ex||'').slice(0,40),s:+x9.setNo||0,o:+x9.of||0,
+        lt:x9.secs?'':ltOf(x9.ex,+x9.setNo||1),pr:x9.secs?0:prOf(x9.ex),
         t:x9.secs?(x9.secs+'s hold'):(x9.targetW!=null?uwStr(x9.targetW)+(x9.targetReps?' \u00d7 '+x9.targetReps:''):''),
         w:+uwNum(+x9.targetW||0)||0,r:parseInt(String(x9.targetReps||''),10)||0,
         rest:+x9.rest||0,sec:+x9.secs||0,
@@ -21786,9 +21805,22 @@ function wristPlanBuild(){
         w:x.targetW!=null?(+uwNum(+x.targetW)||0):null,r:parseInt(String(x.targetReps||''),10)||0,
         rpe:x.targetRpe!=null?String(x.targetRpe):'',rest:+x.rest||0,sec:+x.secs||0,
         dl:x.deload?1:0};
-        if(first){const sw=swapsFor(x.ex);if(sw.length)o.sw=sw.map(n=>String(n).slice(0,40))}
+        if(first){const sw=swapsFor(x.ex);if(sw.length)o.sw=sw.map(n=>String(n).slice(0,40));
+          /* what the best wrist apps show and ours did not (13 Oct 2026): last time's numbers
+             under the target, and the bar a set must clear to be called a PR (display units) */
+          const lt=wristLastStr(x.ex,+x.setNo||1);if(lt)o.lt=lt;
+          const pb=liftBest(x.ex);if(pb>0)o.pr=Math.round(uwNum(pb)*2)/2}
         return o})}}
   catch(e){oops('wristPlanBuild',e);return null}}
+/* LAST TIME, as one short line for a watch face: "80 kg x 8 @8", "45 s",
+   "BW x 12". lastFor is the one reader of "last time"; this only words it. */
+function wristLastStr(ex,no){
+  try{const l=lastFor(ex,no);if(!l)return '';
+    if(l.secs!=null)return (+l.secs||0)+' s';
+    const w=+l.w>0?uwStr(+l.w):'BW';const r=+l.r>0?' x '+Math.round(+l.r):'';
+    const rp=(l.rpe!=null&&l.rpe!=='')?' @'+l.rpe:'';
+    return (w+r+rp).slice(0,24)}
+  catch(e){oops('wristLastStr',e);return ''}}
 let wristPushT=null;
 function wristPlanSoon(){try{if(!wristOn())return;clearTimeout(wristPushT);wristPushT=setTimeout(function(){wristPlanPush()},2500)}catch(e){oops('wristPlanSoon',e)}}
 async function wristPlanPush(force){
@@ -38707,6 +38739,18 @@ function prMap(){
     if(out.length)m[String(h.id)]=out;
     Object.keys(top).forEach(b=>{best[b]=Math.max(best[b]||0,top[b])})});
   S._prMap={stamp,m};return m}
+/* THE BAR A SET HAS TO CLEAR, in kilograms: the best estimated max this
+   lift has ever posted, with the same rules prMap judges by (an RPE 6 set
+   neither sets nor raises it; the live session's own row is left out so a
+   set is judged against EARLIER sessions only). One reader for the wrist
+   plan, the watch push and anything else that wants to say "PR". */
+function liftBest(ex,exceptId){
+  try{const b=gBase(ex);let best=0;
+    (S.history||[]).forEach(h=>{if(!h||h.run||!Array.isArray(h.log)||(exceptId!=null&&String(h.id)===String(exceptId)))return;
+      h.log.forEach(l=>{if(!l||!l.w||!l.r||gBase(l.ex)!==b)return;if(l.rpe!=null&&l.rpe!==''&&+l.rpe<=6)return;
+        best=Math.max(best,e1rm(l.w,l.r,l.rpe))})});
+    return best}
+  catch(e){oops('liftBest',e);return 0}}
 function sessionPRs(s2){
   if(!s2)return[];
   /* the session's own history row is id=String(startedAt) — s2.id
