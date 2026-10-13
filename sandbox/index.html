@@ -1945,7 +1945,7 @@ if(S.sess){S.note=S.sess.note||S.note;
       if(c0&&(s0.log||[]).some(l=>l.ex===c0.ex&&l.setNo===c0.setNo)){const n0=sessAdv(s0);
         if(n0<0)s0.phase='done';else s0.idx=n0}}catch(e){oops('bootSess',e)}
     if(S.sess.phase!=='done')S.sess.phase='ready'}}
-const BUILD_ID='8a6459';  // stamped by tools/build.py with the content hash
+const BUILD_ID='776a5c';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -6503,6 +6503,19 @@ function restoreStash(){
     ls.setItem('prerestore.at',String(Date.now()));
     return keys.length}
   catch(e){oops('restoreStash',e);return 0}}
+/* REPLACE, NOT MERGE (13 Oct 2026): a phone whose record is wrong, not missing,
+   takes a copy whole. The current record is stashed first (undoable), every
+   training-* key goes except the device's own (the sign-in, Strava, last-open),
+   the copy's keys are written as they are, and the app reloads. */
+function restoreReplace(txt){
+  try{const o=JSON.parse(txt);const K=o&&o.keys;if(!K||typeof K!=='object')return false;
+    restoreStash();
+    const ls=localStorage,keep={'training-account-v1':1,'training-strava-v1':1,'training-lastopen-v1':1};
+    const kill=[];for(let i=0;i<ls.length;i++){const k=ls.key(i);if(/^training-/.test(k)&&!keep[k])kill.push(k)}
+    kill.forEach(k=>ls.removeItem(k));
+    Object.keys(K).forEach(k=>{if(/^training-/.test(k)&&!keep[k]&&K[k]!=null)ls.setItem(k,typeof K[k]==='string'?K[k]:JSON.stringify(K[k]))});
+    return true}
+  catch(e){oops('restoreReplace',e);return false}}
 function restoreStashAt(){try{const t=+localStorage.getItem('prerestore.at')||0;return t>0?t:null}catch(e){return null}}
 function restoreUndo(){
   try{const ls=localStorage;if(!restoreStashAt())return false;
@@ -44180,6 +44193,7 @@ function cloudDaysSheet(){
     const rows=S.cloudDays||[];
     const when=r=>{try{return new Date(r.saved_at||r.day).toLocaleString(undefined,{weekday:'short',day:'numeric',month:'short',hour:'numeric',minute:'2-digit'})}catch(e){return String(r.day)}};
     return wrapSheet('Earlier copies','<p style="color:var(--dim);font-size:13px;line-height:1.55">Up to five copies a day are kept on your account for seven days, and the newest is always current. Restoring one sets what is on this phone aside first, so it can be undone from Account.</p>'+
+      '<button data-a="cloudReplaceTog" class="card" style="width:100%;text-align:left;padding:12px 16px;margin-top:8px;display:flex;justify-content:space-between;align-items:center"><span style="font-size:13px">'+(S.cloudReplace?'Replace what is on this phone with the copy':'Merge the copy into what is on this phone')+'</span><span style="color:var(--amber);font-size:13px">'+(S.cloudReplace?'REPLACE':'MERGE')+'</span></button>'+
       (rows.length?rows.map(r=>'<button data-a="cloudDayAsk" data-v="'+esc(r.day)+'|'+(+r.slot||0)+'" class="card" style="width:100%;text-align:left;padding:12px 16px;margin-top:8px;display:flex;justify-content:space-between;align-items:center"><span>'+esc(when(r))+'</span><span style="color:var(--dim);font-size:13px">'+(+r.sessions||0)+' session'+(+r.sessions===1?'':'s')+'</span></button>').join('')
         :'<p style="color:var(--dim);font-size:13px;margin-top:12px">No daily copies yet. The first lands with the next backup.</p>'))}
 /* declared at module top so render()'s closure can publish them: the tab
@@ -49430,12 +49444,16 @@ function runAction(a,v,t,e){
           d:(row.sessions||0)+' session'+(row.sessions===1?'':'s')+' backed up '+fmtDate(row.updated_at)+'. Restoring merges that record into this phone; nothing here is deleted.',
           go:'cloudRestoreGo',v:'',soft:true,ok:'Restore it',no:'Not now'};
         S.sheet={t:'confirm'};render()})();break}
+    case 'cloudReplaceGo':{const row=S.cloudRow;S.cloudRow=null;S.sheet=null;
+      if(row&&row.blob){if(restoreReplace(row.blob)){lset(K_ACCT,Object.assign({},acct()||{},{bkSeen:true,bkHeld:null,bkAt:null}));try{location.reload()}catch(e){oops('cloudReplace.reload',e)}}else flash('That copy could not be read. Nothing was changed.')}
+      render();break}
     case 'cloudRestoreGo':{const row=S.cloudRow;S.cloudRow=null;S.sheet=null;
       if(row&&row.blob){try{restoreStash();doRestore(row.blob);
           /* merged: this phone now holds what the row held, so it may push again */
           lset(K_ACCT,Object.assign({},acct()||{},{bkSeen:true,bkHeld:null,bkAt:null}));cloudBkSoon()}
         catch(e){oops('cloudRestore',e);flash('That backup could not be read.')}}
       render();break}
+    case 'cloudReplaceTog':S.cloudReplace=!S.cloudReplace;render();break;
     case 'cloudDaysOpen':{(async function(){
         const rows=await cloudBkDays();
         if(!rows){flash(S._bkDaysCap===false?'The daily copies are not live on the server yet.':'Could not reach your account just now.');return}
@@ -49444,9 +49462,10 @@ function runAction(a,v,t,e){
         const row=await cloudBkDay(v);
         if(!row){flash('That day\u2019s copy could not be read.');return}
         S.cloudRow=row;
-        S.confirm={t:'Restore the copy from '+fmtDate(row.saved_at||row.day)+'?',
-          d:(row.sessions||0)+' session'+(row.sessions===1?'':'s')+'. What is on this phone now is set aside first, and Account offers to undo it afterwards.',
-          go:'cloudRestoreGo',v:'',soft:true,ok:'Restore it',no:'Not now'};
+        const rep=!!S.cloudReplace;
+        S.confirm={t:(rep?'Replace this phone with the copy from ':'Merge in the copy from ')+fmtDate(row.saved_at||row.day)+'?',
+          d:(row.sessions||0)+' session'+(row.sessions===1?'':'s')+'. What is on this phone now is set aside first, and Account offers to undo it afterwards.'+(rep?' Replacing means this phone becomes exactly that copy; you stay signed in.':' Merging adds what is missing and changes nothing here.'),
+          go:rep?'cloudReplaceGo':'cloudRestoreGo',v:'',soft:true,ok:rep?'Replace it':'Merge it in',no:'Not now'};
         S.sheet={t:'confirm'};render()})();break}
     case 'cloudRestoreUndo':{
       S.confirm={t:'Undo the restore?',d:'This phone goes back to exactly what it held before the restore from '+fmtDate(restoreStashAt()||Date.now())+'. The app reloads.',
