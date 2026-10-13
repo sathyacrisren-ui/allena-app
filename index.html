@@ -1933,7 +1933,7 @@ if(S.sess){S.note=S.sess.note||S.note;
       if(c0&&(s0.log||[]).some(l=>l.ex===c0.ex&&l.setNo===c0.setNo)){const n0=sessAdv(s0);
         if(n0<0)s0.phase='done';else s0.idx=n0}}catch(e){oops('bootSess',e)}
     if(S.sess.phase!=='done')S.sess.phase='ready'}}
-const BUILD_ID='8c3ea3';  // stamped by tools/build.py with the content hash
+const BUILD_ID='3c13d2';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -4659,6 +4659,9 @@ function snapshotData(){
   return out}
 async function acctSync(loud){
   if(!acctReady())return false;
+  /* the Garmin wrist rides every sync: today's plan out, logged sets in
+     (12c-wrist). Fire and forget, never in the sync's own path. */
+  try{if(typeof wristOn==='function'&&wristOn()){setTimeout(function(){try{wristPlanPush();wristPull()}catch(e9){oops('acctSync.wrist',e9)}},50)}}catch(e9){oops('acctSync.wristHook',e9)}
   if(loud){S.acctBusy=true;render()}
   const done=ok9=>{if(loud){S.acctBusy=false;S.acctSynced=ok9?Date.now():0;render();
     if(ok9)setTimeout(function(){S.acctSynced=0;try{render()}catch(e){}},2200)}};
@@ -10874,7 +10877,8 @@ function viewOnboard(){
   const o=obState();if(!o.step)o.step=obSteps()[0];
   const step=o.step,I=obInfer();
   const list=(k,opts,rec)=>'<div class="oblist">'+opts.map(x=>obOpt(k,x[0],x[1],x[2]||'',String(obVal(k))===String(x[0]),rec!=null&&String(rec)===String(x[0]))).join('')+'</div>';
-  if(step==='health')return obPage(o,'Link Apple Health','Your watch already puts workouts, sleep, heart rate and weight into Apple Health. Allena reads them, never writes, and fills in what it can on the next screens.',
+  if(step==='health')return obPage(o,'Link Apple Health','Your watch already puts workouts, sleep, heart rate and weight into Apple Health. Allena reads them, never writes, and fills in what it can on the next screens.'+(obVal('wear')==='garmin'?' A Garmin needs two switches in Garmin Connect first; Allena shows you where after this.':''),
+    list('wear',[['garmin','Garmin','Garmin Connect writes to Health once told to'],['apple','Apple Watch','Already writes to Health'],['other','Something else, or no watch','']])+
     '<div style="display:flex;justify-content:center;padding:28px 0"><div class="obicon"><svg width="54" height="54" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-7.5-4.6-9.3-9.2C1.4 8.4 3.5 5 6.9 5c2 0 3.4 1.1 4.2 2.4h1.8C13.7 6.1 15.1 5 17.1 5c3.4 0 5.5 3.4 4.2 6.8C19.5 16.4 12 21 12 21z" fill="#FF375F"/></svg></div></div>',
     obGo('Continue',true,'obHealth')+'<button data-a="obHealthNo" class="btn obnot">Not now</button>'+obHaveLink());
   if(step==='sex')return obPage(o,'What is your sex?','It sets where your lifts sit against other people, and the ranges for a blood test.',
@@ -19316,12 +19320,19 @@ function healthConnectCard(){
       '<div style="display:flex;align-items:center;gap:8px">'+
       '<span style="font-size:17px">\u2764\ufe0f</span>'+
       '<p class="mono" style="flex:1;font-size:var(--t-caption);color:var(--amber);letter-spacing:.06em">CONNECT APPLE HEALTH</p></div>'+
-      '<p class="disp gradhead" style="font-size:24px;line-height:1.15;margin-top:8px">Allena is a different app once your data flows in</p>'+
+      '<p class="disp gradhead" style="font-size:24px;line-height:1.15;margin-top:8px">'+(S.prof&&S.prof.wear==='garmin'?'Your Garmin can feed Allena on its own':'Allena is a different app once your data flows in')+'</p>'+
+      /* WHAT DO YOU WEAR (12 Oct 2026): a Garmin needs two settings in
+         Connect before anything reaches Health, and nobody is told. The
+         chips remember the answer on the profile; Garmin gets its own door. */
+      '<div class="row" style="gap:6px;margin-top:10px;flex-wrap:wrap">'+[['garmin','Garmin'],['apple','Apple Watch'],['other','Something else']].map(w=>
+        '<button data-a="wearPick" data-v="'+w[0]+'" class="pill" style="flex:none;padding:7px 12px;font-size:13px'+((S.prof&&S.prof.wear)===w[0]?';background:var(--text);color:var(--bg);border-color:var(--text);font-weight:600':'')+'">'+w[1]+'</button>').join('')+'</div>'+
+      (S.prof&&S.prof.wear==='garmin'?'<p style="color:var(--dim);font-size:13px;line-height:1.6;margin-top:10px">'+esc(wearWords('garmin').d)+'</p>'+
+        '<button data-a="hguideOpen" data-v="garmin" class="big disp mt" style="background:var(--amber);color:var(--bg);font-size:15px">'+esc(wearWords('garmin').go)+'</button>':'')+
       '<p style="color:var(--dim);font-size:13px;line-height:1.6;margin-top:8px">Your runs, sleep, heart rate and steps turn on the finds nothing else can make \u2014 how your sleep moves your lifts, what your heart says about recovery. If your Garmin, Apple Watch, Strava or MyFitnessPal already sync to Apple Health, Allena reads it all. Two taps.</p>'+
       (S.hcChecking
         ?'<div class="big disp mt" style="background:var(--raised);color:var(--dim);font-size:15px;display:flex;align-items:center;justify-content:center;gap:8px">'+
          '<span style="width:13px;height:13px;border-radius:12px;border:2px solid var(--line);border-top-color:var(--amber);display:inline-block;animation:spin .7s linear infinite"></span>Listening for Health\u2026</div>'
-        :'<button data-a="healthConnectGo" class="big disp mt" style="background:var(--amber);color:var(--bg);font-size:15px">Connect Apple Health</button>')+
+        :'<button data-a="healthConnectGo" class="'+(S.prof&&S.prof.wear==='garmin'?'btn mt':'big disp mt')+'" style="'+(S.prof&&S.prof.wear==='garmin'?'font-size:13px;color:var(--dim)':'background:var(--amber);color:var(--bg);font-size:15px')+'">'+(S.prof&&S.prof.wear==='garmin'?'Then let Allena read Health':'Connect Apple Health')+'</button>')+
       (S.hcStuck?'<div class="card mt" style="padding:12px 14px;border-color:var(--amber)">'+
         '<p style="color:var(--dim);font-size:13px;line-height:1.6">Nothing arrived \u2014 iOS only shows the Health permission sheet once, ever. If it was missed or denied:</p>'+
         '<p style="color:var(--dim);font-size:13px;line-height:1.8;margin-top:8px">1. Open the <b style="color:var(--text)">Settings</b> app<br>2. <b style="color:var(--text)">Apps \u2192 Health \u2192 Data Access &amp; Devices \u2192 Allena</b><br>3. <b style="color:var(--text)">Turn All Categories On</b>, then reopen Allena</p>'+
@@ -19495,11 +19506,44 @@ function watchGymCard(){
       '<button data-a="wgLog" data-v="'+esc(w.id)+'" class="btn" style="flex:1;color:var(--amber)">Log the lifts</button>'+
       '<button data-a="wgSkip" data-v="'+esc(w.id)+'" class="btn" style="flex:1;color:var(--dim)">It’s covered</button></div></div>'
   }catch(e){return ''}}
+/* ══ THE WATCH ON THEIR WRIST (owner, 12 Oct 2026: "we need garmin workouts
+   to go straight to allena, people want to use their watch... seamless").
+   Garmin's own API is closed to new apps (paused since spring 2026, no
+   date), so the path is Garmin Connect → Apple Health → Allena, and the
+   app has to know a Garmin is there without being told. HealthKit names
+   the app that wrote each workout ("Connect" is Garmin Connect); every
+   native sync records those names on the Health store, and wearable()
+   reads the most recent one back. Nothing is claimed from a name alone:
+   a wearable is "connected" only because its workouts arrived. */
+function hkSrcRecord(list){
+  try{const st=hkDailyStore();const S9=st.src||(st.src={});let n=0;
+    (list||[]).forEach(w=>{const nm=String((w&&w.src)||'').trim().slice(0,32);if(!nm)return;const d=String(w.date||'').slice(0,10);
+      const e=S9[nm]||(S9[nm]={n:0,last:''});e.n++;if(d>e.last)e.last=d;n++});
+    if(n)lset(K_HKD,st)}
+  catch(e){oops('hkSrcRecord',e)}}
+const WEAR_KINDS=[['garmin',/garmin|\bconnect\b/i,'Garmin'],['apple',/apple watch|\bwatch\b/i,'Apple Watch'],['strava',/strava/i,'Strava'],
+  ['coros',/coros/i,'Coros'],['polar',/polar/i,'Polar'],['suunto',/suunto/i,'Suunto'],['whoop',/whoop/i,'Whoop'],['oura',/oura/i,'Oura'],['fitbit',/fitbit|google fit/i,'Fitbit']];
+function wearKind(name){const n=String(name||'');for(const k of WEAR_KINDS)if(k[1].test(n))return {kind:k[0],brand:k[2]};return n?{kind:'other',brand:n}:null}
+function wearable(){
+  /* the most recent writer of a workout into Health; null until one has */
+  try{const S9=(hkDailyStore().src)||{};let best=null;
+    Object.keys(S9).forEach(nm=>{const e=S9[nm];if(!e||!e.n)return;if(!best||e.last>best.last||(e.last===best.last&&e.n>best.n))best={name:nm,n:e.n,last:e.last}});
+    if(!best)return null;const k=wearKind(best.name)||{kind:'other',brand:best.name};
+    return {kind:k.kind,brand:k.brand,name:best.name,n:best.n,last:best.last}}
+  catch(e){oops('wearable',e);return null}}
+/* the words for the connect card and the onboarding chips: what this
+   wearable needs before its workouts reach Allena */
+function wearWords(kind){
+  if(kind==='garmin')return {t:'Garmin Connect does the carrying',d:'Garmin Connect writes every workout, your sleep and your heart rate into Apple Health, and Allena reads it from there within a minute or two. Two settings make it automatic: Connect allowed to write into Health, and Connect allowed to run in the background.',go:'Set up Garmin \u2192 Health (2 min)',src:'garmin'};
+  if(kind==='apple')return {t:'Apple Watch writes to Health on its own',d:'Nothing to set up on the watch. Allow Allena to read Health and the workouts, sleep and heart rate are already there.',go:'Connect Apple Health',src:'watch'};
+  if(kind==='strava')return {t:'Strava can write to Health',d:'Usually the watch\u2019s own app is the better source; Strava is for runs recorded in Strava itself.',go:'See the Strava steps',src:'strava'};
+  return {t:'Most watches sync to Apple Health',d:'Coros, Polar, Suunto, Whoop, Oura and Fitbit all have an Apple Health switch in their app. Turn it on and Allena reads the workouts from Health.',go:'Connect Apple Health',src:'watch'}}
 function hkNative(list){
   try{
     if(typeof list==='string')list=JSON.parse(list);
     if(!Array.isArray(list))return;
     try{hkPulse(0)}catch(e9){}
+    try{hkSrcRecord(list)}catch(e9){oops('hkNative.src',e9)}
     const out=[];
     /* THE AUTOMATIC SYNC IS THE THING BEING SOLD (owner ruling, 19 Sep
        2026): the native side still reads the whole Health archive (10
@@ -21653,6 +21697,178 @@ function squatSummary(e9){
     return{reps:kept.length,pct:pct,toward:toward,even:pct<4,away:away,
       kept:kept.length,total:total,onset:onset,onsetTxt:squatOnsetTxt(onset)}}
   catch(e){oops('squatSummary',e);return null}}
+/* ══ THE GARMIN WRIST (owner, 12 Oct 2026: "can we make an allena app in
+   garmin api so that they dont have to have their phone to log their
+   workout" — "make it usable on all watches") ═══════════════════════════
+   Garmin's cloud API is closed to new apps; the WATCH is open. A Connect
+   IQ app (garmin/) lives on the wrist, pulls today's session from Allena
+   while the phone is near, walks it in the gym with no phone at all,
+   counts reps from the wrist motion, and hands the logged sets back when
+   the phone is near again. THIS FILE IS THE PHONE'S HALF:
+     - the pairing code (the watch has no sign-in; the code names the
+       account, made here under the user's own session, stored on K_ACCT
+       as acct().wrist — no new storage key);
+     - the plan push (wristPlanPush: today's suggested session in the
+       user's display units, one row per account the watch reads);
+     - the pull (wristPull: logged sets come back as wrist_logs rows and
+       are materialised into the session they were planned as, once).
+   The record on the phone stays the record; the watch is a second place
+   to write it, exactly as the Apple Watch is. A Garmin strength activity
+   recorded alongside still reaches Health and is the witness.
+   Server: supabase/wrist.sql + supabase/wrist-function.ts. */
+const WRIST_ALPHA='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+function wristState(){try{const a=acct()||{};return a.wrist||null}catch(e){oops('wristState',e);return null}}
+function wristOn(){const w=wristState();return !!(w&&w.code)}
+function wristCodeMake(){
+  let s='';try{const b=new Uint8Array(8);(window.crypto||{}).getRandomValues?crypto.getRandomValues(b):b.forEach((x,i)=>b[i]=Math.floor(Math.random()*256));
+    for(let i=0;i<8;i++)s+=WRIST_ALPHA[b[i]%WRIST_ALPHA.length]}catch(e){oops('wristCodeMake',e);for(let i=0;i<8;i++)s+=WRIST_ALPHA[Math.floor(Math.random()*WRIST_ALPHA.length)]}
+  return s}
+/* PAIR: one code per account, written under the user's own session (RLS
+   own row). The watch types it once, in the Garmin Connect app's settings
+   for Allena, and sends it with every request. */
+async function wristPair(){
+  try{
+    const h=await frHeaders();if(!h){flash('Sign in first — the watch needs an account to write into.');return null}
+    const cur=wristState();if(cur&&cur.code)return cur;
+    const code=wristCodeMake();
+    const r=await fetch(CLOUD.url+'/rest/v1/wrist_pairs',{method:'POST',headers:Object.assign({'content-type':'application/json',Prefer:'return=minimal'},h),
+      body:JSON.stringify({code:code,device:'garmin'})});
+    if(r.status===404){flash('The watch link is not set up on the server yet.');return null}
+    if(!r.ok){oops('wristPair',new Error('HTTP '+r.status));flash('Could not make a pairing code. Try again in a minute.');return null}
+    const w={code:code,since:today(),device:'garmin',pushed:null,pulled:null};
+    lset(K_ACCT,Object.assign({},acct()||{},{wrist:w}));
+    try{wristPlanPush(true)}catch(e9){oops('wristPair.push',e9)}
+    return w}
+  catch(e){oops('wristPair',e);flash('No connection.');return null}}
+async function wristUnpair(){
+  try{const h=await frHeaders();const w=wristState();
+    if(h&&w&&w.code)await fetch(CLOUD.url+'/rest/v1/wrist_pairs?code=eq.'+encodeURIComponent(w.code),{method:'DELETE',headers:h});
+    lset(K_ACCT,Object.assign({},acct()||{},{wrist:null}));render()}
+  catch(e){oops('wristUnpair',e)}}
+/* THE PLAN: the session Allena would suggest today, every set, in the
+   unit the person reads. The watch has no engine, so the phone does the
+   thinking and the watch gets the answer. Nothing but set targets
+   travel; no history, no health numbers. */
+function wristPlanBuild(){
+  try{
+    const p=activeProgSafe();if(!p||p.empty)return null;
+    let di=null;try{const r=recommendToday();if(r&&!r.empty&&r.top)di=+r.top.i}catch(e){oops('wristPlan.rec',e)}
+    if(di==null){/* every day done or a rest day: the first day not yet done this week, else day 1 */
+      const wk9=weekFor(p.id)||1;let done=null;try{done=weekDone(p.id,wk9)}catch(e){}
+      di=0;for(let i=0;i<(p.days||[]).length;i++){if(!done||!done.has(i)){di=i;break}}}
+    const wk=weekFor(p.id)||1;
+    const sets=sessionSets(p,di,wk);if(!sets.length)return null;
+    const unit=uwUnit();
+    /* OFF THE PLAN, ON THE WRIST (owner, 12 Oct 2026: "what if someone goes
+       off the plan? and wants to add, swap, skip, superset"). The watch
+       cannot type and has no engine, so the choices travel with the plan,
+       already screened: each exercise's swaps from the same readers the
+       phone uses (a rehab day swaps only within its own programme, never
+       the gym pool), and a short add list from the person's own block and
+       recent lifts, every name through the injury screen. */
+    const rehab=!!(p.acl||p.rehabProto||p.kind==='rehab');
+    let ex9=null;try{ex9=exclFor(restrEff())}catch(e){oops('wristPlan.screen',e)}
+    const ok9=n=>{try{return !ex9||!exBlocked(n,[],ex9)}catch(e){return false}};
+    const swapsFor=name=>{try{
+      if(rehab)return (typeof rehabAlternatives==='function'?rehabAlternatives(name):[]).map(x=>x.n).filter(ok9).slice(0,6);
+      const f=subsFor(name);return f?f.list.map(x=>x.n).filter(ok9).slice(0,6):[]}
+      catch(e){oops('wristPlan.swaps',e);return []}};
+    const inDay={};sets.forEach(x=>{inDay[gBase(x.ex)]=1});
+    const add=[];if(!rehab){
+      try{(p.days||[]).forEach((d9,i9)=>{if(i9===di)return;(d9.exercises||[]).forEach(e9=>{const b=gBase(e9.name);if(b&&!inDay[b]&&add.indexOf(b)<0&&ok9(b))add.push(b)})})}catch(e){oops('wristPlan.addProg',e)}
+      try{const cut=dayKey(new Date(Date.now()-60*864e5));const cnt={};(S.history||[]).forEach(h=>{if(!h.complete||h.run||hKey(h)<cut)return;(h.log||[]).forEach(l=>{if(+l.w>0&&+l.r>0){const b=gBase(l.ex);cnt[b]=(cnt[b]||0)+1}})});
+        Object.keys(cnt).sort((a,b)=>cnt[b]-cnt[a]).forEach(b=>{if(!inDay[b]&&add.indexOf(b)<0&&ok9(b))add.push(b)})}catch(e){oops('wristPlan.addHist',e)}}
+    let lastE=null;
+    return {pid:String(p.id),di:di,wk:wk,name:String(p.days[di].name||'').slice(0,40),block:String(p.block||'').slice(0,40),
+      unit:unit,wStep:UNITS.w==='lb'?5:2.5,day:today(),rehab:rehab?1:0,add:add.slice(0,8).map(n=>String(n).slice(0,40)),
+      sets:sets.slice(0,60).map(x=>{const first=x.ex!==lastE;lastE=x.ex;
+        const o={e:String(x.ex||'').slice(0,40),s:+x.setNo||0,o:+x.of||0,
+        w:x.targetW!=null?(+uwNum(+x.targetW)||0):null,r:parseInt(String(x.targetReps||''),10)||0,
+        rpe:x.targetRpe!=null?String(x.targetRpe):'',rest:+x.rest||0,sec:+x.secs||0,
+        dl:x.deload?1:0};
+        if(first){const sw=swapsFor(x.ex);if(sw.length)o.sw=sw.map(n=>String(n).slice(0,40))}
+        return o})}}
+  catch(e){oops('wristPlanBuild',e);return null}}
+let wristPushT=null;
+function wristPlanSoon(){try{if(!wristOn())return;clearTimeout(wristPushT);wristPushT=setTimeout(function(){wristPlanPush()},2500)}catch(e){oops('wristPlanSoon',e)}}
+async function wristPlanPush(force){
+  try{
+    if(!wristOn())return false;const h=await frHeaders();if(!h)return false;
+    const plan=wristPlanBuild();if(!plan)return false;
+    const sig=JSON.stringify(plan);const w=wristState()||{};
+    if(!force&&w.pushed===sig)return true;
+    const r=await fetch(CLOUD.url+'/rest/v1/wrist_plans',{method:'POST',headers:Object.assign({'content-type':'application/json',Prefer:'resolution=merge-duplicates,return=minimal'},h),
+      body:JSON.stringify({plan:plan,updated_at:new Date().toISOString()})});
+    if(r.ok||r.status===201||r.status===204){lset(K_ACCT,Object.assign({},acct()||{},{wrist:Object.assign({},w,{pushed:sig,pushedAt:Date.now()})}));return true}
+    if(r.status!==404)oops('wristPlanPush',new Error('HTTP '+r.status));return false}
+  catch(e){oops('wristPlanPush',e);return false}}
+/* THE PULL: every row the watch wrote and the phone has not taken. Each
+   becomes, or joins, the session it was planned as. Taken rows are
+   marked, never deleted, so a second phone on the same account also
+   sees nothing twice (the row id is the dedupe). */
+async function wristPull(){
+  try{
+    if(!wristOn())return 0;const h=await frHeaders();if(!h)return 0;
+    const r=await fetch(CLOUD.url+'/rest/v1/wrist_logs?taken=eq.false&select=id,device,at,day,plan,sets&order=at.asc&limit=50',{headers:h});
+    if(!r.ok)return 0;const rows=await r.json();if(!Array.isArray(rows)||!rows.length)return 0;
+    let n=0;const took=[];
+    rows.forEach(row=>{try{if(wristMaterialise(row)){n++;took.push(row.id)}else took.push(row.id)}catch(e){oops('wristPull.row',e)}});
+    if(took.length){saveHistory();
+      await fetch(CLOUD.url+'/rest/v1/wrist_logs?id=in.('+took.join(',')+')',{method:'PATCH',headers:Object.assign({'content-type':'application/json',Prefer:'return=minimal'},h),body:JSON.stringify({taken:true})});
+      lset(K_ACCT,Object.assign({},acct()||{},{wrist:Object.assign({},wristState()||{},{pulled:Date.now()})}))}
+    if(n){flash(n+' session'+(n===1?'':'s')+' from your watch landed.');try{cloudBkSoon()}catch(e){}try{render()}catch(e){}}
+    return n}
+  catch(e){oops('wristPull',e);return 0}}
+/* one wrist row into the record. Weights come in the watch's display
+   unit (the plan's), and are stored in kilograms like every weight. */
+function wristMaterialise(row){
+  const id='wr'+String(row.id);
+  if((S.history||[]).some(h=>h&&String(h.id)===id))return false;
+  const P=row.plan||{};const sets=Array.isArray(row.sets)?row.sets:[];
+  const log=[],swaps=[];sets.forEach(x=>{const r9=Math.round(+x.r||0),sec=Math.round(+x.sec||0);if(!(r9>0)&&!(sec>0))return;
+    const w9=x.w!=null&&+x.w>0?Math.round(uwIn(+x.w)*4)/4:0;
+    const t9=+x.t>0?+x.t:undefined;
+    /* a hold comes back as the seconds witnessed (`sec`) and is stored the way the phone stores its own holds */
+    if(sec>0)log.push({ex:String(x.e||'').slice(0,60),setNo:+x.s||log.length+1,secs:sec,w:0,r:0,rpe:null,t:t9});
+    else log.push({ex:String(x.e||'').slice(0,60),setNo:+x.s||log.length+1,w:w9,r:r9,rpe:(+x.rpe>=1&&+x.rpe<=10)?Math.round(+x.rpe*2)/2:null,t:t9});
+    /* a swap made on the wrist is remembered like one made on the phone, so "last time's swaps" asks once */
+    if(x.x&&String(x.x)!==String(x.e)&&!swaps.some(q=>q.orig===String(x.x)))swaps.push({orig:String(x.x).slice(0,60),now:String(x.e).slice(0,60)})});
+  if(!log.length)return false;
+  const ts=log.map(l=>+l.t||0).filter(Boolean);
+  const started=ts.length?Math.min.apply(null,ts):(new Date(row.at).getTime()||Date.now());
+  const ended=ts.length?Math.max.apply(null,ts):started;
+  /* an open phone session for the same day joins instead of doubling */
+  const p=((S.lib&&S.lib.programs)||[]).find(q=>q.id===P.pid);
+  const live=(S.history||[]).find(h=>h&&!h.run&&!h.complete&&h.progId===P.pid&&h.dayIdx===P.di&&hKey(h)===String(row.day||'').slice(0,10));
+  if(live){log.forEach(l=>{if(!(live.log||[]).some(q=>q.ex===l.ex&&q.setNo===l.setNo))live.log.push(l)});live.wristId=id;return true}
+  S.history.push({id:id,date:new Date(started).toISOString(),startedAt:started,
+    block:String(P.block||(p&&p.block)||''),progId:P.pid||null,dayIdx:P.di!=null?+P.di:null,dayTitle:String(P.name||''),week:+P.wk||null,
+    minutes:Math.max(1,Math.round((ended-started)/60000)+3),log:log,note:{src:'Garmin watch'},complete:true,planned:sets.length,wrist:'garmin',
+    swaps:swaps.length?swaps:undefined});
+  return true}
+/* the Settings sheet: pair, the code, the steps, the state */
+function garminSheet(){
+  try{
+    const w=wristState();const signed=(typeof acctReady==='function'&&acctReady()&&!!(acct()||{}).refresh);
+    const fmt=t=>{try{return new Date(t).toLocaleString(undefined,{weekday:'short',hour:'numeric',minute:'2-digit'})}catch(e){return ''}};
+    let inner='<p style="color:var(--dim);font-size:13px;line-height:1.6">The Allena app on a Garmin watch walks today’s session with no phone in the gym: it takes the session from here while the phone is near, counts reps from your wrist, runs the rest clock, and hands the sets back when the phone is near again. Garmin’s own Strength recording still runs alongside, so the heart rate reaches Health as usual.</p>';
+    if(!signed)inner+='<p style="color:var(--amber);font-size:13px;line-height:1.6;margin-top:12px">Sign in first. The watch needs an account to write into.</p>';
+    else if(!w||!w.code)inner+='<button data-a="wristPair" class="big disp mt" style="background:var(--amber);color:var(--bg);font-size:15px">Pair a Garmin watch</button>';
+    else{
+      inner+='<p class="eyebrow mt2">Your pairing code</p>'+
+        '<div class="card mt" style="padding:16px;text-align:center"><p class="disp" style="font-size:32px;font-weight:600;letter-spacing:.18em">'+esc(w.code.slice(0,4)+' '+w.code.slice(4))+'</p>'+
+        '<p style="color:var(--faint);font-size:11px;margin-top:6px">Type it once into the Allena app’s settings in Garmin Connect.</p></div>'+
+        '<p class="eyebrow mt2">How to set it up</p>'+
+        ['Install Allena from the Connect IQ store on your phone (Garmin Connect → More → Connect IQ Store → search Allena).',
+         'In Garmin Connect, open the Allena app’s settings and type the code above.',
+         'With the phone near, open Allena on the watch: today’s session loads. Then go train — the phone can stay home.',
+         'Next time the phone is near, the sets come back here on their own.'].map((s,i)=>'<div style="display:flex;gap:12px;margin-top:8px"><span class="mono" style="color:var(--amber);font-size:11px;flex:none;width:14px">'+(i+1)+'</span><p style="font-size:13px;color:var(--dim);line-height:1.5">'+esc(s)+'</p></div>').join('')+
+        '<p style="font-size:13px;color:var(--dim);line-height:1.5;margin-top:14px">'+(w.pushedAt?'Today’s session was sent to the watch '+esc(fmt(w.pushedAt))+'.':'Today’s session goes to the watch the next time the app syncs.')+(w.pulled?' Last sets from the watch: '+esc(fmt(w.pulled))+'.':' Nothing has come back from the watch yet.')+'</p>'+
+        '<button data-a="wristPush" class="btn mt2">Send today’s session now</button>'+
+        '<button data-a="wristUnpair" class="btn" style="margin-top:8px;color:var(--red);font-size:13px">Unpair this watch</button>'}
+    inner+='<p style="color:var(--faint);font-size:11px;line-height:1.5;margin-top:16px">Works on every Garmin watch that runs Connect IQ apps. Only set targets travel to the watch, and only the sets you logged travel back.</p>';
+    return wrapSheet('Garmin watch',inner)}
+  catch(e){oops('garminSheet',e);return wrapSheet('Garmin watch','<p style="color:var(--dim);font-size:13px">Could not open this just now.</p>')}}
 /* THE RARITY LADDER (owner, 13 Sep 2026: "Big one / Epic / Rare /
    Noticed should have a colour system, otherwise they're all the same").
    They were: the old ladder ran stone, green, #D9D6CD, #FFFFFF — the top
@@ -40459,7 +40675,8 @@ function viewData(){
       ?navRow(I.run,'Your runs',runs().length?runs().length+' logged':'On','nav','run')
       :setRow(I.run,'Running','Off','Running')),
     setRow(I.heart,'Daily check-in',dc?'On':'Off','Daily check-in'),
-    setRow(I.run,'Connect wearables & apps','the Apple Health guide','__hguide')]);}
+    setRow(I.run,'Connect wearables & apps','the Apple Health guide','__hguide'),
+    setRow(I.run,'Garmin watch',(typeof wristOn==='function'&&wristOn())?'Paired':'Log sets with no phone','__garmin')]);}
   {const th=lget('training-theme-v1','system');
    h+='<p class="eyebrow mt2">Appearance</p>'+
    '<div class="card mt" style="padding:13px 15px">'+
@@ -41211,10 +41428,16 @@ function sourcesSheet(){
       '<span style="color:var(--faint);font-size:11px;text-align:right">'+esc(r.src)+'</span></div>'+
       '<p style="font-size:13px;line-height:1.5;margin-top:4px;color:'+(r.quiet?'var(--amber)':'var(--dim)')+'">'+esc(when)+'</p>'+
       '<p style="font-size:13px;line-height:1.5;margin-top:2px;color:'+(r.powers?'var(--text)':'var(--faint)')+'">'+esc(r.powers||r.needs||'')+'</p></div>'}).join('');
+  let wear='';try{const W=(typeof wearable==='function')?wearable():null;
+    if(W){const path=W.kind==='garmin'?'Garmin Connect \u2192 Apple Health \u2192 Allena':W.brand+' \u2192 Apple Health \u2192 Allena';
+      wear='<div class="card" style="padding:13px 15px;margin-top:12px;border-color:var(--green)"><p style="font-size:15px;font-weight:600">'+esc(W.brand)+' is connected</p>'+
+        '<p style="font-size:13px;line-height:1.5;margin-top:4px;color:var(--dim)">'+esc(path)+'. '+W.n+' workout'+(W.n===1?'':'s')+' so far, the last on '+esc(fmt(W.last))+'.</p>'+
+        (W.kind==='garmin'?'<p style="font-size:13px;line-height:1.5;margin-top:4px;color:var(--faint)">Runs and rides arrive whole. A strength workout arrives as its time and heart rate, never its sets: log those here and the watch is the witness.</p>':'')+'</div>'}}
+  catch(e){oops('sourcesWear',e)}
   return wrapSheet('Where your numbers come from',
     '<p style="color:var(--dim);font-size:13px;line-height:1.6">For each number: where it comes from, when it last arrived, and what it is doing for you or what it still needs. iOS does not tell apps what they are allowed to read, so arrival is the only honest sign that a connection works.</p>'+
-    '<div style="display:flex;flex-direction:column;gap:8px;margin-top:14px">'+rows+'</div>'+
-    (wrapOn?'<button data-a="healthConnectGo" class="btn mt2">Sync with Health now</button>'
+    wear+'<div style="display:flex;flex-direction:column;gap:8px;margin-top:14px">'+rows+'</div>'+
+    (wrapOn?'<button data-a="healthConnectGo" class="btn mt2">Sync with Health now</button>'+'<button data-a="hguideOpen" data-v="garmin" class="btn" style="margin-top:8px;color:var(--dim);font-size:13px">Garmin? The two settings that make it automatic</button>'
       :(!any?'<p style="color:var(--faint);font-size:13px;line-height:1.55;margin-top:12px">Health data arrives in the Allena app on iPhone. On the web, what you type still counts.</p>':'')))}
 function sheetHtml(){
   if(!S.sheet)return '';
@@ -41345,6 +41568,7 @@ function sheetHtml(){
       :!last9?'<p style="color:var(--faint);font-size:13px;line-height:1.55;margin-top:20px">Only the last day in the program can be removed this way — remove the days after this one first.</p>'
       :'<p style="color:var(--dim);font-size:13px;line-height:1.55;margin-top:20px">Removing takes it out of the program from here on.'+(doneN9?' The '+doneN9+' session'+(doneN9===1?'':'s')+' you’ve already logged against it stay in History.':'')+'</p>'+
       '<button data-a="dayDelOpen" data-v="'+di9+'" class="big disp mt" style="background:var(--red);color:#fff;font-size:17px">Remove this day</button>'))}
+  if(S.sheet.t==='garmin')return garminSheet();
   if(S.sheet.t==='goals'){
     /* S.gform is shared with the morning, pre, post and bodyweight
        prompts, which leave {am:''} and the like behind; a leftover of
@@ -43763,11 +43987,13 @@ function viewGuide(){
   const health=S.impgMode==='health';
   const HG={
     garmin:{name:'Garmin',addr:'',steps:[
-      ['Open the Garmin Connect app','Sign in \u2014 this app is the bridge between the watch and Apple Health.',''],
-      ['Connect it to Apple Health','More (\u2630) \u2192 Settings \u2192 Health \u2014 turn everything ON: workouts, heart rate, sleep, steps.','Allena only ever reads; nothing writes back to Garmin.'],
-      ['Let it run in the background','iPhone Settings \u2192 Apps \u2192 Garmin Connect: Background App Refresh ON, Bluetooth allowed.','This is the step everyone misses \u2014 without it you have to open Connect by hand every time.'],
+      ['Open the Garmin Connect app','Sign in. Connect is the bridge: the watch talks to Connect, Connect writes into Apple Health, Allena reads Health. Garmin does not let new apps read a watch directly, so this is the road.',''],
+      ['Turn on Apple Health inside Connect','More (\u2630 or \u2026) \u2192 Settings \u2192 Health \u2192 Apple Health \u2192 ON. Then in the same place, turn on every category it offers: workouts, heart rate, sleep, steps.','Allena only ever reads; nothing writes back to Garmin.'],
+      ['Let iOS allow it','iPhone Settings \u2192 Apps \u2192 Health \u2192 Data Access & Devices \u2192 Connect \u2192 Turn All Categories On.','iOS asks this once and hides it; if a workout never shows up in Health, this is where it is stuck.'],
+      ['Let Connect run in the background','iPhone Settings \u2192 Apps \u2192 Garmin Connect: Background App Refresh ON, Bluetooth allowed.','Without it, a workout waits until you open Connect by hand.'],
+      ['Let Allena read Health','iPhone Settings \u2192 Apps \u2192 Health \u2192 Data Access & Devices \u2192 Allena \u2192 Turn All Categories On.',''],
       ['Mind Low Power Mode','The yellow battery pauses background sync until you charge or open Connect \u2014 workouts arrive late, not lost.',''],
-      ['Test it','Save any activity on the watch with the phone nearby \u2014 it should appear in Apple Health within a minute or two, and Allena drinks from there automatically.','']]},
+      ['Test it','Save any activity on the watch with the phone nearby. It should appear in Apple Health within a minute or two; open Allena and it is already there.','A Garmin strength workout arrives as the time and heart rate your watch saw, not the sets: Health carries no sets or weights from any watch. Log the sets in Allena and the watch is the witness that you did them.']]},
     watch:{name:'Apple Watch',addr:'',steps:[
       ['Nothing to set up','Apple Watch writes workouts, heart rate and sleep straight into Health on its own.',''],
       ['Just check Allena\u2019s access','iPhone Settings \u2192 Apps \u2192 Health \u2192 Data Access & Devices \u2192 Allena \u2192 Turn All Categories On.',''],
@@ -47747,8 +47973,18 @@ function runAction(a,v,t,e){
     case 'obBack':obBack();render();break;
     case 'obHealth':{try{if(window.webkit&&window.webkit.messageHandlers&&window.webkit.messageHandlers.allena)
         window.webkit.messageHandlers.allena.postMessage('sync')}catch(e){oops('obHealth',e)}
+      try{const w=obState().wear;if(w){S.prof=S.prof||{};S.prof.wear=w;lset(K_PROF,S.prof)}}catch(e){oops('obHealth.wear',e)}
       S._hkAsked=1;obNext();render();break}
-    case 'obHealthNo':obNext();render();break;
+    case 'obHealthNo':{try{const w=obState().wear;if(w){S.prof=S.prof||{};S.prof.wear=w;lset(K_PROF,S.prof)}}catch(e){oops('obHealthNo.wear',e)}obNext();render();break}
+    /* what they wear, remembered on the profile; a Garmin opens its own guide */
+    case 'wristPair':{S.acctBusy=true;render();wristPair().then(function(){S.acctBusy=false;render()});break}
+    case 'wristPush':{wristPlanPush(true).then(function(ok){flash(ok?'Sent. Open Allena on the watch with the phone near.':'Could not send just now.');render()});break}
+    case 'wristUnpair':{S.confirm={t:'Unpair this watch?',d:'The watch stops loading sessions and nothing more comes back from it. Sets already here stay.',go:'wristUnpairGo',v:'',ok:'Unpair',no:'Keep it'};S.sheet={t:'confirm'};render();break}
+    case 'wristUnpairGo':{S.sheet=null;wristUnpair();break}
+    case 'wearPick':{S.prof=S.prof||{};S.prof.wear=String(v||'');lset(K_PROF,S.prof);
+      if(S.prof.wear==='garmin'){runAction('hguideOpen','garmin');break}render();break}
+    case 'hguideOpen':{S.sheet=null;S.impgMode='health';S.impg=String(v||'garmin');S.impgStep=0;
+      S.guideFrom=S.view;S._navQuiet=1;S.view='guide';render();break}
     case 'obUnit':{if(v!=='kg'&&v!=='lb')break;unitsSet('w',v);render();break}
     case 'obNudge':{const o=obState(),q=String(v).split(':'),d=+q[1]>0?1:-1;
       if(q[0]==='age')o.age=Math.max(13,Math.min(90,Math.round(obVal('age'))+d));
@@ -49030,6 +49266,7 @@ function runAction(a,v,t,e){
       if(v==='__demomode'){S.sheet={t:'demo'};render();break}
       if(v==='__report')v='Report a problem';   // the rows pass a token; the chunk key is the title
       if(v==='__setup'){S.sheet=null;runAction('setupOpen');break}
+      if(v==='__garmin'){S.sheet={t:'garmin'};render();break}
       if(v==='__hguide'){S.sheet=null;S.impgMode='health';S.impg='garmin';S.impgStep=0;
         S.guideFrom=S.view;S._navQuiet=1;S.view='guide';render();break}
       if(v==='__rirfix'){S.sheet={t:'rirfix'};render();break}
