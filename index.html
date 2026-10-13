@@ -1945,7 +1945,7 @@ if(S.sess){S.note=S.sess.note||S.note;
       if(c0&&(s0.log||[]).some(l=>l.ex===c0.ex&&l.setNo===c0.setNo)){const n0=sessAdv(s0);
         if(n0<0)s0.phase='done';else s0.idx=n0}}catch(e){oops('bootSess',e)}
     if(S.sess.phase!=='done')S.sess.phase='ready'}}
-const BUILD_ID='5efb93';  // stamped by tools/build.py with the content hash
+const BUILD_ID='e4c7ca';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -6297,8 +6297,47 @@ function cloudBkPayload(){
   const sessions=(o.keys&&Array.isArray(o.keys[K_H]))?o.keys[K_H].length:0;
   return{blob:blob,bytes:blob.length,sessions:sessions,hash:String(h)}}
 let cloudBkT=null,cloudBkLast=0,cloudBkBusy=false;
+/* THE BACKUP LINE (owner, 14 Oct 2026: "some loading bar at the top whenever new
+   data happens showing allena being backed up to server"). A two-pixel line at
+   the very top of the screen, outside the render loop so a re-render never
+   blinks it: it appears the moment a change is scheduled, runs while the push
+   is on its way, says "Backed up" when the server has it and goes, and stays
+   red with the reason when a push does not land. One writer, bkBar(); the
+   state is readable (bkBarState) so the phone app can draw its own. */
+let bkBarS={state:'',msg:'',at:0},bkBarT=null;
+function bkBarState(){return bkBarS}
+function bkBar(state,msg){
+  try{
+    bkBarS={state:state||'',msg:msg||'',at:Date.now()};
+    clearTimeout(bkBarT);
+    if(state==='done')bkBarT=setTimeout(function(){bkBarS={state:'',msg:'',at:Date.now()};bkBarDraw()},1800);
+    bkBarDraw()}
+  catch(e){oops('bkBar',e)}}
+function bkBarDraw(){
+  try{
+    if(typeof document==='undefined'||!document.body||typeof document.createElement!=='function'||typeof document.getElementById!=='function')return;
+    let el=document.getElementById('bkbar');
+    if(!el){el=document.createElement('div');if(!el||typeof el.setAttribute!=='function')return;el.id='bkbar';
+      el.innerHTML='<div class="bkb-line"><div class="bkb-fill"></div></div><div class="bkb-cap"></div>';
+      const st=document.createElement('style');st.textContent=
+        '#bkbar{position:fixed;left:0;right:0;top:0;z-index:9999;pointer-events:none;opacity:0;transition:opacity .25s}'+
+        '#bkbar.on{opacity:1}'+
+        '#bkbar .bkb-line{height:2px;background:rgba(255,255,255,.08);overflow:hidden}'+
+        '#bkbar .bkb-fill{height:2px;width:35%;background:var(--amber);transform:translateX(-100%);animation:bkbRun 1.1s linear infinite}'+
+        '#bkbar.done .bkb-fill{width:100%;transform:none;animation:none;background:var(--green)}'+
+        '#bkbar.fail .bkb-fill{width:100%;transform:none;animation:none;background:var(--red)}'+
+        '#bkbar .bkb-cap{position:absolute;right:12px;top:calc(env(safe-area-inset-top,0px) + 4px);font-size:11px;letter-spacing:.04em;color:var(--faint);background:var(--surface);padding:2px 8px;border-radius:8px}'+
+        '#bkbar.done .bkb-cap{color:var(--green)}#bkbar.fail .bkb-cap{color:var(--red)}'+
+        '@keyframes bkbRun{to{transform:translateX(300%)}}'+
+        '@media (prefers-reduced-motion:reduce){#bkbar .bkb-fill{animation:none;width:100%;transform:none}}';
+      document.head.appendChild(st);document.body.appendChild(el)}
+    const s=bkBarS.state;
+    el.className=s?('on '+s):'';
+    const cap=el.querySelector&&el.querySelector('.bkb-cap');if(cap)cap.textContent=bkBarS.msg||''}
+  catch(e){oops('bkBarDraw',e)}}
 function cloudBkSoon(){
   if(!acctOn()||S._bkCap===false)return;
+  bkBar('pending','Backing up\u2026');
   clearTimeout(cloudBkT);
   const wait=Math.max(4000,45000-(Date.now()-cloudBkLast));
   cloudBkT=setTimeout(function(){cloudBkT=null;cloudBkPush(false)},wait)}
@@ -6358,7 +6397,7 @@ async function cloudBkPush(loud,urgent){
      cloudBkReconcile below, which reads the row before a device's first
      push and compares it, rather than only fetching it */
   if(cloudBkBusy){cloudBkSoon();return false}   // one in flight: the next one queues behind it
-  cloudBkBusy=true;
+  cloudBkBusy=true;bkBar('busy','Backing up\u2026');
   if(loud){S.bkBusy=true;render()}
   const done=ok9=>{cloudBkBusy=false;if(loud){S.bkBusy=false;render()}return ok9};
   try{
@@ -6367,17 +6406,17 @@ async function cloudBkPush(loud,urgent){
     if(S._deleting)return done(false);
     let pay=cloudBkPayload();
     let a=acct()||{};
-    if(!loud&&a.bkHash===pay.hash)return done(true);   // nothing changed since the last push
+    if(!loud&&a.bkHash===pay.hash){bkBar('');return done(true)}   // nothing changed since the last push
     /* A PUSH NEVER ERASES WHAT THIS PHONE HAS NOT SEEN (audit D1, 2 Oct
        2026): the upsert replaces the whole row, so a reinstalled phone
        holding only its Health runs used to write over a year of lifting.
        Before a device pushes it reads the row: on its first push, and
        whenever another device wrote it since this one did. An empty phone
        merges the row in; a phone with its own sessions holds and says so. */
-    if(!loud&&a.bkHeld)return done(false);   // held until the person merges: no re-download every 45 s
+    if(!loud&&a.bkHeld){bkBar('fail','Not backed up: restore first');return done(false)}   // held until the person merges: no re-download every 45 s
     const rec=await cloudBkReconcile(a);
-    if(rec==='held'){if(loud)flash(cloudBkHeldLine(acct()));return done(false)}
-    if(rec==='offline'){if(loud)flash('No connection.');return done(false)}
+    if(rec==='held'){bkBar('fail','Not backed up: restore first');if(loud)flash(cloudBkHeldLine(acct()));return done(false)}
+    if(rec==='offline'){bkBar('fail','Not backed up: no connection');if(loud)flash('No connection.');return done(false)}
     if(rec==='restored')pay=cloudBkPayload();
     a=acct()||{};
     /* ═══ A DELETE IS NOT A LOST PHONE (review B-4) ═══════════════════
@@ -6417,7 +6456,7 @@ async function cloudBkPush(loud,urgent){
       const a9=acct();
       if(a9&&a9.refresh)lset(K_ACCT,Object.assign({},a9,{bkAt:stamp,bkSeen:true,bkHeld:null,bkHash:pay.hash,bkBytes:pay.bytes,bkSessions:pay.sessions,bkRefused:null}));
       /* a backup is a backup: the never-backed-up warning stands down */
-      lset(K_BK,Date.now());
+      lset(K_BK,Date.now());bkBar('done','Backed up');
       if(loud){flash('Backed up to your account.');try{haptic('success')}catch(e9){}}
       return done(true)}
     let tx='',j=null;try{tx=await r.text();j=JSON.parse(tx)}catch(e9){j=null}
@@ -6429,14 +6468,15 @@ async function cloudBkPush(loud,urgent){
       const a9=acct();
       if(a9&&a9.refresh)lset(K_ACCT,Object.assign({},a9,{bkRefused:{srv:+sh[1],loc:+sh[2],at:new Date().toISOString()}}));
       if(loud)flash('Your account’s backup has '+sh[1]+' sessions and this phone has '+sh[2]+', so it was kept. Restore from the cloud to bring them together.');
+      bkBar('fail','Not backed up: the server kept an older copy');
       return done(false)}
     /* a database that has the table but not social10.sql's column */
     if(r.status===400&&!S._bkNoForced&&/forced/.test(msg)&&(!j||j.code==='PGRST204'||j.code==='42703')){
       S._bkNoForced=1;done(false);return cloudBkPush(loud,urgent)}
-    if(r.status===404||(j&&(j.code==='PGRST205'||j.code==='42P01'))){S._bkCap=false;if(loud)flash('The backup table is not live on the server yet.');return done(false)}
+    if(r.status===404||(j&&(j.code==='PGRST205'||j.code==='42P01'))){S._bkCap=false;bkBar('');if(loud)flash('The backup table is not live on the server yet.');return done(false)}
     oops('cloudBkPush',new Error('backup '+r.status+': '+msg.slice(0,200)));
-    if(loud)flash('Backup failed ('+r.status+'). Try again in a minute.');return done(false)}
-  catch(e){oops('cloudBkPush',e);if(loud)flash('No connection.');return done(false)}}
+    bkBar('fail','Not backed up ('+r.status+'), will retry');if(loud)flash('Backup failed ('+r.status+'). Try again in a minute.');return done(false)}
+  catch(e){oops('cloudBkPush',e);bkBar('fail','Not backed up: no connection, will retry');if(loud)flash('No connection.');return done(false)}}
 async function cloudBkPull(){
   /* the row for this account, or null: {blob,updated_at,sessions,bytes} */
   cloudBkPullOk=false;
