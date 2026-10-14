@@ -1945,7 +1945,7 @@ if(S.sess){S.note=S.sess.note||S.note;
       if(c0&&(s0.log||[]).some(l=>l.ex===c0.ex&&l.setNo===c0.setNo)){const n0=sessAdv(s0);
         if(n0<0)s0.phase='done';else s0.idx=n0}}catch(e){oops('bootSess',e)}
     if(S.sess.phase!=='done')S.sess.phase='ready'}}
-const BUILD_ID='11f5eb';  // stamped by tools/build.py with the content hash
+const BUILD_ID='7535d9';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -21283,6 +21283,7 @@ function runHrAsk(r){
       {type:'hr',id:'RUN:'+String(r.id),start:start,end:end}))
   }catch(e){oops('runHrAsk',e)}}
 function hrWitnessBackfill(){
+  S._hrScanN=(S._hrScanN||0)+1;   // how many times the day scan was asked for, for the tests and Diagnostics
   try{if(watchGym().some(x=>!x.used&&!x.mat&&!x.cov))watchCorroborate()}catch(e9){oops('hrWitnessBackfill.wg',e9)}
   try{
     if(!inWrapper())return;
@@ -46801,6 +46802,10 @@ function runAction(a,v,t,e){
          the next Health pull. Run it here, and let a witness from the old day go. */
       if(f.date&&/^\d{4}-\d{2}-\d{2}$/.test(f.date)&&r.watch&&r.watch.date&&r.watch.date!==hKey(r)){delete r.watch}
       try{if(typeof watchCorroborate==='function')watchCorroborate()}catch(e){oops('histSave.wg',e)}
+      /* and the day's heart rate: a worn watch writes heart rate to Health even when no
+         activity was started, and the day scan (hrWitnessBackfill) only ever ran six seconds
+         after a cold open. A session that has just been given its real day asks that day now. */
+      try{if(typeof hrWitnessBackfill==='function')hrWitnessBackfill()}catch(e){oops('histSave.hr',e)}
       S.hform=null;S.sheet=null;S.patCache=null;render();flash('Session updated.');break}
     case 'delHistYes':{
       /* a watch-materialised session that is deleted must stay deleted
@@ -49369,6 +49374,7 @@ function runAction(a,v,t,e){
       /* a past session typed in pairs with the watch's gym workout now,
          not at the next sync or open (review F-6) */
       try{if(typeof watchCorroborate==='function')watchCorroborate()}catch(e){oops('quickSave.wg',e)}
+      try{if(typeof hrWitnessBackfill==='function')hrWitnessBackfill()}catch(e){oops('quickSave.hr',e)}
       /* a session proposed in the chat goes back to the chat that proposed it, and its card says saved */
       const back9=q.fromChat?'coach':'home';
       try{const m9=q.fromChat&&S.coach&&S.coach.thread&&S.coach.thread[q.fromMsg];if(m9&&m9.log){m9.logDone=1;chatSaveCurrent()}}catch(e9){oops('quickSave.chat',e9)}
