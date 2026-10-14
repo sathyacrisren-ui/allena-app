@@ -1945,7 +1945,7 @@ if(S.sess){S.note=S.sess.note||S.note;
       if(c0&&(s0.log||[]).some(l=>l.ex===c0.ex&&l.setNo===c0.setNo)){const n0=sessAdv(s0);
         if(n0<0)s0.phase='done';else s0.idx=n0}}catch(e){oops('bootSess',e)}
     if(S.sess.phase!=='done')S.sess.phase='ready'}}
-const BUILD_ID='efb46b';  // stamped by tools/build.py with the content hash
+const BUILD_ID='15737b';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -13013,8 +13013,8 @@ function sessionLiveWhy(h){
     return{live:false,why:'the watch recorded '+h.watch.mins+' min but avg HR '+h.watch.hr+' — below working effort'};
   /* a day-scan block (hr.day) already cleared the day scan's own bar, four sparse Garmin
      readings or more across a working hour (14 Oct 2026); a session-window read keeps ten */
-  if(h.hr&&(h.hr.n||0)>=(h.hr.day?4:10)&&(h.hr.avg||0)>=95)
-    return{live:true,why:'heart-witnessed — avg HR '+h.hr.avg+(h.hr.day?' across a working hour that day':' across the session')};
+  if(h.hr&&(h.hr.n||0)>=(h.hr.day?4:10)&&((h.hr.avg||0)>=95||(h.hr.day&&(h.hr.avg||0)>=85&&(h.hr.max||0)>=125)))
+    return{live:true,why:'heart-witnessed — avg HR '+h.hr.avg+(h.hr.day?' across a working hour that day'+((h.hr.avg||0)<95?', peaking at '+h.hr.max:''):' across the session')};
   if(h.manual){
     /* what the day scan found, so "no watch" never has to be taken on faith */
     let seen='';try{const r=S._hrDay&&S._hrDay[String(h.id)];if(r&&r.best)seen='; the day\u2019s best hour read avg '+r.best.avg+' from '+r.best.n+' reading'+(r.best.n===1?'':'s')}catch(e){seen=''}
@@ -21369,7 +21369,11 @@ function hkHR(id,res){
          95 or more across an hour is a working hour whoever wrote them. The best hour seen
          is kept so the session's own line can say what the day held. */
       if(res&&res.n>0&&(!rec.best||res.avg>rec.best.avg))rec.best={avg:Math.round(res.avg),n:res.n,max:Math.round(res.max||0),b:+q[2]||0};
-      const b=(res&&res.n>=4&&res.avg>=95)?res:null;
+      /* LIFTING IS PEAKS OVER RESTS (owner, same day: the best hour read avg 94 from 30
+         readings on a day the chart peaked at 143). A flat 95 average was written for runs;
+         heavy sets with three-minute rests average in the low 90s between 140-plus peaks. An
+         hour that peaks past 125 with an average of 85 or more is lifting, not a walk. */
+      const b=(res&&res.n>=4&&(res.avg>=95||(res.avg>=85&&(res.max||0)>=125)))?res:null;
       if(b){rec.done=1;
         {
           const h=(S.history||[]).find(x=>String(x.id)===String(hid));
