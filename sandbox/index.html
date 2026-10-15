@@ -1945,7 +1945,7 @@ if(S.sess){S.note=S.sess.note||S.note;
       if(c0&&(s0.log||[]).some(l=>l.ex===c0.ex&&l.setNo===c0.setNo)){const n0=sessAdv(s0);
         if(n0<0)s0.phase='done';else s0.idx=n0}}catch(e){oops('bootSess',e)}
     if(S.sess.phase!=='done')S.sess.phase='ready'}}
-const BUILD_ID='1be7a4';  // stamped by tools/build.py with the content hash
+const BUILD_ID='6687c9';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -13020,7 +13020,12 @@ function sessionLiveWhy(h){
     let seen='';try{const r=S._hrDay&&S._hrDay[String(h.id)];
       if(r&&r.best)seen='; the day\u2019s best hour read avg '+r.best.avg+(r.best.max?', peak '+r.best.max:', no peak reported')+', from '+r.best.n+' reading'+(r.best.n===1?'':'s');
       if(r&&r.skipped&&r.skipped.length){const hh=x=>(x.hour%12||12)+(x.hour<12?'am':'pm');
-        seen+='; the '+r.skipped.map(x=>hh(x)+' hour').join(', ')+' left out for a '+r.skipped[0].why}}catch(e){seen=''}
+        seen+='; the '+r.skipped.map(x=>hh(x)+' hour').join(', ')+' left out for a '+r.skipped[0].why}
+      /* and the watch workouts of that day, each with its state, so a workout that should have
+         witnessed the session and did not says why it could not */
+      if(typeof watchGym==='function'){const dk=hKey(h);
+        const ws=watchGym().filter(w=>w&&w.date===dk);
+        if(ws.length)seen+='; watch '+(ws.length===1?'workout':'workouts')+' that day: '+ws.map(w=>(w.time||'?')+' '+(w.mins||0)+' min'+(w.hr?' avg '+w.hr:'')+(w.used?' (already matched to another session)':w.mat?' (became its own session)':w.cov?' (counted as part of a witnessed visit)':' (unmatched)')).join(', ')}}catch(e){seen=''}
     return{live:false,why:'entered by hand — no clock, no watch'+seen}}
   if(!h.startedAt&&!h.minutes)return{live:false,why:'no clock on this session'};
   const mins=h.minutes||0,sets=(h.log||[]).length;
