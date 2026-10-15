@@ -1945,7 +1945,7 @@ if(S.sess){S.note=S.sess.note||S.note;
       if(c0&&(s0.log||[]).some(l=>l.ex===c0.ex&&l.setNo===c0.setNo)){const n0=sessAdv(s0);
         if(n0<0)s0.phase='done';else s0.idx=n0}}catch(e){oops('bootSess',e)}
     if(S.sess.phase!=='done')S.sess.phase='ready'}}
-const BUILD_ID='3ecc08';  // stamped by tools/build.py with the content hash
+const BUILD_ID='1be7a4';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -13017,7 +13017,10 @@ function sessionLiveWhy(h){
     return{live:true,why:'heart-witnessed — avg HR '+h.hr.avg+(h.hr.day?' across a working hour that day'+((h.hr.avg||0)<95?', peaking at '+h.hr.max:''):' across the session')};
   if(h.manual){
     /* what the day scan found, so "no watch" never has to be taken on faith */
-    let seen='';try{const r=S._hrDay&&S._hrDay[String(h.id)];if(r&&r.best)seen='; the day\u2019s best hour read avg '+r.best.avg+(r.best.max?', peak '+r.best.max:', no peak reported')+', from '+r.best.n+' reading'+(r.best.n===1?'':'s')}catch(e){seen=''}
+    let seen='';try{const r=S._hrDay&&S._hrDay[String(h.id)];
+      if(r&&r.best)seen='; the day\u2019s best hour read avg '+r.best.avg+(r.best.max?', peak '+r.best.max:', no peak reported')+', from '+r.best.n+' reading'+(r.best.n===1?'':'s');
+      if(r&&r.skipped&&r.skipped.length){const hh=x=>(x.hour%12||12)+(x.hour<12?'am':'pm');
+        seen+='; the '+r.skipped.map(x=>hh(x)+' hour').join(', ')+' left out for a '+r.skipped[0].why}}catch(e){seen=''}
     return{live:false,why:'entered by hand — no clock, no watch'+seen}}
   if(!h.startedAt&&!h.minutes)return{live:false,why:'no clock on this session'};
   const mins=h.minutes||0,sets=(h.log||[]).length;
@@ -21321,13 +21324,21 @@ function hrWitnessBackfill(){
       .slice(-4).forEach(h=>{const dk=hKey(h);
         const busy=[];
         (S.runs||[]).forEach(r=>{if(String(r.date).slice(0,10)!==dk)return;
-          if(!/^\d\d:\d\d/.test(String(r.time||''))){busy.push([0,Infinity]);return}   // no clock: it could be any hour, so the day stays closed
-          const a=new Date(dk+'T'+String(r.time).slice(0,5)).getTime();busy.push([a,a+Math.max(10,+r.mins||60)*60000])});
+          const lab=(typeof cardioLabel==='function'?cardioLabel(r.type):String(r.type||'run'))||'run';
+          if(!/^\d\d:\d\d/.test(String(r.time||''))){busy.push([0,Infinity,lab]);return}   // no clock: it could be any hour, so the day stays closed
+          const a=new Date(dk+'T'+String(r.time).slice(0,5)).getTime();busy.push([a,a+Math.max(10,+r.mins||60)*60000,lab])});
         watchGym().forEach(w=>{if(w.date!==dk)return;
-          const a=new Date(dk+'T'+(w.time||'12:00')).getTime();busy.push([a,a+Math.max(10,+w.mins||60)*60000])});
+          const a=new Date(dk+'T'+(w.time||'12:00')).getTime();busy.push([a,a+Math.max(10,+w.mins||60)*60000,'watch workout'])});
+        /* AN HOUR IS LEFT OUT ONLY WHEN THE OTHER ACTIVITY FILLS IT (owner, 15 Oct 2026: the
+           scan's best hour was 6-7pm at a 110 peak while Health showed 92-143 for 7-8pm, the hour
+           his walk home from the gym touched). A ten-minute walk used to close the whole hour it
+           brushed. Now an hour is skipped when runs, walks or watch workouts cover half of it or
+           more; the hours left out, and why, are kept so the session's line can say so. */
+        const P=S._hrDay||(S._hrDay={});const rec=(P[String(h.id)]=P[String(h.id)]||{done:0});rec.skipped=[];
         for(let b=0;b<HR_DAY_BLOCKS;b++){
-          const st=new Date(dk+'T'+(HR_DAY_FROM<10?'0':'')+HR_DAY_FROM+':00').getTime()+b*HR_DAY_HRS*3600e3;
-          if(busy.some(x=>x[0]<st+HR_DAY_HRS*3600e3&&x[1]>st))continue;
+          const st=new Date(dk+'T'+(HR_DAY_FROM<10?'0':'')+HR_DAY_FROM+':00').getTime()+b*HR_DAY_HRS*3600e3,en=st+HR_DAY_HRS*3600e3;
+          let cov=0,why='';busy.forEach(x=>{const o=Math.min(en,x[1])-Math.max(st,x[0]);if(o>0){cov+=o;why=why||x[2]}});
+          if(cov>=HR_DAY_HRS*3600e3/2){rec.skipped.push({hour:HR_DAY_FROM+b,why:why});continue}
           try{window.webkit.messageHandlers.allena.postMessage(JSON.stringify(
             {type:'hr',id:'DAY:'+h.id+':'+b,start:Math.round(st/1000),end:Math.round((st+HR_DAY_HRS*3600e3)/1000)}))}catch(e2){}}})
   }catch(e){oops('hrWitnessBackfill',e)}}
