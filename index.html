@@ -1688,9 +1688,16 @@ const LSFAIL={};
    training key schedules a cloud push, so nothing waits on a tap. The
    keys below are device state or caches, not the record: writing them
    never counts as a change worth sending. */
+/* EVERYTHING THAT IS THE PERSON'S IS BACKED UP (owner, 16 Oct 2026: "everything and I mean
+   everything... blocks, sessions, tree, findings, friends, groups, settings"). The account
+   key holds sign-in tokens, which never travel, beside choices that have no other home:
+   the avatar, friends' nicknames, the Garmin pairing, the pod and head-to-head choices,
+   the lifetime high-water marks, the sit-out. These travel; tokens, stamps and caches do
+   not. One list, read by backupObj and doRestore. */
+const ACCT_KEEP=['av','frNames','wrist','podOn','podBlocked','duelPin','duelHist','frNotif','liveHi','wrHi','sitOut','lg','cerWk','raceSeen','signupSkipped','frBase','frCeleb'];
 const BK_SKIP={'training-account-v1':1,'training-lastbackup-v1':1,'training-lastopen-v1':1,
   'training-corrcache-v1':1,'training-aicache-v1':1,'training-strava-v1':1,'training-sandbox-v1':1,
-  'training-active-v2':1,'training-autobk-v1':1,
+  'training-active-v2':1,
   /* usage counters (20 Sep 2026): device telemetry, not the training
      record — surf bumps on every tab tap, so without this a view
      change would schedule a full backup push each time somebody
@@ -1891,6 +1898,24 @@ function audioIn(sec,freq){const c=audioInit();if(!c)return false;
     const t=base+off;g.gain.setValueAtTime(.0001,t);g.gain.exponentialRampToValueAtTime(.4,t+.02);
     g.gain.exponentialRampToValueAtTime(.0001,t+.22);o.start(t);o.stop(t+.25);nodes.push(o);nodes.push(g)});
   return true}
+/* ══ THE SET SOUND (16 Oct 2026, from the Hevy teardown: its set-check
+   sound has its own volume slider and reviewers name it as the one
+   satisfying thing in the app). A logged set gets a short two-note tick;
+   a best gets a rising triad. Its level is the user's own
+   (S.prof.sndSet: 0 off, .3 quiet, .6 normal, 1 loud; default normal)
+   and is separate from the rest alarm, which keeps its own volume. */
+const SND_LEVELS=[['Off',0],['Quiet',.3],['Normal',.6],['Loud',1]];
+function sndLevel(){const v=(S.prof&&S.prof.sndSet!=null)?+S.prof.sndSet:.6;return isNaN(v)?.6:Math.max(0,Math.min(1,v))}
+function audioTick(kind){
+  try{const lv=sndLevel();if(!lv)return false;
+    const c=audioInit();if(!c)return false;
+    const notes=kind==='pr'?[[523,0],[659,.09],[784,.18],[1047,.3]]:[[880,0],[1175,.07]];
+    const t0=c.currentTime;
+    notes.forEach(n=>{const o=c.createOscillator(),g=c.createGain();
+      o.type='sine';o.frequency.value=n[0];o.connect(g);g.connect(c.destination);
+      const t=t0+n[1];g.gain.setValueAtTime(.0001,t);g.gain.exponentialRampToValueAtTime(.35*lv,t+.012);
+      g.gain.exponentialRampToValueAtTime(.0001,t+(kind==='pr'?.22:.13));o.start(t);o.stop(t+.25)});
+    return true}catch(e){oops('audioTick',e);return false}}
 async function wakeOn(){if(wake||!('wakeLock' in navigator))return;
   try{wake=await navigator.wakeLock.request('screen');wake.addEventListener('release',()=>{wake=null})}catch(e){}}
 function wakeOff(){try{wake&&wake.release()}catch(e){}wake=null}
@@ -1945,7 +1970,7 @@ if(S.sess){S.note=S.sess.note||S.note;
       if(c0&&(s0.log||[]).some(l=>l.ex===c0.ex&&l.setNo===c0.setNo)){const n0=sessAdv(s0);
         if(n0<0)s0.phase='done';else s0.idx=n0}}catch(e){oops('bootSess',e)}
     if(S.sess.phase!=='done')S.sess.phase='ready'}}
-const BUILD_ID='6c999f';  // stamped by tools/build.py with the content hash
+const BUILD_ID='4528bb';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -2662,7 +2687,7 @@ const SURFACES={
      rid of this tree and the pop up"): the crown is the tree now, and
      every door into the explorer lands on the crown or on the find's own
      card instead. */
-  findings:true, deep:true, tree:false, territory:false, plans:true, sub:true,
+  findings:true, deep:true, tree:false, territory:true, plans:true, sub:true,
   home:true, session:true, history:true, progress:true, quick:true,
   coach:true, scans:true, import:true, acl:true, aclpath:true, proto:true,
   points:true, collection:false, diary:false, run:true, pattern:true,
@@ -4673,7 +4698,8 @@ async function acctSync(loud){
   if(!acctReady())return false;
   /* the Garmin wrist rides every sync: today's plan out, logged sets in
      (12c-wrist). Fire and forget, never in the sync's own path. */
-  try{if(typeof wristOn==='function'&&wristOn()){setTimeout(function(){try{wristPlanPush();wristPull()}catch(e9){oops('acctSync.wrist',e9)}},50)}}catch(e9){oops('acctSync.wristHook',e9)}
+  try{if(typeof wristOn==='function'&&wristOn()){setTimeout(function(){try{wristPlanPush();wristPull()}catch(e9){oops('acctSync.wrist',e9)}},50)}
+    else if(typeof wristRecover==='function'){setTimeout(function(){try{wristRecover()}catch(e9){oops('acctSync.wristRec',e9)}},50)}}catch(e9){oops('acctSync.wristHook',e9)}
   if(loud){S.acctBusy=true;render()}
   const done=ok9=>{if(loud){S.acctBusy=false;S.acctSynced=ok9?Date.now():0;render();
     if(ok9)setTimeout(function(){S.acctSynced=0;try{render()}catch(e){}},2200)}};
@@ -8580,6 +8606,7 @@ A.commit=(confirmed)=>{const s=S.sess,c=s.sets[s.idx],timed=!!c.secs;
   if(!confirmed&&!timed){const sn=entrySanity(e,c);
     if(sn){S.sanity=sn;S.sheet={t:'sanity'};render();return}}
   const pr=isPR(e);if(pr)e.pr=true;
+  const st0=(function(){try{return holdStates()}catch(e9){oops('commit.hold0',e9);return null}})();
   S.hint=autoReg(e,c);if(S.hint)S.hint.ex=c.ex;   // a set comment belongs to its exercise
   e.t=Date.now(); // wall-clock stamp: a live set is auditable, a typed one is not
   /* one row per set (review, 28 Sep 2026): a set that is somehow logged
@@ -8622,7 +8649,14 @@ A.commit=(confirmed)=>{const s=S.sess,c=s.sets[s.idx],timed=!!c.secs;
      thing the person told the app they were trying to do. A best
      scales with how far the bar actually moved. */
   if(gHit){feelMag('win',1);flash('GOAL HIT · '+gHit.ex+' '+gHit.w+' × '+gHit.r,true)}
-  else if(pr){feelMag('win',prMag(e));try{prBurst('NEW BEST')}catch(e9){oops('commit.prBurst',e9)}flash('NEW BEST · '+c.ex+' · '+pr,true)}};
+  else if(pr){feelMag('win',prMag(e));try{prBurst('NEW BEST')}catch(e9){oops('commit.prBurst',e9)}flash('NEW BEST · '+c.ex+' · '+pr,true)}
+  /* the set sound rides the tick; a best gets the triad (16 Oct 2026) */
+  try{audioTick(pr||gHit?'pr':'set')}catch(e9){oops('commit.snd',e9)}
+  /* GROUND CLAIMED (16 Oct 2026, from the territory-running teardown: the
+     capture moment is the hook). A muscle this set moved from unclaimed or
+     fading to held is said once, at the set, never over a best or a goal. */
+  try{if(!pr&&!gHit&&st0){const got=holdClaimed(st0,holdStates());
+    if(got.length){feel('climb');flash('Claimed \u00b7 '+listWords(got),true)}}}catch(e9){oops('commit.claim',e9)}};
 A.adv=i=>{audioCancel();S.restEnd=null;S.holdEnd=null;S.holdWait=false;const s=S.sess;s.pin=null;
   if(i>=s.sets.length){s.phase='done';try{S.sessReveal=sessionReveal()}catch(e){}}else{s.idx=i;s.phase='ready'}persistActive();render()};
 A.exPlan=()=>{const s=S.sess,seen=[],by={};
@@ -9006,8 +9040,7 @@ function backupObj(){
          and the nicknames they gave their friends. Skipping the whole key quietly reverted both on
          every restore (audit, 22 Sep 2026). Tokens still never travel. */
       const keep={};
-      if(v&&v.av)keep.av=v.av;
-      if(v&&v.frNames)keep.frNames=v.frNames;
+      if(v)ACCT_KEEP.forEach(f=>{if(v[f]!=null)keep[f]=v[f]});
       if(Object.keys(keep).length)o.keys[k]=keep;
       return}
     if(k==='training-strava-v1')return; // Strava tokens too
@@ -9131,11 +9164,16 @@ function doRestore(txt){try{const o=JSON.parse(txt);
     S.cut=lget(K_CUT,{});S.addback=lget(K_ADD,{});S.patSeen=lget(K_PSEEN,{});S.runSeen=lget(K_RUNSEEN,{});
     /* the two account-held choices, merged onto whatever account is signed in here */
     try{const ac=K[K_ACCT];
-      if(ac&&(ac.av||ac.frNames)){
+      if(ac&&typeof ac==='object'){
         const cur=lget(K_ACCT,{})||{};
         const merged=Object.assign({},cur);
-        if(ac.av&&!cur.av)merged.av=ac.av;
-        if(ac.frNames)merged.frNames=Object.assign({},ac.frNames,cur.frNames||{});
+        /* every kept choice lands where this phone has none; nicknames merge; the lifetime
+           high-water marks take the higher; tokens are never in the file to begin with */
+        ACCT_KEEP.forEach(f=>{if(ac[f]==null)return;
+          if(f==='frNames')merged.frNames=Object.assign({},ac.frNames,cur.frNames||{});
+          else if(f==='liveHi'||f==='wrHi'){const a9=typeof ac[f]==='object'?+(ac[f].v||ac[f].pts||0):+ac[f]||0,c9=typeof cur[f]==='object'?+(cur[f].v||cur[f].pts||0):+cur[f]||0;if(cur[f]==null||a9>c9)merged[f]=ac[f]}
+          else if(cur[f]==null)merged[f]=ac[f]});
+        ['access','refresh','expires','tokDead'].forEach(f=>{delete merged[f];if(cur[f]!=null)merged[f]=cur[f]});
         lset(K_ACCT,merged)}}catch(e){oops('restore.acct',e)}
     /* and any training key this build does not know yet: keep it, never lose it */
     Object.keys(K).forEach(k2=>{
@@ -21025,6 +21063,34 @@ function notifPlan(){
   if(P.quest){const d=new Date();const dow=(d.getDay()+6)%7;
     const mon=dayKey(new Date(Date.now()+(7-dow)*864e5));
     items.push({id:'q'+mon,ts:at(mon,9,0),title:'Allena',body:'A new quest is up for the week.'})}
+  /* THE WEEK CLOSES SUNDAY (16 Oct 2026, from the retention teardown:
+     Duolingo's measured Sunday surge). One line on Sunday at six, only
+     while the programme's week still has sessions owed, naming the count.
+     Replanned away the moment the week is full. */
+  if(P.morning){try{
+    const p9=(typeof activeProgSafe==='function')?activeProgSafe():null;
+    const plan9=(p9&&!p9.empty&&p9.days)?p9.days.length:0;
+    if(plan9){const ws9=weekStats(),left9=plan9-ws9.n;
+      const d9=new Date(),dow9=(d9.getDay()+6)%7;
+      const sun9=dayKey(new Date(Date.now()+(6-dow9)*864e5));
+      const at18=new Date(sun9+'T18:00:00').getTime();
+      if(left9>0&&left9<=2&&at18>Date.now()+60000)
+        items.push({id:'wc'+sun9,ts:Math.round(at18/1000),title:'Allena',
+          body:'Your week closes tonight. '+(left9===1?'One session':left9+' sessions')+' still on the plan.'})}}catch(e){oops('notifPlan.wc',e)}}
+  /* THE WIN-BACK LADDER (16 Oct 2026, same teardown): three dated pings
+     at 3, 7 and 14 days from this open, each naming the thing that is
+     actually waiting (the day's call, else the goal lift), never
+     "we miss you". Every open replans and so cancels the ones not due. */
+  if(P.morning){try{
+    const rec9=(typeof recommendToday==='function')?recommendToday():null;
+    const name9=(rec9&&rec9.top&&!rec9.empty)?String(rec9.top.name):'';
+    const goal9=(function(){try{const g=(S.goals||[])[0];return g&&g.ex?String(g.ex):''}catch(e){return ''}})();
+    const bodies=[3,7,14].map(n=>{
+      if(name9)return n<7?name9+' is still waiting on the plan.':name9+' has been waiting '+n+' days. The plan picks up where you left it.';
+      if(goal9)return n<7?'Your '+goal9+' goal is still on the board.':'Nothing logged in '+n+' days. Your '+goal9+' goal is still on the board.';
+      return n<7?'Your programme is where you left it.':'Nothing logged in '+n+' days. Your programme is where you left it.'});
+    [3,7,14].forEach((n,i)=>{const dk9=dk(n);
+      items.push({id:'wb'+n+dk9,ts:at(dk9,10,0),title:'Allena',body:bodies[i]})})}catch(e){oops('notifPlan.wb',e)}}
   /* the race's one push of the day joins the plan HERE, so the budget
      below governs it like everything else (1 Oct 2026, socialPushItem) */
   try{const so=socialPushItem();if(so)items.push(so)}catch(e){oops('notifPlan.social',e)}
@@ -21901,6 +21967,22 @@ function wristCodeMake(){
 /* PAIR: one code per account, written under the user's own session (RLS
    own row). The watch types it once, in the Garmin Connect app's settings
    for Allena, and sends it with every request. */
+/* THE PAIRING COMES BACK FROM THE SERVER (16 Oct 2026): the code lives on wrist_pairs under
+   the account, so a phone that lost its copy (a wipe, a new phone) reads it back on the
+   first sync instead of asking the person to type a new one into Garmin Connect. */
+async function wristRecover(){
+  try{
+    const cur=wristState();if(cur&&cur.code)return cur;
+    if(S._wristRecTried)return null;S._wristRecTried=1;
+    const h=await frHeaders();if(!h)return null;
+    const r=await fetch(CLOUD.url+'/rest/v1/wrist_pairs?select=code,device,created_at&order=created_at.desc&limit=1',{headers:h});
+    if(!r.ok)return null;const rows=await r.json();const p=Array.isArray(rows)&&rows[0];
+    if(!p||!p.code)return null;
+    const w={code:String(p.code),since:String(p.created_at||'').slice(0,10)||today(),device:String(p.device||'garmin'),pushed:null,pulled:null,recovered:1};
+    lset(K_ACCT,Object.assign({},acct()||{},{wrist:w}));
+    try{wristPlanPush(true)}catch(e9){oops('wristRecover.push',e9)}
+    return w}
+  catch(e){oops('wristRecover',e);return null}}
 async function wristPair(){
   try{
     const h=await frHeaders();if(!h){flash('Sign in first — the watch needs an account to write into.');return null}
@@ -33251,23 +33333,37 @@ function watchMetSweep(){
    ══════════════════════════════════════════════════════════ */
 const HOLD_MUSCLES=['Chest','Front delts','Side delts','Rear delts','Rotator cuff','Triceps','Biceps','Forearms','Lats','Upper back','Lower back','Core','Glutes','Quads','Hamstrings','Adductors','Calves','Neck'];
 function holdStates(){
-  const last={};
+  const last={},wk={};
+  /* a session with sets logged is a session (the unsavedFor law): the
+     live row counts, so a set can claim ground the moment it is ticked */
   (S.history||[]).forEach(h=>{
-    if(!h.complete)return;
-    const k=hKey(h);
+    if(!h.complete&&!(h.log&&h.log.length))return;
+    const k=hKey(h),iw=isoWeek(k+'T12:00');
     (h.log||[]).forEach(l=>{
       if(!(l.w||l.r||l.secs))return;
       const b=gBase(l.ex);
       MUSCLE_RULES.forEach(m=>{
         if(HOLD_MUSCLES.indexOf(m[0])<0)return;
-        if(m[1].test(b)&&(!last[m[0]]||k>last[m[0]]))last[m[0]]=k})})});
+        if(!m[1].test(b))return;
+        if(!last[m[0]]||k>last[m[0]])last[m[0]]=k;
+        (wk[m[0]]=wk[m[0]]||{})[iw]=1})})});
+  /* HOW SECURELY HELD (16 Oct 2026, from the territory teardown: the
+     better maps carry two signals, who holds it and how firmly). wks is
+     the run of ISO weeks, counting back from this week, with a set on
+     that muscle; a muscle held three weeks running draws solid. */
   const out={};
   HOLD_MUSCLES.forEach(mu=>{
     const k=last[mu];
-    if(!k){out[mu]={s:'open',days:null};return}
+    if(!k){out[mu]={s:'open',days:null,wks:0};return}
     const d=daysSince(k);
-    out[mu]={s:d<=7?'held':d<=14?'fade':'open',days:d}});
+    let n=0,t=Date.now();
+    while((wk[mu]||{})[isoWeek(new Date(t).toISOString())]){n++;t-=7*864e5;if(n>52)break}
+    out[mu]={s:d<=7?'held':d<=14?'fade':'open',days:d,wks:n}});
   return out}
+/* the muscles a set just moved onto held ground: unclaimed or fading
+   before, held after. One reader for the commit moment and the tests. */
+function holdClaimed(before,after){
+  return HOLD_MUSCLES.filter(m=>before[m]&&after[m]&&before[m].s!=='held'&&after[m].s==='held')}
 function holdCounts(st){
   st=st||holdStates();
   let held=0,fade=0,open=0;
@@ -33371,7 +33467,8 @@ function groundSvg(st,back,opts){
   regs.forEach(r=>{
     const x=(st[r.m]||{}).s;
     const meta=' data-m="'+r.m+'"'+tap+(tap?' data-v="'+r.m+'" style="cursor:pointer"':'');
-    if(x==='held')g+=groundShape(r,'url(#ggh'+id+')',' filter="url(#ggl'+id+')" opacity="0.95"'+meta);
+    if(x==='held'){const firm=((st[r.m]||{}).wks||0)>=3;
+      g+=groundShape(r,'url(#ggh'+id+')',' filter="url(#ggl'+id+')" opacity="'+(firm?'1':'0.82')+'"'+(firm?' stroke="#9BF0B4" stroke-width="1.2"':'')+meta)}
     else if(x==='fade')g+=groundShape(r,'url(#ggf'+id+')',' filter="url(#ggl'+id+')" opacity="0.95"'+meta);
     else g+=groundShape(r,'#3B3935',meta)});
   return '<svg viewBox="0 0 245 560" xmlns="http://www.w3.org/2000/svg" '+(opts.attr||'')+'>'+
@@ -33534,6 +33631,24 @@ function groundStickerRun(){
   .catch(function(){flash('Could not draw the sticker.')})
  }catch(e){flash('Could not draw the sticker.')}}
 
+/* THE DOOR ON TRAIN (16 Oct 2026): the front figure small, the three
+   counts, and what this week claimed. The page behind it is the map. */
+function groundCard(){
+  try{if(typeof surfOn==='function'&&!surfOn('territory'))return '';
+    if(!(S.history||[]).length)return '';
+    const st=holdStates(),c=holdCounts(st);
+    const wkNew=HOLD_MUSCLES.filter(m=>st[m].s==='held'&&st[m].wks===1);
+    const line=c.held===c.total?'The whole map held this week.'
+      :wkNew.length?'Claimed this week: '+listWords(wkNew.slice(0,3))+(wkNew.length>3?' and '+(wkNew.length-3)+' more':'')+'.'
+      :c.fade?listWords(HOLD_MUSCLES.filter(m=>st[m].s==='fade').slice(0,3))+(c.fade===1?' is':' are')+' fading. One session keeps '+(c.fade===1?'it':'them')+'.'
+      :'Every muscle you train this week, you hold.';
+    return '<button data-a="nav" data-v="territory" class="card mt" style="width:100%;text-align:left;padding:14px 16px;display:flex;align-items:center;gap:14px">'+
+      '<span style="width:54px;flex:none">'+groundSvg(st,false,{hit:false,idSuffix:'c',attr:'style="width:100%;height:auto;display:block"'})+'</span>'+
+      '<span style="flex:1;min-width:0"><span class="eyebrow">Your ground</span>'+
+      '<span class="disp" style="font-size:19px;font-weight:600;display:block;margin-top:2px"><span style="color:var(--green)">'+c.held+'</span> of '+c.total+' held'+(c.fade?' <span style="color:var(--amber);font-size:15px">\u00b7 '+c.fade+' fading</span>':'')+'</span>'+
+      '<span style="color:var(--dim);font-size:13px;line-height:1.45;display:block;margin-top:3px">'+esc(line)+'</span></span>'+
+      '<span style="color:var(--faint);flex:none">\u203a</span></button>'}
+  catch(e){oops('groundCard',e);return ''}}
 function viewTerritory(){
   const st=holdStates(),c=holdCounts(st);
   holdBank(st);
@@ -33543,7 +33658,8 @@ function viewTerritory(){
     '<button data-a="back" class="btn" style="width:auto;padding:8px 14px;color:var(--dim);font-size:13px;margin-bottom:14px">‹ Back</button>'+
     '<h1 class="disp vh1">Your ground</h1>'+
     '<p style="color:var(--dim);font-size:13px;line-height:1.6;margin-top:8px">Every muscle you train this week, you hold. Leave one for over a week and it fades; past a fortnight it goes unclaimed — which is an invitation, not a verdict.</p>'+
-    '<div class="card mt2" style="padding:18px 16px">'+bodyMapSvg(st,320)+legsLine(st)+
+    '<div class="mt2" style="padding:6px 0 0">'+bodyMapSvg(st,360)+legsLine(st)+
+    '<p class="mono" style="text-align:center;color:var(--faint);font-size:var(--t-caption);letter-spacing:.08em;margin-top:10px">SOLID OUTLINE = HELD THREE WEEKS RUNNING</p>'+
     '<div class="row mt" style="gap:12px">'+
     '<button data-a="groundShare" class="btn" style="flex:1;color:var(--amber)">Share card</button>'+
     '<button data-a="groundSticker" class="btn" style="flex:1;color:var(--amber)">Story sticker</button></div></div>'+
@@ -33558,7 +33674,7 @@ function viewTerritory(){
       return '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding:10px 0'+(i?';border-top:1px solid var(--line)':'')+'">'+
         '<span style="flex:1;font-size:13px;font-weight:600;color:'+(x.s==='open'?'var(--dim)':'var(--text)')+'">'+esc(m)+'</span>'+
         '<span class="mono" style="color:'+col+';font-size:11px;flex:none">'+
-        (x.s==='held'?'HELD':x.s==='fade'?'FADING · '+x.days+'d':x.days==null?'NEVER CLAIMED':'UNCLAIMED · '+x.days+'d')+'</span></div>'}).join('')+'</div>'+
+        (x.s==='held'?(x.wks>=2?'HELD · '+x.wks+' WEEKS':'HELD'):x.s==='fade'?'FADING · '+x.days+'d':x.days==null?'NEVER CLAIMED':'UNCLAIMED · '+x.days+'d')+'</span></div>'}).join('')+'</div>'+
     '<p style="color:var(--faint);font-size:11px;line-height:1.55;margin-top:12px">Holding all '+c.total+' inside one week banks an epic find — once a month at most. Quality work (balance, mobility, conditioning) keeps you moving but does not claim ground; only trained muscle does.</p>';
   return h+'</div>'}
 
@@ -38819,7 +38935,7 @@ function viewHome(){
      showed +12.5 on a skullcrusher and −5 on his key bench): what
      regulation has moved is VISIBLE and reversible in one place —
      never a mystery a user has to reverse-engineer from set screens */
-  const render1={stats:()=>secStats(),program:()=>secProgram(p,ws),sessions:()=>secSessions(p,ws)+catchRow(p)+adjRow(p),
+  const render1={stats:()=>secStats()+groundCard(),program:()=>secProgram(p,ws),sessions:()=>secSessions(p,ws)+catchRow(p)+adjRow(p),
     goals:()=>secGoals(),support:()=>secSupport()};
   /* program, then the week's sessions (owner call, 11 Sep) — saved
      layouts keep whatever the user chose */
@@ -39041,6 +39157,13 @@ function viewSession(){
      '<path class="an-tick" d="M7.5 12.4l3.1 3.1 6-6.4" fill="none" stroke="var(--green)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>'+
      '<p class="eyebrow" style="color:var(--green);margin:0">Session complete</p></div>'+
      '<h1 class="disp" style="font-size:28px;font-weight:600;line-height:1.1;margin-top:8px">'+esc(s.dayName||'')+'</h1>'+
+     /* UP NEXT (16 Oct 2026, from the Peloton "continue your stack" read):
+        the finish screen names the next session on the plan, once, so the
+        gap between this session and the next is already closed here. */
+     (function(){try{const r9=recommendToday();
+       if(r9&&r9.top&&!r9.empty&&r9.top.name&&r9.top.name!==s.dayName)
+         return '<p class="mono an-pop" style="color:var(--dim);font-size:13px;margin-top:8px">Up next \u00b7 '+esc(String(r9.top.name))+'</p>';
+       return ''}catch(e){oops('doneNext',e);return ''}})()+
      '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:20px">'+
      [[s.log.length,s.log.length===1?'set':'sets'],[mins9,mins9===1?'minute':'minutes'],[vol?volStr(vol):'—','volume']]
       .map((x,i)=>'<div class="card an-pop" style="padding:12px;animation-delay:'+(0.08+i*0.1).toFixed(2)+'s"><p class="mono" style="font-size:20px;font-weight:600">'+x[0]+'</p><p style="color:var(--faint);font-size:11px">'+x[1]+'</p></div>').join('')+'</div>';
@@ -40873,6 +40996,7 @@ function viewData(){
     setRow(I.own,'Your own block','','Your own block')]);
   {const dc=((S.gar&&S.gar.on)||(S.daily&&S.daily.on)||(S.supp&&S.supp.on));
    h+=setGroup('Tracking',[
+    navRow(I.bell,'Set sound',(SND_LEVELS.find(x=>x[1]===sndLevel())||SND_LEVELS[2])[0],'sndSet',null,{sub:'The tick when a set is logged. The rest alarm has its own volume.'}),
     setRow(I.rehab,'Rehab pathway',(S.acl&&S.acl.on)?aclPhaseOf(S.acl.phase):'Off','Rehab pathway'),
     /* RUNNING'S DOOR IS HERE NOW (owner, 21 Sep 2026: "thinking to hide
        the running in settings"). 'row.run' is false, so this row is the
@@ -49510,6 +49634,10 @@ function runAction(a,v,t,e){
       S.sheet={t:'dset',k:v};render();break}
     /* THE SURFACE TABLE'S ONE VISIBLE DOOR BACK (Phase 2a): same shape as
        __premBeta above — a per-device override on S.prof, no new key. */
+    case 'sndSet':{const cur=sndLevel();let i=SND_LEVELS.findIndex(x=>x[1]===cur);if(i<0)i=2;
+      const nx=SND_LEVELS[(i+1)%SND_LEVELS.length];
+      S.prof=Object.assign({},S.prof||{},{sndSet:nx[1]});lset(K_PROF,S.prof);render();
+      try{if(nx[1])audioTick('set')}catch(e){oops('sndSet',e)}break}
     case 'surfAll':{S.prof=Object.assign({},S.prof||{},{surfAll:!(S.prof&&S.prof.surfAll)});
       lset(K_PROF,S.prof);render();
       flash(S.prof.surfAll?'Showing every screen this build hides by default.':'Back to what ships by default.');break}
