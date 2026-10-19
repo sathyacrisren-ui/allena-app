@@ -1970,7 +1970,7 @@ if(S.sess){S.note=S.sess.note||S.note;
       if(c0&&(s0.log||[]).some(l=>l.ex===c0.ex&&l.setNo===c0.setNo)){const n0=sessAdv(s0);
         if(n0<0)s0.phase='done';else s0.idx=n0}}catch(e){oops('bootSess',e)}
     if(S.sess.phase!=='done')S.sess.phase='ready'}}
-const BUILD_ID='2feeec';  // stamped by tools/build.py with the content hash
+const BUILD_ID='ca8b2f';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -29244,7 +29244,16 @@ function crownData(){
       if(w<cur&&!(byW[w-1]||[]).some(s=>s.kind==='lift'))missed.push(w)}
     try{((S.acl&&S.acl.flares)||[]).forEach(f=>{const k=String((f&&f.date)||'').slice(0,10);if(k&&k>=first){const w=byDate(k)+1;if(flares.indexOf(w)<0)flares.push(w)}})}catch(e){oops('crownFlares',e)}
     let deload=null;try{if(typeof isDeloadWeek==='function'&&isDeloadWeek(BP,N))deload=N}catch(e){oops('crownDeload',e)}
-    block={id:BP.id,name:String(BP.block||'Block'),N,week:cur,closed,missed,flares,deload,starts}}
+    /* SKIPPED SESSIONS (owner, 19 Oct 2026: "show us what's lacking, falling behind, skipped
+       sessions, at a glimpse, explained on a tap"). Every planned day of every week up to this
+       one that has no session is a gap: MISSED when its week has gone or was closed, OPEN while
+       the week is still running. Each is a hollow leaf on its week's ring, and says its name. */
+    const gaps=[];try{const days=BP.days||[];
+      for(let w=1;w<=cur;w++){let done=null;try{done=(typeof weekDone==='function')?weekDone(BP.id,w):null}catch(e){done=null}
+        if(!done)continue;const past=w<cur||closed.indexOf(w)>=0;
+        for(let di=0;di<days.length;di++){if(done.has(di))continue;
+          gaps.push({id:'g'+w+'-'+di,w,di,name:String((days[di]||{}).name||('Day '+(di+1))).slice(0,30),state:past?'missed':'open',closedEarly:closed.indexOf(w)>=0})}}}catch(e){oops('crownGaps',e)}
+    block={id:BP.id,name:String(BP.block||'Block'),N,week:cur,closed,missed,flares,deload,starts,gaps}}
   else{
     first=crownFirstDay();if(!first)return {weeks:[],sessions:[],first:null,lifts:[],seed:7};
     const t0=new Date(crownWeekMon(first)+'T12:00');
@@ -29313,6 +29322,10 @@ function crownData(){
   /* THE LIMB FOLLOWS THE LIFT: liftTrend's state, read once per limb,
      never stored. up / level / down / back / early / noband / null. */
   if(block)lifts.forEach(L=>{try{const T=liftTrend(L.members);L.vig=T?T.state:null}catch(e){oops('crownVig',e);L.vig=null}});
+  /* A COLD LIMB (same ask): a lift of this block not trained for ten days or more. Days since
+     its last leaf, read per build, never stored; the limb's tip wears a hollow ring. */
+  if(block)lifts.forEach((L,i)=>{try{let last='';marks.forEach(m=>{if(m.li===i&&m.day>last)last=m.day});
+      L.last=last||null;L.days=last?Math.round((new Date(today()+'T12:00')-new Date(last+'T12:00'))/864e5):null;L.cold=L.days!=null&&L.days>=10}catch(e){oops('crownCold',e);L.cold=false}});
   return {weeks,sessions,marks,first,lifts,rideName,block,seed:crownSeed()}}
 /* the block's own lifts, in the programme's order, goal lifts first;
    only the ones trained at least once in this block get a limb */
@@ -29437,7 +29450,12 @@ function crownModel(D){
       rings.push({r,label:'W'+w+(tags.length?' \u00b7 '+tags.join(', '):''),key:'w'+w,scar:K.closed.indexOf(w)>=0||K.missed.indexOf(w)>=0||K.flares.indexOf(w)>=0,w})}
     /* week 1's own marks sit on the innermost ring edge */
     if(K.closed.indexOf(1)>=0||K.flares.indexOf(1)>=0)rings.push({r:rOf(0)*0.5,label:'',key:'w1',scar:true,w:1});
-    return {nodes,leaves,chains,N,rOf,SE,groups,rings,TR}}
+    /* the gaps: hollow leaves on their week's ring, fanned out from the scar angle so they never sit on a leaf */
+    const gaps=[];try{const perW={};(K.gaps||[]).forEach(g=>{const r=g.w>=2?(rOf(g.w-2)+rOf(g.w-1))/2:rOf(0)*0.5;const k=(perW[g.w]=(perW[g.w]||0)+1);
+        const a=SE.gap+k*0.3;gaps.push({id:g.id,w:g.w,di:g.di,name:g.name,state:g.state,closedEarly:g.closedEarly,r,a,x:Math.cos(a)*r,y:Math.sin(a)*r})})}catch(e){oops('crownGapLayout',e)}
+    /* each limb's outermost node, where a stalling or cold lift wears its mark */
+    const tips={};try{nodes.forEach(n=>{if(!n.g||n.g.charAt(0)!=='L'||n.g==='Lx')return;const rr=Math.hypot(n.x,n.y);if(!tips[n.g]||rr>tips[n.g].r)tips[n.g]={x:n.x,y:n.y,r:rr}})}catch(e){oops('crownTips',e)}
+    return {nodes,leaves,chains,N,rOf,SE,groups,rings,TR,gaps,tips}}
   /* a ring where the month turns, so the zoomed crown has a time axis */
   const rings=[];try{let prev=null;D.weeks.forEach(w=>{if(!w.ss.length)return;const mo=new Date(crownWeekMon(w.ss[0].day)+'T12:00');const key=mo.getFullYear()+'-'+mo.getMonth();
     if(prev!==null&&key!==prev)rings.push({r:rOf(w.i)-0.5*(rOf(w.i)-rOf(Math.max(0,w.i-1))),label:mo.toLocaleDateString(undefined,{month:'short'})+(mo.getMonth()===0?' '+mo.getFullYear():''),key});prev=key})}catch(e){oops('crownRings',e)}
@@ -29727,6 +29745,19 @@ function crownPaint(c,C,V){
       if(!dk){c.strokeStyle=crownRgba(PL.ink,0.35*fade);c.lineWidth=0.6;c.beginPath();c.arc(bx,by,r*1.55,0,Math.PI*2);c.stroke()}}
     if(s.won){c.fillStyle=crownRgba(PL.gold,fade);c.beginPath();c.arc(x-Math.cos(L.ang)*off,y-Math.sin(L.ang)*off,1.8*u*sq,0,Math.PI*2);c.fill()}
     if(s.gate){c.fillStyle=PL.paper;c.beginPath();c.arc(x,y,1.3*u*sq,0,Math.PI*2);c.fill()}});
+  /* 6b. block mode: SKIPPED SESSIONS are hollow leaves on their week's ring, solid outline for a
+     week that has gone, dashed while the week is still open; a STALLING or COLD lift wears a
+     hollow ring at its limb's tip (a short tick down for stalling, dashed for cold) */
+  if(D.block&&(V.t==null||V.t>=1)){
+    (M.gaps||[]).forEach(g=>{const x=X(g.x),y=Y(g.y);if(x<-12||x>W+12||y<-12||y>H+12)return;const len=3.4*u*sq;const selGp=sel&&sel.k==='gap'&&sel.id===g.id;
+      if(selGp){c.save();c.shadowColor=dk?'rgba(255,255,255,.8)':'rgba(30,34,51,.45)';c.shadowBlur=10*u}
+      c.strokeStyle=crownRgba(PL.lift,g.state==='open'?0.5:0.9);c.lineWidth=selGp?1.8:1.2;c.setLineDash(g.state==='open'?[2*u,2*u]:[]);
+      c.beginPath();almond(x+Math.cos(g.a)*len*0.6,y+Math.sin(g.a)*len*0.6,g.a,len);c.stroke();c.setLineDash([]);
+      if(selGp)c.restore()});
+    D.lifts.forEach((L,i)=>{const tip=M.tips&&M.tips['L'+i];if(!tip)return;if(L.vig!=='down'&&!L.cold)return;const x=X(tip.x),y=Y(tip.y);if(x<-12||x>W+12||y<-12||y>H+12)return;
+      const r=2.8*u*sq;c.strokeStyle=crownRgba(PL.ink,0.75);c.lineWidth=1.3;c.setLineDash(L.cold&&L.vig!=='down'?[2*u,2*u]:[]);
+      c.beginPath();c.arc(x,y,r,0,Math.PI*2);c.stroke();c.setLineDash([]);
+      if(L.vig==='down'){c.beginPath();c.moveTo(x,y-r*0.5);c.lineTo(x,y+r*0.5);c.moveTo(x-r*0.4,y+r*0.1);c.lineTo(x,y+r*0.5);c.lineTo(x+r*0.4,y+r*0.1);c.stroke()}})}
   if(V.t!=null&&V.t<1)c.restore();
   /* 7. buds at the rim: closed, a 2px outline, no fill — an open item */
   const buds=(V.t==null||V.t>=1)?(V.buds||[]):[];
@@ -29924,7 +29955,10 @@ function crownCard(){
 function crownBlockWords(D){
   const K=D.block;const grp={up:[],level:[],down:[]};D.lifts.forEach(L=>{if(grp[L.vig])grp[L.vig].push(L.name)});
   const bits=[];if(grp.up.length)bits.push('Climbing: '+grp.up.join(', '));if(grp.level.length)bits.push('Holding: '+grp.level.join(', '));if(grp.down.length)bits.push('Stalling: '+grp.down.join(', '));
-  const scars=[];if(K.closed.length)scars.push('week'+(K.closed.length===1?' ':'s ')+K.closed.join(', ')+' closed early');if(K.missed.length)scars.push('nothing logged in week'+(K.missed.length===1?' ':'s ')+K.missed.join(', '));if(K.flares.length)scars.push('a flare-up in week'+(K.flares.length===1?' ':'s ')+K.flares.join(', '));
+  const cold=D.lifts.filter(L=>L.cold).map(L=>L.name+' ('+L.days+' days)');if(cold.length)bits.push('Cold: '+cold.join(', '));
+  const skipped=(K.gaps||[]).filter(g=>g.state==='missed');
+  const scars=[];if(skipped.length)scars.push(skipped.length+' session'+(skipped.length===1?'':'s')+' skipped ('+skipped.slice(0,3).map(g=>g.name+' in week '+g.w).join(', ')+(skipped.length>3?', \u2026':'')+')');
+  if(K.closed.length)scars.push('week'+(K.closed.length===1?' ':'s ')+K.closed.join(', ')+' closed early');if(K.missed.length)scars.push('nothing logged in week'+(K.missed.length===1?' ':'s ')+K.missed.join(', '));if(K.flares.length)scars.push('a flare-up in week'+(K.flares.length===1?' ':'s ')+K.flares.join(', '));
   return {micro:K.name.toUpperCase()+' \u00b7 WEEK '+K.week+' OF '+K.N+(K.deload===K.week?' \u00b7 DELOAD':''),
     lifts:bits.length?bits.join(' \u00b7 '):'Each limb is one lift in this block.',
     rings:(scars.length?scars.join('; ').replace(/^./,ch=>ch.toUpperCase())+'. ':'')+'Each ring is a week; every session pushes the tree outward. A limb thickens as its lift climbs and thins when it stalls.'}}
@@ -30004,11 +30038,18 @@ function crownSentence(C){
       let E=null;try{E=r.faded?null:corrEffect(r.id)}catch(e){oops('crownRootEff',e)}
       return {title:r.lab,lines:[E?crownEffShort(E,r):r.faded?'This one has faded in your newer numbers.':'These two move together in your numbers.'],
         meta:E?'The lit leaves are the days it is made of':'',acts:[{a:'crownRootOpen',v:r.id,l:'See the numbers',go:1}]}}
+    if(sel&&sel.k==='gap'){const g=(C.M.gaps||[]).find(q=>q.id===sel.id);if(!g)return {lines:[]};
+      const open=g.state==='open';
+      return {title:'Week '+g.w+' \u00b7 '+g.name,
+        lines:[open?'Not done yet. The week is still open.':(g.closedEarly?'Skipped. The week was closed with this session undone.':'Skipped. The week went by without it.')],
+        meta:open?'A hollow leaf fills in when you train it':'A hollow leaf on a past ring stays hollow',
+        acts:open?[{a:'nav',v:'train',l:'Open Train',go:1}]:[]}}
     if(sel&&sel.k==='bud'){const b=crownBuds(C).find(q=>q.id===sel.id);if(!b)return {lines:[]};
       return {title:'To grow',lines:[b.t],acts:[{a:b.a,v:b.v,l:b.act,go:1},{a:'crownBudNo',v:b.id,l:'Not a goal for me'}]}}
     if(X.rung==='lift'&&X.g&&X.g.charAt(0)==='L'&&X.g!=='Lx'){const i=+X.g.slice(1);const I=crownLiftInfo(C,i);const Y=crownLiftSay(I);if(!I)return {lines:[]};
       if(!Y)return {title:I.L.name,lines:['No hard sets logged yet.'],acts:[{a:'crownLift',v:String(i),l:'Open '+I.L.name,go:1}]};
-      return {title:I.L.name,big:Y.big!=null?Y.big+' '+uwUnit():'',lines:[Y.line].concat(Y.goal?[Y.goal]:[]),meta:Y.meta,spark:I.T,acts:[{a:'crownLift',v:String(i),l:'Open '+I.L.name,go:1}]}}
+      const cold=(D.block&&I.L.cold)?['No session on this lift for '+I.L.days+' days. The hollow ring at the limb\u2019s tip is that.']:[];
+      return {title:I.L.name,big:Y.big!=null?Y.big+' '+uwUnit():'',lines:[Y.line].concat(Y.goal?[Y.goal]:[]).concat(cold),meta:Y.meta,spark:I.T,acts:[{a:'crownLift',v:String(i),l:'Open '+I.L.name,go:1}]}}
     if(X.rung==='lift'&&X.g==='Lx'){const n=(D.marks||D.sessions).filter(s=>s.kind==='lift'&&s.li==null).length;return {title:'Other lifting',lines:[n+' session'+(n===1?'':'s')+' without one of your lifts that has a limb.']}}
     if(X.rung==='domain'&&X.g){const k=X.g;const ss=D.sessions.filter(s=>s.kind===k);const since=ss.length?fmtDay(ss[0].day):'';
       if(k==='lift')return {title:'Lifting',big:String(ss.length),lines:['Sessions since '+since+'. Each limb is one lift, and each leaf on it a day you trained it.','Tap a lift to look closer.']};
@@ -30020,7 +30061,8 @@ function crownSentence(C){
     if(X.lens==='roots'){const r=crownRoots(C);const nr=r.filter(q=>q.kind==='read').length;return {title:'Insights',lines:[r.length?'Each chip is a finding, rooted at what it is about'+(nr?': '+nr+' from your tree read'+(nr===1?'':'s')+', '+(r.length-nr)+' from your own numbers':'')+'. Tap one.':'None yet. Each insight you find, and each tree read, grows a root here.']}}
     if(X.lens==='pr'){let n=0;D.sessions.forEach(s=>{if(s.pr)n++});return {title:'PRs',big:String(n),lines:['Sessions that set a PR at the time. Each is a white blossom.']}}
     const w=crownWord(D);
-    if(D.block){const K=D.block;return {title:K.name,big:String(D.sessions.length),lines:['Week '+K.week+' of '+K.N+(K.deload===K.week?', the deload':'')+' \u00b7 '+w.word+'.','Each ring is a week. A limb thickens as its lift climbs and thins when it stalls.']}}
+    if(D.block){const K=D.block;const sk=(K.gaps||[]).filter(g=>g.state==='missed').length,op=(K.gaps||[]).filter(g=>g.state==='open').length;const gl=(sk||op)?[(sk?sk+' session'+(sk===1?'':'s')+' skipped':'')+(sk&&op?', ':'')+(op?op+' still open this week':'')+'. Hollow leaves on the rings; tap one.']:[];
+      return {title:K.name,big:String(D.sessions.length),lines:gl.concat(['Week '+K.week+' of '+K.N+(K.deload===K.week?', the deload':'')+' \u00b7 '+w.word+'.','Each ring is a week. A limb thickens as its lift climbs and thins when it stalls.'])}}
     return {title:'Your tree',big:String(D.sessions.length),lines:['Sessions since '+(D.first?fmtDay(D.first):'')+' \u00b7 '+w.word+'.','Tap a limb to look closer.']}}
   catch(e){oops('crownSentence',e);return {lines:[]}}}
 function crownEffShort(E,r){
@@ -30231,6 +30273,7 @@ function crownHit(C,cv,px,py){
   let best=null,bd=1e9;
   (g.roots||[]).forEach(r=>{const d=Math.hypot(px-(g.cx+r.cx*g.B),py-(g.cy+r.cy*g.B));if(d<bd&&d<=R){bd=d;best={t:'root',id:r.id}}});
   (g.buds||[]).forEach(b=>{const d=Math.hypot(px-(g.cx+b.x*g.B),py-(g.cy+b.y*g.B));if(d<bd&&d<=R){bd=d;best={t:'bud',id:b.id}}});
+  (M.gaps||[]).forEach(gp=>{const d=Math.hypot(px-(g.cx+gp.x*g.B),py-(g.cy+gp.y*g.B));if(d<bd&&d<=R){bd=d;best={t:'gap',id:gp.id}}});
   if(best)return best;
   const wx=(px-g.cx)/g.B,wy=(py-g.cy)/g.B,rw=R/g.B;const near=[];
   M.leaves.forEach(L=>{if(Math.abs(L.x-wx)>rw||Math.abs(L.y-wy)>rw)return;const d=Math.hypot(L.x-wx,L.y-wy)*g.B;if(d<=R)near.push([d-(L.s.pr?6*g.u:0),L])});
@@ -30260,6 +30303,7 @@ function crownTap(px,py){
       if(rd&&rd.ready)runAction('deepGo');else{S.sheet={t:'crownread'};render()}return}
     if(h.t==='root'){let lit=null;try{const E=corrEffect(h.id);if(E)lit=E.outDays}catch(e){oops('crownLit',e)}X.sel={k:'root',id:h.id,lit};render();return}
     if(h.t==='bud'){X.sel={k:'bud',id:h.id};render();return}
+    if(h.t==='gap'){X.sel={k:'gap',id:h.id};render();return}
     if(h.t==='zoom'){const L=h.L;const z=Math.min(crownZmax(C),CRV.z*2);crownFly(L.x,L.y,z,360);return}
     const g=h.t==='leaf'?h.L.g:h.g;
     const inG=X.rung==='lift'?X.g===g:X.rung==='domain'?(X.g==='lift'?g.charAt(0)==='L':X.g===g):false;
