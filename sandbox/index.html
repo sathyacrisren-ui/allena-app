@@ -1970,7 +1970,7 @@ if(S.sess){S.note=S.sess.note||S.note;
       if(c0&&(s0.log||[]).some(l=>l.ex===c0.ex&&l.setNo===c0.setNo)){const n0=sessAdv(s0);
         if(n0<0)s0.phase='done';else s0.idx=n0}}catch(e){oops('bootSess',e)}
     if(S.sess.phase!=='done')S.sess.phase='ready'}}
-const BUILD_ID='661e8e';  // stamped by tools/build.py with the content hash
+const BUILD_ID='30d822';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -4182,12 +4182,18 @@ async function askClaude(q){
       if(kind==='edit')P.edit={id:'e'+Date.now().toString(36),state:'no-go',nb:/new[\s_-]?block/i.test(t),cut:true,lines:[],left:[],vol:[],
         err:'The reply ran out of room before the change was complete, so nothing was proposed and nothing changed. Ask again; Allena will send the change with fewer words.'};
       else P.cutLog=true}
-    const msg={r:'a',t:P.text||t,act:act};
+    /* AN ACTION LINE IS NEVER THE WORDS (owner's export, 20 Oct 2026: a
+       reply whose whole body was "ASK|...|..." reached the thread verbatim,
+       directive and all). The raw fallback exists so an unparsed reply is
+       never lost; it must not resurrect the lines the parser deliberately
+       took out. A reply that is only questions becomes those questions. */
+    const words=P.text||(P.ask.length?P.ask.join(' '):(P.go.length||P.edit||P.log||P.mem.length||P.forget.length?'':t));
+    const msg={r:'a',t:words,act:act};
     if(P.cutLog)msg.cutLog=true;
     /* A CLAIM WITHOUT A CARD IS ANSWERED (same export: "Block 2 is built and
        live", with no card and nothing changed). The app cannot stop the
        model saying it; it can say, under the words, that nothing happened. */
-    if(!P.edit&&!P.log&&coachClaims(P.text||t))msg.claim=true;
+    if(!P.edit&&!P.log&&coachClaims(words))msg.claim=true;
     if(P.go.length)msg.go=P.go;
     if(P.ask.length)msg.ask=P.ask.slice(0,2);
     if(P.log)msg.log=P.log;   // a proposal only: coachLogGo opens it for them to check
@@ -7686,7 +7692,7 @@ function coachSys2(){
   P.push('You are Allena, the coach inside the Allena training app (lifting, running and injury rehab, one recovery model across all three). You know this person well: the RECORD in the first message is everything their app holds from before today, and the RIGHT NOW block in their latest message is today. They should never have to explain their training to you; you already know it. Use it.');
   P.push('HOW TO ANSWER: lead with the answer in plain, everyday words. Short sentences. Usually two to five sentences; longer only when they ask for a plan or an explanation. Use a short list only for steps. Name the number and the date it comes from ("your 82.5 kg × 5 on the 14th"). Talk to them, not about them. Never use their name. No emoji. No hype.');
   P.push('TRUTH: never state a number that is not in the record or RIGHT NOW. If something they ask about is not there, say what is missing and how to add it in the app. Attributing a number to the wrong day or exercise is the one unforgivable error; when a SESSION UNDER DISCUSSION is given, answer about that session. A falling lift is never "a plateau" and never a reason to add load. A walk is never a run. Imported runs have no recorded effort.');
-  P.push('SAFETY: pain, numbness, tingling, swelling or the knee giving way means stop that exercise and talk to their physio or doctor; never diagnose. A physio’s plan always outranks the app’s suggestions. Rehab swaps only come from their own rehab programme. Never conflict with their stated restrictions.');
+  P.push('SAFETY: pain, numbness, tingling, swelling or the knee giving way means stop that exercise and talk to their physio or doctor; never diagnose. A physio’s plan always outranks the app’s suggestions. Rehab swaps only come from their own rehab programme. Never conflict with their stated restrictions. TAKE THEM AT THEIR WORD: when they tell you what their physio, doctor or surgeon said, that is a fact and you build on it. Never ask for it in writing, in a note, in a screenshot or in an appointment summary, never ask whether they are sure, never ask again what they have already told you, and never suggest they check with their physio something their physio has just told them. Asking twice calls them a liar and leaves them with nothing. Their physio names the target and the restrictions; the sets, reps, loads and week-by-week progression that get them there are yours to write, so \u201cwork it out for me\u201d is answered with a plan, never sent back to the clinic. A target they were given is a reason to build today, not a reason to wait.');
   P.push('THE RULES THE APP RUNS ON: double progression (top of the rep range at RPE 9 or under on every set, then add load); RPE targets are ranges; missing reps at an easy effort means they stopped early, so hold the load; a set that MADE its reps under the target effort means more load on the next set, by the lift\u2019s step in the LIVE SESSION block, never the same weight done slower or harder, and a recovery number never argues against it inside the session; the last week of any block of four weeks or more is a deload the app applies itself (half the sets, two RPE points easier, same weight), so a block is never written with its own deload week; 10 to 20 hard sets per muscle a week. Recovery counts runs, lifting and rehab together.'+
     ((S.lib&&(S.lib.programs||[]).some(p=>p.id==='bench-1'))?' Their bench programme: wave 5 weeks (100×4 / 102.5×3 / 105×2 / 100×5 / 102.5×4), +2.5 kg per block; back-offs 90% of the top set; volume bench 87.5×4×8, to 90 when all four hit 8 at RPE 8 or under.':''));
   P.push('THEIR APP, exactly as it looks for them:\n'+coachAppMap());
@@ -7695,7 +7701,7 @@ function coachSys2(){
     'ADJUST|<exercise name exactly as in their programme>|<kilograms, e.g. -2.5> — offers to change a programmed load. Kilograms always. At most one.\n'+
     'REMEMBER|<one plain sentence> — saves a lasting fact about them to Allena’s memory: an injury, a preference, a schedule, an event, how their body responds, a goal. Use it whenever they tell you something worth knowing next time, or ask you to remember. Write it so it reads right months later, with a date if it matters ("Has a wedding on 14 Nov 2026"). Never for things the app already records (sets, runs, check-ins).\n'+
     'FORGET|<the fact, in words> — removes a memory that is no longer true or that they ask you to drop.\n'+
-    'ASK|<a follow-up question they might tap next> — up to two, short (under 80 characters), in their voice, each on its own ASK line.\n'+
+    'ASK|<a follow-up question they might tap next> — up to two, short (under 80 characters), in their voice, each on its own ASK line. A reply is never only action lines: answer in words first, always.\n'+
     'LOG|<one line of JSON> — when they tell you about a session, a run or their bodyweight that is not in the record, propose it so they can save it. The app shows it to them to check; nothing is saved until they tap. Forms: {"kind":"lift","date":"YYYY-MM-DD","name":"Push day","sets":[{"ex":"Bench press","kg":80,"reps":5,"rpe":8},{"ex":"Plank","secs":60}]} (one object per set, their own exercise names from the record), {"kind":"run","date":"YYYY-MM-DD","km":5,"mins":27}, {"kind":"bw","kg":80.5} (today only). Kilograms and kilometres. Put rpe only if they told you how hard it was; never guess it. Leave out anything they did not say. At most one, and say in your reply that they can check it before saving.\n'+
     'EDIT|<one line of JSON> — changes their training plan when they ask: sets, exercises, prescriptions, whole sessions, the block\u2019s length. The app replays it on a copy, refuses what cannot be done, and shows them a card; nothing changes until they tap Make the change or reply yes. Form: {"block":"<block name; leave out for the active one>","changes":[ ...up to 8... ]}. Each change, "day" being the session\u2019s name or number from the record, and "weeks" left out for every week or given as [3,4] or "3-6":\n'+
     '  {"do":"add_sets","day":"Push","ex":"Cable fly","n":2,"weeks":[3,4]} (copies that exercise\u2019s last set)\n'+
@@ -7711,7 +7717,7 @@ function coachSys2(){
     '  {"do":"new_block","name":"Bench Block 2","weeks":6,"days":[{"name":"Push","exercises":[{"ex":"Bench press","sets":4,"reps":"5","kg":82.5,"rpe":8},{"ex":"Cable fly","sets":3,"reps":"12-15","rpe":8}]},{"name":"Pull","exercises":[...]}]} (an exercise may carry "weeks" ([1,2,3] or "1-3") and appear again for other weeks, so a wave or a rep change across the block is written as it was: {"ex":"Bench press","sets":1,"reps":"4","kg":100,"rpe":8,"weeks":[1,4]},{"ex":"Bench press","sets":1,"reps":"3","kg":102.5,"rpe":8,"weeks":[2,5]}... — every week must be covered; when rebuilding from a finished block, carry its week-by-week shape over rather than flattening it; a WHOLE new block; the only other change that may ride with it is "clear"; up to 7 sessions; it becomes their active block at week 1 and a finished block is put away. Build it from the record: their goals, the loads they actually lift now, what progressed and what stalled, their days a week and their injuries. Keep the words before it to two or three sentences: the line is long and must finish.)\n'+
     '  {"do":"start_block","block":"Bench Block 2"} (a block already in their library becomes the active one at week 1; a finished block is put away. On its own in the EDIT. Use it when the block they want is listed under "Also in their library"; never new_block for one that exists.)\n'+
     '  {"do":"clear","ex":"Leg extension"} (when the injury screen refused an exercise and they tell you their physio cleared it: this remembers the clearance, exactly as keeping it in a session preview does; it may ride in the same EDIT as the block or change that needs it. Only on their word about their physio, never on your own judgement.)\n'+
-    'Use their own exercise names from the record; a new exercise gets a sets count and reps (or secs), and an RPE range unless they gave one. Kilograms only. At most one EDIT per reply. HOW TO USE IT: if the request leaves the place open (which session, which weeks, how many sets, what reps), ask first in one short question and offer ASK lines for the likely answers; never guess where something goes. When it is clear, say in a sentence or two what you will change and what you think of it, then add the EDIT line; the card is the confirmation, so do not ask "shall I?" as well. Judge it on the evidence and say so plainly: hard sets per muscle a week (10 to 20 is the range the app runs on; past 20 the extra sets buy little and cost recovery), a clear day between sessions that hit the same muscles, the deload week, their goal lifts, their recovery and their injuries. If you would advise against it, say why in one line with the number, then still propose it if they asked; it is their plan. Two exceptions you refuse outright: anything their injury restrictions screen out, and any change to a rehab protocol or a physio\u2019s plan (that is their physio\u2019s to change; OPEN physio). Sessions are only added at the end of a block and only the last one can be removed; this keeps every logged session matched to its day. The plan has no fixed weekdays: sessions run in order and the week board places them, so if they name a weekday, say that and name the session after it if they want.\n'+
+    'Use their own exercise names from the record; a new exercise gets a sets count and reps (or secs), and an RPE range unless they gave one. Kilograms only. At most one EDIT per reply. HOW TO USE IT: if the request leaves the place open (which session, which weeks, how many sets, what reps), ask first in one short question and offer ASK lines for the likely answers; never guess where something goes. When it is clear, say in a sentence or two what you will change and what you think of it, then add the EDIT line; the card is the confirmation, so do not ask "shall I?" as well. Judge it on the evidence and say so plainly: hard sets per muscle a week (10 to 20 is the range the app runs on; past 20 the extra sets buy little and cost recovery), a clear day between sessions that hit the same muscles, the deload week, their goal lifts, their recovery and their injuries. If you would advise against it, say why in one line with the number, then still propose it if they asked; it is their plan. Two exceptions you refuse outright: anything their injury restrictions screen out, and any change to the exercises, sets or stages INSIDE a rehab protocol or a physio\u2019s plan in the Rehab room (that is their physio\u2019s to change; OPEN physio). That is all this covers. Their lifting and running programme is yours to change on their word, and a lift goal their physio gave them is a target you build the programme toward \u2014 never a change to the physio\u2019s plan, and never a reason to refuse. Sessions are only added at the end of a block and only the last one can be removed; this keeps every logged session matched to its day. The plan has no fixed weekdays: sessions run in order and the week board places them, so if they name a weekday, say that and name the session after it if they want.\n'+
     'NOTHING YOU SAY CHANGES THE APP. Only an EDIT or LOG line, after they tap or reply yes, does. So never say you have built, saved, added, changed or set up anything; say what you propose, put the line, and the card does the rest. Never describe a block, session or change as done unless the record or the card says it is made; never write "Confirmed", "built" or "live" about anything you proposed, because the card is the only thing that confirms it. If they say a change is not there, it is not there: propose it again with the line, do not insist. When they ask you to build their programme or their next block, do it with new_block in that same reply, built from the record; a sentence or two on why, then the line. When they paste a block and ask for it, build EXACTLY what they pasted: their sessions, their exercises, their sets, reps, loads and effort, their number of days. You may say in one sentence what you would change, and then build theirs; never swap their block for yours. When they ask you to build, start, send, confirm or "give me the card", the reply IS the EDIT line: a reply to that without one has failed them, whatever else it says. If the card refused something and they have answered the refusal (their physio cleared it, they chose the days), send the line again with that fixed, in the same reply. A block starts when they open Train and tap it; you never decide the day, never say "tomorrow", never hold a block back for a rest day or a rehab session; you may say in one sentence what you would do, then send the line. If their block is finished, the app also offers "Build block 2 from this data" on Train (OPEN|train), which carries every learned load forward; say so, and still propose yours if they asked you.\n'+
     'WHAT YOU CANNOT DO: save or delete their logged training yourself, change a rehab or physio plan, message their friends, or see anyone else’s data. If they ask, say so plainly and OPEN the place where they can do it themselves.');
   if(coachToolsOn())P.push('LOOKING THINGS UP: the record carries every set for the last six weeks and summaries before that. For anything older or more detailed (a session in March, every run in a month, one whole day, a lift’s full history), call a tool rather than guess. Tool results are the app’s own record.');
@@ -20003,8 +20009,15 @@ function gridColMap(r){
        the exercise slot on whichever came later — every row's name
        landed as an empty note instead of the lift (19 Sep 2026). */
     if(/^exercises?$/i.test(v)||/^exercise[\s_-]?(title|name)\b/i.test(v)||/^(movement|lift)s?$/i.test(v))map.ex=c;
-    else if(/^(load|weight)([\s_(]|$)/i.test(v)||/^(kg|lbs?)$/i.test(v)){map.load=c;
-      if(/lb/i.test(v))map.lb=true}
+    /* FitNotes (Android) writes "Weight" then "Weight Unit", and FitNotes
+       (iOS) writes "Weight (kg)" then "Weight (lbs)": the unit column is
+       never the load, and a kg column is never overridden by a lb one
+       (19 Oct 2026, the ResistX teardown's import list) */
+    else if(/^(load|weight)[\s_]?unit/i.test(v))map.unitCol=c;
+    else if(/^(load|weight)([\s_(]|$)/i.test(v)||/^(kg|lbs?)$/i.test(v)){
+      const lb=/lb/i.test(v);
+      if(map.load==null||(map.lb&&!lb)){map.load=c;map.lb=lb}}
+    else if(/^(is)?[\s_-]?warm[\s_-]?ups?$/i.test(v))map.warm=c;
     else if(/^s(et)?\s*\d+$/i.test(v))map.sets.push(c);
     else if(/^rir$/i.test(v))map.rir=c;
     else if(/^rpe$/i.test(v))map.rpe=c;
@@ -20041,10 +20054,12 @@ function datedGridParse(grid){
       const name=r[map.ex]!=null?String(r[map.ex]).trim():'';
       if(!name||name.length>60)return;
       if(map.setType!=null&&/warm/i.test(String(r[map.setType]||'')))return;
+      if(map.warm!=null&&/^(true|1|yes|y)$/i.test(String(r[map.warm]||'').trim()))return;
       const num=c=>{if(c==null||r[c]==null)return null;
         const v=parseFloat(String(r[c]).replace(',','.'));return isFinite(v)?v:null};
       let w=num(map.load);
-      if(w!=null&&map.lb)w=Math.round(w*0.453592*2)/2;
+      const rowLb=map.unitCol!=null?/lb/i.test(String(r[map.unitCol]||'')):map.lb;
+      if(w!=null&&rowLb)w=Math.round(w*0.453592*2)/2;
       let rpe=num(map.rpe);
       const rir=num(map.rir);
       if(rpe==null&&rir!=null)rpe=Math.max(4,Math.min(10,10-rir));
@@ -33427,6 +33442,57 @@ function holdCounts(st){
   let held=0,fade=0,open=0;
   HOLD_MUSCLES.forEach(m=>{const x=st[m].s;if(x==='held')held++;else if(x==='fade')fade++;else open++});
   return{held:held,fade:fade,open:open,total:HOLD_MUSCLES.length}}
+/* ══ VOLUME YOU CAN DEFEND (19 Oct 2026, from the ResistX teardown:
+   weekly sets per muscle against landmarks, warm-ups excluded). One
+   reader: hard sets per muscle in the last 7 days, a prime mover at 1,
+   an assisting muscle at 0.5 (muscleHits), a set hard at effort 7 or
+   more, or at 10 reps or fewer with no effort logged (the crown's rule).
+   Warm-ups are never logged, so they never count. The zone is the rule
+   the app already runs on: 10 to 20 hard sets a week builds; under
+   maintains; past 20 the extra sets buy little. */
+const VOL_ZONE={lo:10,hi:20};
+function setIsHard(l){
+  if(!l)return false;
+  if(l.secs>0)return true;
+  if(!(l.r>0))return false;
+  const p=parseFloat(l.rpe);
+  return isFinite(p)?p>=7:l.r<=10}
+function muscleWeekSets(){
+  const per={};
+  try{const cut=Date.now()-7*864e5;
+    (S.history||[]).forEach(h=>{
+      if(h.run)return;
+      if(!h.complete&&!(h.log&&h.log.length))return;
+      if(!(new Date(h.date).getTime()>=cut))return;
+      (h.log||[]).forEach(l=>{if(!setIsHard(l))return;
+        const hits=muscleHits(gBase(l.ex));
+        Object.keys(hits).forEach(m=>{if(HOLD_MUSCLES.indexOf(m)>=0)per[m]=(per[m]||0)+hits[m]})})});
+    Object.keys(per).forEach(m=>per[m]=Math.round(per[m]*2)/2)}catch(e){oops('muscleWeekSets',e)}
+  return per}
+function volZone(n){return n>VOL_ZONE.hi?'over':n>=VOL_ZONE.lo?'in':'under'}
+/* the muscles the active programme trains as a prime mover: the only
+   ones an "under" is said about (a neck nobody programmed is not behind) */
+function progMuscles(){
+  const out={};
+  try{const p=activeProgSafe();
+    (p&&p.days||[]).forEach(d=>(d.exercises||[]).forEach(e=>{
+      const h=muscleHits(gBase(e.name));Object.keys(h).forEach(m=>{if(h[m]===1)out[m]=1})}))}catch(e){oops('progMuscles',e)}
+  return out}
+function volWords(m,n){
+  const z=volZone(n);
+  return n+' hard set'+(n===1?'':'s')+' in the last 7 days'+
+    (z==='in'?', inside the 10 to 20 a week that builds.':z==='over'?', past 20. The extra sets buy little and cost recovery.':', under the 10 a week that builds. Under that tends to maintain.')}
+function volLine(){
+  /* one line for the Train door: programme muscles outside the zone */
+  try{const v=muscleWeekSets(),pm=progMuscles();
+    const under=[],over=[];
+    HOLD_MUSCLES.forEach(m=>{if(!pm[m])return;const n=v[m]||0;const z=volZone(n);
+      if(z==='under')under.push(m+' '+n);else if(z==='over')over.push(m+' '+n)});
+    if(!under.length&&!over.length)return '';
+    const parts=[];
+    if(under.length)parts.push('Under 10 hard sets this week: '+under.slice(0,3).join(', ')+(under.length>3?' and '+(under.length-3)+' more':''));
+    if(over.length)parts.push('Past 20: '+over.slice(0,3).join(', '));
+    return parts.join('. ')+'.'}catch(e){oops('volLine',e);return ''}}
 /* ══ the glow mannequin (owner call, Aug 31 2026) ═══════════
    The map's third and final form: a drawn neutral figure, near-
    black on near-black, muscles as light — the "premium
@@ -33704,7 +33770,8 @@ function groundCard(){
       '<span style="width:54px;flex:none">'+groundSvg(st,false,{hit:false,idSuffix:'c',attr:'style="width:100%;height:auto;display:block"'})+'</span>'+
       '<span style="flex:1;min-width:0"><span class="eyebrow">Your ground</span>'+
       '<span class="disp" style="font-size:19px;font-weight:600;display:block;margin-top:2px"><span style="color:var(--green)">'+c.held+'</span> of '+c.total+' held'+(c.fade?' <span style="color:var(--amber);font-size:15px">\u00b7 '+c.fade+' fading</span>':'')+'</span>'+
-      '<span style="color:var(--dim);font-size:13px;line-height:1.45;display:block;margin-top:3px">'+esc(line)+'</span></span>'+
+      '<span style="color:var(--dim);font-size:13px;line-height:1.45;display:block;margin-top:3px">'+esc(line)+'</span>'+
+      (function(){const vl=volLine();return vl?'<span style="color:var(--amber);font-size:13px;line-height:1.45;display:block;margin-top:4px">'+esc(vl)+'</span>':''})()+'</span>'+
       '<span style="color:var(--faint);flex:none">\u203a</span></button>'}
   catch(e){oops('groundCard',e);return ''}}
 function viewTerritory(){
@@ -33712,6 +33779,7 @@ function viewTerritory(){
   holdBank(st);
   const order={open:0,fade:1,held:2};
   const rows=HOLD_MUSCLES.slice().sort((a,b)=>order[st[a].s]-order[st[b].s]||(st[b].days||999)-(st[a].days||999));
+  const vol=muscleWeekSets(),pm=progMuscles();
   let h='<div class="view pad stg phpad">'+
     '<button data-a="back" class="btn" style="width:auto;padding:8px 14px;color:var(--dim);font-size:13px;margin-bottom:14px">‹ Back</button>'+
     '<h1 class="disp vh1">Your ground</h1>'+
@@ -33731,8 +33799,11 @@ function viewTerritory(){
       const col=x.s==='held'?'var(--green)':x.s==='fade'?'var(--amber)':'var(--faint)';
       return '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding:10px 0'+(i?';border-top:1px solid var(--line)':'')+'">'+
         '<span style="flex:1;font-size:13px;font-weight:600;color:'+(x.s==='open'?'var(--dim)':'var(--text)')+'">'+esc(m)+'</span>'+
+        (function(){const n=vol[m]||0,z=volZone(n);const vc=z==='in'?'var(--green)':(z==='over'||pm[m])?'var(--amber)':'var(--faint)';
+          return '<span class="mono" style="color:'+vc+';font-size:11px;flex:none">'+n+' SETS</span>'})()+
         '<span class="mono" style="color:'+col+';font-size:11px;flex:none">'+
         (x.s==='held'?(x.wks>=2?'HELD · '+x.wks+' WEEKS':'HELD'):x.s==='fade'?'FADING · '+x.days+'d':x.days==null?'NEVER CLAIMED':'UNCLAIMED · '+x.days+'d')+'</span></div>'}).join('')+'</div>'+
+    '<p style="color:var(--faint);font-size:11px;line-height:1.55;margin-top:10px">Sets are hard sets in the last 7 days, a prime mover at 1 and an assisting muscle at a half. Allena aims for 10 to 20 a week on the muscles your programme trains; green is inside it, amber is under or past it.</p>'+
     '<p style="color:var(--faint);font-size:11px;line-height:1.55;margin-top:12px">Holding all '+c.total+' inside one week banks an epic find — once a month at most. Quality work (balance, mobility, conditioning) keeps you moving but does not claim ground; only trained muscle does.</p>';
   return h+'</div>'}
 
@@ -42986,6 +43057,8 @@ function sheetHtml(){
       (st.s==='held'?'HELD — trained '+(st.days===0?'today':st.days+' day'+(st.days===1?'':'s')+' ago'):
        st.s==='fade'?'FADING — '+st.days+' days since':
        st.days==null?'NEVER CLAIMED':'UNCLAIMED — '+st.days+' days since')+'</p>'+
+      (function(){try{const n=muscleWeekSets()[m2]||0;const z=volZone(n);
+        return '<p style="color:'+(z==='in'?'var(--green)':'var(--amber)')+';font-size:13px;line-height:1.5;margin-top:8px">'+esc(volWords(m2,n))+'</p>'}catch(e){oops('muscle.vol',e);return ''}})()+
       (b.length?'<p class="eyebrow mt2">What claims it, from your own training</p>'+
         '<div class="card mt" style="padding:4px 15px">'+
         b.slice(0,6).map((x,i)=>'<p style="padding:10px 0;font-size:13px'+(i?';border-top:1px solid var(--line)':'')+'">'+esc(x)+'</p>').join('')+'</div>'
