@@ -1970,7 +1970,7 @@ if(S.sess){S.note=S.sess.note||S.note;
       if(c0&&(s0.log||[]).some(l=>l.ex===c0.ex&&l.setNo===c0.setNo)){const n0=sessAdv(s0);
         if(n0<0)s0.phase='done';else s0.idx=n0}}catch(e){oops('bootSess',e)}
     if(S.sess.phase!=='done')S.sess.phase='ready'}}
-const BUILD_ID='30d822';  // stamped by tools/build.py with the content hash
+const BUILD_ID='f8a90e';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -2134,6 +2134,7 @@ function aiPrefs(){
   return a}
 function aiModelName(){return /haiku/i.test((S.ai&&S.ai.model)||'')?'Haiku':'Sonnet'}
 function repLow(t){if(typeof t==='number')return t;const m=String(t||'').match(/\d+/);return m?+m[0]:null}
+function repStr(t){const lo=repLow(t),hi=repHigh(t);return lo==null?'the written reps':(lo===hi?String(lo):lo+'\u2013'+hi)}
 function repHigh(t){if(typeof t==='number')return t;const m=String(t||'').match(/(\d+)\D+(\d+)/);return m?+m[2]:repLow(t)}
 
 /* ══ entry sanity check ═════════════════════════════════════
@@ -2895,7 +2896,11 @@ function autoReg(e,c){
     if(!isNaN(rpe)&&!isNaN(tLo)&&rpe<tLo-0.5)
       return{level:'ok',msg:'Missed the reps but only RPE '+e.rpe+'. Hold this weight and push nearer the target effort before touching the load.'};
     if(isTop&&short>=2)return{level:'warn',msg:'Top set missed by '+short+' at RPE '+(isNaN(rpe)?'max':e.rpe)+'. Take '+uwNum(drop)+' '+uwUnit()+' off the back-offs today and repeat this week rather than advancing.'};
-    return{level:'warn',msg:'Missed the target at RPE '+(isNaN(rpe)?'high effort':e.rpe)+' — the load is genuinely ahead of you. Take '+uwNum(drop)+' '+uwUnit()+' off the remaining sets and keep the reps.'}}
+    /* THE SENTENCE NAMES WHAT WAS MISSED (owner, 21 Oct 2026: "saying I'm
+       not in rpe range when I clearly am"). "Missed the target at RPE 8"
+       read as the effort missing; it was the reps. Say both numbers. */
+    const inR=!isNaN(rpe)&&!isNaN(tLo)&&!isNaN(tHi)&&rpe>=tLo&&rpe<=tHi;
+    return{level:'warn',msg:e.r+' rep'+(e.r===1?'':'s')+' against '+repStr(c.targetReps)+(isNaN(rpe)?' at a high effort':' at RPE '+e.rpe+(inR?', inside the '+tTxt+' asked for':''))+'. The effort was there and the reps were not, so the load is ahead of you. Take '+uwNum(drop)+' '+uwUnit()+' off the remaining sets and keep the reps.'}}
   /* the NEXT set's target decides what 'hot' means (owner-caught, 11
      Sep: set 1 at RPE 9 against 8 was told to take weight off, when
      set 2 was written at RPE 9 — the weight already fitted it) */
@@ -3364,7 +3369,7 @@ function regFree(rows,c,opts){
     out.why='under-effort miss, bodyweight'}
   else if(belowLow>=2){
     out.level='warn';out.outcome='overshot';
-    out.msg='Missed the bottom of the range on '+belowLow+' sets'+(avg!=null?' at RPE '+(Math.round(avg*10)/10):'')+'. '+
+    out.msg='Under '+low+' reps on '+belowLow+' sets'+(avg!=null?' at RPE '+(Math.round(avg*10)/10)+(d===0?', inside the '+tTxt+' asked for':''):'')+'. '+
       (REH?'That is logged and it goes in the report \u2014 the dose is your physio\u2019s to set, so tell them rather than changing it yourself.'
          :'With no load to drop, the lever is the exercise: take a band or an easier version, or keep the reps and add a set.');
     out.why='reps under target, no load to cut'}
@@ -3468,7 +3473,7 @@ function regulate(rows,c,opts){
     out.msg='Reps came up short on '+belowLow+' sets, but average RPE was '+(Math.round(avg*10)/10)+' against a target of '+tTxt+'. That is stopping early rather than a weight problem — same load next time, taken closer to '+tR+'.';
     out.why='under-effort miss, load unchanged'}
   else if(belowLow>=2){out.level='warn';out.delta=pctCut(0.05);out.outcome='overshot';
-    out.msg='Missed the bottom of the range on '+belowLow+' sets'+(avg!=null?' at RPE '+(Math.round(avg*10)/10):'')+'. Dropping '+uwNum(Math.abs(out.delta))+' '+uwUnit()+' — the load is ahead of you today.'+barNote;
+    out.msg='Under '+low+' reps on '+belowLow+' sets'+(avg!=null?' at RPE '+(Math.round(avg*10)/10)+(d===0?', inside the '+tTxt+' asked for':''):'')+'. The effort was there and the reps were not. Dropping '+uwNum(Math.abs(out.delta))+' '+uwUnit()+' — the load is ahead of you today.'+barNote;
     out.why='reps under target on '+belowLow+' sets'}
   // 2. effort past target — the case that used to slip through
   else if(d!=null&&d>=0.75){
@@ -8571,7 +8576,22 @@ A.begin=()=>{audioInit();S.holdWait=false;S.holdMet=null;const c=S.sess.sets[S.s
 function setPrefill(s,c){
   try{const p=lastFor(c.ex,c.setNo);
     const sameNow=(s.log||[]).filter(l=>l.ex===c.ex&&l.r>0).slice(-1)[0];
-    const w0=c.targetW!=null?c.targetW:(sameNow?sameNow.w:(p?p.w:''));
+    let w0=c.targetW!=null?c.targetW:(sameNow?sameNow.w:(p?p.w:''));
+    /* THE BAR YOU PUT ON IS THE BAR YOU GET BACK (owner, 21 Oct 2026: the
+       screen said "17.5 × 12 @7 · you put 10 kg more on than written" and
+       prefilled 7.5 again). When the SAME written prescription was last
+       lifted heavier, at or under the target effort, the prefill is that
+       weight: the lifter has already overruled the number once and the
+       plan did not move. A different written weight (a wave, a back-off,
+       a new block) keeps the plan's own number. */
+    if(c.targetW!=null){
+      const hi=rpeHigh(c.targetRpe);
+      const src=(sameNow&&sameNow.targetW!=null&&+sameNow.targetW===+c.targetW)?sameNow
+        :(p&&p.targetW!=null&&+p.targetW===+c.targetW)?p:null;
+      const lo=repLow(c.targetReps);
+      /* only a bar that did the job comes back: the reps made, the effort
+         at or under the target. A heavier miss is the regulator's to judge. */
+      if(src&&+src.w>+c.targetW&&(src.rpe==null||isNaN(hi)||+src.rpe<=hi)&&(lo==null||+src.r>=lo))w0=+src.w}
     const r0=typeof c.targetReps==='number'?c.targetReps
       :(sameNow?sameNow.r:(p&&p.r?p.r:(parseInt(c.targetReps)||'')));
     /* 0 is bodyweight: an empty field that says BW, not a zero to type over */
@@ -8778,12 +8798,20 @@ A.tickRow=i=>{const s=S.sess;if(!s)return;i=+i;const st=s.sets[i];if(!st)return;
   const l=sessLogOf(s,st);
   if(l){runAction('editLive',String(s.log.indexOf(l)));return}   // a logged row is fixed, never re-logged
   if(st.skip){st.skip=false;persistActive();render();return}
-  S.rpeAsk=null;s.pin=null;
-  if(st.secs){audioCancel();S.restEnd=null;S.sessEx=null;s.idx=i;s.phase='ready';A.begin();return}
+  S.rpeAsk=null;
+  if(st.secs){audioCancel();S.restEnd=null;S.sessEx=null;s.pin=null;s.idx=i;s.phase='ready';A.begin();return}
   const v=sessRowVals(s,i),r=parseInt(String(v.r).trim(),10),w=sessNum(v.w);
-  if(!(r>0)){flash('Put the reps in first.');render();return}
-  if(isNaN(w)){flash('That weight is not a number.');render();return}
-  if(v.rpe==null){S.rpeAsk=st.exNo+':'+st.setNo;render();return}
+  /* THE SCREEN STAYS WHERE THE TAP WAS (owner, 21 Oct 2026: "slide to an
+     exercise you want to start instead of the next one up and try to log
+     it... shoots you back to what's next"). The pin that aimed the rest at
+     the swiped exercise was cleared BEFORE the effort question, so the
+     render in between fell back to the next set in order. Nothing is
+     cleared until the set is actually logged; until then the exercise on
+     screen is held explicitly. */
+  if(!(r>0)){S.sessEx=st.exNo;flash('Put the reps in first.');render();return}
+  if(isNaN(w)){S.sessEx=st.exNo;flash('That weight is not a number.');render();return}
+  if(v.rpe==null){S.sessEx=st.exNo;S.rpeAsk=st.exNo+':'+st.setNo;render();return}
+  s.pin=null;
   /* ticking a set means the rest before it is over */
   audioCancel();S.restEnd=null;S.holdEnd=null;S.holdWait=false;S.sessEx=null;
   s.idx=i;s.phase='logging';
