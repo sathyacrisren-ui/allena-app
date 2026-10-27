@@ -1590,7 +1590,26 @@ function setsForWeek(ex,wk,prog){const s=ex.sets;let l=null;
   else if(s&&typeof s==='object'){if(s[String(wk)])return s[String(wk)];l=s.default||null}
   if(l&&l.length&&prog&&isDeloadWeek(prog,wk))return deloadSets(l);
   return l}
-function adjOf(prog,name){return (prog&&prog.adj&&prog.adj[name])||0}
+/* ONE LIFT, TWO DAYS, TWO ADJUSTMENTS (owner, 28 Oct 2026: "my technique
+   bench... showing my heavy bench from two days ago" and "the programmed
+   progression is all fried, my heavy bench is all wrong week to week").
+   The learned adjustment was keyed by exercise NAME, so a lift written on
+   two days of one block shared one number: an easy technique day earned
+   an increase that landed on the heavy day, and a heavy-day cut landed
+   on the technique day. When a lift sits on more than one day, its
+   adjustment is kept per day; on one day the plain name is the key, so
+   nothing already learned is lost. A day that has no key of its own
+   still reads the shared one, so an old block carries on as it was
+   until that day's first verdict. */
+function adjKey(prog,name,di){
+  try{if(di==null||!prog||!prog.days)return name;
+    let n=0;prog.days.forEach(d=>{if((d&&d.exercises||[]).some(e=>e&&e.name===name))n++});
+    return n>=2?name+' [day '+(+di+1)+']':name}catch(e){return name}}
+function adjOf(prog,name,di){
+  const A=prog&&prog.adj;if(!A)return 0;
+  const k=adjKey(prog,name,di);
+  if(k!==name&&Object.prototype.hasOwnProperty.call(A,k))return A[k]||0;
+  return A[name]||0}
 function sessAdv(s){
  /* the NEXT UNLOGGED set's index, scanning forward then wrapping —
     a superset hop used to lap the list and silently relog set #1
@@ -1629,7 +1648,7 @@ function sessNow(s){
    becomes the next set's target. */
 function buildSets(prog,di,wk){const d=prog.days[di];if(!d)return[];const out=[];let n=0;
   d.exercises.forEach(ex=>{const l=setsForWeek(ex,wk,prog);if(!l||!l.length)return;n++;
-    let a=adjOf(prog,ex.name);
+    let a=adjOf(prog,ex.name,di);
     /* THE SAFETY NET, AT THE POINT THE PRESCRIPTION IS MADE (Dafydd's
        skullcrusher, 15 Sep 2026 — see adjCap in 01-rpe-regulation). The
        written weight is untouched; Allena's own addition may never carry
@@ -1970,7 +1989,7 @@ if(S.sess){S.note=S.sess.note||S.note;
       if(c0&&(s0.log||[]).some(l=>l.ex===c0.ex&&l.setNo===c0.setNo)){const n0=sessAdv(s0);
         if(n0<0)s0.phase='done';else s0.idx=n0}}catch(e){oops('bootSess',e)}
     if(S.sess.phase!=='done')S.sess.phase='ready'}}
-const BUILD_ID='f8a90e';  // stamped by tools/build.py with the content hash
+const BUILD_ID='7bba14';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -3204,21 +3223,26 @@ function adjCeiling(prog,exName){
   const w=authoredW(prog,exName);
   if(w==null)return Infinity;
   return Math.max(w*0.2,10)}
+/* the day the adjustment belongs to: the live session's, when it is on
+   this block; a change made outside a session is the lift's shared one */
+function adjDay(prog){return (S.sess&&prog&&S.sess.progId===prog.id&&S.sess.dayIdx!=null)?S.sess.dayIdx:null}
 function adjEarned(prog,exName){
-  try{const a=(prog&&prog.adj&&prog.adj[exName])||0;
-    const b=(prog&&prog.adjBase&&prog.adjBase[exName])||0;
+  try{const di=adjDay(prog),k=adjKey(prog,exName,di);
+    const a=adjOf(prog,exName,di);
+    const b=(prog&&prog.adjBase&&(prog.adjBase[k]!=null?prog.adjBase[k]:prog.adjBase[exName]))||0;
     return a-b}catch(e9){return 0}}
 /* a deliberate change is the new baseline — call this right after any
    applyAdj a PERSON asked for */
 function adjRebase(prog,exName){
   try{if(!prog)return;prog.adjBase=prog.adjBase||{};
-    prog.adjBase[exName]=(prog.adj&&prog.adj[exName])||0;saveLib()}
+    const di=adjDay(prog);prog.adjBase[adjKey(prog,exName,di)]=adjOf(prog,exName,di);saveLib()}
   catch(e9){oops('adjRebase',e9)}}
 function applyAdj(exName,delta,why,silent){
   const prog=S.lib.programs.find(p=>p.id===(S.sess?S.sess.progId:activeProg().id));
   if(!prog)return false;
   prog.adj=prog.adj||{};
-  const before=prog.adj[exName]||0;
+  const di=adjDay(prog),key=adjKey(prog,exName,di);
+  const before=adjOf(prog,exName,di);
   /* ═══ A LIFT CANNOT BE BURIED BELOW ZERO (audit pass C, 14 Sep 2026)
      ═══════════════════════════════════════════════════════════════════
      prog.adj was written as before+delta with no clamp anywhere, while the
@@ -3236,16 +3260,16 @@ function applyAdj(exName,delta,why,silent){
   let floor=-Infinity;
   {const aw=authoredW(prog,exName);if(aw!=null)floor=-aw}
   const want=Math.round((before+delta)*4)/4;
-  prog.adj[exName]=Math.max(floor,want);
+  prog.adj[key]=Math.max(floor,want);
   if(want<floor&&!silent){try{flash('That lift is already down to nothing against what was written \u2014 this is a programming question now, not a load one.')}catch(_){}}
-  delta=prog.adj[exName]-before;          // what was ACTUALLY applied
+  delta=prog.adj[key]-before;          // what was ACTUALLY applied
   saveLib();
   if(S.sess){
     S.sess.sets.forEach(st=>{if(st.ex===exName&&st.targetW!=null){st.targetW=Math.max(0,Math.round((st.targetW+delta)*4)/4);st.adj=(st.adj||0)+delta}});
     /* every delta taught during THIS session is on the record — a
        discarded session must unteach them (owner-caught, 8 Sep) */
     S.sess.adjApplied=S.sess.adjApplied||{};
-    S.sess.adjApplied[exName]=Math.round(((S.sess.adjApplied[exName]||0)+delta)*4)/4;
+    S.sess.adjApplied[key]=Math.round(((S.sess.adjApplied[key]||0)+delta)*4)/4;
     persistActive()}
   S.lastAdj={ex:exName,delta:delta};
   if(!silent){vib(14);flash((delta>0?'+':'')+uwNum(delta)+' '+uwUnit()+' on '+exName.replace(/ — .*/,'')+(why?' — '+why:'')+'. Undo is on the set screen.')}
@@ -3578,7 +3602,7 @@ function autoProgress(e,c){
      back (see A.discardYes) */
   try{if(prog){const rs=S.sess.regSnap=S.sess.regSnap||{};
     if(!Object.prototype.hasOwnProperty.call(rs,c.ex))rs[c.ex]={
-      wk:(prog.adjWkBy&&prog.adjWkBy[c.ex]!=null)?prog.adjWkBy[c.ex]:null,
+      wk:(prog.adjWkBy&&prog.adjWkBy[adjKey(prog,c.ex,adjDay(prog))]!=null)?prog.adjWkBy[adjKey(prog,c.ex,adjDay(prog))]:null,
       inc:(prog.inc&&prog.inc[c.ex])?Object.assign({},prog.inc[c.ex]):null}}}
   catch(e9){oops('regSnap',e9)}
   learnStep(prog,c.ex,r.outcome);
@@ -3595,7 +3619,7 @@ function autoProgress(e,c){
        of the calendar week applies; the rest hold. */
     prog.adjWkBy=prog.adjWkBy||{};
     const wk0=(typeof questWeekKey==='function')?questWeekKey():'';
-    if(wk0&&prog.adjWkBy[c.ex]===wk0){
+    if(wk0&&prog.adjWkBy[adjKey(prog,c.ex,adjDay(prog))]===wk0){
       S.exVerdict=Object.assign({},r,{delta:0,outcome:'held',
         msg:'Top of the range again \u2014 but this lift already stepped up once this week. High-frequency work earns one increase a week, not one per session.',
         why:'weekly step already taken'});
@@ -3622,7 +3646,7 @@ function autoProgress(e,c){
       return null}}catch(e9){oops('autoProgress.cap',e9)}}
   if(r.delta){applyAdj(c.ex,r.delta,r.why);
     if(r.delta>0){try{prog.adjWkBy=prog.adjWkBy||{};
-      prog.adjWkBy[c.ex]=(typeof questWeekKey==='function')?questWeekKey():'';saveLib()}catch(e9){}}
+      prog.adjWkBy[adjKey(prog,c.ex,adjDay(prog))]=(typeof questWeekKey==='function')?questWeekKey():'';saveLib()}catch(e9){}}
     return r.delta>0?'up':'down'}
   return null}
 
@@ -4232,7 +4256,18 @@ function coachErrLine(err,status){
   if(ty==='authentication_error'||ty==='permission_error'||status===401||status===403)return 'Your AI key was refused. Check it in Settings, or sign in to use Allena without one.';
   if(/too long|too large/i.test(m)||status===413)return 'This chat has grown too long to send. Start a new chat and ask again.';
   return 'Allena could not answer that one. Try again in a minute.'}
-function lastFor(ex,no){
+function lastFor(ex,no,day){
+  /* THE SAME DAY FIRST (owner, 28 Oct 2026: the technique bench's "last
+     time" was the heavy bench from two days earlier). A lift written on
+     two days of a block compares with its own day when one exists, by the
+     day's title (a re-imported block gets a new id; its day names carry
+     over). With no session of that day yet, any session of the lift. */
+  try{const t=day&&day.title!=null?day.title:(S.sess?S.sess.dayName:null);
+    if(t){const same=lastForScan(ex,no,H=>String(H.dayTitle||'').toLowerCase()===String(t).toLowerCase());
+      if(same)return same}
+    return lastForScan(ex,no,null)}
+  catch(e){oops('lastFor',e);return null}}
+function lastForScan(ex,no,keep){
   /* "LAST TIME" IS THE LATEST SESSION, NOT THE LAST ARRAY SLOT
      (owner-caught, 12 Sep: the set screen showed WEEK 1 while he was
      training week 3, with a real week 2 session in between).
@@ -4254,6 +4289,7 @@ function lastFor(ex,no){
     let best=null,bestKey='';
     (S.history||[]).forEach(H=>{
       if(!H||H.id===cid||!Array.isArray(H.log))return;
+      if(keep&&!keep(H))return;
       /* DO NOT require a weight (daily review, 13 Sep — caught reviewing
          yesterday's own fix). Demanding w or secs excludes a rep-only row,
          which is exactly what a bodyweight set is: chin-ups, dips, band
@@ -4277,7 +4313,7 @@ function lastFor(ex,no){
       best=Object.assign({},rows[0],{date:H.date,week:H.week,day:H.dayTitle});
       bestKey=key});
     return best}
-  catch(e){oops('lastFor',e);return null}}
+  catch(e){oops('lastForScan',e);return null}}
 
 /* ══ actions ════════════════════════════════════════════ */
 
@@ -8937,7 +8973,8 @@ A.discardYes=()=>{if(S.sess){const rid=S.sess.recId||String(S.sess.startedAt);
       if(rs){const prog=S.lib.programs.find(p=>p.id===S.sess.progId);
         if(prog){Object.keys(rs).forEach(ex=>{const r0=rs[ex];
           prog.adjWkBy=prog.adjWkBy||{};prog.inc=prog.inc||{};
-          if(r0.wk==null)delete prog.adjWkBy[ex];else prog.adjWkBy[ex]=r0.wk;
+          const wkK=(typeof adjKey==='function')?adjKey(prog,ex,S.sess.dayIdx):ex;   // the lock lives under the day's key
+          if(r0.wk==null)delete prog.adjWkBy[wkK];else prog.adjWkBy[wkK]=r0.wk;
           if(r0.inc==null)delete prog.inc[ex];else prog.inc[ex]=r0.inc});saveLib()}}}catch(e){oops('discard.reg',e)}}
   audioCancel();ldel(K_A);S.sess=null;S.restEnd=null;S.holdEnd=null;S.sheet=null;S.view='home';wakeOff();flash('Session discarded.')};
 /* RESUMING PICKS UP WHERE THE WORK STOPPED (review, 28 Sep 2026). Four
@@ -11619,7 +11656,7 @@ function goalsCard(){
 function quickInit(dayIdx,week,dateStr){
   const p=activeProg();
   const sets=buildSets(p,dayIdx,week);
-  const rows=sets.map(c=>{const prev=lastFor(c.ex,c.setNo);
+  const rows=sets.map(c=>{const prev=lastFor(c.ex,c.setNo,{title:p.days[dayIdx]&&p.days[dayIdx].name});
     return{ex:c.ex,setNo:c.setNo,of:c.of,exNo:c.exNo,secs:c.secs,perSide:c.perSide,
       targetW:c.targetW,targetReps:c.targetReps,targetRpe:c.targetRpe,
       w:c.secs?'':(c.targetW!=null?c.targetW:(prev?prev.w:'')),
@@ -22103,14 +22140,14 @@ function wristPlanBuild(){
         if(first){const sw=swapsFor(x.ex);if(sw.length)o.sw=sw.map(n=>String(n).slice(0,40));
           /* what the best wrist apps show and ours did not (13 Oct 2026): last time's numbers
              under the target, and the bar a set must clear to be called a PR (display units) */
-          const lt=wristLastStr(x.ex,+x.setNo||1);if(lt)o.lt=lt;
+          const lt=wristLastStr(x.ex,+x.setNo||1,{title:p.days[di].name});if(lt)o.lt=lt;
           const pb=liftBest(x.ex);if(pb>0)o.pr=Math.round(uwNum(pb)*2)/2}
         return o})}}
   catch(e){oops('wristPlanBuild',e);return null}}
 /* LAST TIME, as one short line for a watch face: "80 kg x 8 @8", "45 s",
    "BW x 12". lastFor is the one reader of "last time"; this only words it. */
-function wristLastStr(ex,no){
-  try{const l=lastFor(ex,no);if(!l)return '';
+function wristLastStr(ex,no,day){
+  try{const l=lastFor(ex,no,day);if(!l)return '';
     if(l.secs!=null)return (+l.secs||0)+' s';
     const w=+l.w>0?uwStr(+l.w):'BW';const r=+l.r>0?' x '+Math.round(+l.r):'';
     const rp=(l.rpe!=null&&l.rpe!=='')?' @'+l.rpe:'';
@@ -44215,7 +44252,7 @@ function sheetHtml(){
     return wrapSheet('Modify',inner)}
   if(S.sheet.t==='tune'){
     const s2=S.sess,cur=s2.sets[sessNow(s2)];
-    const prog=S.lib.programs.find(p=>p.id===s2.progId),cur_adj=adjOf(prog,cur.ex);
+    const prog=S.lib.programs.find(p=>p.id===s2.progId),cur_adj=adjOf(prog,cur.ex,s2.dayIdx);
     let inner='<p style="color:var(--dim);font-size:13px;line-height:1.55">Change the load for <b style="color:var(--text)">'+esc(cur.ex)+'</b>. This updates the remaining sets today and the programmed weight from now on.</p>'+
       '<div class="card mt" style="padding:16px;text-align:center">'+
       '<p class="mono" style="font-size:28px;font-weight:600">'+(cur.targetW!=null?uwNum(cur.targetW):'—')+' <span style="font-size:15px;color:var(--dim)">'+uwUnit()+'</span></p>'+
@@ -49235,7 +49272,7 @@ function runAction(a,v,t,e){
       try{if(typeof adjRebase==='function')adjRebase(S.lib.programs.find(p=>p.id===S.sess.progId),cur.ex)}catch(e9){oops('tuneBy.rebase',e9)}
       render();break}
     case 'tuneReset':{const cur=S.sess.sets[sessNow(S.sess)],prog=S.lib.programs.find(p=>p.id===S.sess.progId);
-      applyAdj(cur.ex,-adjOf(prog,cur.ex),'back to the written program');
+      applyAdj(cur.ex,-adjOf(prog,cur.ex,S.sess.dayIdx),'back to the written program');
       try{if(typeof adjRebase==='function')adjRebase(prog,cur.ex)}catch(e9){oops('tuneReset.rebase',e9)}
       render();break}
     case 'undoAdj':undoAdj();break;
