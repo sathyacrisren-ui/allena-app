@@ -1989,7 +1989,7 @@ if(S.sess){S.note=S.sess.note||S.note;
       if(c0&&(s0.log||[]).some(l=>l.ex===c0.ex&&l.setNo===c0.setNo)){const n0=sessAdv(s0);
         if(n0<0)s0.phase='done';else s0.idx=n0}}catch(e){oops('bootSess',e)}
     if(S.sess.phase!=='done')S.sess.phase='ready'}}
-const BUILD_ID='eaacc3';  // stamped by tools/build.py with the content hash
+const BUILD_ID='65ec61';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -35135,6 +35135,34 @@ function dayPriority(p,di,wk){
   return score}
 function isDropped(p,di,wk){const a=(S.dropped||{})[p.id+':'+wk];return !!(a&&a.indexOf(di)>=0)}
 function weekClosed(p,wk){return !!((S.weekStarts||{})[p.id+':'+wk+':closed'])}
+/* close one week: the sessions it did not get to are marked skipped IN
+   that week (visible on its pills and list), and the week is stamped
+   closed. The one writer for the week clock's close and the block finish.
+   Returns the day indexes it marked. */
+function weekCloseMark(p,wk){
+  const ws0=weekState(p,wk),k0=p.id+':'+wk;S.dropped=S.dropped||{};
+  const skipped=[];
+  p.days.forEach((d,i)=>{
+    if(!buildSets(p,i,wk).length)return;
+    if(ws0.done.has(i))return;
+    if((S.dropped[k0]||[]).indexOf(i)>=0)return;
+    skipped.push(i)});
+  if(skipped.length){S.dropped[k0]=(S.dropped[k0]||[]).concat(skipped);lset(K_DROP,S.dropped)}
+  S.weekStarts=S.weekStarts||{};S.weekStarts[p.id+':'+wk+':closed']=today();lset(K_WK,S.weekStarts);
+  return skipped}
+/* what finishing the block now would close: the open weeks and the
+   sessions still undone in them; logged says whether it may finish at all */
+function blockFinishInfo(p){
+  try{if(!p||!(p.weeks>1))return null;
+    const logged=(S.history||[]).some(h=>h&&h.progId===p.id&&h.complete);
+    const weeks=[];let skipped=0;
+    for(let w=1;w<=p.weeks;w++){const ws=weekState(p,w);if(ws.full||weekClosed(p,w))continue;
+      weeks.push(w);
+      const k0=p.id+':'+w;
+      p.days.forEach((d,i)=>{if(!buildSets(p,i,w).length)return;if(ws.done.has(i))return;
+        if(((S.dropped||{})[k0]||[]).indexOf(i)>=0)return;skipped++})}
+    return {logged,weeks,skipped,done:blockDone(p)}}
+  catch(e){oops('blockFinishInfo',e);return null}}
 function weekCurrent(p){
   /* the TRUE current week, derived — first one neither closed nor
      fully logged. Browsing the pills must never change what "today"
@@ -35932,6 +35960,12 @@ function weekClockBody(){
         '<button data-a="clkNow" class="btn" style="flex:1;border-color:var(--amber);color:var(--amber);font-size:13px">Start the clock today</button>'+
         '<button data-a="clkFirst" class="btn" style="flex:1;color:var(--dim);font-size:13px">When I first train</button></div></div>';
     if(lastDateFor(p.id,S.week))h+='<p class="mono" style="font-size:11px;color:var(--faint);margin-top:12px">last trained: '+fmtDate(lastDateFor(p.id,S.week))+'</p>';
+    /* the door to finish the block early (owner, 1 Nov 2026) */
+    try{const fi=blockFinishInfo(p);
+      if(fi&&fi.logged&&!fi.done)h+='<div style="border-top:1px solid var(--line);margin-top:16px;padding-top:12px">'+
+        '<p style="color:var(--dim);font-size:13px;line-height:1.55">'+(fi.skipped?fi.skipped+' session'+(fi.skipped===1?'':'s')+' still undone across week'+(fi.weeks.length===1?' ':'s ')+fi.weeks.join(', ')+'. ':'')+'Finishing now closes the open weeks, marks what was not done as skipped, and opens the review.</p>'+
+        '<button data-a="blockFinishAsk" class="btn mt" style="color:var(--amber);border-color:var(--amber);font-size:13px">Finish this block now</button></div>'}
+    catch(e9){oops('weekClockBody.finish',e9)}
     return h}
   catch(e){oops('weekClockBody',e);return ''}}
 
@@ -47247,16 +47281,8 @@ function runAction(a,v,t,e){
          still means the one on screen. Closing NEVER changes what the week
          contains: the days it did not get to are marked skipped, visibly,
          and the count it really had is the count it keeps. */
-      try{const wk0=(v!=null&&v!=='')?+v:S.week,ws0=weekState(p,wk0);
-        const k0=p.id+':'+wk0;S.dropped=S.dropped||{};
-        const skipped=[];
-        p.days.forEach((d,i)=>{
-          if(!buildSets(p,i,wk0).length)return;
-          if(ws0.done.has(i))return;   // by index (review J-2)
-          if((S.dropped[k0]||[]).indexOf(i)>=0)return;
-          skipped.push(i)});
-        if(skipped.length){S.dropped[k0]=(S.dropped[k0]||[]).concat(skipped);lset(K_DROP,S.dropped)}
-        S.weekStarts=S.weekStarts||{};S.weekStarts[p.id+':'+wk0+':closed']=today();lset(K_WK,S.weekStarts);
+      try{const wk0=(v!=null&&v!=='')?+v:S.week;
+        const skipped=weekCloseMark(p,wk0);
         const note=(skipped.length?' \u2014 '+skipped.length+' session'+(skipped.length===1?'':'s')+' marked skipped':'');
         /* closing the week you are ON moves you forward; closing one you had
            already moved past changes nothing about where you are */
@@ -47266,6 +47292,24 @@ function runAction(a,v,t,e){
           else flash('That was the last week of the block \u2014 build the next one from the Program card.')}
         else flash('Week '+wk0+' closed'+note+'. Week '+weekCurrent(p)+' is the open one now.')}catch(e){oops('weekClose',e)}
       render();break}
+    /* FINISH THE BLOCK, WHATEVER THE LAST WEEK LOOKS LIKE (owner, 1 Nov
+       2026: "need a way to close and finish a block even when the block
+       sessions on the last week weren't complete"). Every open week is
+       closed the way the week clock closes one: nothing disappears, the
+       sessions not done are marked skipped on their weeks, and blockDone
+       answers true, so Train shows the review and the next block. */
+    case 'blockFinishAsk':{const p=activeProgSafe();if(!p)break;
+      const fi=blockFinishInfo(p);if(!fi)break;
+      if(!fi.logged){flash('Nothing has been logged on this block yet. Delete it from the library instead.');break}
+      S.confirm={t:'Finish '+p.block+' now?',
+        d:(fi.weeks.length?'Week'+(fi.weeks.length===1?' ':'s ')+fi.weeks.join(', ')+' close'+(fi.weeks.length===1?'s':'')+' with '+fi.skipped+' session'+(fi.skipped===1?'':'s')+' undone, marked skipped where '+(fi.skipped===1?'it':'they')+' belong. ':'')+'The block counts as done; the review and the next block open from Train.',
+        go:'blockFinishGo',v:'',ok:'Finish the block'};
+      S.sheet={t:'confirm'};render();break}
+    case 'blockFinishGo':{const p=activeProgSafe();if(!p)break;
+      const fi=blockFinishInfo(p);if(!fi||!fi.logged)break;
+      let n=0;fi.weeks.forEach(w=>{n+=weekCloseMark(p,w).length});
+      S._recC=null;S.sheet=null;render();
+      flash(p.block+' finished'+(n?' \u2014 '+n+' session'+(n===1?'':'s')+' marked skipped':'')+'.');break}
     case 'weekDrop':{const p=activeProgSafe();if(!p)break;
       /* the week the clock is on, not the pill being browsed (review J-13) */
       const c9=weekClock();
