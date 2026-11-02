@@ -1585,6 +1585,14 @@ function deloadSets(l){
   const n=Math.max(1,Math.ceil(l.length/2));
   return l.slice(0,n).map(st=>{const c=Object.assign({},st,{deload:1});
     if(c.secs==null&&c.rpe!=null)c.rpe=rpeEase(c.rpe,2);return c})}
+/* an exercise's set lists, whichever shape the author wrote: a plain array
+   (the test fixtures, a typed block) or {default:[...], 2:[...]} (an
+   import, the chat). exSetLists is every list; exBaseSets the one the
+   block edits (the array itself, or default), in place. */
+function exSetLists(ex){const s=ex&&ex.sets;if(Array.isArray(s))return [s];
+  if(s&&typeof s==='object')return Object.keys(s).map(k=>s[k]).filter(Array.isArray);return []}
+function exBaseSets(ex){const s=ex&&ex.sets;if(Array.isArray(s))return s;
+  return (s&&Array.isArray(s['default']))?s['default']:null}
 function setsForWeek(ex,wk,prog){const s=ex.sets;let l=null;
   if(Array.isArray(s))l=s;
   else if(s&&typeof s==='object'){if(s[String(wk)])return s[String(wk)];l=s.default||null}
@@ -1989,7 +1997,7 @@ if(S.sess){S.note=S.sess.note||S.note;
       if(c0&&(s0.log||[]).some(l=>l.ex===c0.ex&&l.setNo===c0.setNo)){const n0=sessAdv(s0);
         if(n0<0)s0.phase='done';else s0.idx=n0}}catch(e){oops('bootSess',e)}
     if(S.sess.phase!=='done')S.sess.phase='ready'}}
-const BUILD_ID='524c46';  // stamped by tools/build.py with the content hash
+const BUILD_ID='3389ce';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -18245,7 +18253,7 @@ function nextBlock(){
   const m=String(p.block).match(/(\d+)(?!.*\d)/);
   np.block=m?p.block.replace(/(\d+)(?!.*\d)/,String(+m[1]+1)):p.block+' II';
   delete np.demo;
-  const adj=p.adj||{};np.adj={};
+  np.adj={};
   const ws=weeklySets(28);
   /* THE LIFTER'S OWN PLATES (review, 28 Sep 2026). Every weight was
      re-snapped to a 1.25 kg grid, and a pound lifter's 225 lb is stored as
@@ -18262,12 +18270,17 @@ function nextBlock(){
      verdict is the LIFT's trend, so it is said once per lift, not once per
      variant. */
   const verdictSaid={};
-  np.days.forEach(d=>d.exercises.forEach(ex=>{
-    const a=adj[ex.name]||0;
+  np.days.forEach((d,di)=>d.exercises.forEach(ex=>{
+    /* the day's own adjustment when the lift sits on two days (28 Oct) */
+    const a=adjOf(p,ex.name,di)||0;
     const nm=ex.name;
     const how=blockLiftVerdict(ex.name);
     let loaded=false;
-    Object.keys(ex.sets||{}).forEach(k=>ex.sets[k].forEach(st=>{
+    /* THE BUTTON DID NOTHING (owner, 2 Nov 2026: "Build block 2 from this
+       data button not working"). Sets written as a plain array have no
+       .forEach on their keys' values; the throw was swallowed and the
+       sheet never opened. exSetLists reads both shapes. */
+    exSetLists(ex).forEach(list=>list.forEach(st=>{
       if(st.w!=null){
         st.w=Math.max(0,snap(st.w+a)); // bake in what you actually lift now
         if(how.load&&st.rpe!=null&&!ex.warmup){st.w=snap(st.w+step);loaded=true}}}));
@@ -18283,12 +18296,13 @@ function nextBlock(){
   np.days.forEach(d=>d.exercises.forEach(ex=>{
     const ms=tag(ex);
     const lo=ms.find(mm=>lows.indexOf(mm)>=0&&!addedFor[mm]);
-    if(lo&&ex.sets&&ex.sets['default']&&ex.sets['default'].length<4&&!/bench|squat|deadlift/i.test(ex.name)){
-      ex.sets['default'].push(JSON.parse(JSON.stringify(ex.sets['default'][ex.sets['default'].length-1])));
+    const base=exBaseSets(ex);
+    if(lo&&base&&base.length<4&&!/bench|squat|deadlift/i.test(ex.name)){
+      base.push(JSON.parse(JSON.stringify(base[base.length-1])));
       addedFor[lo]=1;changes.push(ex.name.replace(/ — .*/,'')+': +1 set — '+lo+' has been under ~6 sets/wk')}
     const hi=ms.find(mm=>highs.indexOf(mm)>=0&&!trimmedFor[mm]);
-    if(hi&&ex.sets&&ex.sets['default']&&ex.sets['default'].length>2&&!/bench/i.test(ex.name)){
-      ex.sets['default'].pop();trimmedFor[hi]=1;
+    if(hi&&base&&base.length>2&&!/bench/i.test(ex.name)){
+      base.pop();trimmedFor[hi]=1;
       changes.push(ex.name.replace(/ — .*/,'')+': −1 set — '+hi+' has been over ~20 sets/wk')}}));
   return{prog:np,changes:changes,run:blockRunReview(p)}}
 /* WHAT THE BLOCK HOLDS (owner, 5 Oct 2026: "building based on last block
