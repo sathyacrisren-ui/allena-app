@@ -1997,7 +1997,7 @@ if(S.sess){S.note=S.sess.note||S.note;
       if(c0&&(s0.log||[]).some(l=>l.ex===c0.ex&&l.setNo===c0.setNo)){const n0=sessAdv(s0);
         if(n0<0)s0.phase='done';else s0.idx=n0}}catch(e){oops('bootSess',e)}
     if(S.sess.phase!=='done')S.sess.phase='ready'}}
-const BUILD_ID='90cdff';  // stamped by tools/build.py with the content hash
+const BUILD_ID='5d990e';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -2083,6 +2083,7 @@ function record(complete){const s=S.sess;return{id:s.recId||String(s.startedAt),
   minutes:sessMinutes(s.startedAt,s.log),
   log:s.log,note:S.note,exNotes:(s.exNotes&&Object.keys(s.exNotes).length?s.exNotes:null),complete:!!complete,planned:s.sets.length,
   deload:(s.sets||[]).some(st=>st&&st.deload)?1:undefined,
+  reg:(s.reg&&Object.keys(s.reg).length)?s.reg:undefined,   // each exercise's verdict direction (up/down/hold), read by regStreak
   motion:(function(){try{const m=s.motion||{};
     const moved=Object.keys(m).filter(k=>m[k]>=3).length;
     return moved?{m:moved,of:s.sets.length}:null}catch(e){return null}})()}}
@@ -3652,11 +3653,60 @@ function autoProgress(e,c){
             ' above what your block writes for it. That far out, the programme is what needs changing, not the load. Program \u203a catch it up to your logs, or start the next block.',
         why:'at the ceiling on the written program'});
       return null}}catch(e9){oops('autoProgress.cap',e9)}}
-  if(r.delta){applyAdj(c.ex,r.delta,r.why);
-    if(r.delta>0){try{prog.adjWkBy=prog.adjWkBy||{};
-      prog.adjWkBy[adjKey(prog,c.ex,adjDay(prog))]=(typeof questWeekKey==='function')?questWeekKey():'';saveLib()}catch(e9){}}
-    return r.delta>0?'up':'down'}
+  /* ═══ A LOAD CHANGE IS SUGGESTED AFTER A PATTERN, NEVER APPLIED FROM ONE
+     SESSION (owner, 5 Nov 2026: "don't like the auto adjusting thing, most
+     of the time it's wrong get rid of it, it shouldn't adjust an exercise
+     based on one day it could've been an off day"). What the coaches do:
+     double progression steps up once every working set reaches the top of
+     the range (Hevy Trainer applies it the same way); the stall rule is
+     three failed sessions in a row before a 10% cut (StrongLifts' default,
+     Starting Strength's "miss again"); ResistX reads a drop across 2 to 3
+     sessions at matched effort. So: the verdict still says what this
+     session showed; the session records its direction (`s.reg`, kept on
+     the row); and only when the same direction has run REG_NEED sessions
+     on this exercise and day does Allena SUGGEST the change, on the
+     exercise card, to apply with a tap. Nothing is written to the plan by
+     the regulator any more. In-session advice (next set) is unchanged. */
+  S.sess.reg=S.sess.reg||{};
+  if(r.delta){const dir=r.delta>0?'up':'down';
+    S.sess.reg[c.ex]=dir;
+    const n=regStreak(prog,c.ex,dir),need=REG_NEED[dir];
+    const key=adjKey(prog,c.ex,adjDay(prog));
+    let msg=regSayNoApply(r.msg);
+    if(n>=need){
+      try{prog.adjSug=prog.adjSug||{};prog.adjSug[key]={ex:c.ex,d:r.delta,why:r.why,n:n,at:today()};
+        (S.sess.sugMade=S.sess.sugMade||[]).push(key);
+        if(dir==='up'){prog.adjWkBy=prog.adjWkBy||{};prog.adjWkBy[key]=(typeof questWeekKey==='function')?questWeekKey():''}
+        saveLib()}catch(e9){oops('autoProgress.sug',e9)}
+      msg+=' Allena suggests '+(r.delta>0?'+':'\u2212')+uwNum(Math.abs(r.delta))+' '+uwUnit()+': '+n+' sessions running. It is on this exercise to apply, or leave.'}
+    else msg+=' Nothing changes on one session: that is '+n+' of '+need+' before Allena suggests a load change.';
+    S.exVerdict=Object.assign({},r,{delta:0,msg:msg,sug:n>=need?r.delta:0});
+    return dir}
+  S.sess.reg[c.ex]='hold';
   return null}
+/* how many sessions in a row (this exercise, this programme day, newest
+   first, this one included) the verdict has pointed the same way */
+const REG_NEED={up:2,down:3};
+function regStreak(prog,ex,dir){
+  let n=1;
+  try{const s=S.sess;if(!s||!prog)return n;
+    const cid=s.recId||String(s.startedAt);
+    const H=(S.history||[]).filter(h=>h&&h.id!==cid&&h.complete&&!h.run&&h.progId===prog.id&&h.dayIdx===s.dayIdx&&(h.log||[]).some(l=>l&&l.ex===ex))
+      .sort((a,b)=>String(b.date).localeCompare(String(a.date)));
+    for(const h of H){if(h.reg&&h.reg[ex]===dir)n++;else break}}
+  catch(e){oops('regStreak',e)}
+  return n}
+/* the verdict without the clause that promised a change the regulator no
+   longer makes; the numbers and the reading stay */
+function regSayNoApply(msg){
+  return String(msg||'')
+    .replace(/ ?Dropping [^\u2014.]*\u2014 /,' ')
+    .replace(/ ?Taking [^.]* off\. /,' ')
+    .replace(/ ?That is a double step: \+[^.]*\./,'')
+    .replace(/ ?\+[\d.,]+ \w+ next session\.( No single session[^.]*\.)?/,'')
+    .replace(/\s{2,}/g,' ').trim()}
+/* the suggestion waiting on an exercise, for its card */
+function adjSugFor(prog,ex,di){try{const k=adjKey(prog,ex,di);const g=prog&&prog.adjSug&&prog.adjSug[k];return g?Object.assign({key:k},g):null}catch(e){return null}}
 
 function garDay(k){k=k||today();return S.gar.days[k]||(S.gar.days[k]={})}
 function garSave(){lset(K_GAR,S.gar)}
@@ -8628,14 +8678,20 @@ function setPrefill(s,c){
        weight: the lifter has already overruled the number once and the
        plan did not move. A different written weight (a wave, a back-off,
        a new block) keeps the plan's own number. */
+    /* AMENDED 5 Nov 2026 (owner: "pre-filled wrong", a 40 written under a
+       75 lifted last time on the same day): the prefill is never below what
+       the lifter PROVED on this exercise, whatever the plan wrote. Proved =
+       the same day's last session (lastFor), reps made, effort at or under
+       the target. The plan's number still wins when it is higher (a written
+       progression) and when last time was a grind or a miss. This session's
+       own earlier set counts only on the same written weight (a back-off
+       stays a back-off). */
     if(c.targetW!=null){
-      const hi=rpeHigh(c.targetRpe);
-      const src=(sameNow&&sameNow.targetW!=null&&+sameNow.targetW===+c.targetW)?sameNow
-        :(p&&p.targetW!=null&&+p.targetW===+c.targetW)?p:null;
-      const lo=repLow(c.targetReps);
-      /* only a bar that did the job comes back: the reps made, the effort
-         at or under the target. A heavier miss is the regulator's to judge. */
-      if(src&&+src.w>+c.targetW&&(src.rpe==null||isNaN(hi)||+src.rpe<=hi)&&(lo==null||+src.r>=lo))w0=+src.w}
+      const hi=rpeHigh(c.targetRpe),lo=repLow(c.targetReps);
+      const proven=src=>!!src&&+src.w>+w0&&(src.rpe==null||isNaN(hi)||+src.rpe<=hi)&&(lo==null||+src.r>=lo);
+      const srcNow=(sameNow&&sameNow.targetW!=null&&+sameNow.targetW===+c.targetW)?sameNow:null;
+      if(proven(srcNow))w0=+srcNow.w;
+      else if(proven(p))w0=+p.w}
     const r0=typeof c.targetReps==='number'?c.targetReps
       :(sameNow?sameNow.r:(p&&p.r?p.r:(parseInt(c.targetReps)||'')));
     /* 0 is bodyweight: an empty field that says BW, not a zero to type over */
@@ -8812,6 +8868,16 @@ A.skipRest=()=>{audioCancel();S.restEnd=null;const n9=sessAdv(S.sess);S.sess.pin
 function sessLogOf(s,st){try{return st?((s.log||[]).find(l=>l.ex===st.ex&&l.setNo===st.setNo)||null):null}catch(e){oops('sessLogOf',e);return null}}
 function sessClosed(s,st){return !!st&&(!!st.skip||!!sessLogOf(s,st))}
 /* the exercise on screen: the one browsed to, else the set in play's */
+/* the sessions this exercise was logged in, newest first, with the set
+   list as written in the log; the live session itself left out */
+function exHistRows(ex,n,s){
+  const out=[];
+  try{const b=gBase(ex),cid=s?(s.recId||String(s.startedAt)):null;
+    (S.history||[]).filter(h=>h&&h.id!==cid&&!h.run&&(h.log||[]).some(l=>l&&gBase(l.ex)===b&&(l.w!=null||l.r!=null||l.secs!=null)))
+      .sort((a,b2)=>String(b2.date).localeCompare(String(a.date))).slice(0,n||6)
+      .forEach(h=>out.push({date:h.date,week:h.week,day:h.dayTitle||'',sets:(h.log||[]).filter(l=>l&&gBase(l.ex)===b).map(entryStr)}))}
+  catch(e){oops('exHistRows',e)}
+  return out}
 function sessShownEx(s){
   try{if(!s||!s.sets||!s.sets.length)return null;
     if(S.sessEx!=null&&s.sets.some(st=>st.exNo===S.sessEx))return S.sessEx;
@@ -8973,6 +9039,9 @@ A.discardYes=()=>{if(S.sess){const rid=S.sess.recId||String(S.sess.startedAt);
         if(prog&&prog.adj){Object.keys(aa).forEach(ex=>{
           prog.adj[ex]=Math.round(((prog.adj[ex]||0)-aa[ex])*4)/4;
           if(!prog.adj[ex])delete prog.adj[ex]});saveLib()}}}catch(e){oops('discard.adj',e)}
+    /* and the suggestion it may have raised (5 Nov 2026): a discarded session is not a session in the pattern */
+    try{const sm=S.sess.sugMade;if(sm&&sm.length){const prog=S.lib.programs.find(p=>p.id===S.sess.progId);
+      if(prog&&prog.adjSug){sm.forEach(k=>{delete prog.adjSug[k]});saveLib()}}}catch(e){oops('discard.sug',e)}
     /* and the two other things it taught (review, 28 Sep 2026): the weekly
        step lock and the learned step size. Left behind, a discarded test
        session blocked the real session's increase that week and made every
@@ -29415,7 +29484,13 @@ function crownData(){
   const rideName=rides.length&&rides.every(s=>s.rt==='ride')?'Riding':'Other cardio';
   /* THE LIMB FOLLOWS THE LIFT: liftTrend's state, read once per limb,
      never stored. up / level / down / back / early / noband / null. */
-  if(block)lifts.forEach(L=>{try{const T=liftTrend(L.members);L.vig=T?T.state:null}catch(e){oops('crownVig',e);L.vig=null}});
+  if(block)lifts.forEach(L=>{try{const T=liftTrend(L.members);L.vig=T?T.state:null;
+      /* the numbers behind the word, for the glance (owner, 5 Nov 2026: "crown
+         should say at a glance what's stalling or improving"): from, to and the
+         move in kg; when the reader has no band yet the move is said "so far" */
+      L.from=T&&T.from!=null?T.from:null;L.to=T&&T.to!=null?T.to:null;L.move=(L.from!=null&&L.to!=null)?Math.round(L.to-L.from):null;
+      L.dir=L.vig==='up'?'up':L.vig==='down'?'down':L.vig==='level'?'level':(L.move==null?null:L.move>0?'upsofar':L.move<0?'downsofar':'flatsofar')}
+    catch(e){oops('crownVig',e);L.vig=null;L.dir=null}});
   /* A COLD LIMB (same ask): a lift of this block not trained for ten days or more. Days since
      its last leaf, read per build, never stored; the limb's tip wears a hollow ring. */
   if(block)lifts.forEach((L,i)=>{try{let last='';marks.forEach(m=>{if(m.li===i&&m.day>last)last=m.day});
@@ -29893,7 +29968,12 @@ function crownPaint(c,C,V){
   if(mode!=='none'){
     roots.forEach(r=>{const x=X(r.cx),y=Y(r.cy);const up=r.cy<0;place(r.lab,x,y+(up?-1:1)*27*u,{fs:11,bold:true,chip:1,faded:r.faded})});
     if(V.readLab)place(V.readLab,cx,cy+tr+15*u,{fs:10,bold:true,go:1});
-    D.lifts.forEach((L,i)=>{const G9=M.groups['L'+i];if(!G9)return;const r=Math.min(G9.rmax*0.62,G9.rmid+0.08);place(L.name,X(Math.cos(G9.a)*r),Y(Math.sin(G9.a)*r),{fs:12,bold:true,lift:i})});
+    /* the glance (5 Nov 2026): in block mode every lift's label carries its
+       direction, a triangle up or down or an equals sign, coloured only when
+       the trend reader has a band behind the word */
+    D.lifts.forEach((L,i)=>{const G9=M.groups['L'+i];if(!G9)return;const r=Math.min(G9.rmax*0.62,G9.rmid+0.08);
+      const g=D.block?(L.dir==='up'||L.dir==='upsofar'?' \u25B2':L.dir==='down'||L.dir==='downsofar'?' \u25BC':L.dir?' =':''):'';
+      place(L.name+g,X(Math.cos(G9.a)*r),Y(Math.sin(G9.a)*r),{fs:12,bold:true,lift:i,dir:D.block?L.dir:null})});
     ['run','ride','rehab'].forEach(k=>{const G9=M.groups[k];if(!G9)return;place(crownDName(k,D),X(Math.cos(G9.a)*G9.rmid),Y(Math.sin(G9.a)*G9.rmid),{fs:12,bold:true})});
     if(M.groups.Lx&&V.z>=1.6)place('Other lifting',X(Math.cos(M.groups.Lx.a)*M.groups.Lx.rmid),Y(Math.sin(M.groups.Lx.a)*M.groups.Lx.rmid),{fs:11});
     if(mode==='full'){
@@ -29909,7 +29989,7 @@ function crownPaint(c,C,V){
   LBL.forEach(l=>{c.font=(l.o.bold?'600 ':'500 ')+Math.round(l.fs)+'px -apple-system,system-ui,sans-serif';c.textAlign='center';c.textBaseline='middle';
     c.fillStyle=PL.lab;const rx=l.x-l.w/2,ry=l.y-l.h/2;
     c.beginPath();if(c.roundRect)c.roundRect(rx,ry,l.w,l.h,4*u);else c.rect(rx,ry,l.w,l.h);c.fill();
-    c.fillStyle=l.o.go?PL.lift:l.o.ring?crownRgba(PL.ink,0.55):l.o.faded?crownRgba(PL.ink,0.5):PL.ink;c.fillText(l.txt,l.x,l.y+0.5)});
+    c.fillStyle=l.o.go?PL.lift:l.o.dir==='up'?PL.lift:l.o.dir==='down'?PL.gold:l.o.ring?crownRgba(PL.ink,0.55):l.o.faded?crownRgba(PL.ink,0.5):PL.ink;c.fillText(l.txt,l.x,l.y+0.5)});
   /* 11. the selected leaf gets a ring */
   if(sel&&sel.k==='leaf'){const L=M.leaves.find(q=>q.s.id===sel.id&&(sel.li==null||q.s.li===sel.li));if(L){const x=X(L.x),y=Y(L.y);c.save();c.shadowColor=dk?'rgba(255,255,255,.9)':'rgba(30,34,51,.5)';c.shadowBlur=10*u;
     c.strokeStyle=dk?'#FFFFFF':PL.ink;c.lineWidth=2;c.beginPath();c.arc(x,y,Math.max(7*u,leafLen(L)*1.5),0,Math.PI*2);c.stroke();c.restore()}}
@@ -30047,8 +30127,13 @@ function crownCard(){
   catch(e){oops('crownCard',e);return ''}}
 /* the block card's words, one reader for the card and the tests */
 function crownBlockWords(D){
-  const K=D.block;const grp={up:[],level:[],down:[]};D.lifts.forEach(L=>{if(grp[L.vig])grp[L.vig].push(L.name)});
-  const bits=[];if(grp.up.length)bits.push('Climbing: '+grp.up.join(', '));if(grp.level.length)bits.push('Holding: '+grp.level.join(', '));if(grp.down.length)bits.push('Stalling: '+grp.down.join(', '));
+  const K=D.block;const grp={up:[],level:[],down:[],upsofar:[],downsofar:[],flatsofar:[]};
+  const U=uwUnit();const kg=L=>(L.move==null||!Math.round(uwNum(L.move)))?'':' '+(L.move>0?'+':'')+Math.round(uwNum(L.move))+' '+U;   // a level lift carries no number
+  D.lifts.forEach(L=>{if(grp[L.dir])grp[L.dir].push(L.name+kg(L))});
+  /* the glance: the word first, the lift and its move after it; "so far" when the trend reader has no band yet */
+  const bits=[];if(grp.up.length)bits.push('Climbing: '+grp.up.join(', '));if(grp.upsofar.length)bits.push('Up so far: '+grp.upsofar.join(', '));
+  if(grp.down.length)bits.push('Stalling: '+grp.down.join(', '));if(grp.downsofar.length)bits.push('Down so far: '+grp.downsofar.join(', '));
+  if(grp.level.length)bits.push('Holding: '+grp.level.join(', '));if(grp.flatsofar.length)bits.push('Flat so far: '+grp.flatsofar.join(', '));
   const cold=D.lifts.filter(L=>L.cold).map(L=>L.name+' ('+L.days+' days)');if(cold.length)bits.push('Cold: '+cold.join(', '));
   const skipped=(K.gaps||[]).filter(g=>g.state==='missed');
   const scars=[];if(skipped.length)scars.push(skipped.length+' session'+(skipped.length===1?'':'s')+' skipped ('+skipped.slice(0,3).map(g=>g.name+' in week '+g.w).join(', ')+(skipped.length>3?', \u2026':'')+')');
@@ -36865,6 +36950,26 @@ function viewDeep(){
     '</div>'}
 /* the programme as the analyst must see it: the sessions, the exercises,
    the written prescription by week (the dossier's shape, 02d) */
+/* the facts since the last read: sessions, runs, PRs, and each main lift's
+   weekly best from then to now with liftTrend's verdict (the one reader for
+   "is this lift moving"). One reader for the read's context and the tests. */
+function deepSinceText(){
+  const st=deepStore();const since=st.last||dayKey(new Date(Date.now()-14*864e5));
+  const L=[];
+  const H=(S.history||[]).filter(h=>h&&h.complete&&!h.run&&hKey(h)>since).sort((a,b)=>String(a.date).localeCompare(String(b.date)));
+  const R=(typeof deepRuns==='function'?deepRuns():[]).filter(r=>String(r.date).slice(0,10)>since);
+  L.push('SINCE THE LAST READ ('+since+' to '+today()+'): '+H.length+' lifting session'+(H.length===1?'':'s')+', '+R.length+' run'+(R.length===1?'':'s')+'.');
+  const prs=[];H.forEach(h=>(h.log||[]).forEach(l=>{if(l&&l.pr&&l.w&&l.r)prs.push(hKey(h)+' '+l.ex+' '+uwNum(l.w)+' '+uwUnit()+' x '+l.r)}));
+  L.push('PERSONAL RECORDS SET IN THIS WINDOW'+(prs.length?' (each is a FACT; name it with its numbers):':': none.'));
+  prs.slice(-12).forEach(x=>L.push('- '+x));
+  const names={};H.forEach(h=>(h.log||[]).forEach(l=>{if(l&&l.w&&l.r)names[gBase(l.ex)]=(names[gBase(l.ex)]||0)+1}));
+  const top=Object.keys(names).sort((a,b)=>names[b]-names[a]).slice(0,6);
+  if(top.length){L.push('MAIN LIFTS, weekly best estimated 1RM, from the trend reader (say the verdict word it gives and no stronger one; "too early" and "cannot say" are answers):');
+    top.forEach(b=>{try{const T=liftTrend(b);if(!T)return;
+      const w=v=>v==null?'?':Math.round(uwNum(v))+' '+uwUnit();
+      const word=T.state==='up'?'UP':T.state==='down'?'DOWN':T.state==='level'?'LEVEL':T.state==='early'?'TOO EARLY (under six weeks of hard sets)':'CANNOT SAY YET (no band until eight consecutive weeks)';
+      L.push('- '+b+': '+w(T.from)+' to '+w(T.to)+' over '+(T.weeks||'?')+' weeks: '+word)}catch(e){oops('deepSince.lift',e)}})}
+  return L}
 function deepProgText(){
   const L=[];
   const p=(typeof activeProgSafe==='function')?activeProgSafe():null;
@@ -36910,6 +37015,12 @@ function deepContext(){
   /* THE ANALYST'S DESK (4 Oct 2026): what the user can change, and the
      trials already running, with the numbers Allena judged them by */
   try{const T=deepTrialsForModel();if(T.length){L.push('STANDING TRIALS \u2014 Allena has already judged each from the numbers; you phrase it:');T.forEach(x=>L.push(x))}}catch(e){oops('deepContext.trials',e)}
+  /* SINCE THE LAST READ (owner, 5 Nov 2026: "said nothing has changed 3
+     read times now - I've progressed on bench, leg press etc new PRs").
+     The proven block is relationships; a PR and a lift that moved are
+     FACTS, and the read never saw them. Here they are, with the trend
+     reader's own verdict word, never a word stronger than it gives. */
+  try{deepSinceText().forEach(x=>L.push(x))}catch(e){oops('deepContext.since',e)}
   try{L.push('THEIR PROGRAMME \u2014 the lifting plan a trial may change (exact names):');deepProgText().forEach(x=>L.push(x))}catch(e){oops('deepContext.prog',e)}
   try{deepRunText().forEach(x=>L.push(x))}catch(e){oops('deepContext.run',e)}
   /* THE WINDOW IS LAW (owner-caught, 8 Sep: a read stitched walks
@@ -36984,7 +37095,8 @@ const DEEP_SYS='You are the translator and the analyst inside a training app. A 
 'NEVER: a flourish about a finding\u2019s own importance (\u201cthis is significant\u201d, \u201cnotably\u201d, \u201cstrikingly\u201d, \u201cwhat is remarkable here\u201d) \u2014 state the number and stop. Never an adjective standing in for a number. Never a frequency word about the body (\u201crare\u201d, \u201ccommon\u201d, \u201coften\u201d) \u2014 say \u201con 9 of the 13 mornings\u201d. Never a confidence word and a likelihood word in the same sentence. Phrase a low chance affirmatively (\u201ca low chance it holds\u201d, never \u201cunlikely to hold\u201d). AT MOST ONE em dash across the WHOLE reply, and none is better; use full stops. No emoji, ever. '+
 /* The zero case: "return fewer" was already here and works. What was
    missing is the week where NOTHING cleared. */
-'IF NOTHING IN THE PROVEN BLOCK IS NEW OR WORTH A PARAGRAPH, return exactly one item titled \u201cNothing new this week\u201d whose body says plainly that the engine looked and found nothing it could stand behind yet, names what it is still waiting on if the block says so, and claims nothing. An honest empty week is a correct answer, not a failure. '+
+'THE SINCE BLOCK IS FACT, NOT RELATIONSHIP: a personal record or a lift the trend reader calls UP since the last read is said in its own item, titled with the lift, with the numbers and the dates, in the plain register (\u201cBench is up: 85 to 92 kg estimated max over 7 weeks, and 90 x 5 on 1 Nov 2026 is your best\u201d) \u2014 and when the lifts are up, say in one line that what they are doing is working, with the numbers that show it; never warmer than that. A lift the reader calls DOWN is said with the number and no cause. TOO EARLY and CANNOT SAY are said as such. '+
+'IF NOTHING IN THE PROVEN BLOCK IS NEW OR WORTH A PARAGRAPH AND THE SINCE BLOCK HAS NO RECORD AND NO LIFT UP OR DOWN, return exactly one item titled \u201cNothing new this week\u201d whose body says plainly that the engine looked and found nothing it could stand behind yet, names what it is still waiting on if the block says so, and claims nothing. An honest empty week is a correct answer, not a failure. '+
 'Reply with ONLY a JSON array, no fences: [{"t":"short title IN PLAIN WORDS a non-lifter understands","d":"the finding, citing its numbers - length varies by finding, one to three sentences, shortest that carries the number and the window","plain":"the same thing for a layperson: what happened and why it matters to their training - no jargon, no numbers required, and its length varies too","refs":[{"kind":"lift","ex":"Chin-up"}],"rar":"rare"}] . "plain" is REQUIRED - it is the translation of "d" for someone who has never read a training log. "refs" (0-3) names the charts that show this finding: kind one of "lift" (with "ex": the exact exercise name from the data), "tonnage", "runs", "bw". "rar" may be "epic" only when the pattern repeats 3+ times in the data. '+
 /* THE ANALYST (owner, 4 Oct 2026: "adjust the plan, give hypotheses on
    certain lifts or runs or other forms of cardio, whatever the user can
@@ -39605,6 +39717,14 @@ function sessTableHtml(s,plan0,no,setsDone){
     catch(e){oops('exChoiceUi',e)}}
   {const adjSt=openHere.map(i=>s.sets[i]).find(x=>x.adj);
    if(adjSt)c+='<p style="color:var(--amber);font-size:13px;margin-top:8px">'+(adjSt.adj>0?'+':'')+uwNum(adjSt.adj)+' '+uwUnit()+' adjusted from your logs</p>'}
+  /* the suggestion waiting on this exercise (5 Nov 2026): a pattern over
+     sessions, applied by the lifter, never by the regulator */
+  try{const pg=S.lib.programs.find(x=>x.id===s.progId),sg=pg&&adjSugFor(pg,first.ex,s.dayIdx);
+    if(sg)c+='<div class="card" style="padding:12px 14px;margin-top:10px;border-color:var(--amber)">'+
+      '<p style="font-size:13px;line-height:1.5">Allena suggests <b>'+(sg.d>0?'+':'\u2212')+uwNum(Math.abs(sg.d))+' '+uwUnit()+'</b>: '+esc(sg.why)+', '+sg.n+' sessions running.</p>'+
+      '<div class="row" style="gap:8px;margin-top:8px"><button data-a="adjSugApply" data-v="'+esc(sg.key)+'" class="btn" style="flex:1;border-color:var(--amber);color:var(--amber);font-size:13px">Apply from now on</button>'+
+      '<button data-a="adjSugDrop" data-v="'+esc(sg.key)+'" class="btn" style="flex:1;color:var(--dim);font-size:13px">Keep as written</button></div></div>'}
+  catch(e){oops('adjSugCard',e)}
   if(s.phase==='working'&&rows.indexOf(s.idx)>=0)c+='<p class="mono" style="color:var(--faint);font-size:13px;margin-top:8px">Set started on your watch · <span id="elapsed">'+mmss((Date.now()-(S.setStart||Date.now()))/1000)+'</span></p>';
   const timedEx=rows.every(i=>s.sets[i].secs);
   c+='<div class="strow hd" style="margin-top:14px"><span class="micro">Set</span>'+
@@ -39650,6 +39770,16 @@ function sessTableHtml(s,plan0,no,setsDone){
           '<span>'+x.v+'</span><span class="rir">'+x.left+'</span></button>').join('')+'</div>'}
     c+='</div>'});
   c+='<button data-a="addSetRow" data-v="'+no+'" style="width:100%;padding:12px 0 6px;color:var(--blue);font-size:15px;background:none;border:0">+ Add set</button>';
+  /* EARLIER SESSIONS OF THIS EXERCISE (owner, 5 Nov 2026: "see all the
+     previous weeks sets for that exercise in that one exercise screen as
+     well not just the corresponding one"). Newest first, every day it was
+     trained on, the set list as logged. */
+  try{const EH=exHistRows(first.ex,6,s);
+    if(EH.length)c+='<details style="margin-top:4px;border-top:1px solid var(--line)"><summary style="padding:10px 0;color:var(--dim);font-size:13px;list-style:none;cursor:pointer">Earlier sessions \u00b7 '+EH.length+' \u203a</summary>'+
+      EH.map(r=>'<div style="padding:8px 0;border-top:1px solid var(--line)"><p class="mono" style="font-size:11px;color:var(--faint);letter-spacing:.05em">'+
+        (r.week?'WEEK '+r.week+' \u00b7 ':'')+esc(r.day||'')+(r.day?' \u00b7 ':'')+esc(fmtDate(r.date))+'</p>'+
+        '<p style="font-size:13px;margin-top:3px;line-height:1.5">'+esc(r.sets.join(' \u00b7 '))+'</p></div>').join('')+'</details>'}
+  catch(e){oops('exHist',e)}
   /* the bar loaded for the set in play, at the weight in its row */
   try{const pi=rows.indexOf(nowI)>=0?nowI:openHere[0];const pst=pi!=null?s.sets[pi]:null;
     if(pst&&pst.bar&&!pst.secs&&S.lay.plates!==false){const kg=uwIn(sessNum(sessRowVals(s,pi).w));
@@ -47324,6 +47454,14 @@ function runAction(a,v,t,e){
       let n=0;fi.weeks.forEach(w=>{n+=weekCloseMark(p,w).length});
       S._recC=null;S.sheet=null;render();
       flash(p.block+' finished'+(n?' \u2014 '+n+' session'+(n===1?'':'s')+' marked skipped':'')+'.');break}
+    /* A LOAD CHANGE IS SUGGESTED, NEVER APPLIED (owner, 5 Nov 2026) */
+    case 'adjSugApply':{const p=S.sess?S.lib.programs.find(x=>x.id===S.sess.progId):activeProgSafe();
+      const sug=p&&p.adjSug&&p.adjSug[v];if(!sug)break;
+      applyAdj(sug.ex,sug.d,'suggested, applied by you');delete p.adjSug[v];saveLib();
+      flash((sug.d>0?'+':'')+uwNum(sug.d)+' '+uwUnit()+' on '+sug.ex+' from now on.');render();break}
+    case 'adjSugDrop':{const p=S.sess?S.lib.programs.find(x=>x.id===S.sess.progId):activeProgSafe();
+      if(!(p&&p.adjSug&&p.adjSug[v]))break;
+      delete p.adjSug[v];saveLib();flash('Kept as written.');render();break}
     case 'weekDrop':{const p=activeProgSafe();if(!p)break;
       /* the week the clock is on, not the pill being browsed (review J-13) */
       const c9=weekClock();
