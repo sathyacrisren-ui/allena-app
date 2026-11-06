@@ -1997,7 +1997,7 @@ if(S.sess){S.note=S.sess.note||S.note;
       if(c0&&(s0.log||[]).some(l=>l.ex===c0.ex&&l.setNo===c0.setNo)){const n0=sessAdv(s0);
         if(n0<0)s0.phase='done';else s0.idx=n0}}catch(e){oops('bootSess',e)}
     if(S.sess.phase!=='done')S.sess.phase='ready'}}
-const BUILD_ID='5d990e';  // stamped by tools/build.py with the content hash
+const BUILD_ID='4c34b4';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -10094,6 +10094,28 @@ function goalExMatch(goalEx,names){
       return !gp.length||!cp.length||cp.some(m=>gp.indexOf(m)>=0)});
     return hit.length===1?hit:null}
   catch(e){oops('goalExMatch',e);return null}}
+/* A GOAL COUNTS FROM ONE DAY (owner, 7 Nov 2026: "it thinks all my
+   different bench exercises on my volume and technique day are the same as
+   my heavy press and therefore putting them into the goal trend"). When the
+   goal's lift is written on more than one day of the active block, the
+   goal tracks ONE of them: the day the person picked (g.day, a day title),
+   else the day that writes the heaviest weight for it. On one day, or none,
+   nothing is filtered. goalDay is the one reader for every surface that
+   measures a goal: the trend, the stats, the chart, the crown. */
+function goalDays(g){
+  try{const p=activeProgSafe();if(!p||!p.days)return [];
+    const NM=goalNames(g).map(x=>String(x).toLowerCase());
+    const out=[];
+    p.days.forEach(d=>{let top=null;(d.exercises||[]).forEach(e=>{if(NM.indexOf(gBase(e.name).toLowerCase())<0)return;
+        (exSetLists(e)[0]||[]).forEach(st=>{if(st&&st.w!=null&&(top==null||+st.w>top))top=+st.w});if(top==null)top=0});
+      if(top!=null)out.push({title:String(d.name||''),top:top})});
+    return out}
+  catch(e){oops('goalDays',e);return []}}
+function goalDay(g){
+  try{const D=goalDays(g);if(D.length<2)return null;
+    if(g&&g.day&&D.some(d=>d.title.toLowerCase()===String(g.day).toLowerCase()))return String(g.day);
+    return D.slice().sort((a,b)=>b.top-a.top)[0].title}
+  catch(e){oops('goalDay',e);return null}}
 function goalNames(g,extra){
   try{
     const all=[];
@@ -10167,8 +10189,9 @@ function exPickApply(s,comp,pick){
   catch(e){oops('exPickApply',e);return 0}}
 function goalStats(g){
   const target=e1rm(g.w,g.r);const pts=[];let actual=false;
-  const NM=goalNames(g);
+  const NM=goalNames(g),day=goalDay(g);
   S.history.forEach(h=>{let best=0;
+    if(day&&String(h.dayTitle||'').toLowerCase()!==day.toLowerCase())return;   // the goal's own day (7 Nov 2026)
     h.log.forEach(l=>{if(NM.indexOf(gBase(l.ex))<0||!l.w||!l.r)return;
       best=Math.max(best,e1rm(l.w,l.r,l.rpe));if(l.w>=g.w&&l.r>=g.r)actual=true});
     if(best>0)pts.push({t:new Date(h.date).getTime(),v:best})});
@@ -29782,7 +29805,7 @@ function crownBuds(C){
     if(!injured){
       /* 1. goal distance, from the lift's own weekly bests */
       try{(S.goals||[]).filter(g=>g&&!g.done&&g.ex).forEach(g=>{if(goalNames(g).concat([g.ex]).some(blocked))return;
-        const T=liftTrend(goalNames(g));if(!T||!T.pts.length)return;
+        const T=liftTrend(goalNames(g),{day:goalDay(g)});if(!T||!T.pts.length)return;
         /* weeks that START inside the 28 days: a week begun before the cut
            reached five weeks back and was quoted as "your last 4 weeks" */
         const recent=T.pts.filter(p=>p.k>=cut);if(!recent.length)return;
@@ -40149,8 +40172,9 @@ function orphanCard(){
     '<p style="font-size:15px;line-height:1.55">'+n+' finding'+(n===1?'':'s')+' point at days that are no longer on this phone. '+
     'Clearing them lowers your points by what they were worth.</p>'+
     '<button data-a="orphanAsk" class="btn mt" style="color:var(--amber);border-color:var(--amber)">Clear them</button></div>'}
-function liftPts(ex){const raw=[];
+function liftPts(ex,day){const raw=[];
   S.history.forEach(h=>{let best=0;
+    if(day&&String(h.dayTitle||'').toLowerCase()!==String(day).toLowerCase())return;   // a goal's own day (7 Nov 2026)
     h.log.forEach(l=>{if(gBase(l.ex)!==ex||!l.w||!l.r)return;best=Math.max(best,e1rm(l.w,l.r,l.rpe))});
     if(best>0)raw.push({t:new Date(h.date).getTime(),v:best})});
   raw.sort((a,b)=>a.t-b.t);
@@ -40178,6 +40202,7 @@ function liftTrend(names,opts){
   const monKey=t=>{const d=new Date(t);d.setHours(12,0,0,0);const dow=(d.getDay()+6)%7;d.setDate(d.getDate()-dow);return dayKey(d)};
   const wk={};let any=0;
   (S.history||[]).forEach(h=>{if(h.run||!h.log)return;const t=new Date(h.date).getTime();if(!isFinite(t))return;
+    if(opts.day&&String(h.dayTitle||'').toLowerCase()!==String(opts.day).toLowerCase())return;   // a goal's own day (7 Nov 2026)
     h.log.forEach(l=>{if(NM.indexOf(gBase(l.ex))<0||!l.w||!l.r)return;any++;
       const k=monKey(t);const W=wk[k]||(wk[k]={k,t:new Date(k+'T12:00').getTime(),v:0,light:0,reps:[]});
       const e=e1rm(+l.w,+l.r,l.rpe);
@@ -40236,7 +40261,7 @@ function goalFlag(){try{return !!((S.acl&&S.acl.on)||(typeof activeProtocols==='
    falling lift there read "too few sessions". tone is green, amber or dim. */
 function goalLine(g){
   try{const st=goalStats(g);
-    let T=null;try{T=liftTrend(goalNames(g))}catch(e){oops('goalTrend',e)}
+    let T=null;try{T=liftTrend(goalNames(g),{day:goalDay(g)})}catch(e){oops('goalTrend',e)}
     const tst=T&&T.state,wk9=st.eta!=null?Math.max(1,Math.ceil(st.eta)):0,u=' '+uwUnit();
     let sub,tone='dim';
     if(g.done){sub='Done \u00b7 '+fmtDate(g.done)+'.';tone='green'}
@@ -40297,7 +40322,7 @@ function fmtShort(t){return new Date(t).toLocaleDateString(undefined,{day:'numer
 let CHART_N=0;
 function liftChart(ex,goal,o){
   o=o||{};
-  const pts=liftPts(ex);
+  const pts=liftPts(ex,goal?goalDay(goal):null);
   if(pts.length<2)return null;
   const target=goal?e1rm(goal.w,goal.r):null;
   const sl=goal&&!goal.done?trendSlope(pts):null;
@@ -42290,7 +42315,12 @@ function sheetHtml(){
       S.goals.map(g=>{const st=goalStats(g);
         return '<div class="card" style="display:flex;align-items:center;gap:12px;padding:12px 14px">'+
         '<div style="flex:1;min-width:0"><p class="mono" style="font-size:13px">'+esc(g.ex)+' '+uwStr(g.w)+' × '+g.r+'</p>'+
-        '<p class="mono" style="color:var(--faint);font-size:11px;margin-top:2px">'+(g.done?'done '+fmtDate(g.done):(st.cur?Math.round(uwNum(st.cur))+' / '+Math.round(uwNum(st.target))+' '+uwUnit()+' e1RM':'no data yet'))+'</p></div>'+
+        '<p class="mono" style="color:var(--faint);font-size:11px;margin-top:2px">'+(g.done?'done '+fmtDate(g.done):(st.cur?Math.round(uwNum(st.cur))+' / '+Math.round(uwNum(st.target))+' '+uwUnit()+' e1RM':'no data yet'))+'</p>'+
+        /* a lift on more than one day counts from one of them (7 Nov 2026) */
+        (function(){try{const D=goalDays(g);if(D.length<2)return '';const cur=goalDay(g);
+          return '<p class="micro" style="margin-top:8px">Counts from</p><div class="row" style="gap:6px;margin-top:4px;flex-wrap:wrap">'+
+            D.map(d=>'<button data-a="gDay" data-v="'+esc(g.id+'|'+d.title)+'" class="pill" style="font-size:13px;padding:5px 9px;'+(d.title===cur?'background:var(--text);color:var(--bg);border-color:var(--text);font-weight:600':'color:var(--dim)')+'">'+esc(d.title)+(d.top?' \u00b7 '+uwNum(d.top):'')+'</button>').join('')+'</div>'}
+          catch(e){oops('goalDayPills',e);return ''}})()+'</div>'+
         '<button data-a="gDel" data-v="'+g.id+'" style="color:var(--red);font-size:13px;padding:6px">Remove</button></div>'}).join('')+'</div>'}
     if(S.goals.length<3){
       inner+='<p class="eyebrow" style="margin-top:'+(S.goals.length?'18':'0')+'px">Add a goal · lift</p>'+
@@ -42302,7 +42332,7 @@ function sheetHtml(){
       stepper('gform.w','Weight',S.gform.w,UNITS.w==='lb'?5:2.5,uwUnit())+stepper('gform.r','Reps',S.gform.r,1,'')+'</div>'+
       '<button data-a="gAdd" class="big disp mt" style="background:'+(gex?'var(--green)':'var(--raised)')+';color:'+(gex?'var(--bg)':'var(--faint)')+';font-size:17px">Add goal</button>';
     }else inner+='<p style="color:var(--dim);font-size:13px;line-height:1.55;margin-top:16px">Three goals is the cap for a block. Spreading focus further dilutes the volume each lift gets — finish or drop one to add another.</p>';
-    inner+='<p style="color:var(--faint);font-size:11px;line-height:1.5;margin-top:16px">Progress and projections use estimated 1RM from every logged set of that lift. The projection fits a line through your last ~4 months — strength gain flattens over time, so treat dates as optimistic. A goal only counts as DONE when you log the actual set.</p>';
+    inner+='<p style="color:var(--faint);font-size:11px;line-height:1.5;margin-top:16px">A lift written on more than one day counts from the day you pick, the heaviest by default, so a volume or technique day never sits in a heavy lift\u2019s trend. Progress and projections use estimated 1RM from every logged set of that lift on that day. The projection fits a line through your last ~4 months — strength gain flattens over time, so treat dates as optimistic. A goal only counts as DONE when you log the actual set.</p>';
     return wrapSheet('Lift goals',inner)}
   if(S.sheet.t==='addex'){
     const f=S.axf,onS='background:var(--text);color:var(--bg);border-color:var(--text);font-weight:600';
@@ -49583,6 +49613,8 @@ function runAction(a,v,t,e){
       S.goals.push({id:'g'+Date.now().toString(36),ex:ex,w:Math.round(uwIn(+f.w)*4)/4,r:+f.r,created:Date.now(),done:null});
       lset(K_GOALS,S.goals);f.ex='';render();break}
     case 'gDel':S.goals=S.goals.filter(g=>g.id!==v);lset(K_GOALS,S.goals);render();break;
+    case 'gDay':{const q=String(v||'');const i=q.indexOf('|');if(i<0)break;const g=S.goals.find(x=>x.id===q.slice(0,i));if(!g)break;
+      g.day=q.slice(i+1);lset(K_GOALS,S.goals);render();break}
 
     case 'unitW':unitsSet('w',v);render();flash(v==='lb'?'Weights now read in pounds — stored metric underneath.':'Weights back to kilograms.');break;
     case 'unitD':unitsSet('d',v);render();flash(v==='mi'?'Distances now read in miles — stored metric underneath.':'Distances back to kilometres.');break;
