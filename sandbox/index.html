@@ -2001,7 +2001,7 @@ if(S.sess){S.note=S.sess.note||S.note;
       if(c0&&(s0.log||[]).some(l=>l.ex===c0.ex&&l.setNo===c0.setNo)){const n0=sessAdv(s0);
         if(n0<0)s0.phase='done';else s0.idx=n0}}catch(e){oops('bootSess',e)}
     if(S.sess.phase!=='done')S.sess.phase='ready'}}
-const BUILD_ID='5a715a';  // stamped by tools/build.py with the content hash
+const BUILD_ID='5e7db0';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -8754,8 +8754,17 @@ A.commit=(confirmed)=>{const s=S.sess,c=s.sets[s.idx],timed=!!c.secs;
        2026: "superset exercises don't need rest"). Mid-round you walk
        straight to the next exercise; the clock runs after the round
        closes. See the weaver in 30-action-router. */
-    const mid=(c.ssNo!=null&&c.ssEnd===false);
-    const r=mid?0:(c.rest||0);
+    /* THE REST FOLLOWS THE ROUND, NOT A MARKED SET (owner, 9 Nov 2026:
+       "sometimes has no rest"). The rest used to run only after the set
+       marked last in the round, so a round done in the other order rested
+       in the middle and never at the end. Now: mid-round while any set of
+       this round is still open, and the rest when the round closes,
+       whichever set closed it; the round rests for its longest exercise. */
+    let mid=false,r=c.rest||0;
+    if(c.ssNo!=null){const round=s.sets.filter(x=>x&&x.ssNo===c.ssNo);
+      mid=round.some(x=>x!==c&&!sessClosed(s,x));
+      if(!mid)r=round.reduce((m,x)=>Math.max(m,+x.rest||0),0)}
+    if(mid)r=0;
     if(r>5){audioCancel();S.restBeep=audioIn(r);S.restEnd=Date.now()+r*1000;S.restTotal=r;s.phase='resting'}
     else{s.idx=ni9;s.phase='ready';if(mid){S.restEnd=null;audioCancel()}}}
   const gHit=checkGoals(e);
@@ -49612,6 +49621,16 @@ function runAction(a,v,t,e){
       s.sets.forEach(st=>{if(lg(st))done.push(st);
         else if(ord.indexOf(st.exNo)>=0)(by[st.exNo]=by[st.exNo]||[]).push(st);
         else rest.push(st)});
+      /* THE ROUND STARTS WITH THE PARTNER (owner, 9 Nov 2026: "starts the
+         second one you click as the first one"). You open the weaver
+         having just done a set of the exercise in play, so the first
+         round must not hand you that exercise again: the exercise whose
+         set was logged last goes to the END of the order, and the weave
+         opens on its partner. Nothing else about the order changes. */
+      try{const lastL=s.log.length?s.log[s.log.length-1]:null;
+        const lastNo=lastL?(s.sets.concat(done).find(x=>x.ex===lastL.ex)||{}).exNo:null;
+        const k=lastNo!=null?ord.indexOf(lastNo):-1;
+        if(k>=0&&k!==ord.length-1){const rot=ord.slice(k+1).concat(ord.slice(0,k+1));ord.length=0;rot.forEach(n=>ord.push(n))}}catch(e9){oops('ssGo.rotate',e9)}
       /* ═══ A SUPERSET HAS ONE REST, AT THE END OF THE ROUND (owner,
          14 Sep 2026: "superset exercises don't need rest") ══════════
          The weave reordered the sets and nothing else, so the app kept
@@ -49629,8 +49648,14 @@ function runAction(a,v,t,e){
         rnd++}
       if(!weave.length)break;
       s.sets=done.concat(weave,rest);
-      s.idx=done.length;
-      if(s.phase!=='resting')s.phase='ready';
+      /* the screen follows the weave: a swiped-to exercise or a rest pinned
+         elsewhere would have held the old page over the new order. Mid-rest
+         idx stays on the set just finished (sessAdv reads forward from it,
+         so the clock lands on the weave's first set); otherwise the first
+         woven set is the one in play. */
+      S.sessEx=null;s.pin=null;
+      if(s.phase==='resting'&&typeof S.restEnd==='number'&&S.restEnd>Date.now())s.idx=Math.max(0,done.length-1);
+      else{s.idx=done.length;s.phase='ready'}
       S.ssOrd=null;S.sheet=null;persistActive();
       flash('Superset on — '+weave.length+' sets woven.');render();break}
     case 'tuneOpen':S.sheet={t:'tune'};render();break;
