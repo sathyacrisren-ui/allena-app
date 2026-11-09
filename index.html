@@ -2001,7 +2001,7 @@ if(S.sess){S.note=S.sess.note||S.note;
       if(c0&&(s0.log||[]).some(l=>l.ex===c0.ex&&l.setNo===c0.setNo)){const n0=sessAdv(s0);
         if(n0<0)s0.phase='done';else s0.idx=n0}}catch(e){oops('bootSess',e)}
     if(S.sess.phase!=='done')S.sess.phase='ready'}}
-const BUILD_ID='7fc048';  // stamped by tools/build.py with the content hash
+const BUILD_ID='b7c188';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -8511,6 +8511,34 @@ A.startRehab=(pid,di)=>{
     phase:'ready',log:[],wu:{},subs:{},startedAt:Date.now(),rehab:true};
   S.note={sleep:'',fatigue:'',knee:''};S.sessEx=null;S.rpeAsk=null;   // a new session opens on its own first exercise
   S.view='session';persistActive();wakeOn();render()};
+/* WHAT TO KEEP WHEN TIME IS SHORT (owner, 9 Nov 2026: "should be able to
+   adjust time and what you want to spend in the gym for that session").
+   One reader for an exercise's keep-priority, read by the preview's
+   presets and time pills and by the mid-session trim: a goal lift first,
+   then a barbell lift, then anything heavy or with three sets or more. */
+function exPrio(name,first,nSets){
+  let sc=0;try{
+    if(first&&first.bar)sc+=3;if(first&&(+first.targetW||0)>=60)sc+=1;
+    if((nSets||0)>=3)sc+=1;
+    if(typeof isGoalLift==='function'&&isGoalLift(name))sc+=8}catch(e){oops('exPrio',e)}
+  return sc}
+/* trim the live session to about `min` minutes: the exercise in play and
+   its open sets stay; the rest are kept by priority while they fit and
+   the others are skipped whole (s.skipped, the table's own flag). The
+   previous skip list is kept so one tap undoes it. */
+function sessFit(min){
+  const s=S.sess;if(!s)return 0;
+  const cur=s.sets[sessNow(s)];const curNo=cur?cur.exNo:null;
+  const open=no=>s.sets.filter(x=>x.exNo===no&&!sessClosed(s,x));
+  const nos=[];s.sets.forEach(x=>{if(nos.indexOf(x.exNo)<0&&open(x.exNo).length&&(s.skipped||[]).indexOf(x.exNo)<0)nos.push(x.exNo)});
+  const rank=nos.filter(n=>n!==curNo).map(n=>{const o=open(n);return{no:n,s:exPrio(o[0].ex,o[0],o.length)}}).sort((a,b)=>b.s-a.s);
+  let keep=curNo!=null?open(curNo).slice():[];
+  const kept=[];
+  rank.forEach(r=>{const o=open(r.no);if(estMins(keep.concat(o))<=min){keep=keep.concat(o);kept.push(r.no)}});
+  const drop=rank.map(r=>r.no).filter(n=>kept.indexOf(n)<0);
+  s.fitPrev=(s.skipped||[]).slice();s.fitMin=min;
+  s.skipped=(s.skipped||[]).concat(drop);
+  persistActive();return drop.length}
 function estMins(sets){
   if(!sets||!sets.length)return 0;
   const work=sets.reduce((a,x)=>a+(x.rest||0)+(x.secs?x.secs*(x.perSide?2:1):45),0);
@@ -44178,6 +44206,9 @@ function sheetHtml(){
      inner+='<div class="row mt" style="gap:8px">'+
       [['full','Full'],['short','~2/3'],['min','Key lifts']].map(m=>
         '<button data-a="prevMode" data-v="'+m[0]+'" class="pill" style="flex:1;font-size:13px'+(shown===m[0]?';background:var(--text);color:var(--bg);border-color:var(--text);font-weight:600':'')+'">'+m[1]+'</button>').join('')+'</div>';
+     /* time today (9 Nov 2026): the minutes you have, kept by priority */
+     inner+='<p class="micro" style="margin-top:12px">Time today</p><div class="row" style="gap:6px;margin-top:6px">'+
+      [30,45,60,75,90].map(m=>'<button data-a="prevFit" data-v="'+m+'" class="pill" style="flex:1;font-size:13px;padding:6px 0'+(pv.preset==='fit'&&pv.fitMin===m?';background:var(--text);color:var(--bg);border-color:var(--text);font-weight:600':'')+'">'+m+'</button>').join('')+'</div>';
      const cutN=pv.ex.filter(e=>e.cut).length;
      if(!untouched&&!pv.preset)inner+='<p class="mono" style="color:var(--faint);font-size:11px;margin-top:8px">Trimmed by hand — tap a preset to start over.</p>';
      else if(cutN)inner+='<p class="mono" style="color:var(--faint);font-size:11px;margin-top:8px">'+cutN+' cut from this week — presets apply to what is left.</p>';}
@@ -44626,6 +44657,7 @@ function sheetHtml(){
       row('sessMenuGo','coachOpen','Ask Allena','she has the live session in front of her')+
       row('modifyOpen','','Modify','tune the load, swap, skip, superset')+
       row('planOpen','','What is left',remain.length+' exercise'+(remain.length===1?'':'s')+' \u00b7 '+setsLeft+' set'+(setsLeft===1?'':'s')+' \u00b7 about '+estMins(s2.sets.slice(s2.idx))+' min')+
+      (s2.fitPrev?row('sessFitUndo','','Undo the time trim','back to the full session'):row('fitOpen','','Short on time','skip what fits least, keep the lifts that matter'))+
       /* "Already did this set? Log it" left with the set card (1 Oct 2026):
          every row of the table logs without a clock */
       (isRehabSession()?row('flagOpen','','Flag this for my physio','pain, swelling or instability'):'')+
@@ -44637,6 +44669,12 @@ function sheetHtml(){
   /* a row of the session table, from its set number (1 Oct 2026): a
      planned set is skipped and stays on screen greyed with an undo; a set
      added this session is removed. Nothing logged is touched from here. */
+  if(S.sheet.t==='fit'){
+    const s2=S.sess;if(!s2)return '';
+    const left=estMins(s2.sets.filter(x=>!sessClosed(s2,x)));
+    return wrapSheet('Short on time',
+      '<p style="color:var(--dim);font-size:13px;line-height:1.55">About '+left+' min left as written. Pick what you have: the exercise you are on stays, your goal and barbell lifts are kept first, and the rest are skipped whole. One tap in the menu brings them back.</p>'+
+      '<div class="row mt" style="gap:8px;flex-wrap:wrap">'+[15,20,30,45].map(m=>'<button data-a="sessFit" data-v="'+m+'" class="btn" style="flex:1;min-width:30%;font-size:15px">'+m+' min</button>').join('')+'</div>')}
   if(S.sheet.t==='srow'){
     const s2=S.sess,st=s2&&s2.sets[S.sheet.i];if(!st)return '';
     const rows=sessRowsOf(s2,st.exNo),n=rows.indexOf(S.sheet.i)+1;
@@ -48690,9 +48728,16 @@ function runAction(a,v,t,e){
       if(d<0&&live.length>1)e.sets.filter(s2=>!s2.cut).slice(-1)[0].cut=true;
       if(d>0){const c=e.sets.filter(s2=>s2.cut)[0];if(c)delete c.cut}
       S.prev.preset=null;render();break}
-    case 'prevMode':{const pv=S.prev;pv.mode=v;pv.preset=v;
-      const rank=pv.ex.map((e,i)=>({i:i,cut:!!e.cut,s:(e.sets[0].bar?3:0)+((e.sets[0].targetW||0)>=60?1:0)+
-        (S.goals.some(g=>{const gb=gBase(g.ex).toLowerCase().trim();return gb&&gBase(e.name).toLowerCase().trim()===gb})?8:0)+(e.sets.length>=3?1:0)}))
+    /* TIME TODAY (owner, 9 Nov 2026): a budget in minutes keeps exercises
+       by priority while the estimate fits; the rest arrive unticked and go
+       through the same move / push / cut decision as any drop */
+    case 'prevFit':{const pv=S.prev;if(!pv)break;const min=+v||60;pv.mode='fit';pv.preset='fit';pv.fitMin=min;
+      const rank=pv.ex.map((e,i)=>({i:i,cut:!!e.cut,s:exPrio(e.name,e.sets[0],e.sets.length)})).filter(x=>!x.cut).sort((a,b)=>b.s-a.s);
+      pv.ex.forEach(e=>{if(e.cut)return;e.keep=false;e.sets.forEach(s2=>delete s2.cut)});
+      let keep=[];rank.forEach((r,k)=>{const e=pv.ex[r.i];if(k===0||estMins(keep.concat(e.sets))<=min){keep=keep.concat(e.sets);e.keep=true}});
+      render();break}
+    case 'prevMode':{const pv=S.prev;pv.mode=v;pv.preset=v;delete pv.fitMin;
+      const rank=pv.ex.map((e,i)=>({i:i,cut:!!e.cut,s:exPrio(e.name,e.sets[0],e.sets.length)}))
         .filter(x=>!x.cut).sort((a,b)=>b.s-a.s);
       pv.ex.forEach(e=>{if(e.cut)return;e.keep=true;e.sets.forEach(s2=>delete s2.cut)});
       if(v==='short'){const cutN=Math.floor(pv.ex.length/3);
@@ -49658,6 +49703,10 @@ function runAction(a,v,t,e){
       else{s.idx=done.length;s.phase='ready'}
       S.ssOrd=null;S.sheet=null;persistActive();
       flash('Superset on — '+weave.length+' sets woven.');render();break}
+    case 'fitOpen':S.sheet={t:'fit'};render();break;
+    case 'sessFit':{const n=sessFit(+v||30);S.sheet=null;render();
+      flash(n?n+' exercise'+(n===1?'':'s')+' skipped to fit about '+(+v||30)+' min. Undo is in the menu.':'It already fits in about '+(+v||30)+' min.');break}
+    case 'sessFitUndo':{const s=S.sess;if(!s||!s.fitPrev)break;s.skipped=s.fitPrev;delete s.fitPrev;delete s.fitMin;persistActive();S.sheet=null;render();flash('Back to the full session.');break}
     case 'tuneOpen':S.sheet={t:'tune'};render();break;
     case 'tuneBy':{const cur=S.sess.sets[sessNow(S.sess)];applyAdj(cur.ex,+v,'manual');
       /* a manual tune is the user's call and never counts against
