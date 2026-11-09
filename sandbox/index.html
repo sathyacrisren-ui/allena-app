@@ -2001,7 +2001,7 @@ if(S.sess){S.note=S.sess.note||S.note;
       if(c0&&(s0.log||[]).some(l=>l.ex===c0.ex&&l.setNo===c0.setNo)){const n0=sessAdv(s0);
         if(n0<0)s0.phase='done';else s0.idx=n0}}catch(e){oops('bootSess',e)}
     if(S.sess.phase!=='done')S.sess.phase='ready'}}
-const BUILD_ID='0cea4a';  // stamped by tools/build.py with the content hash
+const BUILD_ID='5a715a';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -9033,6 +9033,9 @@ A.saveExit=complete=>{const s=S.sess;if(!s)return;
      witnessed */
   try{if(complete)setTimeout(function(){const h9=S.history.find(x=>x&&x.id===recId);if(h9)hrWitnessAsk(h9)},1500)}catch(e){oops('saveExit.witness',e)}
   flash(ok?(complete?'Session saved.':'Saved as unfinished \u2014 pick it back up from Today whenever.'):'Storage is full or blocked — export a backup from Data.');
+  /* THE WRAP OPENS ITSELF (9 Nov 2026): the session that finishes the block lands on the score, once */
+  try{if(complete){S._recC=null;const pw=S.lib.programs.find(p=>p.id===rec.progId);
+    if(pw&&!pw.wrapSeen&&blockDone(pw)){pw.wrapSeen=today();saveLib();runAction('bwOpen',pw.id);return}}}catch(e){oops('saveExit.wrap',e)}
   try{if(S.view!=='today'){S.view='today';render()}}catch(e){}};
 A.discardYes=()=>{if(S.sess){const rid=S.sess.recId||String(S.sess.startedAt);
     S.history=S.history.filter(h=>h.id!==rid);saveHistory();
@@ -34438,28 +34441,113 @@ function reviewAdherence(p){
       esc(b.worst.map(x=>String(x.n).replace(/ — .*/,'')+' ('+x.times+' week'+(x.times===1?'':'s')+')').join(', '))+
       '. If something gets left out every week, it belongs at the start of the session or not in the block at all.</p>':'')+
     '</div>'}
-function viewReview(){
-  const p=S.reviewProg||activeProgSafe();
+/* THE BLOCK WRAP (owner, 9 Nov 2026: "make the transition between blocks
+   from finishing one to starting the next very seamless... finish the
+   block, you get an adherence score for your block that you can flaunt on
+   social, then the block asks your next goals and then it makes a new one
+   from the last ones, tells you trends"). One page, three steps, one
+   direction: 1 the score (adherence, the numbers, what moved, a share
+   card), 2 the goals (hit, kept, changed), 3 the next block built from
+   this one with every change named, and Start. It opens itself the moment
+   the last session of a finished block saves, and from every door the
+   review had. reviewCore is the analysis both the wrap and the old review
+   page draw; nextBlockBody is the next block as both the wrap and the
+   sheet show it. */
+function viewBlockWrap(){
+  try{
+    const bw=S.bw||{};const p=(bw.pid?S.lib.programs.find(x=>x.id===bw.pid):null)||activeProgSafe();
+    if(!p)return '<div class="view pad stg phpad"><p style="color:var(--dim)">No block to wrap up.</p><button data-a="nav" data-v="home" class="btn mt">Back</button></div>';
+    const step=Math.max(1,Math.min(3,+bw.step||1));
+    const R=reviewCore(p);
+    const nx=blockNextName(p);
+    const dots=[1,2,3].map(i=>'<button data-a="bwStep" data-v="'+i+'" aria-label="Step '+i+'" style="flex:1;height:4px;border-radius:4px;background:'+(i<=step?'var(--amber)':'var(--line)')+';border:0;padding:0"></button>').join('');
+    let h='<div class="view pad stg phpad">'+
+      '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px"><p class="eyebrow" style="color:var(--amber)">Block complete \u00b7 step '+step+' of 3</p>'+
+      '<button data-a="nav" data-v="home" class="mono" style="color:var(--faint);font-size:11px;padding:4px 0">Later \u203a</button></div>'+
+      '<div style="display:flex;gap:6px;margin-top:10px">'+dots+'</div>';
+    if(step===1){
+      const st=R.st,adh=R.adh;
+      h+='<h1 class="disp" style="font-size:28px;font-weight:600;margin-top:16px;line-height:1.15">'+esc(p.block)+'</h1>'+
+        '<div class="card mt" style="padding:20px 16px;text-align:center;border-color:var(--amber)">'+
+        '<p class="eyebrow">Adherence</p>'+
+        '<p class="disp" style="font-size:44px;font-weight:600;line-height:1;margin-top:6px;color:'+(adh>=85?'var(--green)':adh>=70?'var(--text)':'var(--amber)')+'">'+adh+'%</p>'+
+        '<p style="color:var(--dim);font-size:13px;margin-top:6px">'+(R.bAdh&&R.bAdh.pct!=null?'of the sets, done as written':'of the sessions, logged')+' \u00b7 '+st.logged+' session'+(st.logged===1?'':'s')+' over '+(st.days/7).toFixed(1)+' weeks</p>'+
+        '<button data-a="blockShare" data-v="'+esc(p.id)+'" class="btn mt" style="border-color:var(--amber);color:var(--amber)">Share your block</button></div>'+
+        '<div class="row mt">'+statBox(st.logged,'sessions')+statBox(tonStr(st.ton),'lifted')+statBox(String(st.prs||0),'personal best'+(st.prs===1?'':'s'))+'</div>'+
+        R.analysis+
+        '<button data-a="bwStep" data-v="2" class="big disp mt2" style="background:var(--amber);color:var(--bg);font-size:15px">Your goals \u203a</button>'}
+    else if(step===2){
+      const G=blockGoals();
+      const hit=G.filter(x=>x.done);
+      h+='<h1 class="disp" style="font-size:28px;font-weight:600;margin-top:16px;line-height:1.15">What are you training for next?</h1>'+
+        (hit.length?'<div class="card mt" style="padding:14px 16px;border-color:var(--green)"><p class="eyebrow" style="color:var(--green)">Hit this block</p>'+
+          hit.map(x=>'<p style="font-size:15px;font-weight:600;margin-top:6px">'+esc(x.ex)+' '+esc(x.goal)+'</p>').join('')+
+          '<p style="color:var(--dim);font-size:13px;line-height:1.55;margin-top:6px">A goal you have hit can come off, or move up. '+esc(nx.replace(/^./,c=>c.toUpperCase()))+' is written toward whatever is left.</p></div>':'')+
+        blockGoalsHtml(p)+
+        '<button data-a="bwStep" data-v="3" class="big disp mt2" style="background:var(--amber);color:var(--bg);font-size:15px">Build '+esc(nx)+' from this one \u203a</button>'}
+    else{
+      if(!S.nb||S.nb.from!==p.id){try{const nb=nextBlock();if(nb){nb.from=p.id;S.nb=nb}}catch(e){oops('bw.next',e)}}
+      const rec=(R.adh<70)?'repeat':'next';
+      h+='<h1 class="disp" style="font-size:28px;font-weight:600;margin-top:16px;line-height:1.15">'+esc(S.nb?S.nb.prog.block:nx)+'</h1>'+
+        '<p style="color:var(--dim);font-size:13px;line-height:1.6;margin-top:8px">'+(rec==='repeat'
+          ?'At '+R.adh+'% adherence this block never got a fair run. Allena would run it again from week 1; the build below is here if you would rather move on.'
+          :'Built from what you actually lifted: your logged loads are the base, lifts that climbed step up, flat or falling lifts hold, and the volume leans toward what was under-trained.')+'</p>'+
+        (S.nb?nextBlockBody(S.nb,{page:true}):'<p style="color:var(--dim);font-size:13px;margin-top:12px">This block cannot be built on (it needs two weeks or more).</p>')+
+        (S.nb?'<button data-a="nextBlockGo" class="big disp mt2" style="background:'+(rec==='next'?'var(--amber)':'var(--raised)')+';color:'+(rec==='next'?'var(--bg)':'var(--text)')+';font-size:15px">Start '+esc(S.nb.prog.block)+'</button>':'')+
+        '<button data-a="repeatBlock" class="btn mt" style="'+(rec==='repeat'?'border-color:var(--amber);color:var(--amber)':'')+'">Run '+esc(p.block)+' again from week 1</button>'+
+        '<button data-a="coachReview" class="btn mt">Talk it through with Allena first</button>'}
+    return h+'</div>'}
+  catch(e){oops('viewBlockWrap',e);return '<div class="view pad stg phpad"><p style="color:var(--dim)">The wrap-up could not be drawn.</p><button data-a="nav" data-v="home" class="btn mt">Back</button></div>'}}
+/* the block as a share card: the score, the numbers, the biggest move */
+function blockShareRun(pid){
+  try{
+    const p=(pid?S.lib.programs.find(x=>x.id===pid):null)||activeProgSafe();const R=p&&reviewCore(p);
+    if(!R||!R.st){flash('Nothing to share for this block yet.');return}
+    const st=R.st;
+    const c=document.createElement('canvas');c.width=1080;c.height=1920;
+    const x=c.getContext('2d');
+    x.fillStyle='#151310';x.fillRect(0,0,1080,1920);
+    const halo=x.createRadialGradient(540,860,100,540,860,900);
+    halo.addColorStop(0,'rgba(240,238,230,0.10)');halo.addColorStop(1,'rgba(240,238,230,0)');
+    x.fillStyle=halo;x.fillRect(0,0,1080,1920);
+    x.textAlign='center';
+    const grad=x.createLinearGradient(140,0,940,0);
+    grad.addColorStop(0,'#F0EEE6');grad.addColorStop(1,'#30D158');
+    x.fillStyle='#8A8578';x.font='600 30px -apple-system,system-ui,sans-serif';
+    x.fillText('A  L  L  E  N  A',540,120);
+    x.fillStyle='#E8E5DC';x.font='600 44px -apple-system,system-ui,sans-serif';
+    x.fillText(String(p.block).toUpperCase().slice(0,22),540,250);
+    x.fillStyle=grad;x.font='800 210px -apple-system,system-ui,sans-serif';
+    x.fillText(R.adh+'%',540,520);
+    x.fillStyle='#8A8578';x.font='500 36px -apple-system,system-ui,sans-serif';
+    x.fillText((R.bAdh&&R.bAdh.pct!=null?'of the sets, done as written':'of the sessions, logged'),540,590);
+    let y=800;
+    const stat=(big,small)=>{x.fillStyle=grad;x.font='800 96px -apple-system,system-ui,sans-serif';x.fillText(big,540,y);
+      x.fillStyle='#8A8578';x.font='500 36px -apple-system,system-ui,sans-serif';x.fillText(small,540,y+58);y+=210};
+    stat(String(st.logged),'sessions over '+(st.days/7).toFixed(1)+' weeks');
+    stat(tonStr(st.ton),'lifted');
+    if(st.prs)stat(String(st.prs),'personal best'+(st.prs===1?'':'s'));
+    const b=st.best&&st.best[0];
+    if(b)stat('+'+uwNum(Math.round(b.d))+' '+uwUnit(),b.ex.length>18?'on the biggest mover':b.ex+', the biggest move');
+    x.fillStyle='#8A8578';x.font='500 36px -apple-system,system-ui,sans-serif';
+    x.fillText('a block of real training',540,1830);
+    S.shareImg=c.toDataURL('image/png');S.shareTitle='Your block';
+    const openSheet=function(){S.sheet={t:'treeshare'};render()};
+    if(navigator.share&&navigator.canShare&&c.toBlob){
+      c.toBlob(function(bl){try{
+        const f=new File([bl],'allena-block.png',{type:'image/png'});
+        if(navigator.canShare({files:[f]}))navigator.share({files:[f]}).catch(function(){});
+        else openSheet()}catch(e){openSheet()}},'image/png')}
+    else openSheet()}
+  catch(e){oops('blockShareRun',e);flash('Could not draw the card.')}}
+/* the analysis the review page and the wrap both draw: what went well,
+   what struggled, the patterns; with the numbers behind it */
+function reviewCore(p){
   const st=blockStats(p);
-  if(!st)return '<div class="view pad stg phpad"><p style="color:var(--dim)">Nothing logged for this block yet.</p>'+
-    '<button data-a="nav" data-v="home" class="btn mt">Back</button></div>';
-  /* ONE ADHERENCE, ONE READER (J-6): the header used to divide sessions
-     logged by planned days (a repeated day took it past 100%) while the
-     adherence card below printed blockAdherence's set-level figure. Both
-     read blockAdherence now; the old ratio only stands in, capped at 100,
-     when that reader has nothing to say. */
-  const bAdh=(function(){try{return blockAdherence(p)}catch(e){oops('viewReview.adh',e);return null}})();
+  if(!st)return {st:null,adh:0,bAdh:null,analysis:''};
+  const bAdh=(function(){try{return blockAdherence(p)}catch(e){oops('reviewCore.adh',e);return null}})();
   const adh=(bAdh&&bAdh.pct!=null)?bAdh.pct:Math.min(100,Math.round(st.logged/Math.max(1,st.planned)*100));
-  const wk=(st.days/7);
-  let h='<div class="view pad stg phpad">'+
-   '<p class="eyebrow" style="color:var(--amber)">Block complete</p>'+
-   '<h1 class="disp" style="font-size:28px;font-weight:600;margin-top:3px;line-height:1.15">'+esc(p.block)+'</h1>'+
-   '<p style="color:var(--dim);font-size:13px;line-height:1.6;margin-top:8px">'+
-   st.logged+' sessions over '+wk.toFixed(1)+' weeks, '+st.sets+' sets, '+tonStr(st.ton)+' moved'+
-   (st.prs?', '+st.prs+' personal best'+(st.prs===1?'':'s'):'')+'. Here is what the numbers say before you decide what comes next.</p>';
-  h+='<div class="row mt2">'+statBox(adh+'%',bAdh&&bAdh.pct!=null?'of the sets':'logged')+statBox(st.logged,'sessions')+statBox(tonStr(st.ton),'lifted')+'</div>';
-  /* the adherence read shows on every review (J-6): a block where nothing
-     improved is the one that needs it most */
+  let h='';
   h+=reviewAdherence(p);
   const good=st.best;
   if(good.length){
@@ -34474,10 +34562,6 @@ function viewReview(){
   if(strug.length||st.cut.length){
     h+='<p class="eyebrow mt2" style="color:var(--amber)">What struggled</p><div style="margin-top:12px;display:flex;flex-direction:column;gap:8px">';
     strug.forEach(x=>{
-      /* A DECLINE IS NEVER A PLATEAU (J-6, the safety rule): a lift that
-         fell says so, with both numbers, and is held, not loaded. The
-         physio is named only with rehab on or a recent pain flag
-         (goalFlag, the 27 Sep ruling). */
       const fell=x.pct<=-1;
       const why=fell?'fell from '+uwNum(Math.round(x.from))+' to '+uwNum(Math.round(x.to))+' '+uwUnit()+' estimated max across the block. Hold the load'+
           (((typeof goalFlag==='function')&&goalFlag())?' and raise it with your physio before adding any.':' and look at sleep, food and recovery before adding any.')
@@ -34490,10 +34574,10 @@ function viewReview(){
         '<span class="mono" style="color:'+(x.d<0?'var(--red)':'var(--faint)')+';font-size:13px">'+(x.d>=0?'+':'')+uwNum(Math.round(x.d))+' '+uwUnit()+'</span></div>'+
         '<p style="color:var(--dim);font-size:13px;line-height:1.5;margin-top:4px">'+esc(why)+'</p></div>'});
     if(st.cut.length)h+='<div class="card" style="padding:13px 15px"><p style="color:var(--dim);font-size:13px;line-height:1.55">'+
-      st.cut.length+' exercise'+(st.cut.length===1?'':'s')+' had load taken off mid-block ('+st.cut.slice(0,3).map(x=>x.replace(/ — .*/,'')).join(', ')+'). That is the system working — but if it keeps happening, the starting loads were too ambitious.</p></div>';
+      st.cut.length+' exercise'+(st.cut.length===1?'':'s')+' had load taken off mid-block ('+st.cut.slice(0,3).map(x=>x.replace(/ — .*/,'')).join(', ')+'). That is the system working — but if it keeps happening on the same lift, the programmed load is too ambitious for the recovery you are getting.</p></div>';
     h+='</div>'}
   const notes=[];
-  if(adh<75)notes.push('You logged '+adh+'% of the programmed '+(bAdh&&bAdh.pct!=null?'sets':'sessions')+'. Below about three quarters a block stops being the block that was written — the fix is usually fewer days, not more discipline.');
+  if(adh<75)notes.push('You logged '+adh+'% of the programmed '+(bAdh&&bAdh.pct!=null?'sets':'sessions')+'. Below about three quarters a block stops being the block that was written — the fix is usually fewer days, not harder ones.');
   if(st.lowVol.length)notes.push(st.lowVol.join(', ')+' sat under about 6 sets a week — maintenance territory rather than growth.');
   if(st.highVol.length)notes.push(st.highVol.join(', ')+' ran above 20 sets a week, where returns flatten but fatigue does not.');
   if(st.eased)notes.push(st.eased+' session'+(st.eased===1?' was':'s were')+' eased for low readiness — worth looking at sleep and stress before adding volume.');
@@ -34501,6 +34585,29 @@ function viewReview(){
   if(notes.length)h+='<p class="eyebrow mt2">Patterns worth carrying forward</p>'+
     '<div class="card mt" style="padding:14px 16px;display:flex;flex-direction:column;gap:8px">'+
     notes.map(n=>'<p style="color:var(--dim);font-size:13px;line-height:1.55">· '+esc(n)+'</p>').join('')+'</div>';
+  return {st,adh,bAdh,analysis:h}}
+function viewReview(){
+  const p=S.reviewProg||activeProgSafe();
+  const st=blockStats(p);
+  if(!st)return '<div class="view pad stg phpad"><p style="color:var(--dim)">Nothing logged for this block yet.</p>'+
+    '<button data-a="nav" data-v="home" class="btn mt">Back</button></div>';
+  /* ONE ADHERENCE, ONE READER (J-6): the header used to divide sessions
+     logged by planned days (a repeated day took it past 100%) while the
+     adherence card below printed blockAdherence's set-level figure. Both
+     read blockAdherence now; the old ratio only stands in, capped at 100,
+     when that reader has nothing to say. */
+  const R=reviewCore(p);const bAdh=R.bAdh,adh=R.adh;
+  const wk=(st.days/7);
+  let h='<div class="view pad stg phpad">'+
+   '<p class="eyebrow" style="color:var(--amber)">Block complete</p>'+
+   '<h1 class="disp" style="font-size:28px;font-weight:600;margin-top:3px;line-height:1.15">'+esc(p.block)+'</h1>'+
+   '<p style="color:var(--dim);font-size:13px;line-height:1.6;margin-top:8px">'+
+   st.logged+' sessions over '+wk.toFixed(1)+' weeks, '+st.sets+' sets, '+tonStr(st.ton)+' moved'+
+   (st.prs?', '+st.prs+' personal best'+(st.prs===1?'':'s'):'')+'. Here is what the numbers say before you decide what comes next.</p>';
+  h+='<div class="row mt2">'+statBox(adh+'%',bAdh&&bAdh.pct!=null?'of the sets':'logged')+statBox(st.logged,'sessions')+statBox(tonStr(st.ton),'lifted')+'</div>';
+  /* the adherence read shows on every review (J-6): a block where nothing
+     improved is the one that needs it most */
+  h+=R.analysis;
   const rec=(adh<70)?'repeat':'next';
   h+=blockGoalsHtml(p);
   h+='<p class="eyebrow mt2">What next</p>'+
@@ -42185,6 +42292,28 @@ function sourcesSheet(){
     wear+'<div style="display:flex;flex-direction:column;gap:8px;margin-top:14px">'+rows+'</div>'+
     (wrapOn?'<button data-a="healthConnectGo" class="btn mt2">Sync with Health now</button>'+'<button data-a="hguideOpen" data-v="garmin" class="btn" style="margin-top:8px;color:var(--dim);font-size:13px">Garmin? The two settings that make it automatic</button>'
       :(!any?'<p style="color:var(--faint);font-size:13px;line-height:1.55;margin-top:12px">Health data arrives in the Allena app on iPhone. On the web, what you type still counts.</p>':'')))}
+/* the next block as the sheet and the wrap page both show it (9 Nov 2026) */
+function nextBlockBody(nb,o){
+  o=o||{};
+  let inner='<p style="color:var(--dim);font-size:13px;line-height:1.55">Built from this block\'s logs: your real working weights (including every adjustment) become the base, rising lifts move up '+uwStr(2.5)+', flat or falling lifts hold, and volume shifts toward under-worked muscles.</p>';
+  inner+='<div class="card mt" style="padding:14px 16px"><p class="disp" style="font-size:17px;font-weight:600">'+esc(nb.prog.block)+'</p>'+
+    '<p class="mono" style="color:var(--faint);font-size:11px;margin-top:3px">'+nb.prog.weeks+' weeks · '+nb.prog.days.length+' days</p></div>';
+  try{const D9=nextBlockDays(nb);if(D9.length)inner+='<p class="eyebrow" style="margin-top:16px">The block, week 1</p>'+
+    D9.map(d=>'<div class="card mt" style="padding:12px 14px"><p style="font-size:15px;font-weight:600">'+esc(d.name)+'</p>'+
+      d.ex.map(x=>'<p style="font-size:13px;color:var(--dim);line-height:1.5;margin-top:4px">'+esc(x.name)+' <span style="color:var(--faint)">'+esc(x.say)+'</span></p>').join('')+'</div>').join('')}catch(e){oops('nextblock.days',e)}
+  if(nb.changes.length)inner+='<p class="eyebrow" style="margin-top:16px">What changed and why</p>'+
+    '<div style="margin-top:8px;display:flex;flex-direction:column;gap:8px">'+
+    nb.changes.slice(0,10).map(c=>'<p style="font-size:13px;color:var(--dim);line-height:1.5">· '+esc(c)+'</p>').join('')+'</div>';
+  else inner+='<p style="color:var(--faint);font-size:13px;margin-top:12px">Clean progression — +'+uwStr(2.5)+' across the board, nothing flagged.</p>';
+  if(nb.run&&nb.run.length)inner+='<p class="eyebrow" style="margin-top:16px">Running this block</p>'+
+    '<div style="margin-top:8px;display:flex;flex-direction:column;gap:8px">'+
+    nb.run.map(c=>'<p style="font-size:13px;color:var(--dim);line-height:1.5">· '+esc(c)+'</p>').join('')+'</div>';
+  /* the goals the block is written toward (4 Oct 2026); changing one
+     closes this sheet, and the review page offers the build again */
+  try{const G9=blockGoals();if(G9.length)inner+='<p class="eyebrow" style="margin-top:16px">Toward your goals</p>'+
+    '<div style="margin-top:8px;display:flex;flex-direction:column;gap:6px">'+G9.map(x=>'<p style="font-size:13px;color:var(--dim);line-height:1.5">· '+esc(x.ex)+' '+esc(x.goal)+' \u00b7 '+esc(x.sub)+'</p>').join('')+'</div>'+
+    '<button data-a="goalsOpen" class="mono" style="color:var(--faint);font-size:11px;padding:8px 0">Change the goals \u203a</button>'}catch(e){oops('nextblock.goals',e)}
+  return inner}
 function sheetHtml(){
   if(!S.sheet)return '';
   if(S.sheet.t==='pod'&&typeof podSheet==='function')return podSheet();
@@ -42614,24 +42743,7 @@ function sheetHtml(){
     return wrapSheet('Swap exercise',inner)}
   if(S.sheet.t==='nextblock'){
     const nb=S.nb;if(!nb)return '';
-    let inner='<p style="color:var(--dim);font-size:13px;line-height:1.55">Built from this block\'s logs: your real working weights (including every adjustment) become the base, rising lifts move up '+uwStr(2.5)+', flat or falling lifts hold, and volume shifts toward under-worked muscles.</p>';
-    inner+='<div class="card mt" style="padding:14px 16px"><p class="disp" style="font-size:17px;font-weight:600">'+esc(nb.prog.block)+'</p>'+
-      '<p class="mono" style="color:var(--faint);font-size:11px;margin-top:3px">'+nb.prog.weeks+' weeks · '+nb.prog.days.length+' days</p></div>';
-    try{const D9=nextBlockDays(nb);if(D9.length)inner+='<p class="eyebrow" style="margin-top:16px">The block, week 1</p>'+
-      D9.map(d=>'<div class="card mt" style="padding:12px 14px"><p style="font-size:15px;font-weight:600">'+esc(d.name)+'</p>'+
-        d.ex.map(x=>'<p style="font-size:13px;color:var(--dim);line-height:1.5;margin-top:4px">'+esc(x.name)+' <span style="color:var(--faint)">'+esc(x.say)+'</span></p>').join('')+'</div>').join('')}catch(e){oops('nextblock.days',e)}
-    if(nb.changes.length)inner+='<p class="eyebrow" style="margin-top:16px">What changed and why</p>'+
-      '<div style="margin-top:8px;display:flex;flex-direction:column;gap:8px">'+
-      nb.changes.slice(0,10).map(c=>'<p style="font-size:13px;color:var(--dim);line-height:1.5">· '+esc(c)+'</p>').join('')+'</div>';
-    else inner+='<p style="color:var(--faint);font-size:13px;margin-top:12px">Clean progression — +'+uwStr(2.5)+' across the board, nothing flagged.</p>';
-    if(nb.run&&nb.run.length)inner+='<p class="eyebrow" style="margin-top:16px">Running this block</p>'+
-      '<div style="margin-top:8px;display:flex;flex-direction:column;gap:8px">'+
-      nb.run.map(c=>'<p style="font-size:13px;color:var(--dim);line-height:1.5">· '+esc(c)+'</p>').join('')+'</div>';
-    /* the goals the block is written toward (4 Oct 2026); changing one
-       closes this sheet, and the review page offers the build again */
-    try{const G9=blockGoals();if(G9.length)inner+='<p class="eyebrow" style="margin-top:16px">Toward your goals</p>'+
-      '<div style="margin-top:8px;display:flex;flex-direction:column;gap:6px">'+G9.map(x=>'<p style="font-size:13px;color:var(--dim);line-height:1.5">· '+esc(x.ex)+' '+esc(x.goal)+' \u00b7 '+esc(x.sub)+'</p>').join('')+'</div>'+
-      '<button data-a="goalsOpen" class="mono" style="color:var(--faint);font-size:11px;padding:8px 0">Change the goals \u203a</button>'}catch(e){oops('nextblock.goals',e)}
+    let inner=nextBlockBody(nb);
     inner+='<button data-a="nextBlockGo" class="big disp mt" style="background:var(--amber);color:var(--bg);font-size:15px">Start this block</button>'+
       '<p style="color:var(--faint);font-size:11px;line-height:1.5;margin-top:12px">Ask Allena to review it first if you want a second opinion — she sees the same stats.</p>';
     return wrapSheet('Next block',inner)}
@@ -45034,6 +45146,7 @@ function render(){
   else if(S.view==='own')body=viewOwn();
   else if(S.view==='ownreview')body=viewOwnReview();
   else if(S.view==='review')body=viewReview();
+  else if(S.view==='blockwrap')body=viewBlockWrap();
   /* never a blank dead page: an unknown or renamed view id falls back
      to Crown instead of rendering nothing (owner-caught) */
   else{S.view='crown';body=viewCrown()}
@@ -47503,8 +47616,9 @@ function runAction(a,v,t,e){
     case 'blockFinishGo':{const p=activeProgSafe();if(!p)break;
       const fi=blockFinishInfo(p);if(!fi||!fi.logged)break;
       let n=0;fi.weeks.forEach(w=>{n+=weekCloseMark(p,w).length});
-      S._recC=null;S.sheet=null;render();
-      flash(p.block+' finished'+(n?' \u2014 '+n+' session'+(n===1?'':'s')+' marked skipped':'')+'.');break}
+      S._recC=null;S.sheet=null;
+      flash(p.block+' finished'+(n?' \u2014 '+n+' session'+(n===1?'':'s')+' marked skipped':'')+'.');
+      runAction('bwOpen',p.id);break}
     /* A LOAD CHANGE IS SUGGESTED, NEVER APPLIED (owner, 5 Nov 2026) */
     case 'adjSugApply':{const p=S.sess?S.lib.programs.find(x=>x.id===S.sess.progId):activeProgSafe();
       const sug=p&&p.adjSug&&p.adjSug[v];if(!sug)break;
@@ -48367,8 +48481,15 @@ function runAction(a,v,t,e){
       const d2=scanDerive(rec3);S.scans.push(d2);scanSave();
       S.sform=null;S.sheet=null;S.view='scans';render();flash('Scan saved.');break}
     case 'scanDel':S.scans=S.scans.filter(x=>x.id!==v);scanSave();render();break;
+    /* THE BLOCK WRAP (9 Nov 2026): one page, three steps, from the score to Start */
+    case 'bwOpen':{const p9=(v?S.lib.programs.find(p=>p.id===v):null)||activeProgSafe();if(!p9){flash('No block to wrap up.');break}
+      S.bw={pid:p9.id,step:1};S.reviewProg=p9;S.sheet=null;S.view='blockwrap';render();break}
+    case 'bwStep':{S.bw=S.bw||{};S.bw.step=Math.max(1,Math.min(3,+v||1));S._navQuiet=1;render();try{window.scrollTo(0,0)}catch(e9){}break}
+    case 'blockShare':blockShareRun(v);break;
     case 'reviewOpen':{const p9=v?S.lib.programs.find(p=>p.id===v):activeProgSafe();
       if(!p9){flash('No block to review.');break}
+      /* a finished block that is still the active one gets the wrap, not the old page */
+      try{S._recC=null;if(!p9.archived&&blockDone(p9)){runAction('bwOpen',p9.id);break}}catch(e9){oops('reviewOpen.wrap',e9)}
       if(thought('rv')){S.think=null;S.reviewProg=p9;S.view='review';render();break}
       thinkStart('rv',reviewSteps(p9),function(){
         setTimeout(function(){S.think=null;S.reviewProg=p9;S.view='review';render()},520)});
