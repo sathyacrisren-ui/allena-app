@@ -2007,7 +2007,7 @@ if(S.sess){S.note=S.sess.note||S.note;
       if(c0&&(s0.log||[]).some(l=>l.ex===c0.ex&&l.setNo===c0.setNo)){const n0=sessAdv(s0);
         if(n0<0)s0.phase='done';else s0.idx=n0}}catch(e){oops('bootSess',e)}
     if(S.sess.phase!=='done')S.sess.phase='ready'}}
-const BUILD_ID='ab8d91';  // stamped by tools/build.py with the content hash
+const BUILD_ID='672878';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -2126,10 +2126,12 @@ function persistActive(){if(S.sess)lset(K_A,Object.assign({},S.sess,{note:S.note
    The tree's prMap reads the same constant. */
 const PR_MARGIN=0.25;
 const prEasy=l=>l&&l.rpe!=null&&l.rpe!==''&&+l.rpe<=6;
-function prBest(e){
+function prBest(e,ctx){
   let best=0;
-  const live=S.sess||null,t0=live?+live.startedAt:Infinity;
-  const own=live?(live.recId||String(live.startedAt)):null;
+  /* ctx (9 Nov 2026): judge an entry as of a saved row, {own:row id, t0:row
+     time, before:[the row's earlier entries]}; without it, the live session */
+  const live=ctx?null:(S.sess||null),t0=ctx?ctx.t0:(live?+live.startedAt:Infinity);
+  const own=ctx?ctx.own:(live?(live.recId||String(live.startedAt)):null);
   const b0=e.secs!=null?e.ex:gBase(e.ex);
   const take=l=>{if(!l||l===e)return;
     if(e.secs!=null){if(l.ex===e.ex&&l.secs!=null)best=Math.max(best,+l.secs||0)}
@@ -2137,11 +2139,23 @@ function prBest(e){
   S.history.forEach(h=>{if(!h||h.id===own||!Array.isArray(h.log))return;
     const ht=new Date(h.date).getTime();if(isFinite(t0)&&!(ht<t0))return;
     h.log.forEach(take)});
-  if(live&&Array.isArray(live.log)){const i=live.log.indexOf(e);(i>=0?live.log.slice(0,i):live.log).forEach(take)}
+  if(ctx&&Array.isArray(ctx.before))ctx.before.forEach(take);
+  else if(live&&Array.isArray(live.log)){const i=live.log.indexOf(e);(i>=0?live.log.slice(0,i):live.log).forEach(take)}
   const cur=e.secs!=null?(+e.secs||0):(e.w&&e.r&&!prEasy(e)?e1rm(e.w,e.r,e.rpe):0);
   return{best:best,cur:cur,margin:e.secs!=null?0:PR_MARGIN}}
-function isPR(e){
-  const b=prBest(e);
+/* A CORRECTED SET IS RE-JUDGED (owner, 9 Nov 2026: "a pr still registers
+   even if you make a mistake and then adjust it"). After an edit, the
+   entry and every later entry of the same lift in that session get their
+   best re-read; a flag that no longer stands comes off. */
+function prRejudge(log,i,ctx){
+  try{const e=log[i];if(!e)return;const b0=e.secs!=null?e.ex:gBase(e.ex);
+    for(let j=i;j<log.length;j++){const l=log[j];if(!l)continue;
+      if((l.secs!=null?l.ex:gBase(l.ex))!==b0)continue;
+      const c=ctx?{own:ctx.own,t0:ctx.t0,before:log.slice(0,j)}:null;
+      if(isPR(l,c))l.pr=true;else delete l.pr}}
+  catch(e9){oops('prRejudge',e9)}}
+function isPR(e,ctx){
+  const b=prBest(e,ctx);
   if(e.secs!=null)return b.best>0&&e.secs>b.best?'longest hold yet ('+e.secs+'s)':null;
   return b.best>0&&b.cur>b.best+b.margin?'best est 1RM yet ('+uwStr(Math.round(b.cur))+')':null}
 /* HOW BIG A BEST IS, AS A FRACTION OF ITSELF. A 2.5 kg move on a
@@ -2202,10 +2216,15 @@ function entrySanity(e,c){
   let hist=pick(true);if(hist.length<3)hist=pick(false);
   const usual=hist.length>=3?hist.map(x=>x.w).sort((a,b)=>a-b)[Math.floor(hist.length/2)]:null;
   const bestE=hist.length?Math.max.apply(null,hist.map(x=>x.e)):null;
-  if(w>0&&tW&&w<=tW*0.5)flags.push('the target was '+uwStr(tW)+' and you logged '+uwNum(w));
+  /* YOUR OWN NUMBERS OUTRANK A WRITTEN TARGET (owner, on video, 9 Nov 2026:
+     32 kg on a curl he always does at 32 was "540% above the 5 kg target"
+     every set). A weight inside what this lifter usually does here is not
+     a typo, whatever the plan wrote. */
+  const nearUsual=usual&&w>=usual*0.6&&w<=usual*1.3;
+  if(w>0&&tW&&w<=tW*0.5&&!nearUsual)flags.push('the target was '+uwStr(tW)+' and you logged '+uwNum(w));
   else if(w>0&&usual&&w<=usual*0.4&&!tW)flags.push('you usually work around '+uwStr(usual)+' here');
   if(w>0&&w<=2.5&&(usual>10||(tW||0)>10))flags.push(uwStr(w)+' is barely more than an empty hand for this lift');
-  if(w>0&&tW&&w>=tW*1.6)flags.push('that is '+Math.round((w/tW-1)*100)+'% above the '+uwStr(tW)+' target');
+  if(w>0&&tW&&w>=tW*1.6&&!nearUsual)flags.push('that is '+Math.round((w/tW-1)*100)+'% above the '+uwStr(tW)+' target');
   if(bestE&&w>0&&r>0&&e1rm(w,r)>=bestE*1.25)flags.push('it would beat your best on this lift by '+uwStr(Math.round(e1rm(w,r)-bestE)));
   if(r>0&&low!=null&&r<=Math.max(1,Math.round(low*0.34))&&!isNaN(rpe)&&rpe>=9)flags.push('only '+r+' rep'+(r===1?'':'s')+' against a target of '+c.targetReps);
   if(r>=30)flags.push(r+' reps is a lot — check it is not a typo');
@@ -45136,8 +45155,8 @@ function render(){
   if(S.view!==S._lastView){S._lastView=S.view;
     try{if(typeof usageBumpView==='function')usageBumpView(S.view)}catch(e9){}
     try{if(S.view==='collection'&&typeof usageBump==='function')usageBump('coll')}catch(e9){}}
-  const ae=document.activeElement,key=ae&&ae.dataset?ae.dataset.in:null;
-  const pos=key&&ae.selectionStart!=null?ae.selectionStart:null;
+  const ae=document.activeElement,key=S._focusKey||(ae&&ae.dataset?ae.dataset.in:null);S._focusKey=null;   // _focusKey: a field asked for once (sanityFix)
+  const pos=key&&(ae&&ae.dataset&&ae.dataset.in===key?ae.selectionStart:null)!=null?(ae&&ae.dataset&&ae.dataset.in===key?ae.selectionStart:null):null;
   let body='';
   try{
   if(S.view==='crown'&&typeof arrivalDue==='function'&&arrivalDue()&&typeof viewArrival==='function')body=viewArrival();   // was below, unreachable (audit)
@@ -47404,7 +47423,14 @@ function runAction(a,v,t,e){
     case 'rowMenuGo':{const i9=S.sheet&&S.sheet.t==='srow'?S.sheet.i:null;S.sheet=null;if(i9==null){render();break}
       if(v==='drop')A.dropRow(i9);else render();break}
     case 'sanityKeep':{S.sheet=null;S.sanity=null;A.commit(true);break}
-    case 'sanityFix':{S.sheet=null;S.sanity=null;render();break}
+    case 'sanityFix':{S.sheet=null;const q=S.sanity;S.sanity=null;
+      /* the tap lands in the weight field of the row it questioned (9 Nov
+         2026: the button closed the sheet and left the person looking at
+         the same row with nothing to do). The row keeps its typed numbers. */
+      try{const s=S.sess;if(s&&q&&q.c){const i=s.sets.indexOf(q.c);
+        if(s.phase==='logging')s.phase='ready';
+        if(i>=0){S.sessEx=q.c.exNo;S._focusKey='srow.'+i+'.w'}}}catch(e9){oops('sanityFix',e9)}
+      render();break}
     case 'skipSet':S.sheet=null;A.skipSet();break;
     case 'skipEx':S.sheet=null;A.skipEx();break;
     case 'skipRest':A.skipRest();break;
@@ -47454,8 +47480,8 @@ function runAction(a,v,t,e){
       if(sh.timed&&!(+sh.secs>0)){flash('A hold needs its seconds.');break}
       if(!sh.timed&&!(+sh.r>0)){flash('Reps are needed — leave weight empty for bodyweight, or delete the set instead.');break}
       const patch=sh.timed?{secs:+sh.secs||0}:{w:Math.round(uwIn(+sh.w||0)*4)/4,r:+sh.r||0,rpe:sh.rpe};
-      if(sh.scope==='live'){Object.assign(S.sess.log[sh.i],patch);upsert(record(S.sess.phase==='done'));persistActive()}
-      else{const h=S.history.find(x=>x.id===sh.sid);if(h){Object.assign(h.log[sh.i],patch);h.edited=today();saveHistory()}}
+      if(sh.scope==='live'){Object.assign(S.sess.log[sh.i],patch);prRejudge(S.sess.log,sh.i,null);upsert(record(S.sess.phase==='done'));persistActive()}
+      else{const h=S.history.find(x=>x.id===sh.sid);if(h){Object.assign(h.log[sh.i],patch);prRejudge(h.log,sh.i,{own:h.id,t0:new Date(h.date).getTime()});h.edited=today();saveHistory()}}
       S.sheet=null;render();break}
     case 'editSetNo':{const sh=S.sheet;
       const e8=sh.scope==='live'?(S.sess&&S.sess.log[sh.i]):((S.history.find(x=>x.id===sh.sid)||{log:[]}).log[sh.i]);
