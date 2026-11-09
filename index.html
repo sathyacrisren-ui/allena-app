@@ -1598,6 +1598,12 @@ function exSetLists(ex){const s=ex&&ex.sets;if(Array.isArray(s))return [s];
 function exBaseSets(ex){const s=ex&&ex.sets;if(Array.isArray(s))return s;
   return (s&&Array.isArray(s['default']))?s['default']:null}
 function setsForWeek(ex,wk,prog){const s=ex.sets;let l=null;
+  /* A DECLINED DELOAD RUNS THE WEEK BEFORE AGAIN (owner, 9 Nov 2026: "the
+     button to remove the deload week puts back in the sets but the weights
+     are still reduced"). The app's own deload never touches the weight; a
+     block written week by week carries its author's lighter last week, so
+     declining the deload has to read the week before it, in full. */
+  try{if(prog&&prog.deloadOff&&deloadDue(prog,wk)&&wk>1)return setsForWeek(ex,wk-1,Object.assign({},prog,{deloadOff:false,deload:false}))}catch(e){}
   if(Array.isArray(s))l=s;
   else if(s&&typeof s==='object'){if(s[String(wk)])return s[String(wk)];l=s.default||null}
   if(l&&l.length&&prog&&isDeloadWeek(prog,wk))return deloadSets(l);
@@ -2001,7 +2007,7 @@ if(S.sess){S.note=S.sess.note||S.note;
       if(c0&&(s0.log||[]).some(l=>l.ex===c0.ex&&l.setNo===c0.setNo)){const n0=sessAdv(s0);
         if(n0<0)s0.phase='done';else s0.idx=n0}}catch(e){oops('bootSess',e)}
     if(S.sess.phase!=='done')S.sess.phase='ready'}}
-const BUILD_ID='b7c188';  // stamped by tools/build.py with the content hash
+const BUILD_ID='768520';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
