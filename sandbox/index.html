@@ -2007,7 +2007,7 @@ if(S.sess){S.note=S.sess.note||S.note;
       if(c0&&(s0.log||[]).some(l=>l.ex===c0.ex&&l.setNo===c0.setNo)){const n0=sessAdv(s0);
         if(n0<0)s0.phase='done';else s0.idx=n0}}catch(e){oops('bootSess',e)}
     if(S.sess.phase!=='done')S.sess.phase='ready'}}
-const BUILD_ID='5a8042';  // stamped by tools/build.py with the content hash
+const BUILD_ID='65f8a3';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -8564,6 +8564,41 @@ function sessFit(min){
   s.fitPrev=(s.skipped||[]).slice();s.fitMin=min;
   s.skipped=(s.skipped||[]).concat(drop);
   persistActive();return drop.length}
+/* ONE SIDE AT A TIME (owner, 11 Nov 2026: "a modify session section where
+   you can opt for that exercise to be single arm or leg where logical").
+   uniOption says whether the lift on screen can be done one side at a time
+   and which side it is: a dumbbell, cable or machine lift, a lunge, a
+   step-up, a leg press. A barbell lift, a pull-up, a dip or a plank cannot,
+   so no row is offered. A lift already written one-sided offers both sides
+   back. The name takes the app's own variant suffix (" — single leg"), so
+   the exact lift keeps its own history and prefill while the family still
+   folds for the crown. The written weight halves going to one side and
+   doubles coming back, as a starting point; the log decides from there. */
+function uniOption(name){
+  try{const n=String(name||'');
+    const m=n.match(/^(.*?)\s*(?:\u2014|-)\s*single (arm|leg)\s*$/i);
+    if(m)return {to:'both',name:m[1].trim(),label:'Both sides',sub:'Back to '+m[1].trim()+' done two-sided'};
+    if(/single|one[- ](arm|leg)|unilateral|per side|alternat/i.test(n))return null;
+    if(/barbell|\bbb\b|deadlift|pull[- ]?ups?|chin[- ]?ups?|\bdips?\b|plank|back squat|front squat|bench press|overhead press|push[- ]?ups?|ab wheel|crunch|sit[- ]?up/i.test(n)&&!/dumbbell|\bdb\b|cable|machine/i.test(n))return null;
+    let side=null;
+    if(/leg|lunge|split|step|calf|rdl|romanian|hip thrust|glute|hamstring|quad|squat|hip/i.test(n))side='leg';
+    else if(/press|row|curl|raise|pulldown|pull[- ]?down|extension|fly|flye|pushdown|pull|shoulder|chest|lat\b|tricep|bicep|delt|shrug/i.test(n))side='arm';
+    if(!side)return null;
+    return {to:side,name:n+' \u2014 single '+side,label:'Single '+side,sub:'One side at a time; weight and reps per side'}}
+  catch(e){oops('uniOption',e);return null}}
+function uniApply(){
+  const s=S.sess;if(!s)return false;
+  const cur=s.sets[sessNow(s)];if(!cur)return false;
+  const opt=uniOption(cur.ex);if(!opt)return false;
+  const no=cur.exNo;
+  const done9=st=>(s.log||[]).some(l=>l.ex===st.ex&&l.setNo===st.setNo);
+  const snap=w=>w==null?null:Math.max(0,Math.round(w/2.5)*2.5);
+  s.sets.forEach(st=>{if(st.exNo!==no||done9(st))return;
+    st.ex=opt.name;
+    if(opt.to==='both'){st.targetW=st.uniW0!=null?st.uniW0:(st.targetW!=null?snap(st.targetW*2):null);delete st.uni;delete st.uniW0}
+    else{if(st.uniW0==null&&st.targetW!=null)st.uniW0=st.targetW;st.targetW=st.targetW!=null?snap(st.targetW/2):null;st.uni=opt.to}
+    delete st.ed});
+  persistActive();return true}
 function estMins(sets){
   if(!sets||!sets.length)return 0;
   const work=sets.reduce((a,x)=>a+(x.rest||0)+(x.secs?x.secs*(x.perSide?2:1):45),0);
@@ -8780,6 +8815,7 @@ A.commit=(confirmed)=>{const s=S.sess,c=s.sets[s.idx],timed=!!c.secs;
      fired the same generic tap as every other button in it. */
   try{feel('sig')}catch(e){oops('commitSig',e)}
   const e={ex:c.ex,setNo:c.setNo,targetW:c.targetW,targetReps:c.targetReps,targetRpe:c.targetRpe};
+  if(c.uni)e.uni=c.uni;   // logged one side at a time (11 Nov 2026)
   if(timed){e.secs=+S.draft.secs;e.perSide=c.perSide;e.w=0;e.r=0;e.rpe=S.draft.rpe
     /* the prescription is the prescription (owner ruling, 9 Sep,
        reversing the 6 Sep heldBest law): overtime is logged to the
@@ -44670,6 +44706,7 @@ function sheetHtml(){
       '<div style="display:flex;flex-direction:column;gap:8px;margin-top:12px">'+
       (cur.targetW!=null?row('tuneOpen','Tune load','Change the weight today and from now on','var(--amber)'):'')+
       row('subOpen','Swap exercise','Machine taken? Convert to an alternative','var(--amber)')+
+      (function(){try{const u=uniOption(cur.ex);return u?row('uniTog',u.label,u.sub,'var(--amber)'):''}catch(e){oops('modify.uni',e);return ''}})()+
       row('axOpen','Add an exercise','One-off, or into the program permanently','var(--amber)')+
       (function(){try{const lg=st=>s2.log.some(l=>l.ex===st.ex&&l.setNo===st.setNo);
         const exs={};s2.sets.forEach(st=>{if(!lg(st))exs[st.exNo]=1});
@@ -49770,6 +49807,9 @@ function runAction(a,v,t,e){
     case 'sessFit':{const n=sessFit(+v||30);S.sheet=null;render();
       flash(n?n+' exercise'+(n===1?'':'s')+' skipped to fit about '+(+v||30)+' min. Undo is in the menu.':'It already fits in about '+(+v||30)+' min.');break}
     case 'sessFitUndo':{const s=S.sess;if(!s||!s.fitPrev)break;s.skipped=s.fitPrev;delete s.fitPrev;delete s.fitMin;persistActive();S.sheet=null;render();flash('Back to the full session.');break}
+    case 'uniTog':{const cur=S.sess&&S.sess.sets[sessNow(S.sess)];const u=cur&&uniOption(cur.ex);
+      if(!u){flash('That one is done two-sided.');break}
+      if(uniApply()){S.sheet=null;render();flash(u.to==='both'?'Both sides again. Today only.':'One '+u.to+' at a time, today only: weight and reps per side.')}break}
     case 'tuneOpen':S.sheet={t:'tune'};render();break;
     case 'tuneBy':{const cur=S.sess.sets[sessNow(S.sess)];applyAdj(cur.ex,+v,'manual');
       /* a manual tune is the user's call and never counts against
