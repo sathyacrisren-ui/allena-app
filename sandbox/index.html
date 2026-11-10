@@ -2007,7 +2007,7 @@ if(S.sess){S.note=S.sess.note||S.note;
       if(c0&&(s0.log||[]).some(l=>l.ex===c0.ex&&l.setNo===c0.setNo)){const n0=sessAdv(s0);
         if(n0<0)s0.phase='done';else s0.idx=n0}}catch(e){oops('bootSess',e)}
     if(S.sess.phase!=='done')S.sess.phase='ready'}}
-const BUILD_ID='672878';  // stamped by tools/build.py with the content hash
+const BUILD_ID='5a8042';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -19844,6 +19844,11 @@ function watchCorroborate(){
       let h=(S.history||[]).find(x=>{
         if(!logged(x)||x.watch)return false;
         if(hKey(x)!==w.date)return false;   /* local day: the watch's date is local, the session's is UTC (audit P5) */
+        /* a typed session's clock is the moment it was typed, not trained (10 Nov
+           2026, caught by the gate at 6pm: a typed row overlapped the SHORTER of
+           two watch workouts by the hour it was typed and took it as its
+           witness); the clock rule is for sessions the app timed */
+        if(x.manual)return false;
         const hs=new Date(x.date).getTime(),he=hs+(x.minutes||45)*60000;
         const ws=new Date(w.date+'T'+(w.time||'12:00')).getTime(),we=ws+(w.mins||30)*60000;
         return ws<he&&we>hs});
@@ -36853,7 +36858,20 @@ function viewLevers(){
    boundary the coach chat already has.
    ══════════════════════════════════════════════════════════ */
 const K_DEEP='training-deepread-v1';
-function deepStore(){const st=lget(K_DEEP,{last:null,items:[]});st.watches=st.watches||[];return st}
+function deepStore(){const st=lget(K_DEEP,{last:null,items:[]});st.watches=st.watches||[];st.past=st.past||[];return st}
+/* the item a key names: a number is the latest read's, "p<read>:<item>" an
+   earlier read's (the page keeps the last twelve reads, owner 10 Nov 2026) */
+/* the earlier reads after this one is saved: the read being replaced goes
+   in front, newest first, twelve deep; a same-day re-run replaces, never stacks */
+function deepPastPush(stA){
+  try{const keep=(stA&&stA.last&&Array.isArray(stA.items)&&stA.items.length&&stA.last!==today())?[{at:stA.last,items:stA.items}]:[];
+    return keep.concat((stA&&stA.past)||[]).slice(0,12)}
+  catch(e){oops('deepPastPush',e);return (stA&&stA.past)||[]}}
+function deepItemAt(key){
+  try{const st=deepStore();const k=String(key==null?'':key);
+    if(k.charAt(0)==='p'){const m=k.slice(1).split(':');const R=(st.past||[])[+m[0]];return R?{it:(R.items||[])[+m[1]],at:R.at,past:true}:null}
+    const it=(st.items||[])[+k||0];return it?{it:it,at:st.last,past:false}:null}
+  catch(e){oops('deepItemAt',e);return null}}
 function deepWatchToggle(i){
   const st=deepStore();const it=(st.items||[])[i];if(!it)return;
   const k=it.t;
@@ -37583,7 +37601,9 @@ async function deepRun(){
         context, last twelve kept, so a link that still holds is one
         line next time and never a fresh paragraph */
      const prevT=(stA.prevT||[]).concat(items.map(x=>x.t)).slice(-12);
-     lset(K_DEEP,{last:today(),items:items,watches:stA.watches||[],trials:stA.trials||[],n:(stA.n||0)+1,prevT:prevT})}
+     /* WHERE ARE MY PREVIOUS TREE READS (owner, 10 Nov 2026): the read being
+        replaced is kept, newest first, twelve deep, so the page can list them */
+     lset(K_DEEP,{last:today(),items:items,watches:stA.watches||[],trials:stA.trials||[],n:(stA.n||0)+1,prevT:prevT,past:deepPastPush(stA)})}
     try{if(typeof usageBump==='function')usageBump('lastRead')}catch(e9){}
     /* THE FINALE (15 Sep). The constellation used to simply vanish when
        the read landed, which threw away the one moment the whole ceremony
@@ -37619,6 +37639,14 @@ async function deepRun(){
    opened a page called This week's read. Each state is one short line
    now, and the findings themselves are PILLS -- the 13 Sep law, which
    this card never got: a title you can scan, the writing on tap. */
+/* the earlier reads, newest first, each folded under its date */
+function deepPastHtml(){
+  try{const P=deepStore().past||[];if(!P.length)return '';
+    return '<p class="eyebrow" style="margin-top:18px">Earlier reads</p>'+P.map((R,ri)=>'<details style="margin-top:8px;border-top:1px solid var(--line)"><summary style="padding:10px 0;font-size:13px;color:var(--dim);list-style:none;cursor:pointer">'+esc(fmtDay(R.at))+' \u00b7 '+(R.items||[]).length+' finding'+((R.items||[]).length===1?'':'s')+' \u203a</summary>'+
+      '<div style="display:flex;flex-direction:column;gap:8px;padding-bottom:8px">'+(R.items||[]).map((x,xi)=>'<button data-a="deepItemOpen" data-v="p'+ri+':'+xi+'" class="card" style="width:100%;text-align:left;padding:12px 14px;display:flex;align-items:center;gap:12px;border-color:'+rarityOf(x.rar)[1]+'">'+
+        '<span style="flex:1;min-width:0"><span class="mono" style="display:block;color:'+rarInk(x.rar)+';font-size:var(--t-caption);letter-spacing:.06em">'+esc(String(x.rar||'').toUpperCase())+'</span>'+
+        '<span style="display:block;font-size:15px;font-weight:600;margin-top:3px">'+esc(x.t)+'</span></span><span class="mono" style="color:var(--faint);font-size:13px;flex:none">\u203a</span></button>').join('')+'</div></details>').join('')}
+  catch(e){oops('deepPastHtml',e);return ''}}
 function deepCard(){
   const st=deepStore();
   let inner;
@@ -37626,8 +37654,11 @@ function deepCard(){
     inner='<p style="color:var(--dim);font-size:13px;line-height:1.6;margin-top:8px">A model reads ten weeks of your own numbers and says what the engines proved. It comes with Premium.</p>'+
       '<button data-a="upgradeOpen" data-v="read" class="big disp mt" style="background:var(--amber);color:var(--bg)">See Premium</button>';
   else if(S.deepBusy)inner='<p class="mono" style="color:var(--amber);font-size:11px;margin-top:8px">Reading ten weeks of numbers…</p>';
-  else if(st.last===today()&&st.items.length)
-    inner='<div style="margin-top:12px;display:flex;flex-direction:column;gap:8px">'+
+  else if(st.items.length)
+    /* the latest read stays on the page until the next one (10 Nov 2026: it
+       showed its findings on the day it ran and a status line after that) */
+    inner=(st.last!==today()?'<p style="color:var(--dim);font-size:13px;line-height:1.6;margin-top:8px">Read on '+esc(fmtDay(st.last))+'. '+esc(deepEvidence().line)+'</p>':'')+
+      '<div style="margin-top:12px;display:flex;flex-direction:column;gap:8px">'+
       st.items.map((x,xi)=>'<button data-a="deepItemOpen" data-v="'+xi+'" class="card" style="width:100%;text-align:left;padding:13px 15px;display:flex;align-items:center;gap:12px;border-color:'+rarityOf(x.rar)[1]+'">'+
         '<span style="flex:1;min-width:0">'+
         '<span class="mono" style="display:block;color:'+rarInk(x.rar)+';font-size:var(--t-caption);letter-spacing:.06em">'+esc(x.rar.toUpperCase())+'</span>'+
@@ -37636,7 +37667,7 @@ function deepCard(){
       '</div>'+
       (function(){const w=deepStore().watches;if(!w.length)return '';
         return '<p class="mono" style="color:var(--blue);font-size:var(--t-caption);letter-spacing:.04em;margin-top:8px">WATCHING: '+w.map(x=>esc(x.t)).join(' · ')+'</p>'})()+
-      '<p class="mono" style="color:var(--faint);font-size:11px;margin-top:8px">Banked in your collection.</p>';
+      '<p class="mono" style="color:var(--faint);font-size:11px;margin-top:8px">Banked in your collection.</p>'+deepPastHtml();
   else if(!aiReady())
     inner=aiLockHtml('The tree read');
   else{
@@ -37926,7 +37957,7 @@ function deepAnalystPrep(items){
 /* THE ONE DISPLAY READER for a finding's analyst half: the web sheet and
    the phone's draw exactly this */
 function deepItemView(i){
-  try{const st=deepStore(),it=(st.items||[])[i];if(!it)return null;
+  try{const st=deepStore(),at=deepItemAt(i),it=at&&at.it;if(!it)return null;
     const V={hyp:it.hyp||'',try:it.try||'',check:null,edit:null,run:it.run?{line:it.run.line,state:it.run.state||'pending'}:null,trial:null,btn:null,editNo:it.editNo||''};
     if(it.check){const ck=it.check,now=deepMetric(ck,deepDayAdd(today(),-14),today());
       V.check={m:ck.m,label:now.label||DEEP_METRICS[ck.m].label,dir:ck.dir,days:ck.days,now:deepMetricSay(ck,now.v),n:now.n,
@@ -38121,7 +38152,7 @@ function deepRowChip(x){
    (deepItemInner): the page the row opens, and the sheet kept for the
    phone's old route. The page wears the finding's tier at the top. */
 function deepItemInner(i,o){
-    const it=(deepStore().items||[])[i];if(!it)return '';
+    const it=(deepItemAt(i)||{}).it;if(!it)return '';
     const rc=rarityOf(it.rar)[1];
     /* older reads cite dates as MM-DD (the model's shorthand) — turn
        them human at display time (owner-caught, 8 Sep: 'I don't
@@ -38176,12 +38207,12 @@ function deepItemInner(i,o){
       '<button data-a="deepAsk" data-v="'+i+'" class="btn mt" style="border-color:var(--amber);color:var(--amber)">Ask Allena about this finding</button>'+
       '<p style="color:var(--faint);font-size:11px;line-height:1.5;margin-top:12px">A read is the model\u2019s interpretation of your own numbers \u2014 clearly labelled, never dressed up as a measurement. The charts are the raw truth it read from.</p>')}
 function viewDeepItem(){
-  const i=+S.deepItemI||0,it=(deepStore().items||[])[i];
+  const i=S.deepItemI==null?0:S.deepItemI,at=deepItemAt(i),it=at&&at.it;
   const back='<button data-a="back" class="btn" style="width:auto;padding:8px 14px;color:var(--dim);font-size:13px;margin-bottom:14px">\u2039 Back</button>';
   if(!it)return '<div class="view pad stg phpad">'+back+'<p style="color:var(--dim);font-size:13px">That finding is not on this read.</p></div>';
   const rc=rarityOf(it.rar)[1];
   return '<div class="view pad stg phpad dipage" style="--tier:'+rc+'">'+back+
-    '<p class="mono" style="color:'+rc+';font-size:var(--t-caption);letter-spacing:.08em">THIS WEEK\u2019S READ \u00b7 '+esc(it.rar.toUpperCase())+' \u00b7 MODEL READ</p>'+
+    '<p class="mono" style="color:'+rc+';font-size:var(--t-caption);letter-spacing:.08em">'+(at.past?'READ ON '+esc(String(fmtDay(at.at)).toUpperCase()):'THIS WEEK\u2019S READ')+' \u00b7 '+esc(it.rar.toUpperCase())+' \u00b7 MODEL READ</p>'+
     '<h1 class="disp vh1" style="margin-top:8px">'+esc(it.t)+'</h1>'+
     '<p style="color:var(--faint);font-size:11px;margin-top:6px">Interpretation, not measurement.</p>'+
     '<div class="card dicard">'+deepItemInner(i,{page:true})+'</div></div>'}
@@ -49439,7 +49470,7 @@ function runAction(a,v,t,e){
       S.coach.input='About the deep-read finding \u201c'+it.t+'\u201d \u2014 '+(it.plain||it.d).slice(0,180)+' \u2026 what should I actually do with this?';
       render();break}
     /* a finding of the read opens as a PAGE (owner, 5 Oct 2026), not a sheet */
-    case 'deepItemOpen':{S.deepItemI=+v;S.sheet=null;S.backTo=S.view;S.backDrawer=false;S.view='deepitem';render();break}
+    case 'deepItemOpen':{S.deepItemI=(String(v).charAt(0)==='p')?String(v):+v;S.sheet=null;S.backTo=S.view;S.backDrawer=false;S.view='deepitem';render();break}
     case 'pvSubOpen':S.sheet={t:'pvsub',i:+v};render();break;
     case 'pvSubBack':S.sheet={t:'preview'};render();break;
     case 'pvSubPick':{const sh=S.sheet,e=S.prev&&S.prev.ex[sh.i];if(!e)break;
