@@ -2007,7 +2007,7 @@ if(S.sess){S.note=S.sess.note||S.note;
       if(c0&&(s0.log||[]).some(l=>l.ex===c0.ex&&l.setNo===c0.setNo)){const n0=sessAdv(s0);
         if(n0<0)s0.phase='done';else s0.idx=n0}}catch(e){oops('bootSess',e)}
     if(S.sess.phase!=='done')S.sess.phase='ready'}}
-const BUILD_ID='65f8a3';  // stamped by tools/build.py with the content hash
+const BUILD_ID='439e44';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -8586,9 +8586,10 @@ function uniOption(name){
     if(!side)return null;
     return {to:side,name:n+' \u2014 single '+side,label:'Single '+side,sub:'One side at a time; weight and reps per side'}}
   catch(e){oops('uniOption',e);return null}}
-function uniApply(){
+function uniApply(exNo){
   const s=S.sess;if(!s)return false;
-  const cur=s.sets[sessNow(s)];if(!cur)return false;
+  /* by exercise number when asked (the superset sheet, 13 Nov 2026), else the set in play */
+  const cur=exNo!=null?s.sets.find(x=>x.exNo===+exNo&&!sessClosed(s,x)):s.sets[sessNow(s)];if(!cur)return false;
   const opt=uniOption(cur.ex);if(!opt)return false;
   const no=cur.exNo;
   const done9=st=>(s.log||[]).some(l=>l.ex===st.ex&&l.setNo===st.setNo);
@@ -44690,7 +44691,12 @@ function sheetHtml(){
         return '<button data-a="ssTog" data-v="'+g.exNo+'" class="card" style="width:100%;text-align:left;padding:13px 15px;display:flex;align-items:center;gap:12px'+(pos>=0?';border-color:var(--green)':'')+'">'+
         '<span style="width:26px;height:26px;border-radius:26px;border:1.5px solid '+(pos>=0?'var(--green)':'var(--line)')+';display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex:none;color:'+(pos>=0?'var(--green)':'var(--faint)')+'">'+(pos>=0?(pos+1):'')+'</span>'+
         '<span style="flex:1;min-width:0"><span style="display:block;font-size:15px;font-weight:600">'+esc(g.ex)+'</span>'+
-        '<span style="color:var(--faint);font-size:11px">'+g.left+' set'+(g.left===1?'':'s')+' left</span></span></button>'}).join('')+
+        '<span style="color:var(--faint);font-size:11px">'+g.left+' set'+(g.left===1?'':'s')+' left</span></span>'+
+        /* one side at a time, set here for any lift in the weave (owner, 13 Nov 2026: "supersets should also handle single arm sets") */
+        (function(){try{const u=uniOption(g.ex);if(!u)return '';
+          return '<span data-a="ssUni" data-v="'+g.exNo+'" role="button" class="pill" style="flex:none;font-size:13px;padding:5px 9px;'+(u.to==='both'?'background:var(--text);color:var(--bg);border-color:var(--text);font-weight:600':'color:var(--dim)')+'">'+(u.to==='both'?'Single '+(/single leg/i.test(g.ex)?'leg':'arm')+' \u2713':u.label)+'</span>'}
+          catch(e){oops('ss.uni',e);return ''}})()+
+        '</button>'}).join('')+
       '</div>';
     inner+=ord.length>=2
       ?'<button data-a="ssGo" class="big disp mt2" style="background:var(--green);color:var(--bg);font-size:17px">Start the superset</button>'
@@ -49753,6 +49759,7 @@ function runAction(a,v,t,e){
       saveLib();S.recSel=null;
       S.sheet={t:'dayreview',di:p.days.length-1};render();break}
     case 'ssOpen':{S.ssOrd=[];S.sheet={t:'ss'};render();break}
+    case 'ssUni':{if(uniApply(+v))render();break}
     case 'ssTog':{const n=+v;S.ssOrd=S.ssOrd||[];
       const i=S.ssOrd.indexOf(n);if(i>=0)S.ssOrd.splice(i,1);else S.ssOrd.push(n);render();break}
     case 'ssGo':{const s=S.sess;const ord=S.ssOrd||[];
