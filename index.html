@@ -2007,7 +2007,7 @@ if(S.sess){S.note=S.sess.note||S.note;
       if(c0&&(s0.log||[]).some(l=>l.ex===c0.ex&&l.setNo===c0.setNo)){const n0=sessAdv(s0);
         if(n0<0)s0.phase='done';else s0.idx=n0}}catch(e){oops('bootSess',e)}
     if(S.sess.phase!=='done')S.sess.phase='ready'}}
-const BUILD_ID='9508c7';  // stamped by tools/build.py with the content hash
+const BUILD_ID='1a64af';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -29412,11 +29412,11 @@ function treeXSheet(){
    - MARKS GROW AT THE SQUARE ROOT OF THE ZOOM, positions never move, so
      zooming spreads a cluster apart (owner ruling, 14 Sep, re-applied).
    - THE WOOD IS QUIET. Warm grey, leaves are the loudest thing (track 6). */
-const CROWN_C={lift:'#248A3D',run:'#0040DD',ride:'#0E7C86',rehab:'#C2185B',gold:'#9A6F1E',ink:'#1E2233',paper:'#F7F4EE',wood0:'#3A3530',wood1:'#8C8378',wdim:'#C9C2B7',chip:'#FFFFFF',lab:'rgba(247,244,238,.88)'}; /* auditcheck-allow: hardcoded-theme-colour — the light palette, chosen by crownPal() */
+const CROWN_C={stall:'#C76E00',down:'#D70015',lift:'#248A3D',run:'#0040DD',ride:'#0E7C86',rehab:'#C2185B',gold:'#9A6F1E',ink:'#1E2233',paper:'#F7F4EE',wood0:'#3A3530',wood1:'#8C8378',wdim:'#C9C2B7',chip:'#FFFFFF',lab:'rgba(247,244,238,.88)'}; /* auditcheck-allow: hardcoded-theme-colour — the light palette, chosen by crownPal() */
 /* THE TREE FOLLOWS THE THEME (owner, 26 Sep 2026). The dark set is the
    iOS dark palette the rest of the app uses. Light gold is #9A6F1E, not
    #B8892B, which failed 3:1 on paper (track 6). */
-const CROWN_CD={lift:'#30D158',run:'#409CFF',ride:'#40C8E0',rehab:'#FF6482',gold:'#E0A458',ink:'#ECE8DE',paper:'#0B0B0D',wood0:'#7A7268',wood1:'#A39B8F',wdim:'#46423C',chip:'#1C1C1F',lab:'rgba(11,11,13,.78)'}; /* auditcheck-allow: hardcoded-theme-colour — the dark palette, chosen by crownPal() from the live theme */
+const CROWN_CD={stall:'#FF9F0A',down:'#FF453A',lift:'#30D158',run:'#409CFF',ride:'#40C8E0',rehab:'#FF6482',gold:'#E0A458',ink:'#ECE8DE',paper:'#0B0B0D',wood0:'#7A7268',wood1:'#A39B8F',wdim:'#46423C',chip:'#1C1C1F',lab:'rgba(11,11,13,.78)'}; /* auditcheck-allow: hardcoded-theme-colour — the dark palette, chosen by crownPal() from the live theme */
 function crownDark(){try{return crestTheme()==='dark'}catch(e){oops('crownDark',e);return false}}
 function crownPal(){return crownDark()?CROWN_CD:CROWN_C}
 const CROWN_TOK='--text:#1E2233;--dim:#57534C;--faint:#6B685F;--surface:#FFFFFF;--raised:#EFEBE3;--cardline:rgba(30,34,51,.12);background:#F7F4EE;color:#1E2233';
@@ -29498,14 +29498,17 @@ function crownLifts(sessions){
      trunk, reaching out to the week it started. A lift is its aliases, so a
      goal named one way and logged another stays one limb. */
   const out=[];const taken={};
-  const add=(name,members,goal)=>{if(out.length>=12)return;const m=members.filter(x=>x&&!taken[x]);if(!m.length)return;m.forEach(x=>taken[x]=1);out.push({name,members:m,goal:goal||null})};
+  const add=(name,members,goal)=>{if(out.length>=12)return;const m=members.filter(x=>x&&!Object.keys(taken).some(t=>liftSame(t,x)));if(!m.length)return;m.forEach(x=>taken[liftKeyOf(x)]=1);out.push({name,members:m,goal:goal||null})};
   try{(S.goals||[]).filter(g=>g&&!g.done&&g.ex).forEach(g=>{const nm=goalNames(g);add(String(nm[0]||g.ex),nm,g)})}catch(e){oops('crownLiftGoals',e)}
-  try{const cut=dayKey(new Date(Date.now()-84*864e5));const all={},recent={},days={};
-    sessions.forEach(s=>{if(s.kind!=='lift')return;const seen={};(s.h.log||[]).forEach(l=>{if(!(+l.w>0&&+l.r>0))return;const b=gBase(l.ex);if(!b||seen[b])return;seen[b]=1;
-      days[b]=(days[b]||0)+1;(all[b]=all[b]||{})[s.wi]=1;if(s.day>=cut)(recent[b]=recent[b]||{})[s.wi]=1})});
-    Object.keys(all).filter(b=>days[b]>=3)
+  try{const cut=dayKey(new Date(Date.now()-84*864e5));const all={},recent={},days={},names={};
+    /* bucketed by the alias key, so "Bench" and "Bench press" are one limb named by the spelling used most */
+    const keyOf={};const bucketKey=b=>{if(keyOf[b])return keyOf[b];const k=liftKeyOf(b);const hit=Object.keys(all).find(q=>liftSame(q,k));return (keyOf[b]=hit||k)};
+    sessions.forEach(s=>{if(s.kind!=='lift')return;const seen={};(s.h.log||[]).forEach(l=>{if(!(+l.w>0&&+l.r>0))return;const b=gBase(l.ex);if(!b)return;const k=bucketKey(b);if(seen[k])return;seen[k]=1;
+      (names[k]=names[k]||{})[b]=((names[k]||{})[b]||0)+1;
+      days[k]=(days[k]||0)+1;(all[k]=all[k]||{})[s.wi]=1;if(s.day>=cut)(recent[k]=recent[k]||{})[s.wi]=1})});
+    Object.keys(all).filter(k=>days[k]>=3)
       .sort((a,b)=>(Object.keys(recent[b]||{}).length-Object.keys(recent[a]||{}).length)||(days[b]-days[a])||a.localeCompare(b))
-      .forEach(b=>add(b,[b],null))}catch(e){oops('crownLiftPick',e)}
+      .forEach(k=>{const ns=Object.keys(names[k]).sort((a,b)=>names[k][b]-names[k][a]);add(ns[0],ns,null)})}catch(e){oops('crownLiftPick',e)}
   return out}
 function crownData(){
   /* the record as trained weeks: every completed session with a day, a
@@ -29595,16 +29598,16 @@ function crownData(){
   const lifts=block?crownBlockLifts(BP,sessions):crownLifts(sessions);
   const marks=[];
   const p90=arr=>{const a=arr.filter(x=>x>0).sort((x,y)=>x-y);return a.length?a[Math.min(a.length-1,Math.floor(a.length*0.9))]:0};
-  const tonOf=(s,L)=>(s.h.log||[]).reduce((a,l)=>a+((+l.w>0&&+l.r>0&&L.members.indexOf(gBase(l.ex))>=0)?(+l.w)*(+l.r):0),0);
+  const tonOf=(s,L)=>(s.h.log||[]).reduce((a,l)=>a+((+l.w>0&&+l.r>0&&liftMemberOf(L.members,l.ex))?(+l.w)*(+l.r):0),0);
   const liftP=lifts.map(L=>p90(sessions.filter(s=>s.kind==='lift').map(s=>tonOf(s,L))));
   sessions.forEach(s=>{
     if(s.kind!=='lift'){marks.push(s);return}
     s.lift=-1;let bn=0;const on=[];
-    lifts.forEach((L,i)=>{const n=(s.h.log||[]).filter(l=>+l.w>0&&+l.r>0&&L.members.indexOf(gBase(l.ex))>=0).length;if(n>bn){bn=n;s.lift=i}if(n)on.push(i)});
+    lifts.forEach((L,i)=>{const n=(s.h.log||[]).filter(l=>+l.w>0&&+l.r>0&&liftMemberOf(L.members,l.ex)).length;if(n>bn){bn=n;s.lift=i}if(n)on.push(i)});
     if(!on.length){marks.push(s);return}
     on.forEach((i,j)=>{const L=lifts[i];let best=null;
-      (s.h.log||[]).forEach(l=>{if(!(+l.w>0&&+l.r>0)||L.members.indexOf(gBase(l.ex))<0)return;const e=e1rm(+l.w,+l.r,l.rpe);if(!best||e>best.e)best={w:+l.w,r:+l.r,e}});
-      const prs=s.prs.filter(p=>L.members.indexOf(p.ex)>=0);const t=tonOf(s,L);
+      (s.h.log||[]).forEach(l=>{if(!(+l.w>0&&+l.r>0)||!liftMemberOf(L.members,l.ex))return;const e=e1rm(+l.w,+l.r,l.rpe);if(!best||e>best.e)best={w:+l.w,r:+l.r,e}});
+      const prs=s.prs.filter(p=>liftMemberOf(L.members,p.ex));const t=tonOf(s,L);
       const e=Object.create(s);e.li=i;e.labS=best?uwNum(best.w)+'\u00d7'+best.r:'';e.lab=L.name+(e.labS?' '+e.labS:'');
       e.prs=prs;e.pr=prs.length>0;e.mag=Math.max(0.35,Math.min(1,liftP[i]>0&&t>0?t/liftP[i]:(t>0?1:0.5)));
       /* a week won is one gold mark, on the day's first leaf only */
@@ -29612,7 +29615,7 @@ function crownData(){
       marks.push(e)})});
   /* a lift's PR count reads every session that set a PR on it, the same
      list its sheet shows: a squat day that also set a bench PR is a bench PR */
-  lifts.forEach((L,i)=>{L.n=marks.filter(m=>m.li===i).length;L.prs=sessions.filter(s=>s.prs.some(p=>L.members.indexOf(p.ex)>=0)).length});
+  lifts.forEach((L,i)=>{L.n=marks.filter(m=>m.li===i).length;L.prs=sessions.filter(s=>s.prs.some(p=>liftMemberOf(L.members,p.ex))).length});
   /* the cardio sector is "Riding" only when every session in it is a ride */
   const rides=sessions.filter(s=>s.kind==='ride');
   const rideName=rides.length&&rides.every(s=>s.rt==='ride')?'Riding':'Other cardio';
@@ -29634,10 +29637,11 @@ function crownData(){
    only the ones trained at least once in this block get a limb */
 function crownBlockLifts(BP,sessions){
   const out=[];const taken={};
-  const add=(name,members,goal)=>{if(out.length>=12)return;const m=members.filter(x=>x&&!taken[x]);if(!m.length)return;m.forEach(x=>taken[x]=1);out.push({name,members:m,goal:goal||null})};
-  const trained={};sessions.forEach(s=>{if(s.kind!=='lift')return;(s.h.log||[]).forEach(l=>{if(+l.w>0&&+l.r>0)trained[gBase(l.ex)]=1})});
-  try{(S.goals||[]).filter(g=>g&&!g.done&&g.ex).forEach(g=>{const nm=goalNames(g);if(nm.some(x=>trained[x]))add(String(nm[0]||g.ex),nm,g)})}catch(e){oops('crownBlockGoals',e)}
-  try{(BP.days||[]).forEach(d=>(d.exercises||[]).forEach(e=>{const b=gBase(e.name);if(b&&trained[b])add(b,[b],null)}))}catch(e){oops('crownBlockPick',e)}
+  const add=(name,members,goal)=>{if(out.length>=12)return;const m=members.filter(x=>x&&!Object.keys(taken).some(t=>liftSame(t,x)));if(!m.length)return;m.forEach(x=>taken[liftKeyOf(x)]=1);out.push({name,members:m,goal:goal||null})};
+  const trained={},names={};sessions.forEach(s=>{if(s.kind!=='lift')return;(s.h.log||[]).forEach(l=>{if(+l.w>0&&+l.r>0){const k=liftKeyOf(l.ex);trained[k]=1;(names[k]=names[k]||{})[gBase(l.ex)]=1}})});
+  const aliases=b=>Object.keys(names[liftKeyOf(b)]||{}).concat([b]).filter((x,i,a)=>a.indexOf(x)===i);
+  try{(S.goals||[]).filter(g=>g&&!g.done&&g.ex).forEach(g=>{const nm=goalNames(g);if(nm.some(x=>trained[liftKeyOf(x)]))add(String(nm[0]||g.ex),nm,g)})}catch(e){oops('crownBlockGoals',e)}
+  try{(BP.days||[]).forEach(d=>(d.exercises||[]).forEach(e=>{const b=gBase(e.name);if(b&&trained[liftKeyOf(b)])add(b,aliases(b),null)}))}catch(e){oops('crownBlockPick',e)}
   return out}
 function crownGroup(s){return s.kind==='lift'?(s.li!=null?'L'+s.li:'Lx'):s.kind}
 function crownSectors(D){
@@ -29815,7 +29819,7 @@ function crownRootTarget(out,D,M){
   /* lifting in general, never a particular limb: a deadlift finding must not run to the bench */
   const anyLift=()=>Object.keys(M.groups).some(g=>g.charAt(0)==='L')?'lift':null;
   let g=null;const o=String(out);
-  if(o.slice(0,3)==='ex:'){const nm=o.slice(3);D.lifts.forEach((L,i)=>{if(!g&&L.members.indexOf(nm)>=0&&has('L'+i))g='L'+i});if(!g)g=anyLift()}
+  if(o.slice(0,3)==='ex:'){const nm=o.slice(3);D.lifts.forEach((L,i)=>{if(!g&&liftMemberOf(L.members,nm)&&has('L'+i))g='L'+i});if(!g)g=anyLift()}
   else if(o==='benchtop')g=liftBy(/bench/i)||anyLift();
   else if(o==='squattop')g=liftBy(/squat/i)||anyLift();
   else if(o==='deadtop')g=liftBy(/deadlift/i)||anyLift();
@@ -30026,15 +30030,18 @@ function crownPaint(c,C,V){
   const leafLen=L=>{let f=1;if(V.unf&&V.unf.id===L.s.id&&(V.unf.li==null||V.unf.li===L.s.li)){f=Math.max(0.05,Math.min(1,(now-V.unf.t0)/700));f=1-Math.pow(1-f,3)}return 3.7*u*sq*(0.72+0.55*L.s.mag)*f};
   const almond=(x,y,a,len)=>{const w=len/1.8,ca=Math.cos(a),sa=Math.sin(a);const ax=x-ca*len,ay=y-sa*len,bx=x+ca*len,by=y+sa*len;
     c.moveTo(ax,ay);c.quadraticCurveTo(x-sa*w*1.25,y+ca*w*1.25,bx,by);c.quadraticCurveTo(x+sa*w*1.25,y-ca*w*1.25,ax,ay)};
-  /* block mode: a stalling lift's leaves wilt (drawn pale) */
-  const wilt=L=>!!(D.block&&L.s.li!=null&&D.lifts[L.s.li]&&D.lifts[L.s.li].vig==='down');
-  ['lift','rehab','run','ride'].forEach(k=>{[true,false].forEach(lit=>{let any=false;c.beginPath();
-    M.leaves.forEach(L=>{if(L.s.kind!==k||!inT(L))return;if(dimmed&&on(L)!==lit)return;if(!dimmed&&!lit)return;if(!dimmed&&wilt(L))return;const x=X(L.x),y=Y(L.y);if(x<-12||x>W+12||y<-12||y>H+12)return;
+  /* THE LEAF WEARS THE LIFT'S STATE (owner, 13 Nov 2026: "instead of the
+     equal sign and the triangle... a change in colour. Orange when it's
+     stalling, red when it's regressing"). In block mode a lift's leaves are
+     green while it climbs, orange while it holds, red while it falls, and
+     the domain green when the reader cannot say yet. The state is read per
+     build from liftTrend, never stored. */
+  const leafCol=L=>{if(!D.block||L.s.li==null)return PL[L.s.kind];const d=(D.lifts[L.s.li]||{}).dir;return d==='down'?PL.down:d==='level'?PL.stall:PL[L.s.kind]};
+  const COLS=[PL.lift,PL.stall,PL.down,PL.rehab,PL.run,PL.ride];
+  COLS.forEach(col=>{[true,false].forEach(lit=>{let any=false;c.beginPath();
+    M.leaves.forEach(L=>{if(leafCol(L)!==col||!inT(L))return;if(dimmed&&on(L)!==lit)return;if(!dimmed&&!lit)return;const x=X(L.x),y=Y(L.y);if(x<-12||x>W+12||y<-12||y>H+12)return;
       const len=leafLen(L);almond(x+Math.cos(L.ang)*len*0.6,y+Math.sin(L.ang)*len*0.6,L.ang,len);any=true});
-    if(any){c.fillStyle=lit?PL[k]:crownRgba(PL[k],0.22);c.fill()}})});
-  if(!dimmed){let any=false;c.beginPath();M.leaves.forEach(L=>{if(!wilt(L)||!inT(L))return;const x=X(L.x),y=Y(L.y);if(x<-12||x>W+12||y<-12||y>H+12)return;
-      const len=leafLen(L)*0.85;almond(x+Math.cos(L.ang)*len*0.6,y+Math.sin(L.ang)*len*0.6,L.ang,len);any=true});
-    if(any){c.fillStyle=crownRgba(PL.lift,0.38);c.fill()}}
+    if(any){c.fillStyle=lit?col:crownRgba(col,0.22);c.fill()}})});
   /* 6. marks: a PR is a white blossom, gold is a week won, a gate a bead.
      Glow only on a PR set this week and on the selection. */
   const wkNow=crownWeekMon(today());
@@ -30106,8 +30113,8 @@ function crownPaint(c,C,V){
        direction, a triangle up or down or an equals sign, coloured only when
        the trend reader has a band behind the word */
     D.lifts.forEach((L,i)=>{const G9=M.groups['L'+i];if(!G9)return;const r=Math.min(G9.rmax*0.62,G9.rmid+0.08);
-      const g=D.block?(L.dir==='up'||L.dir==='upsofar'?' \u25B2':L.dir==='down'||L.dir==='downsofar'?' \u25BC':L.dir?' =':''):'';
-      place(L.name+g,X(Math.cos(G9.a)*r),Y(Math.sin(G9.a)*r),{fs:12,bold:true,lift:i,dir:D.block?L.dir:null})});
+      /* the colour carries the state now (13 Nov 2026), the glyphs are gone */
+      place(L.name,X(Math.cos(G9.a)*r),Y(Math.sin(G9.a)*r),{fs:12,bold:true,lift:i,dir:D.block?L.dir:null})});
     ['run','ride','rehab'].forEach(k=>{const G9=M.groups[k];if(!G9)return;place(crownDName(k,D),X(Math.cos(G9.a)*G9.rmid),Y(Math.sin(G9.a)*G9.rmid),{fs:12,bold:true})});
     if(M.groups.Lx&&V.z>=1.6)place('Other lifting',X(Math.cos(M.groups.Lx.a)*M.groups.Lx.rmid),Y(Math.sin(M.groups.Lx.a)*M.groups.Lx.rmid),{fs:11});
     if(mode==='full'){
@@ -30123,7 +30130,7 @@ function crownPaint(c,C,V){
   LBL.forEach(l=>{c.font=(l.o.bold?'600 ':'500 ')+Math.round(l.fs)+'px -apple-system,system-ui,sans-serif';c.textAlign='center';c.textBaseline='middle';
     c.fillStyle=PL.lab;const rx=l.x-l.w/2,ry=l.y-l.h/2;
     c.beginPath();if(c.roundRect)c.roundRect(rx,ry,l.w,l.h,4*u);else c.rect(rx,ry,l.w,l.h);c.fill();
-    c.fillStyle=l.o.go?PL.lift:l.o.dir==='up'?PL.lift:l.o.dir==='down'?PL.gold:l.o.ring?crownRgba(PL.ink,0.55):l.o.faded?crownRgba(PL.ink,0.5):PL.ink;c.fillText(l.txt,l.x,l.y+0.5)});
+    c.fillStyle=l.o.go?PL.lift:l.o.dir==='up'?PL.lift:l.o.dir==='down'?PL.down:l.o.dir==='level'?PL.stall:l.o.ring?crownRgba(PL.ink,0.55):l.o.faded?crownRgba(PL.ink,0.5):PL.ink;c.fillText(l.txt,l.x,l.y+0.5)});
   /* 11. the selected leaf gets a ring */
   if(sel&&sel.k==='leaf'){const L=M.leaves.find(q=>q.s.id===sel.id&&(sel.li==null||q.s.li===sel.li));if(L){const x=X(L.x),y=Y(L.y);c.save();c.shadowColor=dk?'rgba(255,255,255,.9)':'rgba(30,34,51,.5)';c.shadowBlur=10*u;
     c.strokeStyle=dk?'#FFFFFF':PL.ink;c.lineWidth=2;c.beginPath();c.arc(x,y,Math.max(7*u,leafLen(L)*1.5),0,Math.PI*2);c.stroke();c.restore()}}
@@ -30183,7 +30190,7 @@ function crownLiftSay(I){
      rule, which is also what to do about it. */
   if(!T.pts||!T.pts.length)return {big:null,line:'No hard sets on this lift yet. A set counts at effort 7 or more, or at 10 reps or fewer when no effort is logged.',goal:'',meta};
   let big=T.to||T.now||T.best,line='';
-  if(T.state==='early')line='New here. A trend needs six weeks of hard sets.';
+  if(T.state==='early')line=(T.n>=1?T.n+' week'+(T.n===1?'':'s')+' with a hard set':'New here')+'. A trend needs six.';
   else if(T.state==='back'){big=T.back.now;line='Back after '+wk(T.back.gapW)+' off. Your best before the break: '+n(T.back.best)+' '+U+'.'}
   else{const d=n(T.to)-n(T.from);
     if(T.state==='up')line='Up '+d+' '+U+' in '+wk(T.weeks)+'.';
@@ -30199,7 +30206,7 @@ const CROWN_CSS='<style>[data-crowncv]{display:block;width:100%;height:100%;touc
   '.crx-top{display:flex;align-items:center;gap:8px;padding:8px 12px 4px}'+
   '.crx-top button{min-width:44px;min-height:44px;background:none;border:0;color:inherit}'+
   '.crx-crumb{flex:1;min-width:0;display:flex;align-items:center;gap:4px;font-size:15px;white-space:nowrap;overflow:hidden}'+
-  '.crx-crumb button{min-width:0;min-height:36px;padding:0 2px;font-size:15px;color:var(--dim)}.crx-crumb button:last-child{color:var(--text);font-weight:600}'+
+  '.crx-crumb button{min-width:0;max-width:44%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-height:36px;padding:0 2px;font-size:15px;color:var(--dim)}.crx-crumb button:last-child{color:var(--text);font-weight:600}'+
   '.crx-lens{display:flex;gap:6px;padding:2px 12px 6px;overflow-x:auto;scrollbar-width:none}'+
   '.crx-lens button{flex:none;min-height:32px;padding:0 12px;border-radius:999px;border:1px solid var(--cr-cardline);background:none;color:var(--dim);font-size:13px}'+
   '.crx-lens button.on{border-color:var(--text);color:var(--text)}'+
@@ -30274,7 +30281,7 @@ function crownBlockWords(D){
   if(K.closed.length)scars.push('week'+(K.closed.length===1?' ':'s ')+K.closed.join(', ')+' closed early');if(K.missed.length)scars.push('nothing logged in week'+(K.missed.length===1?' ':'s ')+K.missed.join(', '));if(K.flares.length)scars.push('a flare-up in week'+(K.flares.length===1?' ':'s ')+K.flares.join(', '));
   return {micro:K.name.toUpperCase()+' \u00b7 WEEK '+K.week+' OF '+K.N+(K.deload===K.week?' \u00b7 DELOAD':''),
     lifts:bits.length?bits.join(' \u00b7 '):'Each limb is one lift in this block.',
-    rings:(scars.length?scars.join('; ').replace(/^./,ch=>ch.toUpperCase())+'. ':'')+'Each ring is a week; every session pushes the tree outward. A limb thickens as its lift climbs and thins when it stalls.'}}
+    rings:(scars.length?scars.join('; ').replace(/^./,ch=>ch.toUpperCase())+'. ':'')+'Each ring is a week; every session pushes the tree outward. A limb\u2019s leaves are green while its lift climbs, orange while it holds, red while it falls.'}}
 function crownMoments(){
   /* overlay moments: goal ceremony, crest update, race ceremony, replay.
      Never inside a swipe preview: the peek is a snapshot beside the page
@@ -30342,6 +30349,9 @@ function crownSentence(C){
       const s=(sel.li!=null&&(D.marks||[]).find(m=>m.id===sel.id&&m.li===sel.li))||s0;
       const wk=D.sessions.filter(q=>q.wi===s.wi);const name={lift:'Strength',run:'Run',ride:'Ride',rehab:'Rehab'}[s.kind];
       const lines=[(s.kind==='rehab'?'Rehab session':s.lab)+(s.mins?' \u00b7 '+s.mins+' min':'')];
+      /* every set of this lift that day, on a limb's leaf (13 Nov 2026) */
+      try{if(sel.li!=null&&D.lifts[sel.li]){const L=D.lifts[sel.li];const sets=(s.h.log||[]).filter(l=>+l.w>0&&+l.r>0&&liftMemberOf(L.members,l.ex)).map(l=>uwNum(l.w)+'\u00d7'+l.r+(l.rpe!=null&&l.rpe!==''?' @'+l.rpe:''));
+        if(sets.length)lines.push(sets.join(' \u00b7 '))}}catch(e){oops('crownLeafSets',e)}
       s.prs.forEach(p=>lines.push('PR: '+p.ex+' '+Math.round(uwNum(p.e))+' '+uwUnit()+' estimated max, up from '+Math.round(uwNum(p.prev))+'.'));
       return {title:name+' \u00b7 '+s.dayS,lines,meta:wk.length>1?wk.length+' sessions that week':'',
         acts:[{a:'crownLeafOpen',v:s.id,l:s.kind==='run'?'Open the run':s.kind==='ride'?'Open the activity':'Open the session',go:1}]}}
@@ -30362,7 +30372,13 @@ function crownSentence(C){
     if(X.rung==='lift'&&X.g&&X.g.charAt(0)==='L'&&X.g!=='Lx'){const i=+X.g.slice(1);const I=crownLiftInfo(C,i);const Y=crownLiftSay(I);if(!I)return {lines:[]};
       if(!Y)return {title:I.L.name,lines:['No hard sets logged yet.'],acts:[{a:'crownLift',v:String(i),l:'Open '+I.L.name,go:1}]};
       const cold=(D.block&&I.L.cold)?['No session on this lift for '+I.L.days+' days. The hollow ring at the limb\u2019s tip is that.']:[];
-      return {title:I.L.name,big:Y.big!=null?Y.big+' '+uwUnit():'',lines:[Y.line].concat(Y.goal?[Y.goal]:[]).concat(cold),meta:Y.meta,spark:I.T,acts:[{a:'crownLift',v:String(i),l:'Open '+I.L.name,go:1}]}}
+      /* depth (owner, 13 Nov 2026): the graph first, then the word, the goal, the best and the last session; a lift with no goal can become one */
+      const T=I.T;const extra=[];
+      try{if(T&&T.best){const lastP=T.pts&&T.pts[T.pts.length-1];extra.push('Best '+Math.round(uwNum(T.best))+' '+uwUnit()+' estimated max'+(lastP?' \u00b7 last hard week '+fmtDay(lastP.k)+', '+Math.round(uwNum(lastP.v))+' '+uwUnit():'')+'.')}}catch(e){oops('crownLiftExtra',e)}
+      try{const pg=S.lib.programs.find(x=>D.block&&x.id===D.block.id);const sg=pg&&adjSugFor(pg,I.L.members[0],null);if(sg)extra.push('Allena suggests '+(sg.d>0?'+':'\u2212')+uwNum(Math.abs(sg.d))+' '+uwUnit()+' on it, waiting on the exercise card.')}catch(e){}
+      const acts=[{a:'crownLift',v:String(i),l:'Open '+I.L.name,go:1}];
+      if(!I.L.goal)acts.push({a:'crownGoalAdd',v:I.L.name,l:'Make it a goal'});
+      return {title:I.L.name,big:Y.big!=null?Y.big+' '+uwUnit():'',lines:[Y.line].concat(Y.goal?[Y.goal]:[]).concat(extra).concat(cold),meta:Y.meta,spark:T,sparkDir:I.L.dir||null,acts}}
     if(X.rung==='lift'&&X.g==='Lx'){const n=(D.marks||D.sessions).filter(s=>s.kind==='lift'&&s.li==null).length;return {title:'Other lifting',lines:[n+' session'+(n===1?'':'s')+' without one of your lifts that has a limb.']}}
     if(X.rung==='domain'&&X.g){const k=X.g;const ss=D.sessions.filter(s=>s.kind===k);const since=ss.length?fmtDay(ss[0].day):'';
       if(k==='lift')return {title:'Lifting',big:String(ss.length),lines:['Sessions since '+since+'. Each limb is one lift, and each leaf on it a day you trained it.','Tap a lift to look closer.']};
@@ -30375,7 +30391,7 @@ function crownSentence(C){
     if(X.lens==='pr'){let n=0;D.sessions.forEach(s=>{if(s.pr)n++});return {title:'PRs',big:String(n),lines:['Sessions that set a PR at the time. Each is a white blossom.']}}
     const w=crownWord(D);
     if(D.block){const K=D.block;const sk=(K.gaps||[]).filter(g=>g.state==='missed').length,op=(K.gaps||[]).filter(g=>g.state==='open').length;const gl=(sk||op)?[(sk?sk+' session'+(sk===1?'':'s')+' skipped':'')+(sk&&op?', ':'')+(op?op+' still open this week':'')+'. Hollow leaves on the rings; tap one.']:[];
-      return {title:K.name,big:String(D.sessions.length),lines:gl.concat(['Week '+K.week+' of '+K.N+(K.deload===K.week?', the deload':'')+' \u00b7 '+w.word+'.','Each ring is a week. A limb thickens as its lift climbs and thins when it stalls.'])}}
+      return {title:K.name,big:String(D.sessions.length),lines:gl.concat(['Week '+K.week+' of '+K.N+(K.deload===K.week?', the deload':'')+' \u00b7 '+w.word+'.','Each ring is a week. Green leaves climb, orange hold, red fall. Tap a limb to look closer.'])}}
     return {title:'Your tree',big:String(D.sessions.length),lines:['Sessions since '+(D.first?fmtDay(D.first):'')+' \u00b7 '+w.word+'.','Tap a limb to look closer.']}}
   catch(e){oops('crownSentence',e);return {lines:[]}}}
 function crownEffShort(E,r){
@@ -30392,6 +30408,28 @@ function crownEffLine(E,r){
   if(E.tag){const w=corrArms({sig:E.sig,out:E.out,lag:E.lag},'');
     return (w[0]+' ('+E.hiN+'), '+crownOutW(r.out).toLowerCase()+' averaged '+op(E.hiMean)+'; '+w[1]+' ('+E.loN+'), '+op(E.loMean)+'. The two moved together on '+E.together+' of '+E.counted+' days, where chance would give about '+E.chance+'.').replace(/^./,c=>c.toUpperCase())}
   return 'On the '+E.hiN+' days with '+crownSigW(r.fam).toLowerCase()+' over '+sp(E.split)+', '+crownOutW(r.out).toLowerCase()+' '+lag+' averaged '+op(E.hiMean)+'. On the other '+E.loN+', '+op(E.loMean)+'. The two moved together on '+E.together+' of '+E.counted+' days, where chance would give about '+E.chance+'.'}
+/* THE TREND GRAPH IN THE PANEL (owner, 13 Nov 2026: "show the trend graph
+   as well, maybe the trend graph first"). Weekly best estimated max, one
+   dot a week, hollow where the week was only light, the line in the state's
+   colour; the first and last values printed at the ends. One reader for the
+   page and the tests; a lift with fewer than two hard weeks draws nothing. */
+function crownSparkSvg(T,dir){
+  try{if(!T||!T.pts||T.pts.length<2)return '';
+    const PL=crownPal();const col=dir==='down'||dir==='downsofar'?PL.down:dir==='level'||dir==='flatsofar'?PL.stall:dir==='up'||dir==='upsofar'?PL.lift:PL.ink;
+    const W=320,H=76,px=34,py=12;const pts=T.pts,hol=T.hollow||[];
+    const all=pts.concat(hol);const t0=Math.min.apply(null,all.map(p=>p.t)),t1=Math.max.apply(null,all.map(p=>p.t));
+    const vs=all.map(p=>p.v);let v0=Math.min.apply(null,vs),v1=Math.max.apply(null,vs);if(v1-v0<2){v0-=1;v1+=1}
+    const X=t=>t1===t0?W/2:px+(t-t0)/(t1-t0)*(W-2*px),Y=v=>H-py-(v-v0)/(v1-v0)*(H-2*py);
+    const path=pts.map((p,i)=>(i?'L':'M')+X(p.t).toFixed(1)+' '+Y(p.v).toFixed(1)).join(' ');
+    const fmt=v=>Math.round(uwNum(v));
+    return '<svg viewBox="0 0 '+W+' '+H+'" width="100%" height="'+H+'" style="display:block;margin-top:8px" role="img" aria-label="Weekly best, '+fmt(pts[0].v)+' to '+fmt(pts[pts.length-1].v)+' '+uwUnit()+'">'+
+      (T.band&&T.to?'<rect x="'+px+'" y="'+Y(T.to+T.band).toFixed(1)+'" width="'+(W-2*px)+'" height="'+Math.max(1,Y(T.to-T.band)-Y(T.to+T.band)).toFixed(1)+'" fill="'+crownRgba(col,0.10)+'"/>':'')+
+      '<path d="'+path+'" fill="none" stroke="'+col+'" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>'+
+      hol.map(p=>'<circle cx="'+X(p.t).toFixed(1)+'" cy="'+Y(p.v).toFixed(1)+'" r="3" fill="none" stroke="'+crownRgba(PL.ink,0.45)+'" stroke-width="1.2"/>').join('')+
+      pts.map(p=>'<circle cx="'+X(p.t).toFixed(1)+'" cy="'+Y(p.v).toFixed(1)+'" r="3" fill="'+col+'"/>').join('')+
+      '<text x="'+(px-6)+'" y="'+(Y(pts[0].v)+4).toFixed(1)+'" text-anchor="end" font-size="11" fill="'+crownRgba(PL.ink,0.7)+'">'+fmt(pts[0].v)+'</text>'+
+      '<text x="'+(W-px+6)+'" y="'+(Y(pts[pts.length-1].v)+4).toFixed(1)+'" font-size="11" font-weight="600" fill="'+col+'">'+fmt(pts[pts.length-1].v)+'</text></svg>'}
+  catch(e){oops('crownSparkSvg',e);return ''}}
 function crownCrumbs(C){
   const X=crownX();const out=[['canopy','Crown']];
   const dom=X.g?(X.g.charAt(0)==='L'?'lift':X.g):null;
@@ -30401,13 +30439,19 @@ function crownCrumbs(C){
   return out}
 function viewCrownX(){
   try{const C=crownM();const X=crownX();
-    const crumbs=crownCrumbs(C);
+    /* the breadcrumb never runs together (owner, 13 Nov 2026: "overcrowded,
+       they get blended into each other"): at most the last two rungs with a
+       leading ellipsis home, and each rung clipped on its own */
+    let crumbs=crownCrumbs(C);
+    if(crumbs.length>3)crumbs=[['canopy','\u2026']].concat(crumbs.slice(-2));
     const lensB=(k,l)=>'<button data-a="crownLens" data-v="'+k+'" class="'+(X.lens===k?'on':'')+'"'+(X.lens===k?' aria-pressed="true"':'')+'>'+l+'</button>';
     const rootsN=crownRoots(C).length,budsN=crownBuds(C).length;
     const P=crownSentence(C);
     const panel='<div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px">'+
         '<p class="disp" style="font-size:21px;font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(P.title||'')+'</p>'+
         (P.big?'<p class="disp" style="font-size:26px;font-weight:600;flex:none">'+esc(P.big)+'</p>':'')+'</div>'+
+      /* the trend graph first (owner, 13 Nov 2026) */
+      (P.spark?crownSparkSvg(P.spark,P.sparkDir):'')+
       (P.lines||[]).map((l,i)=>'<p style="font-size:'+(i?15:17)+'px;line-height:1.4;margin-top:'+(i?4:6)+'px;color:'+(i?'var(--dim)':'var(--text)')+'">'+esc(l)+'</p>').join('')+
       /* the counts and the one button share a row, near the thumb (owner: "too hard to reach") */
       '<div style="display:flex;align-items:center;gap:10px;margin-top:10px"><p style="flex:1;min-width:0;font-size:13px;color:var(--faint)">'+esc(P.meta||'')+'</p>'+
@@ -40422,10 +40466,31 @@ function orphanCard(){
     '<p style="font-size:15px;line-height:1.55">'+n+' finding'+(n===1?'':'s')+' point at days that are no longer on this phone. '+
     'Clearing them lowers your points by what they were worth.</p>'+
     '<button data-a="orphanAsk" class="btn mt" style="color:var(--amber);border-color:var(--amber)">Clear them</button></div>'}
+/* A LIFT IS ITS ALIASES (owner, 13 Nov 2026: his bench read "new here, a
+   trend needs six weeks" after months of benching, because the new block
+   wrote "Bench" and the old sessions said "Bench press", and every limb
+   and trend matched the base name as a string). liftKeyOf is the one key:
+   the alias resolver's, on the base name; liftMemberOf asks it. */
+function liftKeyOf(name){try{const b=gBase(name);return (typeof exAliasNorm==='function')?exAliasNorm(b).key:String(b).toLowerCase()}catch(e){return String(gBase(name)).toLowerCase()}}
+/* two names are one lift when their keys match, or when one is a whole-word
+   prefix of the other and they train the same prime movers ("Bench" and
+   "Bench press", never "Bench" and "Bench dip": goalExMatch's rule, audit
+   C-17). Memoised: the trend asks it once per logged set. */
+const LIFT_SAME={};
+function liftSame(a,b){
+  const ka=liftKeyOf(a),kb=liftKeyOf(b);if(ka===kb)return true;
+  const ck=ka<kb?ka+'|'+kb:kb+'|'+ka;if(LIFT_SAME[ck]!=null)return LIFT_SAME[ck];
+  let same=false;
+  try{if(ka&&kb&&(ka.indexOf(kb+' ')===0||kb.indexOf(ka+' ')===0)){
+    const pm=n=>{const h=muscleHits(n);return Object.keys(h).filter(k=>h[k]===1)};
+    const pa=pm(gBase(a)),pb=pm(gBase(b));
+    same=!pa.length||!pb.length||pa.some(m=>pb.indexOf(m)>=0)}}catch(e){same=false}
+  LIFT_SAME[ck]=same;return same}
+function liftMemberOf(members,name){return (Array.isArray(members)?members:[members]).some(m=>liftSame(m,name))}
 function liftPts(ex,day){const raw=[];
   S.history.forEach(h=>{let best=0;
     if(day&&String(h.dayTitle||'').toLowerCase()!==String(day).toLowerCase())return;   // a goal's own day (7 Nov 2026)
-    h.log.forEach(l=>{if(gBase(l.ex)!==ex||!l.w||!l.r)return;best=Math.max(best,e1rm(l.w,l.r,l.rpe))});
+    h.log.forEach(l=>{if(!liftMemberOf(ex,l.ex)||!l.w||!l.r)return;best=Math.max(best,e1rm(l.w,l.r,l.rpe))});
     if(best>0)raw.push({t:new Date(h.date).getTime(),v:best})});
   raw.sort((a,b)=>a.t-b.t);
   const m=[];raw.forEach(p=>{const k=dayKey(p.t);
@@ -40453,7 +40518,7 @@ function liftTrend(names,opts){
   const wk={};let any=0;
   (S.history||[]).forEach(h=>{if(h.run||!h.log)return;const t=new Date(h.date).getTime();if(!isFinite(t))return;
     if(opts.day&&String(h.dayTitle||'').toLowerCase()!==String(opts.day).toLowerCase())return;   // a goal's own day (7 Nov 2026)
-    h.log.forEach(l=>{if(NM.indexOf(gBase(l.ex))<0||!l.w||!l.r)return;any++;
+    h.log.forEach(l=>{if(!liftMemberOf(NM,l.ex)||!l.w||!l.r)return;any++;
       const k=monKey(t);const W=wk[k]||(wk[k]={k,t:new Date(k+'T12:00').getTime(),v:0,light:0,reps:[]});
       const e=e1rm(+l.w,+l.r,l.rpe);
       const hasR=l.rpe!=null&&l.rpe!=='';const near=hasR?(+l.rpe>=7):(+l.r<=10);
@@ -47896,7 +47961,11 @@ function runAction(a,v,t,e){
     case 'crownBack':{if(!crownBackUp()){S.view=S.crxBack||'crown';S.crxBack=null;S._navQuiet=1}render();break}
     case 'crownCrumb':{if(String(v)!=='leaf'){crownGo(v);render()}break}
     case 'crownLens':{const X9=crownX();X9.lens=String(v||'all');X9.sel=null;render();break}
-    case 'crownMode':{S.prof=S.prof||{};S.prof.crownMode=String(v)==='all'?'all':'block';lset(K_PROF,S.prof);S._crownM=null;S._crownImg=null;render();break}
+    case 'crownMode':{S.prof=S.prof||{};S.prof.crownMode=String(v)==='all'?'all':'block';lset(K_PROF,S.prof);S._crownM=null;S._crownImg=null;
+      /* the other mode has other limbs: a rung or a selection kept across the switch pointed at the wrong lift (13 Nov 2026) */
+      S.crx={rung:'canopy',lens:'all',sel:null};try{CRV.z=1;CRV.ox=0;CRV.oy=0}catch(e9){}
+      render();break}
+    case 'crownGoalAdd':{S.gform={ex:String(v||''),w:UNITS.w==='lb'?135:60,r:8};S.sheet={t:'goals'};render();break}
     case 'crownReplay':{crownReplayGo();break}
     case 'crownLeafOpen':{S.sheet={t:'crownleaf',id:String(v)};render();break}
     case 'crownRootOpen':{S.sheet={t:'crownroot',id:String(v)};render();break}
