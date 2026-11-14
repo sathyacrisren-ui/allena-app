@@ -2007,7 +2007,7 @@ if(S.sess){S.note=S.sess.note||S.note;
       if(c0&&(s0.log||[]).some(l=>l.ex===c0.ex&&l.setNo===c0.setNo)){const n0=sessAdv(s0);
         if(n0<0)s0.phase='done';else s0.idx=n0}}catch(e){oops('bootSess',e)}
     if(S.sess.phase!=='done')S.sess.phase='ready'}}
-const BUILD_ID='b907c0';  // stamped by tools/build.py with the content hash
+const BUILD_ID='4a8826';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -29622,7 +29622,8 @@ function crownData(){
   const rideName=rides.length&&rides.every(s=>s.rt==='ride')?'Riding':'Other cardio';
   /* THE LIMB FOLLOWS THE LIFT: liftTrend's state, read once per limb,
      never stored. up / level / down / back / early / noband / null. */
-  if(block)lifts.forEach(L=>{try{const T=liftTrend(L.members,{day:L.goal?goalDay(L.goal):null});L.vig=T?T.state:null;
+  /* in both modes (owner, 14 Nov 2026: "the tree branches still don't represent the trending colour"): the colour follows the direction wherever the tree is read */
+  lifts.forEach(L=>{try{const T=liftTrend(L.members,{day:L.goal?goalDay(L.goal):null});L.vig=T?T.state:null;
       /* the numbers behind the word, for the glance (owner, 5 Nov 2026: "crown
          should say at a glance what's stalling or improving"): from, to and the
          move in kg; when the reader has no band yet the move is said "so far" */
@@ -30027,7 +30028,7 @@ function crownPaint(c,C,V){
        falling lift red, blended with the wood tone so it still reads as a
        limb; a climbing lift keeps the wood, its leaves carry the green. */
     let woodC=crownMix(PL.wood0,PL.wood1,tcol);
-    try{if(D.block&&ch.g&&/^L\d+$/.test(String(ch.g))){const L9=D.lifts[+String(ch.g).slice(1)];const sc=L9&&(L9.dir==='down'?PL.down:L9.dir==='level'?PL.stall:null);if(sc)woodC=crownMix(woodC,sc,0.72)}}catch(e9){}
+    try{if(ch.g&&/^L\d+$/.test(String(ch.g))){const L9=D.lifts[+String(ch.g).slice(1)];const d9=L9&&L9.dir;const sc=d9==='down'||d9==='downsofar'?PL.down:d9==='level'||d9==='flatsofar'?PL.stall:null;if(sc)woodC=crownMix(woodC,sc,0.72)}}catch(e9){}
     c.fillStyle=dimC?PL.wdim:woodC;
     c.beginPath();const left=[],right=[];
     for(let i=0;i<P.length;i++){const a=P[Math.max(0,i-1)],b=P[Math.min(P.length-1,i+1)];let tx=b[0]-a[0],ty=b[1]-a[1];const tl=Math.hypot(tx,ty)||1;tx/=tl;ty/=tl;
@@ -30050,7 +30051,8 @@ function crownPaint(c,C,V){
      green while it climbs, orange while it holds, red while it falls, and
      the domain green when the reader cannot say yet. The state is read per
      build from liftTrend, never stored. */
-  const leafCol=L=>{if(!D.block||L.s.li==null)return PL[L.s.kind];const d=(D.lifts[L.s.li]||{}).dir;return d==='down'?PL.down:d==='level'?PL.stall:PL[L.s.kind]};
+  const dirCol=d=>d==='down'||d==='downsofar'?PL.down:d==='level'||d==='flatsofar'?PL.stall:null;
+  const leafCol=L=>{if(L.s.li==null)return PL[L.s.kind];const c=dirCol((D.lifts[L.s.li]||{}).dir);return c||PL[L.s.kind]};
   const COLS=[PL.lift,PL.stall,PL.down,PL.rehab,PL.run,PL.ride];
   COLS.forEach(col=>{[true,false].forEach(lit=>{let any=false;c.beginPath();
     M.leaves.forEach(L=>{if(leafCol(L)!==col||!inT(L))return;if(dimmed&&on(L)!==lit)return;if(!dimmed&&!lit)return;const x=X(L.x),y=Y(L.y);if(x<-12||x>W+12||y<-12||y>H+12)return;
@@ -30128,7 +30130,7 @@ function crownPaint(c,C,V){
        the trend reader has a band behind the word */
     D.lifts.forEach((L,i)=>{const G9=M.groups['L'+i];if(!G9)return;const r=Math.min(G9.rmax*0.62,G9.rmid+0.08);
       /* the colour carries the state now (13 Nov 2026), the glyphs are gone */
-      place(L.name,X(Math.cos(G9.a)*r),Y(Math.sin(G9.a)*r),{fs:12,bold:true,lift:i,dir:D.block?L.dir:null})});
+      place(L.name,X(Math.cos(G9.a)*r),Y(Math.sin(G9.a)*r),{fs:12,bold:true,lift:i,dir:L.dir||null})});
     ['run','ride','rehab'].forEach(k=>{const G9=M.groups[k];if(!G9)return;place(crownDName(k,D),X(Math.cos(G9.a)*G9.rmid),Y(Math.sin(G9.a)*G9.rmid),{fs:12,bold:true})});
     if(M.groups.Lx&&V.z>=1.6)place('Other lifting',X(Math.cos(M.groups.Lx.a)*M.groups.Lx.rmid),Y(Math.sin(M.groups.Lx.a)*M.groups.Lx.rmid),{fs:11});
     if(mode==='full'){
@@ -30144,7 +30146,7 @@ function crownPaint(c,C,V){
   LBL.forEach(l=>{c.font=(l.o.bold?'600 ':'500 ')+Math.round(l.fs)+'px -apple-system,system-ui,sans-serif';c.textAlign='center';c.textBaseline='middle';
     c.fillStyle=PL.lab;const rx=l.x-l.w/2,ry=l.y-l.h/2;
     c.beginPath();if(c.roundRect)c.roundRect(rx,ry,l.w,l.h,4*u);else c.rect(rx,ry,l.w,l.h);c.fill();
-    c.fillStyle=l.o.go?PL.lift:l.o.dir==='up'?PL.lift:l.o.dir==='down'?PL.down:l.o.dir==='level'?PL.stall:l.o.ring?crownRgba(PL.ink,0.55):l.o.faded?crownRgba(PL.ink,0.5):PL.ink;c.fillText(l.txt,l.x,l.y+0.5)});
+    c.fillStyle=l.o.go?PL.lift:(l.o.dir==='up'||l.o.dir==='upsofar')?PL.lift:(l.o.dir==='down'||l.o.dir==='downsofar')?PL.down:(l.o.dir==='level'||l.o.dir==='flatsofar')?PL.stall:l.o.ring?crownRgba(PL.ink,0.55):l.o.faded?crownRgba(PL.ink,0.5):PL.ink;c.fillText(l.txt,l.x,l.y+0.5)});
   /* 11. the selected leaf gets a ring */
   if(sel&&sel.k==='leaf'){const L=M.leaves.find(q=>q.s.id===sel.id&&(sel.li==null||q.s.li===sel.li));if(L){const x=X(L.x),y=Y(L.y);c.save();c.shadowColor=dk?'rgba(255,255,255,.9)':'rgba(30,34,51,.5)';c.shadowBlur=10*u;
     c.strokeStyle=dk?'#FFFFFF':PL.ink;c.lineWidth=2;c.beginPath();c.arc(x,y,Math.max(7*u,leafLen(L)*1.5),0,Math.PI*2);c.stroke();c.restore()}}
@@ -30711,7 +30713,14 @@ function crownAfterRender(){
     try{if(!CRV.unfDone){CRV.unfDone=1;const s=C.D.sessions[C.D.sessions.length-1];if(s&&s.day>=dayKey(new Date(Date.now()-2*864e5)))CRV.unf={id:s.id,t0:Date.now()};
       if(CRV.unf){const tick=()=>{if(!CRV.unf)return;crownDraw();if(Date.now()-CRV.unf.t0<760)requestAnimationFrame(tick);else CRV.unf=null};requestAnimationFrame(tick)}}}catch(e){oops('crownUnfurl',e)}
     if(home)crownSize(home);
-    if(cx){const r=crownSize(cx);CRV.W=r.W;CRV.H=r.H;C._zmax=0;
+    /* THE CANVAS KEEPS ITS SIZE WHILE THE PANEL CHANGES (owner, on video,
+       14 Nov 2026: "the zoom in also unwantedly vertically stretched the
+       tree"). The canvas box was flex:1, so when the lifts rail folded on
+       zoom the panel shrank, the box grew and CSS stretched the bitmap to
+       fill it until something re-measured. The box is pinned to the height
+       it had at mount; a window resize clears the pin and measures again. */
+    if(cx){try{const pb=cx.parentElement;if(pb){pb.style.height='';pb.style.flex='';const rh=pb.getBoundingClientRect().height;if(rh>0){pb.style.flex='none';pb.style.height=Math.round(rh)+'px'}}}catch(e9){oops('crownPin',e9)}
+      const r=crownSize(cx);CRV.W=r.W;CRV.H=r.H;C._zmax=0;
       /* the zoom from where the tree sat on the first screen (FLIP) */
       if(CRV.flip){const f=CRV.flip;CRV.flip=null;
         const reduced=(function(){try{return !!(window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches)}catch(e){return false}})();
@@ -30754,7 +30763,7 @@ function crownAfterRender(){
     document.addEventListener('wheel',e=>{const cv=inX(e);if(!cv)return;e.preventDefault();const r=cv.getBoundingClientRect();const mx=e.clientX-r.left,my=e.clientY-r.top;
       const B0=Math.min(CRV.W,CRV.H)/2/(CRV.ext||CROWN_EXT);const wx=(mx-CRV.W/2-CRV.ox)/(B0*CRV.z),wy=(my-CRV.H/2-CRV.oy)/(B0*CRV.z);const C=S._crownM;
       CRV.z=Math.max(0.9,Math.min(C?crownZmax(C):8,CRV.z*(e.deltaY<0?1.12:0.9)));CRV.ox=mx-CRV.W/2-wx*B0*CRV.z;CRV.oy=my-CRV.H/2-wy*B0*CRV.z;crownClamp();crownFrame()},{passive:false});
-    window.addEventListener('resize',()=>{try{if(CRV.home||CRV.cv){if(CRV.home)crownSize(CRV.home);if(CRV.cv){const r=crownSize(CRV.cv);CRV.W=r.W;CRV.H=r.H}crownDraw()}}catch(e){oops('crownResize',e)}});
+    window.addEventListener('resize',()=>{try{if(CRV.home||CRV.cv){if(CRV.home)crownSize(CRV.home);if(CRV.cv){try{const pb=CRV.cv.parentElement;if(pb){pb.style.height='';pb.style.flex='';const rh=pb.getBoundingClientRect().height;if(rh>0){pb.style.flex='none';pb.style.height=Math.round(rh)+'px'}}}catch(e9){}const r=crownSize(CRV.cv);CRV.W=r.W;CRV.H=r.H}crownDraw()}}catch(e){oops('crownResize',e)}});
     window.crownReset=function(){CRV.z=1;CRV.ox=0;CRV.oy=0};
   }catch(e){oops('crownGestures',e)}
 })();
