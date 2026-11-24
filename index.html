@@ -2007,7 +2007,7 @@ if(S.sess){S.note=S.sess.note||S.note;
       if(c0&&(s0.log||[]).some(l=>l.ex===c0.ex&&l.setNo===c0.setNo)){const n0=sessAdv(s0);
         if(n0<0)s0.phase='done';else s0.idx=n0}}catch(e){oops('bootSess',e)}
     if(S.sess.phase!=='done')S.sess.phase='ready'}}
-const BUILD_ID='cf33a4';  // stamped by tools/build.py with the content hash
+const BUILD_ID='29d713';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -22533,6 +22533,63 @@ function garminSheet(){
     inner+='<p style="color:var(--faint);font-size:11px;line-height:1.5;margin-top:16px">Works on every Garmin watch that runs Connect IQ apps. Only set targets travel to the watch, and only the sets you logged travel back.</p>';
     return wrapSheet('Garmin watch',inner)}
   catch(e){oops('garminSheet',e);return wrapSheet('Garmin watch','<p style="color:var(--dim);font-size:13px">Could not open this just now.</p>')}}
+/* ══ THE CLAUDE CONNECTOR (owner, 24 Nov 2026: "can I connect my allena to
+   Claude" — "yes connector now") ═══════════════════════════════════════
+   The Claude app reads this account's newest backup through the `claude`
+   edge function (supabase/claude-function.ts), READ ONLY. Its credential
+   is a long random key made here under the user's own session and carried
+   in the connector's address. One key per account: making a new one ends
+   the old. Lives on K_ACCT as `claude` and is not in ACCT_KEEP, so the
+   key never rides a backup; a reinstall makes a new link. */
+function claudeLink(){try{return (acct()||{}).claude||null}catch(e){oops('claudeLink',e);return null}}
+function claudeUrl(){const c=claudeLink();return (c&&c.token)?CLOUD.url+'/functions/v1/claude/'+c.token:''}
+function claudeTokenMake(){
+  /* a credential: real randomness or nothing */
+  if(typeof crypto==='undefined'||!crypto.getRandomValues)return '';
+  const b=new Uint8Array(24);crypto.getRandomValues(b);
+  let s='';for(let i=0;i<b.length;i++)s+=(b[i]<16?'0':'')+b[i].toString(16);return s}
+async function claudeLinkOff(quiet){
+  try{const h=await frHeaders();
+    /* RLS narrows this to the caller's own rows */
+    if(h){const r=await fetch(CLOUD.url+'/rest/v1/claude_links?token=neq.0',{method:'DELETE',headers:h});
+      if(!r.ok&&r.status!==404){oops('claudeLinkOff',new Error('HTTP '+r.status));if(!quiet)flash('Could not turn the link off. Try again in a minute.');return false}}
+    else if(!quiet){flash('Sign in first, then turn it off.');return false}
+    lset(K_ACCT,Object.assign({},acct()||{},{claude:null}));return true}
+  catch(e){oops('claudeLinkOff',e);if(!quiet)flash('No connection. The link is still on.');return false}}
+async function claudeLinkMake(){
+  try{
+    const h=await frHeaders();if(!h){flash('Sign in first. Claude reads the backup your account keeps.');return null}
+    const token=claudeTokenMake();if(!token){flash('This device cannot make a safe key.');return null}
+    await claudeLinkOff(true);
+    const r=await fetch(CLOUD.url+'/rest/v1/claude_links',{method:'POST',headers:Object.assign({Prefer:'return=minimal'},h),body:JSON.stringify({token:token})});
+    if(r.status===404){flash('The Claude link is not set up on the server yet.');return null}
+    if(!r.ok){oops('claudeLinkMake',new Error('HTTP '+r.status));flash('Could not make the link. Try again in a minute.');return null}
+    const c={token:token,since:today()};
+    lset(K_ACCT,Object.assign({},acct()||{},{claude:c}));
+    try{cloudBkPush(false,true)}catch(e9){oops('claudeLinkMake.push',e9)}   // so the first question reads today
+    return c}
+  catch(e){oops('claudeLinkMake',e);flash('No connection.');return null}}
+function claudeSheet(){
+  try{
+    const c=claudeLink();const signed=(typeof acctReady==='function'&&acctReady()&&!!(acct()||{}).refresh);
+    const step=(s,i)=>'<div style="display:flex;gap:12px;margin-top:8px"><span class="mono" style="color:var(--amber);font-size:11px;flex:none;width:14px">'+(i+1)+'</span><p style="font-size:13px;color:var(--dim);line-height:1.5">'+esc(s)+'</p></div>';
+    let inner='<p style="color:var(--dim);font-size:13px;line-height:1.6">Ask Claude about your training from the Claude app. It reads the backup your account keeps: your sessions and sets, runs, daily numbers, scans, goals and rehab. It can read and nothing else. It cannot change your plan or your record.</p>';
+    if(!signed)inner+='<p style="color:var(--amber);font-size:13px;line-height:1.6;margin-top:12px">Sign in first. Claude reads the backup your account keeps.</p>';
+    else if(!c||!c.token)inner+='<button data-a="claudeMake" class="big disp mt" style="background:var(--amber);color:var(--bg);font-size:15px">'+(S.acctBusy?'Making your link…':'Make my Claude link')+'</button>';
+    else{
+      inner+='<p class="eyebrow mt2">Your link</p>'+
+        '<div class="card mt" style="padding:14px"><p class="mono" style="font-size:11px;color:var(--dim);word-break:break-all;line-height:1.5">'+esc(claudeUrl())+'</p></div>'+
+        '<button data-a="claudeCopy" class="big disp mt" style="background:var(--amber);color:var(--bg);font-size:15px">Copy the link</button>'+
+        '<p class="eyebrow mt2">How to set it up</p>'+
+        ['Copy the link above.',
+         'In Claude, open Settings, then Connectors, then Add custom connector.',
+         'Name it Allena, paste the link as the address, and add it.',
+         'In a chat, switch Allena on and ask. "How is my bench going?" is a good first one.'].map(step).join('')+
+        '<p style="font-size:13px;color:var(--amber);line-height:1.5;margin-top:14px">The link is the key. Anyone who has it can read your training, so do not share it. Turning it off here ends it at once.</p>'+
+        '<button data-a="claudeOff" class="btn mt2" style="color:var(--red);font-size:13px">Turn the link off</button>'}
+    inner+='<p style="color:var(--faint);font-size:11px;line-height:1.5;margin-top:16px">What Claude reads goes to Anthropic under your own Claude account. Your name, email, chats here and sign-in are never sent.</p>';
+    return wrapSheet('Claude',inner)}
+  catch(e){oops('claudeSheet',e);return wrapSheet('Claude','<p style="color:var(--dim);font-size:13px">Could not open this just now.</p>')}}
 /* THE RARITY LADDER (owner, 13 Sep 2026: "Big one / Epic / Rare /
    Noticed should have a colour system, otherwise they're all the same").
    They were: the old ladder ran stone, green, #D9D6CD, #FFFFFF — the top
@@ -41842,7 +41899,8 @@ function viewData(){
       :setRow(I.run,'Running','Off','Running')),
     setRow(I.heart,'Daily check-in',dc?'On':'Off','Daily check-in'),
     setRow(I.run,'Connect wearables & apps','the Apple Health guide','__hguide'),
-    setRow(I.run,'Garmin watch',(typeof wristOn==='function'&&wristOn())?'Paired':'Log sets with no phone','__garmin')]);}
+    setRow(I.run,'Garmin watch',(typeof wristOn==='function'&&wristOn())?'Paired':'Log sets with no phone','__garmin'),
+    setRow(I.run,'Claude',(typeof claudeLink==='function'&&claudeLink())?'Connected':'Ask Claude about your training','__claude')]);}
   {const th=lget('training-theme-v1','system');
    h+='<p class="eyebrow mt2">Appearance</p>'+
    '<div class="card mt" style="padding:13px 15px">'+
@@ -42757,6 +42815,7 @@ function sheetHtml(){
       :'<p style="color:var(--dim);font-size:13px;line-height:1.55;margin-top:20px">Removing takes it out of the program from here on.'+(doneN9?' The '+doneN9+' session'+(doneN9===1?'':'s')+' you’ve already logged against it stay in History.':'')+'</p>'+
       '<button data-a="dayDelOpen" data-v="'+di9+'" class="big disp mt" style="background:var(--red);color:#fff;font-size:17px">Remove this day</button>'))}
   if(S.sheet.t==='garmin')return garminSheet();
+  if(S.sheet.t==='claude')return claudeSheet();
   if(S.sheet.t==='clouddays')return cloudDaysSheet();
   if(S.sheet.t==='goals'){
     /* S.gform is shared with the morning, pre, post and bodyweight
@@ -49264,6 +49323,10 @@ function runAction(a,v,t,e){
     case 'wristPush':{wristPlanPush(true).then(function(ok){flash(ok?'Sent. Open Allena on the watch with the phone near.':'Could not send just now.');render()});break}
     case 'wristUnpair':{S.confirm={t:'Unpair this watch?',d:'The watch stops loading sessions and nothing more comes back from it. Sets already here stay.',go:'wristUnpairGo',v:'',ok:'Unpair',no:'Keep it'};S.sheet={t:'confirm'};render();break}
     case 'wristUnpairGo':{S.sheet=null;wristUnpair();break}
+    case 'claudeMake':{if(S.acctBusy)break;S.acctBusy=true;render();claudeLinkMake().then(function(){S.acctBusy=false;render()});break}
+    case 'claudeCopy':{try{navigator.clipboard.writeText(claudeUrl()).then(function(){flash('Link copied. Paste it into Claude.')},function(){flash('Copy blocked. Press and hold the link to copy it.')})}catch(e){oops('claudeCopy',e);flash('Could not copy on this device.')}break}
+    case 'claudeOff':{S.confirm={t:'Turn the Claude link off?',d:'Claude stops being able to read your training at once. You can make a new link any time.',go:'claudeOffGo',v:'',ok:'Turn it off',no:'Keep it'};S.sheet={t:'confirm'};render();break}
+    case 'claudeOffGo':{S.sheet={t:'claude'};render();claudeLinkOff().then(function(){render()});break}
     case 'wearPick':{S.prof=S.prof||{};S.prof.wear=String(v||'');lset(K_PROF,S.prof);
       if(S.prof.wear==='garmin'){runAction('hguideOpen','garmin');break}render();break}
     case 'hguideOpen':{S.sheet=null;S.impgMode='health';S.impg=String(v||'garmin');S.impgStep=0;
@@ -50587,6 +50650,7 @@ function runAction(a,v,t,e){
       if(v==='__report')v='Report a problem';   // the rows pass a token; the chunk key is the title
       if(v==='__setup'){S.sheet=null;runAction('setupOpen');break}
       if(v==='__garmin'){S.sheet={t:'garmin'};render();break}
+      if(v==='__claude'){S.sheet={t:'claude'};render();break}
       if(v==='__hguide'){S.sheet=null;S.impgMode='health';S.impg='garmin';S.impgStep=0;
         S.guideFrom=S.view;S._navQuiet=1;S.view='guide';render();break}
       if(v==='__rirfix'){S.sheet={t:'rirfix'};render();break}
