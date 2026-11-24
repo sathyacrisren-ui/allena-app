@@ -2007,7 +2007,7 @@ if(S.sess){S.note=S.sess.note||S.note;
       if(c0&&(s0.log||[]).some(l=>l.ex===c0.ex&&l.setNo===c0.setNo)){const n0=sessAdv(s0);
         if(n0<0)s0.phase='done';else s0.idx=n0}}catch(e){oops('bootSess',e)}
     if(S.sess.phase!=='done')S.sess.phase='ready'}}
-const BUILD_ID='e0e36d';  // stamped by tools/build.py with the content hash
+const BUILD_ID='c9b4d7';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -18431,7 +18431,7 @@ function blockLiftVerdict(name){
     const U=' '+uwUnit();
     if(T&&T.state==='up')return{load:true,say:''};
     if(T&&T.state==='down')return{load:false,say:'down from about '+uwNum(T.from)+' to '+uwNum(T.to)+U+' estimated max over '+T.weeks+' weeks — held, not loaded'};
-    if(T&&T.state==='level')return{load:false,say:'level for '+T.weeks+' weeks — held at current load to consolidate'};
+    if(T&&T.state==='level')return{load:false,stall:true,say:'level for '+T.weeks+' weeks — held at current load to consolidate'};
     if(T&&T.state==='back')return{load:false,say:'back after '+T.back.gapW+' weeks off — held at current load while you rebuild'};
     /* the reader cannot judge yet: the slope may hold a lift, never load it */
     const noband=T&&T.state==='noband';
@@ -18485,23 +18485,60 @@ function nextBlock(){
     if(a)changes.push(nm+': carried your '+(a>0?'+':'')+uwNum(a)+' '+uwUnit()+' adjustment into the base');
     /* a lift that takes the step is a change, and the preview says so */
     if(loaded)changes.push(nm+': +'+(lb?5:2.5)+' '+uwUnit()+' on the working sets');
-    if(how.say){const base=gBase(ex.name);if(!verdictSaid[base]){verdictSaid[base]=1;changes.push(base+': '+how.say)}}
+    if(how.say){const base=gBase(ex.name);if(!verdictSaid[base]){verdictSaid[base]=1;
+      /* A STALLED LIFT GETS SOMETHING NEW (owner, 24 Nov 2026: "whatever is
+         lagging, stalling, allena should do something about it"). Level
+         against its own swing is the one state that earns it: the load
+         holds and one set is added (five at most), the coach's first lever
+         on a plateau. A falling lift is never given more; too few weeks is
+         still no claim. */
+      let extra='';
+      if(how.stall&&!ex.warmup){const b=exBaseSets(ex);if(b&&b.length&&b.length<5){b.push(JSON.parse(JSON.stringify(b[b.length-1])));ex._stallAdd=1;extra='. One set added to move it'}}
+      changes.push(base+': '+how.say+extra)}}
   }));
-  // balance: one extra set for clearly low muscles that appear in the program, trim one for high
-  const tag=(ex)=>MUSCLE_RULES.filter(r=>r[1].test(ex.name)).map(r=>r[0]);
-  const lows=Object.keys(ws).filter(k2=>ws[k2]>0&&ws[k2]<6).sort((a,b)=>ws[a]-ws[b]).slice(0,2),highs=Object.keys(ws).filter(k2=>ws[k2]>=20).slice(0,1);
-  const addedFor={},trimmedFor={};
-  np.days.forEach(d=>d.exercises.forEach(ex=>{
-    const ms=tag(ex);
-    const lo=ms.find(mm=>lows.indexOf(mm)>=0&&!addedFor[mm]);
-    const base=exBaseSets(ex);
-    if(lo&&base&&base.length<4&&!/bench|squat|deadlift/i.test(ex.name)){
-      base.push(JSON.parse(JSON.stringify(base[base.length-1])));
-      addedFor[lo]=1;changes.push(ex.name.replace(/ — .*/,'')+': +1 set — '+lo+' has been under ~6 sets/wk')}
-    const hi=ms.find(mm=>highs.indexOf(mm)>=0&&!trimmedFor[mm]);
-    if(hi&&base&&base.length>2&&!/bench/i.test(ex.name)){
-      base.pop();trimmedFor[hi]=1;
-      changes.push(ex.name.replace(/ — .*/,'')+': −1 set — '+hi+' has been over ~20 sets/wk')}}));
+  /* WHAT IS UNDER-TRAINED GETS MORE, NOT A SENTENCE (owner, 24 Nov 2026: "she
+     said I don't get enough sets of lateral raises per week and same with
+     some others yet does nothing new on the new block"). The old pass took
+     the two lowest muscles in the HISTORY, which were often muscles the
+     block has no exercise for, so nothing changed. It reads the block as
+     WRITTEN now: every muscle the block trains as a prime mover with under
+     6 sets a week (indirect ones aside) gets one more set on its exercises,
+     and when that still leaves it short, its main exercise is written onto
+     a second day. Lowest first, four muscles and ten added sets at most,
+     so a session does not double. Over 20 a week still loses a set. */
+  const tag=(ex)=>MUSCLE_RULES.filter(r=>r[1].test(ex.name)&&!(r[0]==='Biceps'&&/leg curl|hamstring/i.test(ex.name))).map(r=>r[0]);
+  const INDIRECT={'Core':1,'Lower back':1,'Adductors':1,'Front delts':1,'Upper back':1,'Neck':1,'Forearms':1,'Rotator cuff':1};
+  const LEGM={'Quads':1,'Hamstrings':1,'Glutes':1,'Calves':1,'Adductors':1};
+  const nSets=ex=>(exBaseSets(ex)||[]).length;
+  const planned=()=>{const per={};np.days.forEach(d=>d.exercises.forEach(ex=>tag(ex).forEach(m=>per[m]=(per[m]||0)+nSets(ex))));return per};
+  let budget=10;
+  try{const P0=planned();
+    Object.keys(P0).filter(m=>!INDIRECT[m]&&P0[m]>0&&P0[m]<6).sort((x,y)=>P0[x]-P0[y]).slice(0,4).forEach(m=>{
+      const was=P0[m];const mine=[];np.days.forEach(d=>d.exercises.forEach(ex=>{if(tag(ex).indexOf(m)>=0)mine.push({d,ex})}));
+      mine.forEach(q=>{const base=exBaseSets(q.ex);
+        if(budget>0&&planned()[m]<6&&base&&base.length&&base.length<4&&!q.ex._stallAdd&&!/bench|squat|deadlift/i.test(q.ex.name)){
+          base.push(JSON.parse(JSON.stringify(base[base.length-1])));budget--;
+          changes.push(q.ex.name.replace(/ — .*/,'')+': +1 set. '+m+' was written at '+was+' sets a week, and under about 6 maintains rather than builds')}});
+      if(planned()[m]<6&&budget>=2&&mine.length){
+        /* only an accessory is written onto a second day: never a goal lift, a barbell lift or a bench, squat or deadlift (the push-harder law) */
+        const acc=mine.filter(q=>!q.ex.bar&&!/bench|squat|deadlift/i.test(q.ex.name)&&!(typeof isGoalLift==='function'&&isGoalLift(q.ex.name)));
+        const src=acc.slice().sort((x,y)=>nSets(y.ex)-nSets(x.ex))[0];const leg=!!LEGM[m];
+        if(!src)return;
+        const cand=np.days.filter(d=>!d.recday&&!d.exercises.some(ex=>tag(ex).indexOf(m)>=0)).map(d=>{let lg=0,up=0,tot=0;
+          d.exercises.forEach(ex=>{const n=nSets(ex);tot+=n;if(tag(ex).some(x=>LEGM[x]))lg+=n;else up+=n});return{d,tot,match:leg?lg>=up:up>=lg}})
+          .sort((x,y)=>(y.match-x.match)||(x.tot-y.tot));
+        if(cand.length){const n=Math.min(3,budget,Math.max(2,6-planned()[m]));const b0=exBaseSets(src.ex)||[];const one=b0[b0.length-1];
+          if(one){const cp=JSON.parse(JSON.stringify(src.ex));delete cp._stallAdd;cp.sets={'default':Array.from({length:n},()=>JSON.parse(JSON.stringify(one)))};
+            cand[0].d.exercises.push(cp);budget-=n;
+            changes.push(src.ex.name.replace(/ — .*/,'')+': also on '+cand[0].d.name+', '+n+' sets. '+m+' now gets '+planned()[m]+' sets a week, up from '+was)}}}})}
+  catch(e){oops('nextBlock.volume',e)}
+  try{const highs=Object.keys(ws).filter(k2=>ws[k2]>=20).slice(0,1);const trimmedFor={};
+    np.days.forEach(d=>d.exercises.forEach(ex=>{const base=exBaseSets(ex);
+      const hi=tag(ex).find(mm=>highs.indexOf(mm)>=0&&!trimmedFor[mm]);
+      if(hi&&base&&base.length>2&&!/bench/i.test(ex.name)){base.pop();trimmedFor[hi]=1;
+        changes.push(ex.name.replace(/ — .*/,'')+': −1 set — '+hi+' has been over ~20 sets/wk')}}))}
+  catch(e){oops('nextBlock.trim',e)}
+  np.days.forEach(d=>d.exercises.forEach(ex=>{delete ex._stallAdd}));
   /* A GOAL LIFT IS IN THE BLOCK (owner, 24 Nov 2026: "this new block doesn't
      have any barbell row even though I put it as a goal"). The builder
      copied the old block's exercises and never looked at the goals. An open
