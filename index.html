@@ -2007,7 +2007,7 @@ if(S.sess){S.note=S.sess.note||S.note;
       if(c0&&(s0.log||[]).some(l=>l.ex===c0.ex&&l.setNo===c0.setNo)){const n0=sessAdv(s0);
         if(n0<0)s0.phase='done';else s0.idx=n0}}catch(e){oops('bootSess',e)}
     if(S.sess.phase!=='done')S.sess.phase='ready'}}
-const BUILD_ID='1d1dd0';  // stamped by tools/build.py with the content hash
+const BUILD_ID='077757';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -43017,6 +43017,14 @@ function sheetHtml(){
           '<span style="font-size:15px;font-weight:600">'+esc(sb.n)+'</span>'+
           '<span class="mono" style="color:var(--amber);font-size:13px;white-space:nowrap">'+(w?uwNum(w)+' '+uwUnit():'—')+'</span></div>'+
           '<p style="color:var(--faint);font-size:11px;margin-top:4px">'+esc(String(sb.u).replace('kg',uwUnit()))+' · '+esc(sb.note)+'</p></button>'}).join('')+'</div>';
+    /* ANY EXERCISE, NOT ONLY THE PRESETS (owner, 24 Nov 2026, from this sheet:
+       "there's another exercise I want to add instead"). The typed swap the
+       no-preset branch always had, offered here too. */
+    {const f3=S.axf||(S.axf={cat:'pushH',name:'',sets:3,reps:'8-12',w:'',hold:false,secs:30,perSide:false,perm:false});
+     inner+='<p class="eyebrow" style="margin-top:16px">Something else</p>'+
+      '<input data-in="axf.name" value="'+esc(f3.name||'')+'" placeholder="Type any exercise" autocomplete="off" style="width:100%;margin-top:8px">'+
+      '<div id="axnear">'+(typeof exNearHtml==='function'?exNearHtml(f3.name):'')+'</div>'+
+      '<button data-a="subFreeTyped" class="big disp mt" style="background:'+(String(f3.name||'').trim()?'var(--green)':'var(--raised)')+';color:'+(String(f3.name||'').trim()?'var(--bg)':'var(--faint)')+'">Swap to this</button>'}
     if(cur.origEx)inner+='<button data-a="subRevert" class="btn mt">Revert to '+esc(cur.origEx)+'</button>';
     inner+='<p style="color:var(--faint);font-size:11px;line-height:1.5;margin-top:12px">Converted weights are a starting point. First set at the suggested load, then adjust to hit the target RPE — the app logs what you actually do.</p>';
     return wrapSheet('Swap exercise',inner)}
@@ -50351,9 +50359,17 @@ function runAction(a,v,t,e){
           if(prog.days[di]){prog.days[di].exercises.push({name:name,rest:rest,cue:cue,bar:bar,
             sets:{'default':f.hold?hold(secs,n,!!f.perSide):mk(f.reps,Array.from({length:n},(_,i)=>i===n-1?9:8))}});saveLib()}}}
       S.sheet=null;render();flash('Added '+name+(f.perm?' — today and every week.':' to today.'));break}
-    case 'subOpen':S.sheet={t:'sub'};render();break;
+    case 'subOpen':if(S.axf)S.axf.name='';S.sheet={t:'sub'};render();break;
     case 'subFree':case 'subFreeTyped':{
-      const nm=String(a==='subFree'?(dv||''):(S.axf&&S.axf.name||'')).trim();if(!nm)break;
+      let nm=String(a==='subFree'?(dv||''):(S.axf&&S.axf.name||'')).trim();if(!nm)break;
+      /* a typed swap (24 Nov 2026) joins the lift it already is, passes the
+         injury screen like every other offer, and starts at the weight
+         last lifted on it when there is one */
+      let lastW=null;
+      if(a==='subFreeTyped'){
+        try{const same=(typeof exNear==='function'?exNear(nm,3):[]).find(x=>x.same);if(same)nm=gBase(same.n)}catch(e9){oops('subTyped.alias',e9)}
+        try{if(!(typeof isRehabSession==='function'&&isRehabSession())&&exBlocked(nm,[],exclFor(restrEff()))){flash(nm+' clashes with your injury settings, so it was not swapped in.');break}}catch(e9){oops('subTyped.screen',e9);break}
+        try{const cut=Date.now()-120*864e5;(S.history||[]).forEach(h=>{if(h.run||!(new Date(h.date).getTime()>=cut))return;(h.log||[]).forEach(l=>{if(+l.w>0&&+l.r>0&&liftMemberOf(nm,l.ex)&&(lastW==null||+l.w>lastW))lastW=+l.w})})}catch(e9){oops('subTyped.w',e9)}}
       /* THE SET IN PLAY (review L-1/A-2): during rest s.idx is the set just
          finished, so this renamed the FINISHED exercise — logged sets and
          all — and sessAdv then stopped recognising them as logged. The
@@ -50364,9 +50380,11 @@ function runAction(a,v,t,e){
       const done9=st=>(s3.log||[]).some(l=>l.ex===st.ex&&l.setNo===st.setNo);
       let pool=null;Object.keys(POOL).some(k=>{const p=POOL[k].find(x=>x.n===nm);if(p){pool=p;return true}return false});
       s3.sets.forEach(st=>{if(st.exNo!==no||done9(st))return;
-        st.origEx=st.origEx||st.ex;st.ex=nm;
+        st.origEx=st.origEx||st.ex;st.ex=nm;delete st.ed;
         if(pool){st.bar=pool.eq==='bb';if(pool.cue)st.cue=pool.cue}
-        st.subUnit='same weight — adjust to RPE'});
+        if(lastW!=null&&st.targetW!=null){if(st.origW===undefined)st.origW=st.targetW;st.targetW=lastW;st.subUnit='your last weight on it'}
+        else st.subUnit='same weight — adjust to RPE'});
+      if(S.axf)S.axf.name='';
       S.sheet=null;persistActive();render();flash('Swapped to '+nm+'.');break}
     case 'subPick':{
       /* THE SAME LIST THE SHEET DREW (review A-1/A-2/L-1, injury-grade). The
