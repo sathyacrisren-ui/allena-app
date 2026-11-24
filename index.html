@@ -2007,7 +2007,7 @@ if(S.sess){S.note=S.sess.note||S.note;
       if(c0&&(s0.log||[]).some(l=>l.ex===c0.ex&&l.setNo===c0.setNo)){const n0=sessAdv(s0);
         if(n0<0)s0.phase='done';else s0.idx=n0}}catch(e){oops('bootSess',e)}
     if(S.sess.phase!=='done')S.sess.phase='ready'}}
-const BUILD_ID='077757';  // stamped by tools/build.py with the content hash
+const BUILD_ID='cf33a4';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -10834,6 +10834,16 @@ function hwAssign(dows,sp){
   choose(0,[]);
   if(!best)best={runD:[longDay],lifts:rest.slice(0,sp.lift)};
   return{runDays:HW_DN.filter(d=>best.runD.indexOf(d)>=0),liftDays:HW_DN.filter(d=>best.lifts.indexOf(d)>=0),longDay:longDay,added:added}}
+/* the lifting block a new week may be built around: the active one, when it
+   is the person's own lifting block (never rehab, a physio plan or support) */
+function hwKeepBlock(){
+  try{const a=activeProgSafe();if(!a||a.empty||!a.days||!a.days.length)return null;
+    if(S.hw&&S.hw.progId===a.id)return null;   // the block this flow wrote a moment ago is replaced on a rebuild, never kept
+    return mainProgs().some(p=>p.id===a.id)?a:null}
+  catch(e){oops('hwKeepBlock',e);return null}}
+/* kept by default for a running race (running joins the lifting you have);
+   a lifting-led goal writes a new block unless the chip says keep */
+function hwKeepOn(W){try{if(!W||!hwKeepBlock())return false;return W.keep!=null?!!W.keep:W.goal==='race'}   /* Hyrox writes its own block: it needs the stations */catch(e){return false}}
 function hwStart(from){
   /* the five-door screen reached by going back from the onboarding
      week is still the onboarding flow (startSetup marks it fromOb), so
@@ -10843,6 +10853,11 @@ function hwStart(from){
   S.hw={step:'goal',from:from||'ob',goal:null,dist:null,date:null,inf:inf,bal:hwBalance(56),
     dows:(inf.dows||hwDefaultDows(inf.n||4)).slice(),mins:inf.mins||60,exp:inf.exp||'new',
     five:inf.five!=null?inf.five:'unsure'};
+  /* KEEP MY LIFTING BLOCK (owner, 24 Nov 2026: a marathon in March beside
+     the block he had just built; "Build my week" wrote its own lifting
+     block over the active one). When a lifting block is active the week is
+     built AROUND it by default; one chip writes a new one instead. */
+  S.hw.keep=null;   // null = the default for the goal (hwKeepOn); the chip sets true or false
   S.setup=null;S.sheet=null;S.view='week';render()}
 /* a single weekly easy run for the lifting-led goals: one long easy run,
    +8% a week, a down week every fourth — the same shape the other
@@ -10901,21 +10916,29 @@ function hwBuild(){
     /* an existing profile keeps everything it had (equipment, injuries,
        focus, units); only what this flow decides is written over it */
     const keep=S.prof&&!S.prof.skipped?S.prof:{};
-    const prof=Object.assign(obDefaultProf(),keep,{days:Math.max(1,sp.lift),mins:W.mins,exp:W.exp,goal:L.goal,goals:L.goals,style:L.style,weeks:6});
+    const kb=hwKeepOn(W)?hwKeepBlock():null;
+    /* a kept block keeps the lifting answers that wrote it; only the week's plan is new */
+    const prof=kb?Object.assign(obDefaultProf(),keep):Object.assign(obDefaultProf(),keep,{days:Math.max(1,sp.lift),mins:W.mins,exp:W.exp,goal:L.goal,goals:L.goals,style:L.style,weeks:6});
+    /* a race with a date leads (owner, same day: "a matter of stalling the
+       strength work to prioritise running"): the daily call keeps leg lifts
+       light near the hard runs, and the regulator only ever suggests */
+    if(kb&&(W.goal==='race'||W.goal==='hyrox'))prof.prio='run';
     prof.surf=Object.assign({},prof.surf||{});
     if(sp.run>0)prof.surf['run.plan']=true;
     else if(S.runplan&&S.runplan.by==='hw'){delete prof.surf['run.plan'];S.runplan=null;lset('training-runplan-v1',null)}
     prof.plan={goal:W.goal,dist:W.goal==='race'?(W.dist||'10k'):null,date:W.date||null,
       dows:W.dows.slice(),runDays:A.runDays,liftDays:A.liftDays,longDay:A.longDay,added:A.added,
-      target:wait?null:hwTarget(W.goal,W.dist),five:W.five,built:today(),runWait:wait||null};
+      target:wait?null:hwTarget(W.goal,W.dist),five:W.five,built:today(),runWait:wait||null,keep:kb?kb.id:null};
     try{demoWipe()}catch(e){oops('hwBuild.demo',e)}
     S.prof=prof;lset(K_PROF,prof);
     /* "Change something" and build again replaces the block this flow
        made a moment ago; it never piles up copies in the library */
     if(W.progId){S.lib.programs=S.lib.programs.filter(p=>p.id!==W.progId);if(S.lib.activeId===W.progId)S.lib.activeId=null;W.progId=null}
+    if(kb){S.lib.activeId=kb.id;saveLib()}   // the block, its week and everything logged on it stay exactly as they are
+    else{
     if(sp.lift>0){const pg=genProgram(prof);S.lib.programs.push(pg);S.lib.activeId=pg.id;W.progId=pg.id}
     if(!S.lib.activeId&&S.lib.programs.length)S.lib.activeId=S.lib.programs[0].id;
-    saveLib();if(S.lib.activeId)setWeek(1,S.lib.activeId);
+    saveLib();if(S.lib.activeId)setWeek(1,S.lib.activeId)}
     const g=hwRunPlan(W,A,sp);
     /* one fact, one reader: when the plan runs fewer days than the week
        asked (the from-scratch plan stops at four), the profile's week
@@ -11034,7 +11057,8 @@ function viewWeek(){
         return '<button data-a="hwDay" data-v="'+d+'" aria-pressed="'+(on?'true':'false')+'" class="pill" style="flex:1;padding:10px 0;justify-content:center;'+(on?'background:var(--text);color:var(--bg);border-color:var(--text);font-weight:600':'')+'">'+d.slice(0,2)+'</button>'}).join('')+'</div>'+
       '<div style="display:flex;flex-direction:column;gap:10px;margin-top:14px">'+
       hwChip('hwCycle','mins','Each session','About '+W.mins+' min')+
-      hwChip('hwCycle','exp','Lifting',(HW_EXP.find(x=>x[0]===W.exp)||HW_EXP[0])[1])+
+      (function(){const kb=hwKeepBlock();return kb?hwChip('hwCycle','keep','Your lifting',hwKeepOn(W)?'Keep '+kb.block:'Write a new block'):''})()+
+      (hwKeepOn(W)?'':hwChip('hwCycle','exp','Lifting',(HW_EXP.find(x=>x[0]===W.exp)||HW_EXP[0])[1]))+
       (sp.run>0?hwChip('hwCycle','five','Your 5K now',hwFiveLabel(W.five)):'')+
       '</div>';
     const few=W.dows.length<2;
@@ -35633,6 +35657,11 @@ function weekTrainable(p,wk){
   if(wk<=1)return true;
   if((S.weekStarts||{})[p.id+':'+wk+':force'])return true;
   return weekClosed(p,wk-1)||weekState(p,wk-1).full}
+function weekSpanDays(p){
+  try{const P=S.prof&&S.prof.plan;const n=(p&&p.days||[]).filter(d=>!d.recday).length;
+    const L=P&&P.keep===p.id&&P.liftDays?P.liftDays.length:0;
+    return (L>0&&n>L)?Math.ceil(7*n/L):7}
+  catch(e){oops('weekSpanDays',e);return 7}}
 function weekClock(){
   const p=activeProgSafe();if(!p||p.weeks<2)return null;
   /* the clock ticks for the REAL week, weekCurrent(p), the same one the
@@ -35645,7 +35674,12 @@ function weekClock(){
   /* round, not floor (J-5): noon to noon across the October spring-forward
      is 23 hours a day, and floor lost a whole day of the week */
   const dayN=start?Math.round((new Date(today()+'T12:00')-new Date(start+'T12:00'))/864e5)+1:1;
-  const left=Math.max(0,7-dayN);
+  /* A FIVE-SESSION BLOCK ON TWO LIFTING DAYS IS NOT LATE (24 Nov 2026). When
+     the week plan lifts fewer days than the block has sessions (a kept block
+     beside a race plan), one block week takes longer than seven days by
+     design, and the clock counts that span instead of calling it overdue. */
+  const span=weekSpanDays(p);
+  const left=Math.max(0,span-dayN);
   const remaining=[];
   p.days.forEach((d,i)=>{if(!buildSets(p,i,wk).length||dayAllGone(p,i,wk))return;
     if(ws.done.has(i))return;
@@ -35654,7 +35688,7 @@ function weekClock(){
   remaining.sort((a,b)=>b.pri-a.pri);
   const over=remaining.length>left+1&&dayN>1;
   return{wk:wk,start:start,day:dayN,left:left,remaining:remaining,done:ws.n,total:ws.total,
-    over:over,expired:dayN>7,hard:dayN>9}}
+    over:over,expired:dayN>span,hard:dayN>span+2,span:span}}
 function hardDaysRun(){ // consecutive days trained, ending today or, before today's session, yesterday
   /* the morning after three straight days is the morning the rest call is
      FOR (J-4): today has nothing logged yet, so starting the count at today
@@ -35675,12 +35709,12 @@ function weekCardBody(){
   const wkN=c.wk,browsing=S.week!==wkN;
   let h='<div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px">'+
     '<p class="eyebrow">Week '+wkN+' clock</p>'+
-    '<span class="mono" style="font-size:11px;color:'+(c.expired?'var(--amber)':'var(--faint)')+'">'+(c.day>7?'7+ days':'day '+c.day+' of 7')+'</span></div>'+
-    '<div style="display:flex;gap:3px;margin-top:12px">'+Array.from({length:7},(_,i)=>
-      '<div style="flex:1;height:5px;border-radius:4px;background:'+(i<Math.min(7,c.day)?(c.expired?'var(--amber)':'var(--dim)'):'var(--line)')+'"></div>').join('')+'</div>'+
+    '<span class="mono" style="font-size:11px;color:'+(c.expired?'var(--amber)':'var(--faint)')+'">'+(c.day>(c.span||7)?(c.span||7)+'+ days':'day '+c.day+' of '+(c.span||7))+'</span></div>'+
+    '<div style="display:flex;gap:3px;margin-top:12px">'+Array.from({length:(c.span||7)},(_,i)=>
+      '<div style="flex:1;height:5px;border-radius:4px;background:'+(i<Math.min((c.span||7),c.day)?(c.expired?'var(--amber)':'var(--dim)'):'var(--line)')+'"></div>').join('')+'</div>'+
     '<p class="mono" style="color:var(--faint);font-size:11px;margin-top:8px">'+c.done+' of '+c.total+' sessions logged'+
       (c.remaining.length?' · '+c.remaining.length+' left, '+c.left+' day'+(c.left===1?'':'s')+' to fit them':'')+'</p>';
-  if(c.expired)h+='<p style="color:var(--dim);font-size:13px;line-height:1.55;margin-top:8px">This week has run past seven days. Close it and move on — a stretched week means less frequency per muscle, not more work done.</p>'+
+  if(c.expired)h+='<p style="color:var(--dim);font-size:13px;line-height:1.55;margin-top:8px">This week has run past '+((c.span||7)===7?'seven':(c.span||7))+' days. Close it and move on — a stretched week means less frequency per muscle, not more work done.</p>'+
     '<button data-a="weekClose" data-v="'+wkN+'" class="btn mt" style="border-color:var(--amber);color:var(--amber)">Close week '+wkN+' and start week '+(wkN+1)+'</button>';
   else if(c.over){const drop=c.remaining[c.remaining.length-1];
     h+='<p style="color:var(--dim);font-size:13px;line-height:1.55;margin-top:8px">More sessions left than days to do them. Stacking them back to back costs you more than dropping one — the lowest-value session this week is <b style="color:var(--text)">'+esc(drop.name)+'</b>.</p>'+
@@ -49197,6 +49231,7 @@ function runAction(a,v,t,e){
       if(v==='mins')W.mins=nx(HW_MINS,W.mins);
       else if(v==='exp')W.exp=nx(HW_EXP.map(x=>x[0]),W.exp);
       else if(v==='five')W.five=nx(HW_FIVE,W.five);
+      else if(v==='keep')W.keep=!hwKeepOn(W);
       render();break}
     case 'hwBuild':{const W=S.hw;if(!W||W.dows.length<2)break;
       if(!hwBuild()){flash('That didn\u2019t build. Allena wrote down why, under Settings \u2192 Diagnostics.');break}
