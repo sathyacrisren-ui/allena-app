@@ -2007,7 +2007,7 @@ if(S.sess){S.note=S.sess.note||S.note;
       if(c0&&(s0.log||[]).some(l=>l.ex===c0.ex&&l.setNo===c0.setNo)){const n0=sessAdv(s0);
         if(n0<0)s0.phase='done';else s0.idx=n0}}catch(e){oops('bootSess',e)}
     if(S.sess.phase!=='done')S.sess.phase='ready'}}
-const BUILD_ID='2b6de0';  // stamped by tools/build.py with the content hash
+const BUILD_ID='256301';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -36952,7 +36952,10 @@ function viewLevers(){
    boundary the coach chat already has.
    ══════════════════════════════════════════════════════════ */
 const K_DEEP='training-deepread-v1';
-function deepStore(){const st=lget(K_DEEP,{last:null,items:[]});st.watches=st.watches||[];st.past=st.past||[];return st}
+function deepStore(){const st=lget(K_DEEP,{last:null,items:[]});st.watches=st.watches||[];st.past=st.past||[];
+  /* an item stored by an older build may carry no tier or title; the page read x.rar.toUpperCase() and threw (24 Nov 2026) */
+  const fix=a=>(Array.isArray(a)?a:[]).filter(x=>x&&typeof x==='object').map(x=>{if(!x.rar)x.rar='common';x.t=String(x.t||'A finding');x.d=String(x.d||'');return x});
+  st.items=fix(st.items);st.past=st.past.filter(R=>R&&R.at).map(R=>{R.items=fix(R.items);return R});return st}
 /* the item a key names: a number is the latest read's, "p<read>:<item>" an
    earlier read's (the page keeps the last twelve reads, owner 10 Nov 2026) */
 /* the earlier reads after this one is saved: the read being replaced goes
@@ -37751,7 +37754,15 @@ function deepCard(){
   else if(st.items.length)
     /* the latest read stays on the page until the next one (10 Nov 2026: it
        showed its findings on the day it ran and a status line after that) */
-    inner=(st.last!==today()?'<p style="color:var(--dim);font-size:13px;line-height:1.6;margin-top:8px">Read on '+esc(fmtDay(st.last))+'. '+esc(deepEvidence().line)+'</p>':'')+
+    /* THE NEXT READ'S DOOR COMES FIRST (owner, 24 Nov 2026: "can't open the
+       tree read"). The 10 Nov change put this branch ahead of the ready
+       one, so once any read existed the "Read my week" button never drew
+       again. A ready read leads; the last read's findings sit under it. */
+    inner=(function(){try{if(st.last===today()||!aiReady())return '';const rdy=deepReadyInfo();if(!rdy)return '';
+        return '<p class="mono" style="color:var(--amber);font-size:11px;margin-top:10px">'+esc(rdy.line)+'</p>'+
+          '<button data-a="deepRun" class="big disp mt" style="background:var(--amber);color:var(--bg)">Read my week</button>'+
+          '<p class="eyebrow" style="margin-top:18px">Your last read</p>'}catch(e){oops('deepCard.ready',e);return ''}})()+
+      (st.last!==today()?'<p style="color:var(--dim);font-size:13px;line-height:1.6;margin-top:8px">Read on '+esc(fmtDay(st.last))+'. '+esc(deepEvidence().line)+'</p>':'')+
       '<div style="margin-top:12px;display:flex;flex-direction:column;gap:8px">'+
       st.items.map((x,xi)=>'<button data-a="deepItemOpen" data-v="'+xi+'" class="card" style="width:100%;text-align:left;padding:13px 15px;display:flex;align-items:center;gap:12px;border-color:'+rarityOf(x.rar)[1]+'">'+
         '<span style="flex:1;min-width:0">'+
