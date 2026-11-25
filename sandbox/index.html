@@ -2007,7 +2007,7 @@ if(S.sess){S.note=S.sess.note||S.note;
       if(c0&&(s0.log||[]).some(l=>l.ex===c0.ex&&l.setNo===c0.setNo)){const n0=sessAdv(s0);
         if(n0<0)s0.phase='done';else s0.idx=n0}}catch(e){oops('bootSess',e)}
     if(S.sess.phase!=='done')S.sess.phase='ready'}}
-const BUILD_ID='55825e';  // stamped by tools/build.py with the content hash
+const BUILD_ID='9e8165';  // stamped by tools/build.py with the content hash
 const SANDBOX=true;   // demo build: seeded data, no setup wizard
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -8781,10 +8781,18 @@ function setPrefill(s,c){
        stays a back-off). */
     if(c.targetW!=null){
       const hi=rpeHigh(c.targetRpe),lo=repLow(c.targetReps);
-      const proven=src=>!!src&&+src.w>+w0&&(src.rpe==null||isNaN(hi)||+src.rpe<=hi)&&(lo==null||+src.r>=lo);
+      /* THE WEIGHT AND THE REPS TRAVEL TOGETHER (owner, 25 Nov 2026: "why
+         is allena auto inputting half the weight", 80 x 6 @8 last time and
+         a row reading 40 x 6). When the written reps are a range the row
+         shows the SOURCE set's own reps, so demanding the range's floor of
+         it kept last time's 6 reps and dropped back to the plan's 40: a row
+         nobody lifted. Effort at or under target still decides; a written
+         number of reps still has to be made (the row shows that number). */
+      const pairs=typeof c.targetReps!=='number';
+      const proven=(src,pair)=>!!src&&+src.w>+w0&&(src.rpe==null||isNaN(hi)||+src.rpe<=hi)&&(lo==null||+src.r>=lo||(pair&&+src.r>0));
       const srcNow=(sameNow&&sameNow.targetW!=null&&+sameNow.targetW===+c.targetW)?sameNow:null;
-      if(proven(srcNow))w0=+srcNow.w;
-      else if(proven(p))w0=+p.w}
+      if(proven(srcNow,pairs))w0=+srcNow.w;
+      else if(proven(p,pairs&&!sameNow))w0=+p.w}
     const r0=typeof c.targetReps==='number'?c.targetReps
       :(sameNow?sameNow.r:(p&&p.r?p.r:(parseInt(c.targetReps)||'')));
     /* 0 is bodyweight: an empty field that says BW, not a zero to type over */
@@ -10158,7 +10166,16 @@ function viewSetup(){
     (st.step<T.length-1?'<button data-a="suStep" data-v="1" class="btn" style="flex:2;border-color:var(--amber);color:var(--amber)">Next</button>':'')+'</div></div>'+
     '</div>'}
 
-function gBase(n){return String(n).split('—')[0].trim()}
+/* AN ECCENTRIC SET IS ITS OWN LIFT (owner, 25 Nov 2026, from the Claude
+   connector's read of his day: leg extensions lifted with both legs and
+   lowered on one over five seconds, 96 kg, were logged as ordinary sets and
+   called a PR over an 82). Every other variant folds into its base lift;
+   this one never does, so its bests, its trend and its "last time" are its
+   own and the ordinary lift's are untouched. */
+const ECC_SUF=' — eccentric';
+function eccIs(n){return /—\s*eccentric\b/i.test(String(n||''))}
+function eccName(n,on){const b=String(n||'').replace(/\s*—\s*eccentric\b/i,'').trim();return on?b+ECC_SUF:b}
+function gBase(n){const b=String(n).split('—')[0].trim();return eccIs(n)?b+ECC_SUF:b}
 /* A GOAL NAMED "Bench" FOUND NOTHING IN 172 LOGGED "Bench press" ROWS
    (owner-reported, 16 Sep 2026: the Progress page showed
    "0 / 127 kg est 1RM — No Bench sessions logged yet" on an account
@@ -40653,6 +40670,7 @@ function liftKeyOf(name){try{const b=gBase(name);return (typeof exAliasNorm==='f
    C-17). Memoised: the trend asks it once per logged set. */
 const LIFT_SAME={};
 function liftSame(a,b){
+  if(eccIs(a)!==eccIs(b))return false;   // an eccentric set is its own lift (25 Nov 2026)
   const ka=liftKeyOf(a),kb=liftKeyOf(b);if(ka===kb)return true;
   const ck=ka<kb?ka+'|'+kb:kb+'|'+ka;if(LIFT_SAME[ck]!=null)return LIFT_SAME[ck];
   let same=false;
@@ -44963,6 +44981,7 @@ function sheetHtml(){
       (cur.targetW!=null?row('tuneOpen','Tune load','Change the weight today and from now on','var(--amber)'):'')+
       row('subOpen','Swap exercise','Machine taken? Convert to an alternative','var(--amber)')+
       (function(){try{const u=uniOption(cur.ex);return u?row('uniTog',u.label,u.sub,'var(--amber)'):''}catch(e){oops('modify.uni',e);return ''}})()+
+      (cur.secs?'':row('eccTog',eccIs(cur.ex)?'Back to normal sets':'Eccentric sets',eccIs(cur.ex)?'The sets left go back to '+esc(eccName(cur.ex,false)):'Slow lowering, or up on two and down on one. Tracked apart, so it never counts as a best on the normal lift','var(--amber)'))+
       row('axOpen','Add an exercise','One-off, or into the program permanently','var(--amber)')+
       (function(){try{const lg=st=>s2.log.some(l=>l.ex===st.ex&&l.setNo===st.setNo);
         const exs={};s2.sets.forEach(st=>{if(!lg(st))exs[st.exNo]=1});
@@ -45145,6 +45164,9 @@ function sheetHtml(){
         '<p style="color:var(--dim);font-size:11px;letter-spacing:.1em;text-transform:uppercase;margin:16px 0 8px">RPE</p>'+
         rpeGrid('sheet.rpe',S.sheet.rpe);
     inner+='<button data-a="editSave" class="big disp mt" style="background:var(--green);color:var(--bg);font-size:17px">Save changes</button>';
+    if(!S.sheet.timed)inner+='<button data-a="editEcc" class="card" style="width:100%;text-align:left;padding:10px 14px;font-size:13px;margin-top:12px">'+
+      (eccIs(e.ex)?'This was a normal set':'This was an eccentric set (slow lowering)')+
+      '<span style="display:block;color:var(--faint);font-size:11px;margin-top:2px">'+(eccIs(e.ex)?'Counts with '+esc(eccName(e.ex,false))+' again':'Tracked apart from '+esc(eccName(e.ex,false))+', so it is not a best on it')+'</span></button>';
     if(S.sheet.scope==='live'){
       /* mislogged under the wrong exercise (owner-caught, 3 Sep:
          shoulder press numbers landed on the row) — move the set
@@ -50078,6 +50100,23 @@ function runAction(a,v,t,e){
     case 'uniTog':{const cur=S.sess&&S.sess.sets[sessNow(S.sess)];const u=cur&&uniOption(cur.ex);
       if(!u){flash('That one is done two-sided.');break}
       if(uniApply()){S.sheet=null;render();flash(u.to==='both'?'Both sides again. Today only.':'One '+u.to+' at a time, today only: weight and reps per side.')}break}
+    case 'eccTog':{const s=S.sess,cur=s&&s.sets[sessNow(s)];if(!cur||cur.secs)break;
+      const on=!eccIs(cur.ex),no=cur.exNo;
+      s.sets.forEach(st=>{if(st.exNo!==no||(s.log||[]).some(l=>l.ex===st.ex&&l.setNo===st.setNo))return;
+        st.ex=eccName(st.ex,on);delete st.ed});
+      persistActive();S.sheet=null;render();flash(on?'Eccentric sets, today only. Tracked apart from the normal lift.':'Normal sets again.');break}
+    case 'editEcc':{const sh=S.sheet,live=sh.scope==='live';
+      const h=live?null:S.history.find(x=>x.id===sh.sid),log=live?(S.sess&&S.sess.log):(h&&h.log);
+      const e=log&&log[sh.i];if(!e||e.secs!=null)break;
+      {const was=e.ex,now=eccName(e.ex,!eccIs(e.ex));
+       /* the live table ties a log to its row by name and set number: the row moves with it */
+       if(live)(S.sess.sets||[]).forEach(st=>{if(st.ex===was&&st.setNo===e.setNo)st.ex=now});
+       e.ex=now}
+      /* both lifts are judged again: the one it left and the one it joined */
+      {const ctx=live?null:{own:h.id,t0:new Date(h.date).getTime()},seen={};
+       log.forEach((l,j)=>{const b=l&&(l.secs!=null?l.ex:gBase(l.ex));if(l&&!seen[b]){seen[b]=1;prRejudge(log,j,ctx)}})}
+      if(live){upsert(record(S.sess.phase==='done'));persistActive()}else{h.edited=today();saveHistory()}
+      S.sheet=null;render();flash(eccIs(e.ex)?'Marked eccentric. It no longer counts on the normal lift.':'Back with the normal lift.');break}
     case 'tuneOpen':S.sheet={t:'tune'};render();break;
     case 'tuneBy':{const cur=S.sess.sets[sessNow(S.sess)];applyAdj(cur.ex,+v,'manual');
       /* a manual tune is the user's call and never counts against
