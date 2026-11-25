@@ -2007,7 +2007,7 @@ if(S.sess){S.note=S.sess.note||S.note;
       if(c0&&(s0.log||[]).some(l=>l.ex===c0.ex&&l.setNo===c0.setNo)){const n0=sessAdv(s0);
         if(n0<0)s0.phase='done';else s0.idx=n0}}catch(e){oops('bootSess',e)}
     if(S.sess.phase!=='done')S.sess.phase='ready'}}
-const BUILD_ID='bc9a98';  // stamped by tools/build.py with the content hash
+const BUILD_ID='3a8307';  // stamped by tools/build.py with the content hash
 const SANDBOX=false;  // production: setup wizard on first launch
 if(!SANDBOX&&!S.prof&&!S.history.length&&!S.sess)S.view='setup';
 if(!lget(K_GOALS,null)&&S.lib.programs.some(p=>p.id==='bench-1')){
@@ -31234,6 +31234,12 @@ function homeTiles(){
     T.goals={open:(S.goals||[]).filter(g=>!g.done).length,choices:opts.length,isGoal:!!(pick&&pick.goal),
       a:'homeLiftOpen',v:'',list:it?[it]:[]}}
   catch(e){oops('homeTiles.goals',e);T.goals={open:0,choices:0,isGoal:false,list:[],a:'homeLiftOpen',v:''}}
+  /* FORM IS ON HOME (owner, 26 Nov 2026, from the Form card on Progress:
+     "should be on the home page somewhere where it doesn't take up more
+     scroll space"). formModel's own word and number, one line on today's
+     session tile: the body's state beside the thing it decides. Null until
+     the model has its fortnight and eight loaded days. */
+  try{const F=formModel();T.form=F?{state:F.state,tsb:F.tsb,col:F.col}:null}catch(e){oops('homeTiles.form',e);T.form=null}
   return T}
 
 /* the web's drawing of homeTiles(): a two-by-two of tiles and one wide card
@@ -31283,7 +31289,9 @@ function homeGridHtml(){
   /* today's session */
   {const s=T.sess;
    h+=tile(s.a,s.v,lab(s.kind==='live'?(s.unsaved?'Not saved yet':'In progress'):s.kind==='block'?'Block complete':'Today')+'<span class="hname">'+esc(s.name)+'</span><span class="hsub">'+esc(s.sub)+'</span>'+
-     (s.run?'<span class="hsub">+ '+esc(s.run)+'</span>':'')+'<span class="hgo">'+esc(s.btn)+' ›</span>',
+     (s.run?'<span class="hsub">+ '+esc(s.run)+'</span>':'')+
+     (T.form?'<span class="hsub">Form: <span style="color:'+T.form.col+';font-weight:600">'+esc(T.form.state)+'</span> '+(T.form.tsb>0?'+':'')+T.form.tsb+'</span>':'')+
+     '<span class="hgo">'+esc(s.btn)+' ›</span>',
      s.kind==='plan'||s.kind==='live'?' style="border-color:var(--greensoft)"':s.kind==='block'?' style="border-color:var(--amber)"':'')}
   /* the race: the race page's own podium, smaller (podColHtml is the one
      drawing), in its gold wash, with its one sentence; your own place under
